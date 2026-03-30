@@ -36,14 +36,14 @@ def _run(cmd: str) -> Callable[[Callable[[Context], None]], Callable[[Context], 
     return decorator
 
 
-def _logged(name: str) -> Callable[[Callable[[Context], None]], Callable[[Context], None]]:
+def _logged(name: str) -> Callable[[Callable[..., None]], Callable[..., None]]:
     """Decorator: print ✅ on success or ❌ on SystemExit failure."""
 
-    def decorator(fn: Callable[[Context], None]) -> Callable[[Context], None]:
+    def decorator(fn: Callable[..., None]) -> Callable[..., None]:
         @wraps(fn)
-        def wrapper(context: Context) -> None:
+        def wrapper(context: Context, *args: object, **kwargs: object) -> None:
             try:
-                fn(context)
+                fn(context, *args, **kwargs)
                 print(f'✅ {name} passed 👍')
             except SystemExit:
                 print(f'❌ {name} failed 👎')
