@@ -25,9 +25,13 @@ def ty(context):
     context.run("uv run ty check src/ _CI/tasks/ tests/", echo=True)
 
 
-@task(pre=[format, ruff_lint, pylint, ty])
+@task
 def lint(context):
     """Run all linting steps: format, ruff-lint, pylint, ty."""
+    format(context)
+    ruff_lint(context)
+    pylint(context)
+    ty(context)
 
 
 @task

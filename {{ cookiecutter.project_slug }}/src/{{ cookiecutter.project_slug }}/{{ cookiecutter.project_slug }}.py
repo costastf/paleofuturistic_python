@@ -1,3 +1,6 @@
+"""{{ cookiecutter.project_slug }} module."""
+
+
 def hello(someone: str = 'you') -> str:
     """Greet someone.
 

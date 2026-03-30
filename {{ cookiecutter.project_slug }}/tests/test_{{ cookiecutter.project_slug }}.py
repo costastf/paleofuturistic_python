@@ -1,11 +1,13 @@
-from unittest import TestCase
+"""Smoke tests for {{ cookiecutter.project_slug }}."""
 
 from {{ cookiecutter.project_slug }} import hello
 
 
-class TestSmoke(TestCase):
-    def test_sanity(self):
-        self.assertTrue(True)
+def test_sanity() -> None:
+    """Sanity check."""
+    assert True  # noqa: S101
 
-    def test_integration(self):
-        self.assertEqual('Hello you from {{ cookiecutter.project_slug }}!', hello())
+
+def test_integration() -> None:
+    """Integration test for hello function."""
+    assert hello() == 'Hello you from {{ cookiecutter.project_slug }}!'  # noqa: S101
