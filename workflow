@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+# Cross-platform launcher — sh ignores the @-lines, cmd.exe ignores #-lines
+
+":" ; uv run python _CI/lib/vendor/bin/invoke --search-root _CI "$@"
+":" ; exit $?
+@uv run python _CI\lib\vendor\bin\invoke --search-root _CI %*

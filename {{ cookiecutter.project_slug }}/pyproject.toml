@@ -23,9 +23,12 @@ classifiers = [
 [dependency-groups]
 dev = [
     "click<=8.2.1",
+    "invoke==2.2.0",
     "mkdocs==1.6.1",
     "mkdocstrings[python]==0.30.1",
     "mypy==1.18.2",
+    "pylint",
+    "pytest",
     "ruff==0.13.1",
 ]
 
@@ -61,3 +64,14 @@ ignore = [
 [tool.mypy]
 files = ["src/"]
 disallow_untyped_defs = true
+
+[tool.pylint.main]
+source-roots = ["src"]
+
+[tool.pylint.messages_control]
+disable = [
+    "C0114",  # missing-module-docstring
+]
+
+[tool.pylint.format]
+max-line-length = 120
