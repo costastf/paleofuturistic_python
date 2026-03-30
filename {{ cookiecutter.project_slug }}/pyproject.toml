@@ -80,6 +80,7 @@ exclude = [
     "site-packages",
     "venv",
     "scratch",
+    "_CI",
 ]
 # Same as Black.
 line-length = 120
