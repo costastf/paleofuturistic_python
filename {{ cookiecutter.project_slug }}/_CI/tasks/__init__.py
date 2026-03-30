@@ -87,8 +87,15 @@ def lint(context: Context) -> None:
 @task
 @_logged('secure')
 @_run('uv run pip-audit')
-def secure(context: Context) -> None:
+def audit(context: Context) -> None:
     """Run pip-audit security scan."""
+
+
+@task
+@_logged('secure.extract-sbom')
+@_run('uv run cyclonedx-py environment')
+def extract_sbom(context: Context) -> None:
+    """Extract a Software Bill of Materials using CycloneDX."""
 
 
 @task
@@ -112,4 +119,9 @@ def document(context: Context) -> None:
     """Build the documentation."""
 
 
-namespace = Collection(ruff_format, ruff_lint, pylint, ty, lint, secure, test, build, document)
+_secure_ns = Collection('secure')
+_secure_ns.add_task(audit, default=True)  # type: ignore[invalid-argument-type]
+_secure_ns.add_task(extract_sbom)  # type: ignore[invalid-argument-type]
+
+namespace = Collection(ruff_format, ruff_lint, pylint, ty, lint, test, build, document)
+namespace.add_collection(_secure_ns)

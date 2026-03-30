@@ -38,6 +38,7 @@ lint = [
     "ty",
 ]
 security = [
+    "cyclonedx-bom",
     "pip-audit",
 ]
 test = [
