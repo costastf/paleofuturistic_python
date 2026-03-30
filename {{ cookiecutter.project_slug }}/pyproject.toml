@@ -114,6 +114,7 @@ ignore = [
     # Formatter conflicts
     "COM812",  # missing-trailing-comma (conflicts with formatter)
     "Q000",    # bad-quotes-inline-string (conflicts with format.quote-style)
+    "Q003",
 ]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
@@ -147,6 +148,9 @@ docstring-code-line-length = "dynamic"
 
 [tool.ruff.lint.flake8-quotes]
 docstring-quotes = "double"
+
+[tool.ty.environment]
+extra-paths = ["_CI/lib/vendor"]
 
 [tool.pylint.MASTER]
 init-hook = "import sys; sys.path.append('src/'); sys.path.append('_CI/lib/vendor/')"

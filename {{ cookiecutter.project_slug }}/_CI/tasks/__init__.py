@@ -1,61 +1,115 @@
-from invoke import Collection, task
+"""CI task definitions for the project workflow."""
+
+from collections.abc import Callable
+from functools import wraps
+
+from invoke import Collection, Context, task
+
+_PATHS = 'src/ _CI/tasks/ tests/'
+
+
+def _run(cmd: str) -> Callable[[Callable[[Context], None]], Callable[[Context], None]]:
+    """Decorator: replace the function body with a shell-command invocation."""
+
+    def decorator(fn: Callable[[Context], None]) -> Callable[[Context], None]:
+        @wraps(fn)
+        def wrapper(context: Context) -> None:
+            result = context.run(cmd, echo=True, warn=True)
+            if result is None or result.failed:
+                raise SystemExit(1)
+
+        return wrapper
+
+    return decorator
+
+
+def _logged(name: str) -> Callable[[Callable[[Context], None]], Callable[[Context], None]]:
+    """Decorator: print ✅ on success or ❌ on SystemExit failure."""
+
+    def decorator(fn: Callable[[Context], None]) -> Callable[[Context], None]:
+        @wraps(fn)
+        def wrapper(context: Context) -> None:
+            try:
+                fn(context)
+                print(f'✅ {name} passed 👍')
+            except SystemExit:
+                print(f'❌ {name} failed 👎')
+                raise
+
+        return wrapper
+
+    return decorator
 
 
 @task
-def format(context):
+@_logged('ruff-format')
+@_run(f'uv run ruff format --diff {_PATHS}')
+def ruff_format(context: Context) -> None:
     """Check code formatting with ruff."""
-    context.run("uv run ruff format --diff src/ _CI/tasks/ tests/", echo=True)
 
 
 @task
-def ruff_lint(context):
+@_logged('ruff-lint')
+@_run(f'uv run ruff check {_PATHS}')
+def ruff_lint(context: Context) -> None:
     """Run ruff linter."""
-    context.run("uv run ruff check src/ _CI/tasks/ tests/", echo=True)
 
 
 @task
-def pylint(context):
-    """Run pylint on src/."""
-    context.run("uv run pylint src/ _CI/tasks/ tests/", echo=True)
+@_logged('pylint')
+@_run(f'uv run pylint {_PATHS}')
+def pylint(context: Context) -> None:
+    """Run pylint."""
 
 
 @task
-def ty(context):
-    """Run ty type checker on src/."""
-    context.run("uv run ty check src/ _CI/tasks/ tests/", echo=True)
+@_logged('ty')
+@_run(f'uv run ty check {_PATHS}')
+def ty(context: Context) -> None:
+    """Run ty type checker."""
 
 
 @task
-def lint(context):
-    """Run all linting steps: format, ruff-lint, pylint, ty."""
-    format(context)
-    ruff_lint(context)
-    pylint(context)
-    ty(context)
+@_logged('lint')
+def lint(context: Context) -> None:
+    """Run all linting steps; reports all failures before exiting."""
+    failed = False
+    linting_steps = (ruff_lint, pylint, ty)
+    for step in linting_steps:
+        try:
+            step(context)
+        except SystemExit:
+            failed = True
+    if failed:
+        raise SystemExit(1)
 
 
 @task
-def secure(context):
+@_logged('secure')
+@_run('uv run pip-audit')
+def secure(context: Context) -> None:
     """Run pip-audit security scan."""
-    context.run("uv run pip-audit", echo=True)
 
 
 @task
-def test(context):
+@_logged('test')
+@_run('uv run pytest --strict')
+def test(context: Context) -> None:
     """Run pytest."""
-    context.run("uv run pytest --strict", echo=True)
 
 
 @task
-def build(context):
+@_logged('build')
+@_run('uv build')
+def build(context: Context) -> None:
     """Build the package."""
-    context.run("uv build", echo=True)
 
 
 @task
-def document(context):
+@_logged('document')
+@_run('uv run mkdocs build')
+def document(context: Context) -> None:
     """Build the documentation."""
-    context.run("uv run mkdocs build", echo=True)
 
 
-namespace = Collection(format, ruff_lint, pylint, ty, lint, secure, test, build, document)
+namespace = Collection(ruff_format, ruff_lint, pylint, ty, lint, secure, test, build, document)

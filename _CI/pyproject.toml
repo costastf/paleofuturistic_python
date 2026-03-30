@@ -41,5 +41,7 @@ drop = [
 ]
 
 [tool.ruff]
-
 line-length = 121
+
+[tool.ruff.format]
+quote-style = "single"
