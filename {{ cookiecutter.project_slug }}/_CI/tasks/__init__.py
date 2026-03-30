@@ -19,15 +19,27 @@ def pylint(context):
     context.run("uv run pylint src/", echo=True)
 
 
-@task(pre=[format, ruff_lint, pylint])
+@task
+def ty(context):
+    """Run ty type checker on src/."""
+    context.run("uv run ty check src/", echo=True)
+
+
+@task(pre=[format, ruff_lint, pylint, ty])
 def lint(context):
-    """Run all linting steps: format, ruff-lint, pylint."""
+    """Run all linting steps: format, ruff-lint, pylint, ty."""
+
+
+@task
+def secure(context):
+    """Run pip-audit security scan."""
+    context.run("uv run pip-audit", echo=True)
 
 
 @task
 def test(context):
     """Run pytest."""
-    context.run("uv run pytest", echo=True)
+    context.run("uv run pytest --strict", echo=True)
 
 
 @task
@@ -42,4 +54,4 @@ def document(context):
     context.run("uv run mkdocs build", echo=True)
 
 
-namespace = Collection(format, ruff_lint, pylint, lint, test, build, document)
+namespace = Collection(format, ruff_lint, pylint, ty, lint, secure, test, build, document)
