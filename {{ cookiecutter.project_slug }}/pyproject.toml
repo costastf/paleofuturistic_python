@@ -75,3 +75,9 @@ disable = [
 
 [tool.pylint.format]
 max-line-length = 120
+
+
+[tool.uv]
+# Make sure that when this version is bumped to also bumpe the base-image version of uv below in [tool.docker-versions]
+required-version = "==0.11.1"
+exclude-newer = "1 week"
