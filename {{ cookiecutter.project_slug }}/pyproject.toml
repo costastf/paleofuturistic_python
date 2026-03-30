@@ -42,7 +42,6 @@ security = [
 ]
 test = [
     "pytest",
-    "pytest-asyncio",
     "pytest-env",
 ]
 
