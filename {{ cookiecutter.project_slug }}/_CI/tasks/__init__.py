@@ -134,9 +134,9 @@ def audit(context: Context, ignore: str | None = None) -> None:
 
 @task
 @_logged('secure.extract-sbom')
-@_run('uv run cyclonedx-py environment')
+@_run('uv run cyclonedx-py environment --output-file sbom.json')
 def extract_sbom(context: Context) -> None:
-    """Extract a Software Bill of Materials using CycloneDX."""
+    """Extract a Software Bill of Materials using CycloneDX into sbom.json."""
 
 
 @task
