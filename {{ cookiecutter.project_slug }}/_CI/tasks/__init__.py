@@ -4,13 +4,13 @@ from invoke import Collection, task
 @task
 def format(context):
     """Check code formatting with ruff."""
-    context.run("uv run ruff format --diff", echo=True)
+    context.run("uv run ruff format --diff src/ _CI/tasks/", echo=True)
 
 
 @task
 def ruff_lint(context):
     """Run ruff linter."""
-    context.run("uv run ruff check", echo=True)
+    context.run("uv run ruff check src/ _CI/tasks/", echo=True)
 
 
 @task
