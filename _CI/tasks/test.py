@@ -24,6 +24,9 @@ def test(context):
         with context.cd(str(template_repo)):
             context.run('git init -b main', echo=True)
             context.run('git add -A', echo=True)
+            # Force-add the vendored CI lib so cruft includes it in generated projects.
+            # It is git-ignored by the broad `lib/` pattern in .gitignore.
+            context.run('git add -f "{{ cookiecutter.project_slug }}/_CI/lib/"', echo=True)
             context.run('git commit -m "temp: template snapshot for testing" '
                         '--author "ci <ci@localhost>"', echo=True)
 

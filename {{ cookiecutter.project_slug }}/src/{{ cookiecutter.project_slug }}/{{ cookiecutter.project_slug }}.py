@@ -1,14 +1,10 @@
-def hello(someone: str = "you") -> str:
+def hello(someone: str = 'you') -> str:
     """Greet someone.
 
-    Parameters
-    ----------
-    someone : str, default='you'
-        The name of the person to greet, by default 'you'
+    Args:
+        someone: The name of the person to greet.
 
-    Returns
-    -------
-    str
-        A greeting message
+    Returns:
+        A greeting message.
     """
-    return f"Hello {someone} from {{ cookiecutter.project_slug }}!"
+    return f'Hello {someone} from {{ cookiecutter.project_slug }}!'

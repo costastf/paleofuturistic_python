@@ -23,7 +23,6 @@ classifiers = [
 [dependency-groups]
 dev = [
     "click<=8.2.1",
-    "invoke==2.2.0",
     {include-group = "document"},
     {include-group = "lint"},
     {include-group = "security"},
@@ -43,50 +42,146 @@ security = [
 ]
 test = [
     "pytest",
+    "pytest-asyncio",
+    "pytest-env",
 ]
 
 [build-system]
 requires = ["uv_build>=0.8.15,<=0.11.1"]
 build-backend = "uv_build"
 
+[tool.ruff]
+target-version = "py312"
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+    "scratch",
+]
+# Same as Black.
+line-length = 120
+indent-width = 4
+
 [tool.ruff.lint]
-select = [
-    # pycodestyle
-    "E",
-    # Pyflakes
-    "F",
-    # pyupgrade
-    "UP",
-    # flake8-bugbear
-    "B",
-    # flake8-simplify
-    "SIM",
-    # isort
-    "I",
-]
-# Recommended ignore list for preventing clashes between ruff lint and ruff format.
+select = ["ALL"]
 ignore = [
-    # indentation-with-invalid-multiple
-    "E111",
-    # indentation-with-invalid-multiple-comment
-    "E114",
-    # over-indented
-    "E117",
+    # Docstring style conflicts (pick one from each pair)
+    "D203",    # one-blank-line-before-class (conflicts with D211)
+    "D213",    # multi-line-summary-second-line (conflicts with D212)
+    # "D105",    # undocumented-magic-method
+    # "D107",    # undocumented-public-init
+    # "TRY003",  # raise-vanilla-args
+    # "EM101",   # raw-string-in-exception
+    # "EM102",   # f-string-in-exception
+    # "BLE001",  # blind-exception (legitimate in network code)
+    # "FBT001",  # boolean-type-hint-positional-argument
+    # "FBT002",  # boolean-default-value-positional-argument
+    # "PLR0912", # too-many-branches
+    # "PLR0913", # too-many-arguments
+    # "PLR0915", # too-many-statements
+    # "C901",    # complex-structure
+    # "PLC0415", # import-outside-toplevel (used intentionally)
+    # "ANN002",  # missing-type-args
+    # "ANN003",  # missing-type-kwargs
+    # "ANN401",  # dynamically-typed-expression (Any in **kwargs is legitimate)
+    # "TD",      # todo comments
+    # "FIX",     # fixme comments
+    # "ERA",     # commented-out code
+    # Formatter conflicts
+    "COM812",  # missing-trailing-comma (conflicts with formatter)
+    "Q000",    # bad-quotes-inline-string (conflicts with format.quote-style)
 ]
 
-[tool.pylint.main]
-source-roots = ["src"]
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
 
-[tool.pylint.messages_control]
-disable = [
-    "C0114",  # missing-module-docstring
-]
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-[tool.pylint.format]
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = []
+
+[tool.ruff.format]
+# Like Black, use double quotes for strings.
+quote-style = "single"
+
+# Like Black, indent with spaces, rather than tabs.
+indent-style = "space"
+
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"
+
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+
+[tool.pylint.MASTER]
+init-hook = "import sys; sys.path.append('src/')"
+
+[tool.pylint."MESSAGES CONTROL"]
 max-line-length = 120
+disable = [
+    "too-few-public-methods",
+    "duplicate-code",
+    "logging-fstring-interpolation",
+    "too-many-ancestors",
+    "import-outside-toplevel",
+    # Complexity thresholds — already enforced by ruff (PLR0912/PLR0913/PLR0915)
+    "too-many-arguments",
+    "too-many-positional-arguments",
+    "too-many-branches",
+    "too-many-statements",
+    "too-many-locals",
+    "too-many-instance-attributes",
+    # Design choices
+    "unused-argument",           # handled by ruff ARG rules
+    "wrong-import-position",     # handled by ruff isort
+    # "broad-exception-caught",    # legitimate in network/auth code
+    # "protected-access",          # companion-object pattern
+]
+
+[tool.pytest.ini_options]
+markers = []
+filterwarnings = []
+pythonpath = ["src"]
+testpaths = ["tests"]
+env = []
+env_files = [".env"]
 
 
 [tool.uv]
-# Make sure that when this version is bumped to also bumpe the base-image version of uv below in [tool.docker-versions]
 required-version = "==0.11.1"
 exclude-newer = "1 week"
