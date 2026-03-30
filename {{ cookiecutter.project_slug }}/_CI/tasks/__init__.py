@@ -16,13 +16,13 @@ def ruff_lint(context):
 @task
 def pylint(context):
     """Run pylint on src/."""
-    context.run("uv run pylint src/", echo=True)
+    context.run("uv run pylint src/ _CI/tasks/", echo=True)
 
 
 @task
 def ty(context):
     """Run ty type checker on src/."""
-    context.run("uv run ty check src/", echo=True)
+    context.run("uv run ty check src/ _CI/tasks/", echo=True)
 
 
 @task(pre=[format, ruff_lint, pylint, ty])
