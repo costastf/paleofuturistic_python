@@ -4,25 +4,25 @@ from invoke import Collection, task
 @task
 def format(context):
     """Check code formatting with ruff."""
-    context.run("uv run ruff format --diff src/ _CI/tasks/", echo=True)
+    context.run("uv run ruff format --diff src/ _CI/tasks/ tests/", echo=True)
 
 
 @task
 def ruff_lint(context):
     """Run ruff linter."""
-    context.run("uv run ruff check src/ _CI/tasks/", echo=True)
+    context.run("uv run ruff check src/ _CI/tasks/ tests/", echo=True)
 
 
 @task
 def pylint(context):
     """Run pylint on src/."""
-    context.run("uv run pylint src/ _CI/tasks/", echo=True)
+    context.run("uv run pylint src/ _CI/tasks/ tests/", echo=True)
 
 
 @task
 def ty(context):
     """Run ty type checker on src/."""
-    context.run("uv run ty check src/ _CI/tasks/", echo=True)
+    context.run("uv run ty check src/ _CI/tasks/ tests/", echo=True)
 
 
 @task(pre=[format, ruff_lint, pylint, ty])
