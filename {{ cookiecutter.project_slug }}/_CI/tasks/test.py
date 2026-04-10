@@ -22,5 +22,5 @@ def test(context: Context) -> None:
 
 
 namespace = Collection('test')
-namespace.add_task(cast(Task, test), default=True)
+namespace.add_task(cast(Task, test), default=True, name='all')
 namespace.add_task(cast(Task, pytest))

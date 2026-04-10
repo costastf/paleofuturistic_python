@@ -57,6 +57,6 @@ def secure(context: Context) -> None:
 
 
 namespace = Collection('secure')
-namespace.add_task(cast(Task, secure), default=True)
+namespace.add_task(cast(Task, secure), default=True, name='all')
 namespace.add_task(cast(Task, audit))
 namespace.add_task(cast(Task, extract_sbom))

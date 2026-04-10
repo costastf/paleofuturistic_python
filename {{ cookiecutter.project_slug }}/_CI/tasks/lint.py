@@ -43,7 +43,7 @@ def lint(context: Context) -> None:
 
 
 namespace = Collection('lint')
-namespace.add_task(cast(Task, lint), default=True)
+namespace.add_task(cast(Task, lint), default=True, name='all')
 namespace.add_task(cast(Task, ruff_lint), name='ruff')
 namespace.add_task(cast(Task, pylint))
 namespace.add_task(cast(Task, ty))

@@ -23,5 +23,5 @@ def build(context: Context) -> None:
 
 
 namespace = Collection('build')
-namespace.add_task(cast(Task, build), default=True)
+namespace.add_task(cast(Task, build), default=True, name='all')
 namespace.add_task(cast(Task, package))

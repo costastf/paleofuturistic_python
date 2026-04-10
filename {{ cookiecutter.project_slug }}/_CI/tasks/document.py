@@ -29,6 +29,6 @@ def document(context: Context) -> None:
 
 
 namespace = Collection('document')
-namespace.add_task(cast(Task, document), default=True)
+namespace.add_task(cast(Task, document), default=True, name='all')
 namespace.add_task(cast(Task, build))
 namespace.add_task(cast(Task, open_), name='open')

@@ -22,5 +22,5 @@ def format_(context: Context) -> None:
 
 
 namespace = Collection('format')
-namespace.add_task(cast(Task, format_), default=True, name='format')
+namespace.add_task(cast(Task, format_), default=True, name='all')
 namespace.add_task(cast(Task, ruff_format), name='ruff')
