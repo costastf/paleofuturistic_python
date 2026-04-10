@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 from functools import wraps
-from invoke import Collection, Context, task
+from invoke import Collection, Context
 
 _PATHS = 'src/ _CI/tasks/ tests/'
 _SECURITY_OVERRIDE_ENV = '{{ cookiecutter.project_slug | upper }}_SECURITY_OVERRIDE'
@@ -63,27 +63,16 @@ def _run_steps(*steps: Callable[[Context], None]) -> Callable[[Context], None]:
 
 
 from . import build as _build  # noqa: E402
+from . import document as _document  # noqa: E402
 from . import format_ as _format  # noqa: E402
 from . import lint as _lint  # noqa: E402
 from . import secure as _secure  # noqa: E402
+from . import test as _test  # noqa: E402
 
-
-@task
-@_logged('test')
-@_run('uv run pytest --strict')
-def test(context: Context) -> None:
-    """Run pytest."""
-
-
-@task
-@_logged('document')
-@_run('uv run mkdocs build')
-def document(context: Context) -> None:
-    """Build the documentation."""
-
-
-namespace = Collection(test, document)
+namespace = Collection()
+namespace.add_collection(_build.namespace)
+namespace.add_collection(_document.namespace)
 namespace.add_collection(_format.namespace)
 namespace.add_collection(_lint.namespace)
 namespace.add_collection(_secure.namespace)
-namespace.add_collection(_build.namespace)
+namespace.add_collection(_test.namespace)
