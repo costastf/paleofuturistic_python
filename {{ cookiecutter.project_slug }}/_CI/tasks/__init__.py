@@ -5,8 +5,9 @@ import re
 from collections.abc import Callable
 from datetime import date
 from functools import wraps
+from typing import cast
 
-from invoke import Collection, Context, task
+from invoke import Collection, Context, Task, task
 
 _PATHS = 'src/ _CI/tasks/ tests/'
 _IGNORE_PATTERN = re.compile(
@@ -175,13 +176,13 @@ def document(context: Context) -> None:
 
 
 _secure_ns = Collection('secure')
-_secure_ns.add_task(secure, default=True)  # type: ignore[invalid-argument-type]
-_secure_ns.add_task(audit)  # type: ignore[invalid-argument-type]
-_secure_ns.add_task(extract_sbom)  # type: ignore[invalid-argument-type]
+_secure_ns.add_task(cast(Task, secure), default=True)
+_secure_ns.add_task(cast(Task, audit))
+_secure_ns.add_task(cast(Task, extract_sbom))
 
 _build_ns = Collection('build')
-_build_ns.add_task(build, default=True)  # type: ignore[invalid-argument-type]
-_build_ns.add_task(package)  # type: ignore[invalid-argument-type]
+_build_ns.add_task(cast(Task, build), default=True)
+_build_ns.add_task(cast(Task, package))
 
 namespace = Collection(ruff_format, ruff_lint, pylint, ty, lint, test, document)
 namespace.add_collection(_secure_ns)
