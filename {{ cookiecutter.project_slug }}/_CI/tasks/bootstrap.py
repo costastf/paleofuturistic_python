@@ -8,12 +8,12 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .shared import exec_, logged
+from .shared import execute, logged
 
-_SENTINEL = Path('.bootstrapped')
+SENTINEL = Path('.bootstrapped')
 
 
-def _is_ci() -> bool:
+def is_ci() -> bool:
     """Detect CI environment (GitHub Actions, GitLab CI, etc.)."""
     return os.environ.get('CI', '').lower() == 'true'
 
@@ -35,24 +35,24 @@ class BootstrapStep:
     ci_behavior: str = 'skip'
 
 
-def _install_pre_commit(context: Context) -> None:
-    exec_(context, 'uv run pre-commit install')
+def install_pre_commit(context: Context) -> None:
+    execute(context, 'uv run pre-commit install')
 
 
 # Register steps here — add new ones as needed
-_STEPS: list[BootstrapStep] = [
+STEPS: list[BootstrapStep] = [
     BootstrapStep(
         name='pre-commit hooks',
-        action=_install_pre_commit,
+        action=install_pre_commit,
         prompt='Install pre-commit hooks? [y/N] ',
         ci_behavior='skip',
     ),
 ]
 
 
-def _run_steps(context: Context) -> None:
-    ci = _is_ci()
-    for step in _STEPS:
+def run_steps(context: Context) -> None:
+    ci = is_ci()
+    for step in STEPS:
         if ci:
             if step.ci_behavior == 'run':
                 print(f'  Running {step.name}...')
@@ -75,10 +75,10 @@ def bootstrap(context: Context, force: bool = False) -> None:
         context: Invoke context.
         force: Force re-bootstrap even if already done.
     """
-    if _SENTINEL.exists() and not force:
+    if SENTINEL.exists() and not force:
         return
-    _run_steps(context)
-    _SENTINEL.touch()
+    run_steps(context)
+    SENTINEL.touch()
 
 
 namespace = Collection('bootstrap')

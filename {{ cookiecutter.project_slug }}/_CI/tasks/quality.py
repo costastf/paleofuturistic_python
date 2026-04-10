@@ -5,22 +5,22 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .shared import exec_, logged, run, run_steps
+from .shared import execute, logged, run, run_steps
 
-_PYSCN_REPORTS_DIR = Path('.pyscn/reports')
+PYSCN_REPORTS_DIR = Path('.pyscn/reports')
 
 
-def _latest_pyscn_report() -> Path:
+def latest_pyscn_report() -> Path:
     """Return the most recently created pyscn HTML report."""
-    return max(_PYSCN_REPORTS_DIR.glob('analyze_*.html'), key=lambda p: p.stat().st_mtime)
+    return max(PYSCN_REPORTS_DIR.glob('analyze_*.html'), key=lambda p: p.stat().st_mtime)
 
 
 @task
 @logged('quality.pyscn-analyze')
 def pyscn_analyze(context: Context) -> None:
     """Run pyscn comprehensive analysis with HTML report."""
-    exec_(context, 'uv run pyscn analyze src/')
-    exec_(context, f'open {_latest_pyscn_report()}')
+    execute(context, 'uv run pyscn analyze src/')
+    execute(context, f'open {latest_pyscn_report()}')
 
 
 @task
@@ -31,16 +31,16 @@ def pyscn_check(context: Context) -> None:
 
 
 @logged('quality.pyscn-analyze')
-def _pyscn_analyze_only(context: Context) -> None:
+def pyscn_analyze_only(context: Context) -> None:
     """Run pyscn analyze without opening the report."""
-    exec_(context, 'uv run pyscn analyze src/')
+    execute(context, 'uv run pyscn analyze src/')
 
 
 @task
 @logged('quality.pyscn')
 def pyscn(context: Context) -> None:
     """Run all pyscn steps; reports all failures before exiting."""
-    run_steps(_pyscn_analyze_only, pyscn_check)(context)
+    run_steps(pyscn_analyze_only, pyscn_check)(context)
 
 
 @task

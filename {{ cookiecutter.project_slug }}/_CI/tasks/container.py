@@ -4,24 +4,24 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .shared import exec_, logged
+from .shared import execute, logged
 
 
-_IMAGE_NAME = '{{ cookiecutter.project_slug }}-deps'
+IMAGE_NAME = '{{ cookiecutter.project_slug }}-deps'
 
 
 @task
 @logged('container.build')
 def build(context: Context) -> None:
     """Build the dependency cache Docker image locally."""
-    exec_(context, f'docker build -f Dockerfile.deps -t {_IMAGE_NAME}:latest .')
+    execute(context, f'docker build -f Dockerfile.deps -t {IMAGE_NAME}:latest .')
 
 
 @task
 @logged('container.act')
 def act(context: Context) -> None:
     """Run the full CI workflow locally using act."""
-    exec_(context, 'act push --secret-file .secrets')
+    execute(context, 'act push --secret-file .secrets')
 
 
 @task

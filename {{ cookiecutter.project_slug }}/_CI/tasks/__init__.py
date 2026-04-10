@@ -26,7 +26,7 @@ namespace.add_collection(secure.namespace)
 namespace.add_collection(test.namespace)
 
 # Wire bootstrap as a pre-task on all other top-level default tasks
-_bootstrap_task = bootstrap.bootstrap
-for _module in (build, container, develop, document, format_, lint, quality, secure, test):
-    for _task in _module.namespace.tasks.values():
-        _task.pre.insert(0, _bootstrap_task)
+bootstrap_task = bootstrap.bootstrap
+for module in (build, container, develop, document, format_, lint, quality, secure, test):
+    for task in module.namespace.tasks.values():
+        task.pre.insert(0, bootstrap_task)

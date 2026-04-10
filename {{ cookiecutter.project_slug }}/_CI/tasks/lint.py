@@ -4,7 +4,7 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .shared import PATHS, exec_, logged, run, run_steps
+from .shared import PATHS, execute, logged, run, run_steps
 
 
 @task
@@ -46,9 +46,9 @@ def commitizen(context: Context, commit_msg_file: str | None = None) -> None:
             When omitted, checks the last committed message.
     """
     if commit_msg_file:
-        exec_(context, f'uv run cz check --commit-msg-file {commit_msg_file}')
+        execute(context, f'uv run cz check --commit-msg-file {commit_msg_file}')
     else:
-        exec_(context, 'uv run cz check --rev-range HEAD')
+        execute(context, 'uv run cz check --rev-range HEAD')
 
 
 @task

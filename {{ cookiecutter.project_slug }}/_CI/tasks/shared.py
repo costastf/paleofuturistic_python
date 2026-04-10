@@ -9,7 +9,7 @@ PATHS = 'src/ _CI/tasks/ tests/'
 SECURITY_OVERRIDE_ENV = '{{ cookiecutter.project_slug | upper }}_SECURITY_OVERRIDE'
 
 
-def exec_(context: Context, cmd: str) -> None:
+def execute(context: Context, cmd: str) -> None:
     """Execute a shell command, raising SystemExit(1) on failure."""
     result = context.run(cmd, echo=True, warn=True)
     if result is None or result.failed:
@@ -22,7 +22,7 @@ def run(cmd: str) -> Callable[[Callable[[Context], None]], Callable[[Context], N
     def decorator(fn: Callable[[Context], None]) -> Callable[[Context], None]:
         @wraps(fn)
         def wrapper(context: Context) -> None:
-            exec_(context, cmd)
+            execute(context, cmd)
 
         return wrapper
 

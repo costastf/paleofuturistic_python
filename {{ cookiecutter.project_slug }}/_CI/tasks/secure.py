@@ -7,9 +7,9 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .shared import SECURITY_OVERRIDE_ENV, exec_, logged, run, run_steps
+from .shared import SECURITY_OVERRIDE_ENV, execute, logged, run, run_steps
 
-_IGNORE_PATTERN = re.compile(
+IGNORE_PATTERN = re.compile(
     r'(?P<vulnerability_id>[A-Za-z0-9\-_]+)'
     r'(::(?P<expiration_date>\d{4}-\d{2}-\d{2}))?'
 )
@@ -34,12 +34,12 @@ def audit(context: Context, ignore: str | None = None) -> None:
     combined = ','.join(filter(None, [ignore, env_override]))
     ignore_args = [
         f'--ignore-vuln {m.group("vulnerability_id")}'
-        for m in _IGNORE_PATTERN.finditer(combined)
+        for m in IGNORE_PATTERN.finditer(combined)
         if not m.group('expiration_date')
         or date.fromisoformat(m.group('expiration_date')) > today
     ]
     ignore_opts = (' ' + ' '.join(ignore_args)) if ignore_args else ''
-    exec_(context, f'uv run pip-audit{ignore_opts}')
+    execute(context, f'uv run pip-audit{ignore_opts}')
 
 
 @task
