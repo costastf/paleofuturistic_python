@@ -4,14 +4,15 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .shared import logged, run, run_steps
+from .shared import exec_, logged, run, run_steps
 
 
 @task
 @logged('quality.pyscn.analyze')
-@run('uv run pyscn analyze src/')
 def pyscn_analyze(context: Context) -> None:
     """Run pyscn comprehensive analysis with HTML report."""
+    exec_(context, 'uv run pyscn analyze src/')
+    exec_(context, 'open reports/index.html')
 
 
 @task
@@ -21,11 +22,17 @@ def pyscn_check(context: Context) -> None:
     """Run pyscn CI-friendly quality gate."""
 
 
+@logged('quality.pyscn.analyze')
+def _pyscn_analyze_only(context: Context) -> None:
+    """Run pyscn analyze without opening the report."""
+    exec_(context, 'uv run pyscn analyze src/')
+
+
 @task
 @logged('quality.pyscn')
 def pyscn(context: Context) -> None:
     """Run all pyscn steps; reports all failures before exiting."""
-    run_steps(pyscn_analyze, pyscn_check)(context)
+    run_steps(_pyscn_analyze_only, pyscn_check)(context)
 
 
 @task
