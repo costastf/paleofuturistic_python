@@ -36,10 +36,17 @@ def complexipy(context: Context) -> None:
 
 
 @task
+@logged('lint.commitizen')
+@run('uv run cz check --rev-range HEAD')
+def commitizen(context: Context) -> None:
+    """Lint commit messages using commitizen conventional commits."""
+
+
+@task
 @logged('lint')
 def lint(context: Context) -> None:
     """Run all linting steps; reports all failures before exiting."""
-    run_steps(ruff_lint, pylint, ty, complexipy)(context)
+    run_steps(ruff_lint, pylint, ty, complexipy, commitizen)(context)
 
 
 namespace = Collection('lint')
@@ -48,3 +55,4 @@ namespace.add_task(cast(Task, ruff_lint), name='ruff')
 namespace.add_task(cast(Task, pylint))
 namespace.add_task(cast(Task, ty))
 namespace.add_task(cast(Task, complexipy))
+namespace.add_task(cast(Task, commitizen))
