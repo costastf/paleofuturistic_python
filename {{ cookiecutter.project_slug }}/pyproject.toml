@@ -25,6 +25,7 @@ dev = [
     "click<=8.2.1",
     {include-group = "document"},
     {include-group = "lint"},
+    {include-group = "quality"},
     {include-group = "security"},
     {include-group = "test"},
 ]
@@ -37,6 +38,9 @@ lint = [
     "pylint",
     "ruff==0.13.1",
     "ty",
+]
+quality = [
+    "pyscn",
 ]
 security = [
     "cyclonedx-bom",
