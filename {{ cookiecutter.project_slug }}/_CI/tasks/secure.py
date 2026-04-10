@@ -7,7 +7,7 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from ._shared import SECURITY_OVERRIDE_ENV, exec_, logged, run, run_steps
+from .shared import SECURITY_OVERRIDE_ENV, exec_, logged, run, run_steps
 
 _IGNORE_PATTERN = re.compile(
     r'(?P<vulnerability_id>[A-Za-z0-9\-_]+)'
