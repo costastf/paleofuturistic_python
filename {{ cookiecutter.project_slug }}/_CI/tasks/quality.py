@@ -1,10 +1,18 @@
 """Quality task definitions."""
 
+from pathlib import Path
 from typing import cast
 
 from invoke import Collection, Context, Task, task
 
 from .shared import exec_, logged, run, run_steps
+
+_PYSCN_REPORTS_DIR = Path('.pyscn/reports')
+
+
+def _latest_pyscn_report() -> Path:
+    """Return the most recently created pyscn HTML report."""
+    return max(_PYSCN_REPORTS_DIR.glob('analyze_*.html'), key=lambda p: p.stat().st_mtime)
 
 
 @task
@@ -12,7 +20,7 @@ from .shared import exec_, logged, run, run_steps
 def pyscn_analyze(context: Context) -> None:
     """Run pyscn comprehensive analysis with HTML report."""
     exec_(context, 'uv run pyscn analyze src/')
-    exec_(context, 'open reports/index.html')
+    exec_(context, f'open {_latest_pyscn_report()}')
 
 
 @task
