@@ -2,12 +2,40 @@ default_install_hook_types: [pre-commit, commit-msg]
 repos:
   - repo: local
     hooks:
-      - id: lint
-        name: Lint code
-        entry: ./workflow lint
+      - id: lint-commit
+        name: Lint commit message
+        description: "Example: feat: added new feature"
+        entry: sh -c './workflow lint.commitizen --commit-msg-file="$1"' --
+        language: system
+        pass_filenames: true
+        stages: [commit-msg]
+      - id: ruff
+        name: Lint with ruff
+        entry: ./workflow lint.ruff
         language: system
         pass_filenames: false
         files: ^(_CI/tasks/|src/|tests/).*\.py$
+        stages: [pre-commit]
+      - id: pylint
+        name: Lint with pylint
+        entry: ./workflow lint.pylint
+        language: system
+        pass_filenames: false
+        files: ^(_CI/tasks/|src/|tests/).*\.py$
+        stages: [pre-commit]
+      - id: ty
+        name: Type check with ty
+        entry: ./workflow lint.ty
+        language: system
+        pass_filenames: false
+        files: ^(_CI/tasks/|src/|tests/).*\.py$
+        stages: [pre-commit]
+      - id: complexipy
+        name: Complexity check with complexipy
+        entry: ./workflow lint.complexipy
+        language: system
+        pass_filenames: false
+        files: ^(src/).*\.py$
         stages: [pre-commit]
       - id: test
         name: Run tests
@@ -16,10 +44,3 @@ repos:
         pass_filenames: false
         files: ^(src/|tests/).*\.py$
         stages: [pre-commit]
-      - id: lint-commit
-        name: Lint commit message
-        description: "Example: feat: added new feature"
-        entry: sh -c './workflow lint.commitizen --commit-msg-file="$1"' --
-        language: system
-        pass_filenames: true
-        stages: [commit-msg]
