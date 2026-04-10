@@ -79,31 +79,38 @@ def ruff_format(context: Context) -> None:
 
 
 @task
-@_logged('ruff-lint')
+@_logged('lint.ruff')
 @_run(f'uv run ruff check {_PATHS}')
 def ruff_lint(context: Context) -> None:
     """Run ruff linter."""
 
 
 @task
-@_logged('pylint')
+@_logged('lint.pylint')
 @_run(f'uv run pylint {_PATHS}')
 def pylint(context: Context) -> None:
     """Run pylint."""
 
 
 @task
-@_logged('ty')
+@_logged('lint.ty')
 @_run(f'uv run ty check {_PATHS}')
 def ty(context: Context) -> None:
     """Run ty type checker."""
 
 
 @task
+@_logged('lint.complexipy')
+@_run('uv run complexipy src/')
+def complexipy(context: Context) -> None:
+    """Run complexipy cognitive complexity checker."""
+
+
+@task
 @_logged('lint')
 def lint(context: Context) -> None:
     """Run all linting steps; reports all failures before exiting."""
-    _run_steps(ruff_lint, pylint, ty)(context)
+    _run_steps(ruff_lint, pylint, ty, complexipy)(context)
 
 
 @task
@@ -184,6 +191,14 @@ _build_ns = Collection('build')
 _build_ns.add_task(cast(Task, build), default=True)
 _build_ns.add_task(cast(Task, package))
 
-namespace = Collection(ruff_format, ruff_lint, pylint, ty, lint, test, document)
+_lint_ns = Collection('lint')
+_lint_ns.add_task(cast(Task, lint), default=True)
+_lint_ns.add_task(cast(Task, ruff_lint), name='ruff')
+_lint_ns.add_task(cast(Task, pylint))
+_lint_ns.add_task(cast(Task, ty))
+_lint_ns.add_task(cast(Task, complexipy))
+
+namespace = Collection(ruff_format, test, document)
+namespace.add_collection(_lint_ns)
 namespace.add_collection(_secure_ns)
 namespace.add_collection(_build_ns)
