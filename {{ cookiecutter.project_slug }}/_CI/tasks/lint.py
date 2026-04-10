@@ -37,9 +37,18 @@ def complexipy(context: Context) -> None:
 
 @task
 @logged('lint.commitizen')
-@run('uv run cz check --rev-range HEAD')
-def commitizen(context: Context) -> None:
-    """Lint commit messages using commitizen conventional commits."""
+def commitizen(context: Context, commit_msg_file: str | None = None) -> None:
+    """Lint commit messages using commitizen conventional commits.
+
+    Args:
+        context: Invoke context.
+        commit_msg_file: Path to a commit message file (used by commit-msg hooks).
+            When omitted, checks the last committed message.
+    """
+    if commit_msg_file:
+        exec_(context, f'uv run cz check --commit-msg-file {commit_msg_file}')
+    else:
+        exec_(context, 'uv run cz check --rev-range HEAD')
 
 
 @task

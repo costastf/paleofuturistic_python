@@ -23,11 +23,15 @@ classifiers = [
 [dependency-groups]
 dev = [
     "click<=8.2.1",
+    {include-group = "develop"},
     {include-group = "document"},
     {include-group = "lint"},
     {include-group = "quality"},
     {include-group = "security"},
     {include-group = "test"},
+]
+develop = [
+    "pre-commit",
 ]
 document = [
     "mkdocs==1.6.1",
