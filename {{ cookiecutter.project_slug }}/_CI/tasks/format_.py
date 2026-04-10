@@ -4,23 +4,23 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from . import _PATHS, _logged, _run, _run_steps
+from ._shared import PATHS, logged, run, run_steps
 
 
 @task
-@_logged('format.ruff')
-@_run(f'uv run ruff format --diff {_PATHS}')
+@logged('format.ruff')
+@run(f'uv run ruff format --diff {PATHS}')
 def ruff_format(context: Context) -> None:
     """Check code formatting with ruff."""
 
 
 @task
-@_logged('format')
+@logged('format')
 def format_(context: Context) -> None:
     """Run all formatting steps; reports all failures before exiting."""
-    _run_steps(ruff_format)(context)
+    run_steps(ruff_format)(context)
 
 
 namespace = Collection('format')
-namespace.add_task(cast(Task, format_), default=True)
+namespace.add_task(cast(Task, format_), default=True, name='format')
 namespace.add_task(cast(Task, ruff_format), name='ruff')

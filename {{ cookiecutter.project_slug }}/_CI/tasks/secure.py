@@ -7,7 +7,7 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from . import _SECURITY_OVERRIDE_ENV, _exec, _logged, _run, _run_steps
+from ._shared import SECURITY_OVERRIDE_ENV, exec_, logged, run, run_steps
 
 _IGNORE_PATTERN = re.compile(
     r'(?P<vulnerability_id>[A-Za-z0-9\-_]+)'
@@ -16,7 +16,7 @@ _IGNORE_PATTERN = re.compile(
 
 
 @task
-@_logged('secure.audit')
+@logged('secure.audit')
 def audit(context: Context, ignore: str | None = None) -> None:
     """Run pip-audit security scan.
 
@@ -30,7 +30,7 @@ def audit(context: Context, ignore: str | None = None) -> None:
             variable, which is merged with any ``--ignore`` argument.
     """
     today = date.today()  # noqa: DTZ011
-    env_override = os.environ.get(_SECURITY_OVERRIDE_ENV, '')
+    env_override = os.environ.get(SECURITY_OVERRIDE_ENV, '')
     combined = ','.join(filter(None, [ignore, env_override]))
     ignore_args = [
         f'--ignore-vuln {m.group("vulnerability_id")}'
@@ -39,21 +39,21 @@ def audit(context: Context, ignore: str | None = None) -> None:
         or date.fromisoformat(m.group('expiration_date')) > today
     ]
     ignore_opts = (' ' + ' '.join(ignore_args)) if ignore_args else ''
-    _exec(context, f'uv run pip-audit{ignore_opts}')
+    exec_(context, f'uv run pip-audit{ignore_opts}')
 
 
 @task
-@_logged('secure.extract-sbom')
-@_run('uv run cyclonedx-py environment --output-file sbom.json')
+@logged('secure.extract-sbom')
+@run('uv run cyclonedx-py environment --output-file sbom.json')
 def extract_sbom(context: Context) -> None:
     """Extract a Software Bill of Materials using CycloneDX into sbom.json."""
 
 
 @task
-@_logged('secure')
+@logged('secure')
 def secure(context: Context) -> None:
     """Run all security checks; reports all failures before exiting."""
-    _run_steps(audit, extract_sbom)(context)
+    run_steps(audit, extract_sbom)(context)
 
 
 namespace = Collection('secure')

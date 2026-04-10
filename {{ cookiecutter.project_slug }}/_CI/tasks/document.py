@@ -4,28 +4,28 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from . import _exec, _logged, _run, _run_steps
+from ._shared import exec_, logged, run, run_steps
 
 
 @task
-@_logged('document.build')
-@_run('uv run mkdocs build')
+@logged('document.build')
+@run('uv run mkdocs build')
 def build(context: Context) -> None:
     """Build the documentation."""
 
 
 @task
-@_logged('document.open')
+@logged('document.open')
 def open_(context: Context) -> None:
     """Open the built documentation in the default browser."""
-    _exec(context, 'open site/index.html')
+    exec_(context, 'open site/index.html')
 
 
 @task
-@_logged('document')
+@logged('document')
 def document(context: Context) -> None:
     """Build and open the documentation; reports all failures before exiting."""
-    _run_steps(build, open_)(context)
+    run_steps(build, open_)(context)
 
 
 namespace = Collection('document')
