@@ -3,6 +3,7 @@
 from invoke import Collection
 
 from . import build as _build
+from . import container as _container
 from . import document as _document
 from . import format_ as _format
 from . import lint as _lint
@@ -12,6 +13,7 @@ from . import test as _test
 
 namespace = Collection()
 namespace.add_collection(_build.namespace)
+namespace.add_collection(_container.namespace)
 namespace.add_collection(_document.namespace)
 namespace.add_collection(_format.namespace)
 namespace.add_collection(_lint.namespace)

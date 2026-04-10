@@ -1,0 +1,10 @@
+FROM ghcr.io/astral-sh/uv:python{{ cookiecutter.python_version }}-bookworm-slim
+
+WORKDIR /app
+
+COPY pyproject.toml uv.lock ./
+
+RUN uv sync --frozen --all-extras --dev --no-install-project
+
+ENV UV_PROJECT_ENVIRONMENT=/app/.venv
+ENV PATH="/app/.venv/bin:$PATH"

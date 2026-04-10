@@ -142,6 +142,9 @@ venv.bak/
 # Rope project settings
 .ropeproject
 
+# act local CI
+.secrets
+
 # mkdocs documentation
 /site
 
