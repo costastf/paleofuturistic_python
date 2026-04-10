@@ -37,6 +37,13 @@ repos:
         pass_filenames: false
         files: ^(src/).*\.py$
         stages: [pre-commit]
+      - id: pyscn
+        name: Quality check with pyscn
+        entry: ./workflow quality.pyscn-check
+        language: system
+        pass_filenames: false
+        files: ^(src/).*\.py$
+        stages: [pre-commit]
       - id: test
         name: Run tests
         entry: ./workflow test
