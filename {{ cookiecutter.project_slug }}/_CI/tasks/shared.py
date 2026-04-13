@@ -1,9 +1,15 @@
 """Shared utilities for CI task definitions."""
 
+import os
 from collections.abc import Callable
 from functools import wraps
 
 from invoke import Context
+
+
+def is_ci() -> bool:
+    """Detect CI environment (GitHub Actions, GitLab CI, etc.)."""
+    return os.environ.get('CI', '').lower() == 'true'
 
 PATHS = 'src/ _CI/tasks/ tests/'
 SECURITY_OVERRIDE_ENV = '{{ cookiecutter.project_slug | upper }}_SECURITY_OVERRIDE'

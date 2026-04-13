@@ -1,6 +1,5 @@
 """Bootstrap task definitions for initial development environment setup."""
 
-import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,14 +7,9 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .shared import execute, logged
+from .shared import execute, is_ci, logged
 
 SENTINEL = Path('.bootstrapped')
-
-
-def is_ci() -> bool:
-    """Detect CI environment (GitHub Actions, GitLab CI, etc.)."""
-    return os.environ.get('CI', '').lower() == 'true'
 
 
 @dataclass
@@ -36,6 +30,7 @@ class BootstrapStep:
 
 
 def install_pre_commit(context: Context) -> None:
+    """Install and activate pre-commit hooks."""
     execute(context, 'uv run pre-commit install')
 
 
@@ -51,6 +46,7 @@ STEPS: list[BootstrapStep] = [
 
 
 def run_steps(context: Context) -> None:
+    """Execute all registered bootstrap steps, respecting CI context."""
     ci = is_ci()
     for step in STEPS:
         if ci:

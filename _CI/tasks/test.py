@@ -44,9 +44,13 @@ def test(context):
         make_file_executable(project_dir / 'workflow')
 
         with context.cd(str(project_dir)):
+            context.run('git init -b main', echo=True)
+            context.run('git add -A', echo=True)
+            context.run('git -c commit.gpgsign=false commit -m "feat: initial project from template" '
+                        '--author "ci <ci@localhost>"', echo=True)
             context.run('uv sync --all-extras --dev', echo=True)
             for step in ('lint', 'test', 'build', 'document'):
-                result = context.run(f'./workflow {step}', warn=True, echo=True)
+                result = context.run(f'./workflow {step}', warn=True, echo=True, env={'CI': 'true'})
                 if result.failed:
                     print(emojize_message(f'Task "{step}" failed', success=False))
                     raise SystemExit(1)
