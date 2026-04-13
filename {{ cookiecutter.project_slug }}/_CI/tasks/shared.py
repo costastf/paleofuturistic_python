@@ -1,6 +1,7 @@
 """Shared utilities for CI task definitions."""
 
 import os
+import shutil
 from collections.abc import Callable
 from functools import wraps
 
@@ -10,6 +11,19 @@ from invoke import Context
 def is_ci() -> bool:
     """Detect CI environment (GitHub Actions, GitLab CI, etc.)."""
     return os.environ.get('CI', '').lower() == 'true'
+
+
+def container_engine() -> str:
+    """Return the available container engine ('docker' or 'podman').
+
+    Raises:
+        SystemExit: If neither docker nor podman is found.
+    """
+    for engine in ('docker', 'podman'):
+        if shutil.which(engine):
+            return engine
+    print('No container engine found. Install docker or podman.')
+    raise SystemExit(1)
 
 PATHS = 'src/ _CI/tasks/ tests/'
 SECURITY_OVERRIDE_ENV = '{{ cookiecutter.project_slug | upper }}_SECURITY_OVERRIDE'
