@@ -8,6 +8,36 @@ from .shared import container_engine, execute, logged
 
 
 IMAGE_NAME = '{{ cookiecutter.project_slug }}-deps'
+QA_WORKFLOW = '.github/workflows/quality-assurance.yaml'
+
+
+def _podman_socket(context: Context) -> str:
+    """Discover the podman API socket path.
+
+    Tries ``podman info`` first, then falls back to ``podman machine inspect``
+    for macOS where podman runs inside a VM.
+
+    Raises:
+        SystemExit: If the socket path cannot be determined.
+    """
+    result = context.run(
+        {%- raw %}
+        'podman info --format "{{.Host.RemoteSocket.Path}}"',
+        {%- endraw %}
+        hide=True, warn=True,
+    )
+    if result and not result.failed and result.stdout.strip():
+        return result.stdout.strip()
+    result = context.run(
+        {%- raw %}
+        'podman machine inspect --format "{{.ConnectionInfo.PodmanSocket.Path}}"',
+        {%- endraw %}
+        hide=True, warn=True,
+    )
+    if result and not result.failed and result.stdout.strip():
+        return result.stdout.strip()
+    print('Could not determine podman socket path. Is podman machine running?')
+    raise SystemExit(1)
 
 
 @task
@@ -21,25 +51,21 @@ def build(context: Context) -> None:
 @task
 @logged('container.act')
 def act(context: Context) -> None:
-    """Run the full CI workflow locally using act."""
+    """Run the QA workflow locally using act."""
     engine = container_engine()
     if engine == 'podman':
-        result = context.run(
-            {%- raw %}
-            'podman info --format "{{.Host.RemoteSocket.Path}}"',
-            {%- endraw %}
-            hide=True, warn=True,
-        )
-        socket = result.stdout.strip() if result and not result.failed else '/run/podman/podman.sock'
+        socket = _podman_socket(context)
         execute(
             context,
-            f'DOCKER_HOST=unix://{socket} act push --secret-file .secrets '
+            f'DOCKER_HOST=unix://{socket} act push -W {QA_WORKFLOW} --secret-file .secrets '
+            f'--container-architecture linux/amd64 '
             f'--container-options "-v {socket}:/var/run/docker.sock"',
         )
     else:
         execute(
             context,
-            'act push --secret-file .secrets '
+            f'act push -W {QA_WORKFLOW} --secret-file .secrets '
+            '--container-architecture linux/amd64 '
             '--container-options "-v /var/run/docker.sock:/var/run/docker.sock"',
         )
 
