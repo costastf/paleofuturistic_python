@@ -1,7 +1,7 @@
 # _CI — Workflow Tooling
 
 A portable, vendored CI/CD framework built on [Invoke](https://www.pyinvoke.org/).
-All dependencies ship in `lib/vendor/`, so `./workflow` works immediately after clone — no global installs required.
+All dependencies ship in `lib/vendor/`, so `./workflow.cmd` works immediately after clone — no global installs required.
 
 ## Design Principles
 
@@ -19,7 +19,7 @@ All dependencies ship in `lib/vendor/`, so `./workflow` works immediately after 
 
 ## Interface
 
-All commands are invoked via `./workflow <namespace>.<task>`. Running a namespace without a task name executes its default.
+All commands are invoked via `./workflow.cmd <namespace>.<task>`. Running a namespace without a task name executes its default.
 
 ```
 bootstrap              One-time dev environment setup

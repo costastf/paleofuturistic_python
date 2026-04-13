@@ -5,48 +5,48 @@ repos:
       - id: lint-commit
         name: Lint commit message
         description: "Example: feat: added new feature"
-        entry: sh -c './workflow lint.commitizen --commit-msg-file="$1"' --
+        entry: sh -c './workflow.cmd lint.commitizen --commit-msg-file="$1"' --
         language: system
         pass_filenames: true
         stages: [commit-msg]
       - id: ruff
         name: Lint with ruff
-        entry: ./workflow lint.ruff
+        entry: ./workflow.cmd lint.ruff
         language: system
         pass_filenames: false
         files: ^(_CI/tasks/|src/|tests/).*\.py$
         stages: [pre-commit]
       - id: pylint
         name: Lint with pylint
-        entry: ./workflow lint.pylint
+        entry: ./workflow.cmd lint.pylint
         language: system
         pass_filenames: false
         files: ^(_CI/tasks/|src/|tests/).*\.py$
         stages: [pre-commit]
       - id: ty
         name: Type check with ty
-        entry: ./workflow lint.ty
+        entry: ./workflow.cmd lint.ty
         language: system
         pass_filenames: false
         files: ^(_CI/tasks/|src/|tests/).*\.py$
         stages: [pre-commit]
       - id: complexipy
         name: Complexity check with complexipy
-        entry: ./workflow lint.complexipy
+        entry: ./workflow.cmd lint.complexipy
         language: system
         pass_filenames: false
         files: ^(src/).*\.py$
         stages: [pre-commit]
       - id: pyscn
         name: Quality check with pyscn
-        entry: ./workflow quality.pyscn-check
+        entry: ./workflow.cmd quality.pyscn-check
         language: system
         pass_filenames: false
         files: ^(src/).*\.py$
         stages: [pre-commit]
       - id: test
         name: Run tests
-        entry: ./workflow test
+        entry: ./workflow.cmd test
         language: system
         pass_filenames: false
         files: ^(src/|tests/).*\.py$
