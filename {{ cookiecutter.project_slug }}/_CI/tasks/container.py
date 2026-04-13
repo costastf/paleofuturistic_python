@@ -55,7 +55,7 @@ def act(context: Context) -> None:
             context,
             f'DOCKER_HOST=unix://{socket} act push -W {QA_WORKFLOW} --secret-file .secrets '
             f'--container-architecture linux/amd64 '
-            f'--container-options "-v {socket}:/var/run/docker.sock"',
+            f'--container-daemon-socket {socket}',
         )
     else:
         execute(
