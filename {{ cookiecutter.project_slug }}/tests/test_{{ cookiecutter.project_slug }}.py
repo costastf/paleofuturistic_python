@@ -5,9 +5,9 @@ from {{ cookiecutter.project_slug }} import hello
 
 def test_sanity() -> None:
     """Sanity check."""
-    assert True  # noqa: S101
+    assert True
 
 
 def test_integration() -> None:
     """Integration test for hello function."""
-    assert hello() == 'Hello you from {{ cookiecutter.project_slug }}!'  # noqa: S101
+    assert hello() == 'Hello you from {{ cookiecutter.project_slug }}!'
