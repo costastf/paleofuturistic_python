@@ -1,5 +1,6 @@
 """Bootstrap task definitions for initial development environment setup."""
 
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -46,15 +47,15 @@ STEPS: list[BootstrapStep] = [
 
 
 def run_steps(context: Context) -> None:
-    """Execute all registered bootstrap steps, respecting CI context."""
-    ci = is_ci()
+    """Execute all registered bootstrap steps, respecting CI and TTY context."""
+    non_interactive = is_ci() or not sys.stdin.isatty()
     for step in STEPS:
-        if ci:
+        if non_interactive:
             if step.ci_behavior == 'run':
                 print(f'  Running {step.name}...')
                 step.action(context)
             else:
-                print(f'  Skipping {step.name} (CI mode)')
+                print(f'  Skipping {step.name} (non-interactive mode)')
         elif step.prompt:
             if input(step.prompt).strip().lower() in ('y', 'yes'):
                 step.action(context)
