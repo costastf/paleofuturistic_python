@@ -54,7 +54,8 @@ def act(context: Context) -> None:
         execute(
             context,
             f'DOCKER_HOST=unix://{socket} act push -W {QA_WORKFLOW} --secret-file .secrets '
-            f'--container-architecture linux/amd64',
+            f'--container-architecture linux/amd64 '
+            f'--container-daemon-socket ""',
         )
     else:
         execute(
