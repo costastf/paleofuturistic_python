@@ -1,5 +1,6 @@
 """Container task definitions for building and running the deps image."""
 
+from pathlib import Path
 from typing import cast
 
 from invoke import Collection, Context, Task, task
@@ -20,22 +21,17 @@ def _podman_socket(context: Context) -> str:
     Raises:
         SystemExit: If the socket path cannot be determined.
     """
-    result = context.run(
+    for cmd in (
         {%- raw %}
         'podman info --format "{{.Host.RemoteSocket.Path}}"',
-        {%- endraw %}
-        hide=True, warn=True,
-    )
-    if result and not result.failed and result.stdout.strip():
-        return result.stdout.strip()
-    result = context.run(
-        {%- raw %}
         'podman machine inspect --format "{{.ConnectionInfo.PodmanSocket.Path}}"',
         {%- endraw %}
-        hide=True, warn=True,
-    )
-    if result and not result.failed and result.stdout.strip():
-        return result.stdout.strip()
+    ):
+        result = context.run(cmd, hide=True, warn=True)
+        if result and not result.failed and result.stdout.strip():
+            socket = result.stdout.strip()
+            if Path(socket).exists():
+                return socket
     print('Could not determine podman socket path. Is podman machine running?')
     raise SystemExit(1)
 
