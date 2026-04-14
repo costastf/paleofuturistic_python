@@ -18,9 +18,12 @@ jobs:
 
     steps:
       - name: Checkout repository
+        {#- Escape curly braces for Cookiecutter. -#}
+        {%- raw %}
+        if: ${{ !env.ACT }}
+        {%- endraw %}
         run: |
-          git config --global --add safe.directory "${GITHUB_WORKSPACE}"
-          git init
+          git init -b main
           git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git fetch --depth=1 origin "${GITHUB_SHA}"
           git checkout FETCH_HEAD
@@ -45,10 +48,16 @@ jobs:
       {%- endraw %}
 
     steps:
+      - name: Configure git
+        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+
       - name: Checkout repository
+        {#- Escape curly braces for Cookiecutter. -#}
+        {%- raw %}
+        if: ${{ !env.ACT }}
+        {%- endraw %}
         run: |
-          git config --global --add safe.directory "${GITHUB_WORKSPACE}"
-          git init
+          git init -b main
           git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git fetch --depth=1 origin "${GITHUB_SHA}"
           git checkout FETCH_HEAD
