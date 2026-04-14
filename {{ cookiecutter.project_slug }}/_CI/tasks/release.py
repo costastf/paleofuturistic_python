@@ -22,7 +22,7 @@ def validate(context: Context) -> None:
         raise SystemExit(1)
 
 
-@task(positional=['increment'])
+@task
 @logged('release.bump')
 def bump(context: Context, increment: str = '') -> None:
     """Bump the version, update the changelog, and create a git tag.
@@ -59,7 +59,7 @@ def publish(context: Context) -> None:
     execute(context, 'uv publish')
 
 
-@task(positional=['increment'])
+@task
 @logged('release')
 def release(context: Context, increment: str = '') -> None:
     """Run the full release flow: validate, bump, push, build, and publish.
@@ -83,3 +83,18 @@ namespace.add_task(cast(Task, validate))
 namespace.add_task(cast(Task, bump))
 namespace.add_task(cast(Task, push))
 namespace.add_task(cast(Task, publish))
+
+
+# Register each increment type as a named task so that
+# `./workflow.cmd release minor` works alongside `./workflow.cmd release -i minor`.
+def _make_increment_task(increment_type: str) -> Task:
+    @task
+    def _task(context: Context) -> None:
+        release(context, increment=increment_type)
+
+    _task.__doc__ = f'Release with {increment_type} version increment.'
+    return cast(Task, _task)
+
+
+for _increment in ('major', 'minor', 'patch', 'alpha', 'beta', 'rc'):
+    namespace.add_task(_make_increment_task(_increment), name=_increment)
