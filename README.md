@@ -19,7 +19,6 @@ Give their docs a look-over before continuing if you want to get a better unders
 ### Setup
 
 - Initialize with `uvx cruft create --checkout latest https://github.com/schubergphilis/paleofuturistic_python` and fill in your project details.
-- Run `uv sync --all-extras --dev` to download the dependencies and generate a lock file.
 - On first run of any workflow command, the bootstrap step will prompt to install pre-commit hooks.
 
 ### Workflow
