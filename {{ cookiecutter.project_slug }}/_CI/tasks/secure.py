@@ -6,7 +6,7 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .configuration import IGNORE_PATTERN, PROJECT_NAME, SECURITY_OVERRIDE_ENV
+from .configuration import IGNORE_PATTERN, OWASP_DTRACK_SETTINGS, PROJECT_NAME, SECURITY_OVERRIDE_ENV
 from .shared import execute, logged
 
 
@@ -58,12 +58,12 @@ def sbom_extract(context: Context, write: bool = False) -> None:
 def sbom_upload(context: Context) -> None:
     """Extract and upload SBOM to OWASP Dependency Track.
 
-    Requires the OWASP_DTRACK_API_KEY environment variable to be set.
+    Requires the OWASP_DTRACK_URL and OWASP_DTRACK_API_KEY environment variables to be set.
     """
-    api_key = os.environ.get('OWASP_DTRACK_API_KEY')
-    if not api_key:
-        print('OWASP_DTRACK_API_KEY environment variable is not set.')
-        print('Set it to your Dependency Track API key to enable SBOM uploads.')
+    missing = [v for v in OWASP_DTRACK_SETTINGS if not os.environ.get(v)]
+    if missing:
+        print(f'Missing required environment variables: {", ".join(missing)}')
+        print('Set them to enable SBOM uploads to Dependency Track.')
         raise SystemExit(1)
     sbom_extract(context, write=True)
     result = context.run('uv run cz version', hide=True)

@@ -19,4 +19,6 @@ QA_WORKFLOW = '.github/workflows/continuous-integration.yaml'
 
 PROJECT_NAME = '{{ cookiecutter.project_slug }}'
 
+OWASP_DTRACK_SETTINGS = ('OWASP_DTRACK_URL', 'OWASP_DTRACK_API_KEY')
+
 SENTINEL = Path('.bootstrapped')

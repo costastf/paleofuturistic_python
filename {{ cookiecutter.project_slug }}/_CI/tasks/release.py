@@ -38,7 +38,7 @@ def bump(context: Context, increment: str = '') -> None:
     semver_types = ('major', 'minor', 'patch')
     valid = semver_types + prerelease_types
     if increment not in valid:
-        print('Usage: ./workflow.cmd release <increment>')
+        print('Usage: ./workflow.cmd release -i <increment>')
         print(f'  increment: {", ".join(valid)}')
         raise SystemExit(1)
     if increment in prerelease_types:
@@ -82,7 +82,7 @@ def publish(context: Context) -> None:
     execute(context, 'uv publish')
 
 
-@task(positional=['increment'])
+@task
 @logged('release')
 def release(context: Context, increment: str = '', no_push: bool = False) -> None:
     """Run the full release flow: validate, bump, push, build, and publish.

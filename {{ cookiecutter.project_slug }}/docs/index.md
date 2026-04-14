@@ -29,7 +29,7 @@ All commands are invoked via `./workflow.cmd <namespace>.<task>`:
 | `./workflow.cmd lint` | Run all linters (ruff, pylint, ty, complexipy, commitizen) |
 | `./workflow.cmd test` | Run all tests (pytest) |
 | `./workflow.cmd build` | Run security checks and build the package |
-| `./workflow.cmd release <type>` | Bump version, tag, push, build, and publish to PyPI |
+| `./workflow.cmd release -i <type>` | Bump version, tag, push, build, and publish to PyPI |
 | `./workflow.cmd format` | Check code formatting (ruff) |
 | `./workflow.cmd quality` | Run code quality analysis (pyscn) |
 | `./workflow.cmd secure` | Run security audit and generate SBOM |
