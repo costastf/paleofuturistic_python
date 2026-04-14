@@ -1,5 +1,7 @@
 """Release task definitions."""
 
+import shutil
+from pathlib import Path
 from typing import cast
 
 from invoke import Collection, Context, Task, task
@@ -100,6 +102,20 @@ def release(context: Context, increment: str = '', no_push: bool = False) -> Non
         push(context)
     build(context)
     publish(context)
+    clean(context)
+
+
+@task
+@logged('release.clean')
+def clean(context: Context) -> None:
+    """Remove build artifacts (dist/ and sbom.json)."""
+    if Path('dist').exists():
+        shutil.rmtree('dist')
+        print('Removed dist/')
+    sbom = Path('sbom.json')
+    if sbom.exists():
+        sbom.unlink()
+        print('Removed sbom.json')
 
 
 namespace = Collection('release')
@@ -109,3 +125,4 @@ namespace.add_task(cast(Task, bump))
 namespace.add_task(cast(Task, changelog))
 namespace.add_task(cast(Task, push))
 namespace.add_task(cast(Task, publish))
+namespace.add_task(cast(Task, clean))
