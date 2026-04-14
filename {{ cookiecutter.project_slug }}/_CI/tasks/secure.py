@@ -6,7 +6,7 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .configuration import IGNORE_PATTERN, SECURITY_OVERRIDE_ENV
+from .configuration import IGNORE_PATTERN, PROJECT_NAME, SECURITY_OVERRIDE_ENV
 from .shared import execute, logged
 
 
@@ -37,8 +37,8 @@ def audit(context: Context, ignore: str | None = None) -> None:
 
 
 @task
-@logged('secure.extract-sbom')
-def extract_sbom(context: Context, write: bool = False) -> None:
+@logged('secure.sbom-extract')
+def sbom_extract(context: Context, write: bool = False) -> None:
     """Extract a Software Bill of Materials using CycloneDX.
 
     By default prints the SBOM to stdout. With --write, writes to sbom.json.
@@ -54,6 +54,33 @@ def extract_sbom(context: Context, write: bool = False) -> None:
 
 
 @task
+@logged('secure.sbom-upload')
+def sbom_upload(context: Context) -> None:
+    """Extract and upload SBOM to OWASP Dependency Track.
+
+    Requires the OWASP_DTRACK_API_KEY environment variable to be set.
+    """
+    api_key = os.environ.get('OWASP_DTRACK_API_KEY')
+    if not api_key:
+        print('OWASP_DTRACK_API_KEY environment variable is not set.')
+        print('Set it to your Dependency Track API key to enable SBOM uploads.')
+        raise SystemExit(1)
+    sbom_extract(context, write=True)
+    result = context.run('uv run cz version', hide=True)
+    if result is None or result.failed:
+        print('Could not determine project version.')
+        raise SystemExit(1)
+    version = result.stdout.strip()
+    execute(
+        context,
+        f'uv run owasp-dtrack-cli test '
+        f'--project-name {PROJECT_NAME} '
+        f'--project-version {version} '
+        f'--auto-create sbom.json',
+    )
+
+
+@task
 @logged('secure')
 def secure(context: Context) -> None:
     """Run all security checks; reports all failures before exiting."""
@@ -63,7 +90,7 @@ def secure(context: Context) -> None:
     except SystemExit:
         failed = True
     try:
-        extract_sbom(context, write=True)
+        sbom_extract(context, write=True)
     except SystemExit:
         failed = True
     if failed:
@@ -73,4 +100,5 @@ def secure(context: Context) -> None:
 namespace = Collection('secure')
 namespace.add_task(cast(Task, secure), default=True, name='all')
 namespace.add_task(cast(Task, audit))
-namespace.add_task(cast(Task, extract_sbom))
+namespace.add_task(cast(Task, sbom_extract))
+namespace.add_task(cast(Task, sbom_upload))

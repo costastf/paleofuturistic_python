@@ -17,4 +17,6 @@ IMAGE_NAME = '{{ cookiecutter.project_slug }}-deps'
 ACT_IMAGE_NAME = '{{ cookiecutter.project_slug }}-act'
 QA_WORKFLOW = '.github/workflows/continuous-integration.yaml'
 
+PROJECT_NAME = '{{ cookiecutter.project_slug }}'
+
 SENTINEL = Path('.bootstrapped')

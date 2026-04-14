@@ -49,6 +49,7 @@ quality = [
 ]
 security = [
     "cyclonedx-bom",
+    "owasp-dependency-track-cli",
     "pip-audit",
 ]
 test = [

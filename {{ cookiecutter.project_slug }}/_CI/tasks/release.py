@@ -7,6 +7,7 @@ from typing import cast
 from invoke import Collection, Context, Task, task
 
 from .build import build
+from .secure import sbom_upload
 from .shared import execute, logged
 
 
@@ -102,6 +103,7 @@ def release(context: Context, increment: str = '', no_push: bool = False) -> Non
         push(context)
     build(context)
     publish(context)
+    sbom_upload(context)
     clean(context)
 
 
