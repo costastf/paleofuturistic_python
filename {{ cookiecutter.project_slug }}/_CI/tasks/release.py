@@ -35,7 +35,7 @@ def bump(context: Context, increment: str = '') -> None:
     semver_types = ('major', 'minor', 'patch')
     valid = semver_types + prerelease_types
     if increment not in valid:
-        print(f'Usage: ./workflow.cmd release <increment>')
+        print('Usage: ./workflow.cmd release <increment>')
         print(f'  increment: {", ".join(valid)}')
         raise SystemExit(1)
     if increment in prerelease_types:
