@@ -9,7 +9,7 @@ from .shared import container_engine, execute, logged
 
 
 IMAGE_NAME = '{{ cookiecutter.project_slug }}-deps'
-QA_WORKFLOW = '.github/workflows/quality-assurance.yaml'
+QA_WORKFLOW = '.github/workflows/continuous-integration.yaml'
 
 
 def _podman_socket(context: Context) -> str:
