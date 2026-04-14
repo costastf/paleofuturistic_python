@@ -58,6 +58,7 @@ def act(context: Context) -> None:
             f'DOCKER_HOST=unix://{socket} act push -W {QA_WORKFLOW} --secret-file .secrets '
             f'--container-architecture linux/amd64 '
             f'--pull=false '
+            f'--bind '
             f'--container-daemon-socket /var/run/docker.sock',
         )
     else:
@@ -66,6 +67,7 @@ def act(context: Context) -> None:
             f'act push -W {QA_WORKFLOW} --secret-file .secrets '
             '--container-architecture linux/amd64 '
             '--pull=false '
+            '--bind '
             '--container-options "-v /var/run/docker.sock:/var/run/docker.sock"',
         )
 
