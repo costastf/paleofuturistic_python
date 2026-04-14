@@ -9,6 +9,13 @@ repos:
         language: system
         pass_filenames: true
         stages: [commit-msg]
+      - id: format
+        name: Format code and sort imports
+        entry: ./workflow.cmd format
+        language: system
+        pass_filenames: false
+        files: ^(_CI/tasks/|src/|tests/).*\.py$
+        stages: [pre-commit]
       - id: ruff
         name: Lint with ruff
         entry: ./workflow.cmd lint.ruff

@@ -95,6 +95,7 @@ def release(context: Context, increment: str = '', no_push: bool = False) -> Non
         no_push: Skip push step (useful during development).
     """
     validate(context)
+    clean(context)
     bump(context, increment=increment)
     changelog(context, write=True)
     if no_push:

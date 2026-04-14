@@ -145,6 +145,9 @@ venv.bak/
 # Bootstrap sentinel
 _CI/.bootstrapped
 
+# SBOM
+sbom.json
+
 # act local CI
 .secrets
 
