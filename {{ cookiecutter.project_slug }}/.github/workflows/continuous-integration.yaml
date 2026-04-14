@@ -13,16 +13,23 @@ jobs:
     outputs:
       {#- Escape curly braces for Cookiecutter. -#}
       {%- raw %}
-      image: ${{ steps.build.outputs.image }}
+      image: ${{ steps.deps.outputs.image }}
       {%- endraw %}
 
     steps:
       - name: Checkout repository
-        uses: ./.github/actions/checkout
+        run: |
+          git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+          git init
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "${GITHUB_SHA}"
+          git checkout FETCH_HEAD
 
-      - name: Build deps image
-        id: build
-        uses: ./.github/actions/build-deps-image
+      - name: Publish deps image
+        id: deps
+        run: |
+          ./workflow.cmd container publish
+          echo "image=$(cat .deps-image)" >> "$GITHUB_OUTPUT"
 
   ci:
     name: Continuous Integration
@@ -39,7 +46,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: ./.github/actions/checkout
+        run: |
+          git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+          git init
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "${GITHUB_SHA}"
+          git checkout FETCH_HEAD
 
       - name: Lint code
         run: ./workflow.cmd lint
