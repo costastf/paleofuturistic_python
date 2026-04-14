@@ -1,6 +1,7 @@
 """Shared utilities for CI task definitions."""
 
 import os
+import platform
 import shutil
 from collections.abc import Callable
 from functools import wraps
@@ -11,6 +12,28 @@ from invoke import Context
 def is_ci() -> bool:
     """Detect CI environment (GitHub Actions, GitLab CI, etc.)."""
     return os.environ.get('CI', '').lower() == 'true'
+
+
+def operating_system() -> str:
+    """Return the current operating system ('windows', 'macos', or 'linux').
+
+    Raises:
+        SystemExit: If the operating system is not recognized.
+    """
+    systems = {'windows': 'windows', 'darwin': 'macos', 'linux': 'linux'}
+    system = platform.system().lower()
+    if system in systems:
+        return systems[system]
+    print(f'Unsupported operating system: {system}')
+    raise SystemExit(1)
+
+
+def open_command() -> str:
+    """Return the shell command to open a file in the default application.
+
+    Returns 'open' on macOS/Linux and 'start' on Windows.
+    """
+    return 'start' if operating_system() == 'windows' else 'open'
 
 
 def container_engine() -> str:

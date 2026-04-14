@@ -4,7 +4,7 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .shared import execute, is_ci, logged, run, run_steps
+from .shared import execute, is_ci, logged, open_command, run, run_steps
 
 
 @task
@@ -20,7 +20,7 @@ def view(context: Context) -> None:
     """Open the built documentation in the default browser. Skipped in CI."""
     if is_ci():
         return
-    execute(context, 'open site/index.html')
+    execute(context, f'{open_command()} site/index.html')
 
 
 @task

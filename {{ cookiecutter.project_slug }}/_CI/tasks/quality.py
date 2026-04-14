@@ -5,7 +5,7 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .shared import execute, is_ci, logged, run, run_steps
+from .shared import execute, is_ci, logged, open_command, run, run_steps
 
 PYSCN_REPORTS_DIR = Path('.pyscn/reports')
 
@@ -21,7 +21,7 @@ def pyscn_analyze(context: Context) -> None:
     """Run pyscn comprehensive analysis with HTML report."""
     execute(context, 'uv run pyscn analyze src/')
     if not is_ci():
-        execute(context, f'open {latest_pyscn_report()}')
+        execute(context, f'{open_command()} {latest_pyscn_report()}')
 
 
 @task
