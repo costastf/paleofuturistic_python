@@ -66,7 +66,7 @@ def sbom_upload(context: Context) -> None:
         print('Set them to enable SBOM uploads to Dependency Track.')
         raise SystemExit(1)
     sbom_extract(context, write=True)
-    result = context.run('uv run cz version', hide=True)
+    result = context.run('uv run cz version -p', hide=True)
     if result is None or result.failed:
         print('Could not determine project version.')
         raise SystemExit(1)
