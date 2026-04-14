@@ -19,6 +19,7 @@ watch:
   - src
 
 plugins:
+- include-markdown
 - mkdocstrings:
     handlers:
       python:

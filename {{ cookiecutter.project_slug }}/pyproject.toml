@@ -35,6 +35,7 @@ develop = [
 ]
 document = [
     "mkdocs==1.6.1",
+    "mkdocs-include-markdown-plugin",
     "mkdocstrings[python]==0.30.1",
 ]
 lint = [
