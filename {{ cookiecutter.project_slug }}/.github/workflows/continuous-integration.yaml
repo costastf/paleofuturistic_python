@@ -1,4 +1,4 @@
-name: Quality Assurance CI
+name: Continuous Integration
 
 on:
   push:
@@ -13,57 +13,19 @@ jobs:
     outputs:
       {#- Escape curly braces for Cookiecutter. -#}
       {%- raw %}
-      image: ${{ steps.image-ref.outputs.image }}
+      image: ${{ steps.build.outputs.image }}
       {%- endraw %}
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: ./.github/actions/checkout
 
-      - name: Compute image tag from uv.lock hash
-        id: tag
-        run: echo "tag=$(sha256sum uv.lock | cut -c1-16)" >> "$GITHUB_OUTPUT"
+      - name: Build deps image
+        id: build
+        uses: ./.github/actions/build-deps-image
 
-      - name: Set full image reference
-        id: image-ref
-        {#- Escape curly braces for Cookiecutter. -#}
-        {%- raw %}
-        run: echo "image=ghcr.io/${{ github.repository }}-deps:${{ steps.tag.outputs.tag }}" >> "$GITHUB_OUTPUT"
-        {%- endraw %}
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          {#- Escape curly braces for Cookiecutter. -#}
-          {%- raw %}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-          {%- endraw %}
-
-      - name: Check if image already exists
-        id: check
-        {#- Escape curly braces for Cookiecutter. -#}
-        {%- raw %}
-        run: |
-          if docker manifest inspect "${{ steps.image-ref.outputs.image }}" > /dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-        {%- endraw %}
-
-      - name: Build and push deps image
-        {#- Escape curly braces for Cookiecutter. -#}
-        {%- raw %}
-        if: steps.check.outputs.exists == 'false'
-        run: |
-          docker build -f Dockerfile.deps -t "${{ steps.image-ref.outputs.image }}" .
-          docker push "${{ steps.image-ref.outputs.image }}"
-        {%- endraw %}
-
-  qa:
-    name: Quality Assurance
+  ci:
+    name: Continuous Integration
     needs: build-deps-image
     runs-on: ubuntu-latest
     container:
@@ -77,10 +39,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-
-      - name: Install project
-        run: uv sync --frozen --all-extras --dev
+        uses: ./.github/actions/checkout
 
       - name: Lint code
         run: ./workflow.cmd lint

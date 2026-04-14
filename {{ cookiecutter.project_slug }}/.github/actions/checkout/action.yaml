@@ -1,0 +1,13 @@
+name: Checkout repository
+description: Shallow-clone the repository at the triggered commit.
+runs:
+  using: composite
+  steps:
+    - name: Checkout
+      run: |
+        git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+        git init
+        git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+        git fetch --depth=1 origin "${GITHUB_SHA}"
+        git checkout FETCH_HEAD
+      shell: bash
