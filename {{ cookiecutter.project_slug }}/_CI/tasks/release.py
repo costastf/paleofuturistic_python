@@ -61,7 +61,7 @@ def publish(context: Context) -> None:
 
 @task
 @logged('release')
-def release(context: Context, increment: str = '') -> None:
+def release(context: Context, increment: str = '', no_push: bool = False) -> None:
     """Run the full release flow: validate, bump, push, build, and publish.
 
     Steps execute sequentially — any failure stops the chain.
@@ -69,10 +69,14 @@ def release(context: Context, increment: str = '') -> None:
     Args:
         context: Invoke context.
         increment: Version increment type — major, minor, patch, alpha, beta, or rc.
+        no_push: Skip push step (useful during development).
     """
     validate(context)
     bump(context, increment=increment)
-    push(context)
+    if no_push:
+        print('Skipping push.')
+    else:
+        push(context)
     build(context)
     publish(context)
 
