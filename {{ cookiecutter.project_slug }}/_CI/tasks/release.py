@@ -46,11 +46,22 @@ def bump(context: Context, increment: str = '') -> None:
 
 @task
 @logged('release.changelog')
-def changelog(context: Context) -> None:
-    """Generate the changelog from all tags and commit it."""
-    execute(context, 'uv run cz changelog')
-    execute(context, 'git add docs/changelog.md')
-    execute(context, 'git commit --no-gpg-sign -m "docs: update changelog"')
+def changelog(context: Context, write: bool = False) -> None:
+    """Generate the changelog from all tags.
+
+    By default prints the changelog to stdout. With --write, writes to
+    docs/changelog.md and commits the result.
+
+    Args:
+        context: Invoke context.
+        write: Write changelog to file and commit instead of printing to stdout.
+    """
+    if write:
+        execute(context, 'uv run cz changelog')
+        execute(context, 'git add docs/changelog.md')
+        execute(context, 'git commit --no-gpg-sign -m "docs: update changelog"')
+    else:
+        execute(context, 'uv run cz changelog --dry-run')
 
 
 @task
@@ -68,7 +79,7 @@ def publish(context: Context) -> None:
     execute(context, 'uv publish')
 
 
-@task
+@task(positional=['increment'])
 @logged('release')
 def release(context: Context, increment: str = '', no_push: bool = False) -> None:
     """Run the full release flow: validate, bump, push, build, and publish.
@@ -82,7 +93,7 @@ def release(context: Context, increment: str = '', no_push: bool = False) -> Non
     """
     validate(context)
     bump(context, increment=increment)
-    changelog(context)
+    changelog(context, write=True)
     if no_push:
         print('Skipping push.')
     else:
@@ -98,18 +109,3 @@ namespace.add_task(cast(Task, bump))
 namespace.add_task(cast(Task, changelog))
 namespace.add_task(cast(Task, push))
 namespace.add_task(cast(Task, publish))
-
-
-# Register each increment type as a named task so that
-# `./workflow.cmd release minor` works alongside `./workflow.cmd release -i minor`.
-def _make_increment_task(increment_type: str) -> Task:
-    @task
-    def _task(context: Context) -> None:
-        release(context, increment=increment_type)
-
-    _task.__doc__ = f'Release with {increment_type} version increment.'
-    return cast(Task, _task)
-
-
-for _increment in ('major', 'minor', 'patch', 'alpha', 'beta', 'rc'):
-    namespace.add_task(_make_increment_task(_increment), name=_increment)

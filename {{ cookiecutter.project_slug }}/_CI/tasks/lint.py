@@ -47,8 +47,10 @@ def commitizen(context: Context, commit_msg_file: str | None = None) -> None:
     """
     if commit_msg_file:
         execute(context, f'uv run cz check --commit-msg-file {commit_msg_file}')
-    else:
+    elif context.run('git rev-parse HEAD', hide=True, warn=True):
         execute(context, 'uv run cz check --rev-range HEAD')
+    else:
+        print('No commits yet — skipping commitizen check.')
 
 
 @task

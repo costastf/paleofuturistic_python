@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run:*)",
+      "Bash(find /Users/ctyfoxylos/tmp/paleofuturistic_python/{{ cookiecutter.project_slug }} -type f \\\\\\( -name \"*.py\" -o -name \"*.toml\" -o -name \"*.yml\" -o -name \"*.yaml\" -o -name \"*.json\" \\\\\\) ! -path \"*/_CI/lib/vendor/*\")",
+      "Bash(find '/Users/ctyfoxylos/tmp/paleofuturistic_python/{{ cookiecutter.project_slug }}' -type f \\\\\\( -name \"*.py\" -o -name \"*.toml\" -o -name \"*.yml\" -o -name \"*.yaml\" -o -name \"*.json\" \\\\\\) ! -path \"*vendor*\")",
+      "Bash(./workflow.cmd test:*)",
+      "Bash(uvx cruft:*)",
+      "mcp__plugin_oh-my-claudecode_t__state_clear",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Read(//private/tmp/test_link/paleofuturistic_python_project/site/api/**)"
+    ]
+  }
+}
