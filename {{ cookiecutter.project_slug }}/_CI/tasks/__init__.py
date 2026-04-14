@@ -10,6 +10,7 @@ from . import document
 from . import format_
 from . import lint
 from . import quality
+from . import release
 from . import secure
 from . import test
 
@@ -22,11 +23,12 @@ namespace.add_collection(document.namespace)
 namespace.add_collection(format_.namespace)
 namespace.add_collection(lint.namespace)
 namespace.add_collection(quality.namespace)
+namespace.add_collection(release.namespace)
 namespace.add_collection(secure.namespace)
 namespace.add_collection(test.namespace)
 
 # Wire bootstrap as a pre-task on all other top-level default tasks
 bootstrap_task = bootstrap.bootstrap
-for module in (build, container, develop, document, format_, lint, quality, secure, test):
+for module in (build, container, develop, document, format_, lint, quality, release, secure, test):
     for task in module.namespace.tasks.values():
         task.pre.insert(0, bootstrap_task)

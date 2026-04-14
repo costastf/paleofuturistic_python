@@ -72,6 +72,12 @@ directory = "reports"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
+version_provider = "uv"
+version_scheme = "pep440"
+tag_format = "v$version"
+update_changelog_on_bump = true
+changelog_incremental = true
+changelog_file = "docs/changelog.md"
 
 [tool.ruff]
 target-version = "py312"
