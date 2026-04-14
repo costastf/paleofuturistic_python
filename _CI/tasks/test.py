@@ -1,3 +1,4 @@
+import os
 import shutil
 import tempfile
 from pathlib import Path
@@ -7,7 +8,7 @@ from invoke import task
 from _CI import (PROJECT_ROOT_DIRECTORY,
                  emojize_message,
                  make_file_executable)
-from _CI.tasks.configuration import IGNORE_PATTERNS, PROJECT_SLUG, QA_STEPS
+from _CI.tasks.configuration import IGNORE_PATTERNS, PROJECT_SLUG, QA_STEPS, TEMPLATE_SECURITY_OVERRIDE_ENV
 
 
 @task
@@ -47,8 +48,12 @@ def test(context):
             context.run('git -c commit.gpgsign=false commit -m "feat: initial project from template" '
                         '--author "ci <ci@localhost>"', echo=True)
             context.run('uv sync --all-extras --dev', echo=True)
+            env = {'CI': 'true'}
+            security_override = os.environ.get(TEMPLATE_SECURITY_OVERRIDE_ENV)
+            if security_override:
+                env[f'{PROJECT_SLUG.upper()}_SECURITY_OVERRIDE'] = security_override
             for step in QA_STEPS:
-                result = context.run(f'./workflow.cmd {step}', warn=True, echo=True, env={'CI': 'true'})
+                result = context.run(f'./workflow.cmd {step}', warn=True, echo=True, env=env)
                 if result.failed:
                     print(emojize_message(f'Task "{step}" failed', success=False))
                     raise SystemExit(1)
