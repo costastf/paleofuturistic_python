@@ -15,7 +15,7 @@ All dependencies ship in `lib/vendor/`, so `./workflow.cmd` works immediately af
 
 **Visual feedback.** The `@logged(name)` decorator emits pass/fail status per step, making terminal output scannable at a glance.
 
-**Cross-platform.** The `workflow` launcher is a polyglot script — sh on Unix/macOS, cmd.exe on Windows — that delegates to the vendored Invoke CLI via `uv run`.
+**Cross-platform.** The `workflow.cmd` launcher is a polyglot script — sh on Unix/macOS, cmd.exe on Windows — that delegates to the vendored Invoke CLI via `uv run`.
 
 ## Interface
 
@@ -31,6 +31,7 @@ build.package          Package only (uv build)
 container              Build deps image + run CI via act
 container.build        Build dependency Docker image locally
 container.act          Run GitHub Actions workflow locally
+container.publish      Build and publish deps image to GHCR (CI) or locally
 
 develop.pre-commit-install   Install pre-commit hooks
 develop.pre-commit           Run all hooks on entire codebase
@@ -39,8 +40,8 @@ document               Build and view documentation
 document.build         Build docs (mkdocs)
 document.view          Open docs in browser
 
-format                 Check code formatting
-format.ruff            Ruff format --diff
+format                 Format code and sort imports
+format.ruff            Ruff import sorting + code formatting
 
 lint                   Run all linters
 lint.ruff              Ruff check
@@ -53,9 +54,21 @@ quality                Run all quality checks
 quality.pyscn-analyze  Comprehensive analysis with HTML report
 quality.pyscn-check    CI-friendly quality gate
 
+release                Full release flow: validate, bump, changelog, push, build, publish, upload SBOM, clean
+release -i <type>      Version increment type: major, minor, patch, alpha, beta, rc
+release --no-push      Skip push step (useful during development)
+release.validate       Ensure working tree is clean
+release.bump           Bump version and create git tag
+release.changelog      Print changelog to stdout (--write to persist and commit)
+release.push           Push commit and tags to remote
+release.publish        Publish package to PyPI
+release.sbom-upload    Extract and upload SBOM to Dependency Track
+release.clean          Remove build artifacts (dist/ and sbom.json)
+
 secure                 Run all security checks
 secure.audit           pip-audit (supports --ignore with expiry dates)
-secure.extract-sbom    Generate CycloneDX SBOM
+secure.sbom-extract    Generate CycloneDX SBOM (--write to save to sbom.json)
+secure.sbom-upload     Extract SBOM and upload to OWASP Dependency Track
 
 test                   Run all tests
 test.pytest            pytest --strict
@@ -69,7 +82,22 @@ test.pytest            pytest --strict
 | `@run(cmd)` | Decorator — replace function body with a shell command |
 | `@logged(name)` | Decorator — print pass/fail status after execution |
 | `run_steps(*fns)` | Run all steps, accumulate failures, raise once at the end |
-| `PATHS` | Standard directories targeted by linters: `src/ _CI/tasks/ tests/` |
+
+## Configuration (`tasks/configuration.py`)
+
+Centralized constants shared across task modules:
+
+| Constant | Purpose |
+|----------|---------|
+| `PATHS` | Standard directories targeted by linters/formatters: `src/ _CI/tasks/ tests/` |
+| `SECURITY_OVERRIDE_ENV` | Environment variable name for security audit overrides |
+| `IGNORE_PATTERN` | Regex for parsing vulnerability IDs with optional expiry dates |
+| `OWASP_DTRACK_SETTINGS` | Required environment variables for Dependency Track uploads |
+| `PROJECT_NAME` | Project name for SBOM uploads |
+| `IMAGE_NAME` / `ACT_IMAGE_NAME` | Container image names for deps cache and act |
+| `QA_WORKFLOW` | Path to the CI workflow YAML |
+| `PYSCN_REPORTS_DIR` | Directory for pyscn HTML reports |
+| `SENTINEL` | Bootstrap sentinel file path |
 
 ## Bootstrap Framework (`tasks/bootstrap.py`)
 
@@ -94,19 +122,21 @@ Each step has a `prompt` for local interactive use and a `ci_behavior` for unatt
 ```
 _CI/
   tasks/
-    __init__.py      Namespace aggregation + bootstrap wiring
-    shared.py        Core decorators and utilities
-    bootstrap.py     One-time setup framework
-    build.py         Package build
-    container.py     Docker image + act
-    develop.py       Pre-commit management
-    document.py      MkDocs documentation
-    format_.py       Ruff formatting
-    lint.py          Ruff, pylint, ty, complexipy, commitizen
-    quality.py       pyscn analysis
-    secure.py        pip-audit, CycloneDX SBOM
-    test.py          pytest
+    __init__.py        Namespace aggregation + bootstrap wiring
+    configuration.py   Centralized constants
+    shared.py          Core decorators and utilities
+    bootstrap.py       One-time setup framework
+    build.py           Package build
+    container.py       Docker image + act
+    develop.py         Pre-commit management
+    document.py        MkDocs documentation
+    format_.py         Ruff formatting + import sorting
+    lint.py            Ruff, pylint, ty, complexipy, commitizen
+    quality.py         pyscn analysis
+    release.py         Version bump, changelog, publish, SBOM upload
+    secure.py          pip-audit, CycloneDX SBOM, Dependency Track upload
+    test.py            pytest
   lib/
-    vendor/          Vendored Invoke + dependencies (committed)
-    vendor.txt       Pinned dependency list
+    vendor/            Vendored Invoke + dependencies (committed)
+    vendor.txt         Pinned dependency list
 ```

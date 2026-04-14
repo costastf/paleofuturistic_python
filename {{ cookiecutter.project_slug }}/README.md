@@ -17,18 +17,35 @@ Prerequisite: [uv](https://docs.astral.sh/uv/)
 ### Setup
 
 - Fork and clone this repository.
-- Download additional dependencies: `uv sync --all-extras --dev`
-- Optional: validate the setup with `uv run python -m unittest`
+- Download dependencies: `uv sync --all-extras --dev`
+- On first run of any workflow command, the bootstrap step will prompt to install pre-commit hooks.
 
 ### Workflow
 
-- Download dependencies (if you need any): `uv add some_lib_you_need`
+All commands are invoked via `./workflow.cmd <namespace>.<task>`:
+
+| Command | Description |
+|---------|-------------|
+| `./workflow.cmd format` | Format code and sort imports |
+| `./workflow.cmd lint` | Run all linters (ruff, pylint, ty, complexipy, commitizen) |
+| `./workflow.cmd test` | Run all tests (pytest) |
+| `./workflow.cmd build` | Run security checks and build the package |
+| `./workflow.cmd release -i <type>` | Bump version, tag, push, build, publish, and upload SBOM |
+| `./workflow.cmd quality` | Run code quality analysis (pyscn) |
+| `./workflow.cmd secure` | Run security audit and generate SBOM |
+| `./workflow.cmd document` | Build and view documentation (mkdocs) |
+| `./workflow.cmd container.build` | Build the dependency cache container image |
+| `./workflow.cmd container.act` | Run the CI workflow locally using act |
+| `./workflow.cmd develop.pre-commit` | Run all pre-commit hooks on the codebase |
+| `./workflow.cmd bootstrap --force` | Re-run the development environment setup |
+
+### Development cycle
+
+- Add dependencies: `uv add some_lib_you_need`
 - Develop (optional, tinker: `uvx --with-editable . ptpython`)
-- QA:
-    - Format: `uv run ruff format`
-    - Lint: `uv run ruff check`
-    - Type check: `uv run mypy`
-    - Test: `uv run python -m unittest`
-- Build (to validate it works): `uv build`
-- Review documentation updates: `uv run mkdocs serve`
+- Format: `./workflow.cmd format`
+- Lint: `./workflow.cmd lint`
+- Test: `./workflow.cmd test`
+- Build: `./workflow.cmd build`
+- Review docs: `./workflow.cmd document`
 - Make a pull request.

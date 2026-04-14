@@ -5,14 +5,15 @@ from typing import cast
 from invoke import Collection, Context, Task, task
 
 from .configuration import PATHS
-from .shared import logged, run, run_steps
+from .shared import execute, logged, run_steps
 
 
 @task
 @logged('format.ruff')
-@run(f'uv run ruff format --diff {PATHS}')
 def ruff_format(context: Context) -> None:
-    """Check code formatting with ruff."""
+    """Format code and sort imports with ruff."""
+    execute(context, f'uv run ruff check --select I --fix {PATHS}')
+    execute(context, f'uv run ruff format {PATHS}')
 
 
 @task
