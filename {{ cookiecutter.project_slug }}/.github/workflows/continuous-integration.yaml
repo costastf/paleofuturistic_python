@@ -1,10 +1,7 @@
 name: Quality Assurance CI
 
 on:
-  pull_request:
   push:
-    branches:
-      - main
 
 jobs:
   build-deps-image:
