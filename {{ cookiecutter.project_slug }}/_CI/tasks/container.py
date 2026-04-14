@@ -57,7 +57,7 @@ def act(context: Context) -> None:
             context,
             f'DOCKER_HOST=unix://{socket} act push -W {QA_WORKFLOW} --secret-file .secrets '
             f'--container-architecture linux/amd64 '
-            f'--pull=if-not-present '
+            f'--pull=false '
             f'--container-daemon-socket /var/run/docker.sock',
         )
     else:
@@ -65,7 +65,7 @@ def act(context: Context) -> None:
             context,
             f'act push -W {QA_WORKFLOW} --secret-file .secrets '
             '--container-architecture linux/amd64 '
-            '--pull=if-not-present '
+            '--pull=false '
             '--container-options "-v /var/run/docker.sock:/var/run/docker.sock"',
         )
 
@@ -104,7 +104,7 @@ def publish(context: Context) -> None:
             print(f'Image already exists: {image}')
         else:
             execute(context, f'{engine} build -f Dockerfile.deps -t {image} .')
-    Path('.deps-image').write_text(image)
+    Path('.deps-image').write_text(image, encoding='utf-8')
 
 
 @task
