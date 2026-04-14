@@ -4,7 +4,8 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .shared import PATHS, execute, logged, run, run_steps
+from .configuration import PATHS
+from .shared import execute, logged, run, run_steps
 
 
 @task

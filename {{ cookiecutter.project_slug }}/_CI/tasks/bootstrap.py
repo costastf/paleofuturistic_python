@@ -3,14 +3,12 @@
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
-from pathlib import Path
 from typing import cast
 
 from invoke import Collection, Context, Task, task
 
+from .configuration import SENTINEL
 from .shared import execute, is_ci, logged
-
-SENTINEL = Path('.bootstrapped')
 
 
 @dataclass

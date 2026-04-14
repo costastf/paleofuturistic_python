@@ -1,18 +1,13 @@
 """Security task definitions."""
 
 import os
-import re
 from datetime import date
 from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .shared import SECURITY_OVERRIDE_ENV, execute, logged, run, run_steps
-
-IGNORE_PATTERN = re.compile(
-    r'(?P<vulnerability_id>[A-Za-z0-9\-_]+)'
-    r'(::(?P<expiration_date>\d{4}-\d{2}-\d{2}))?'
-)
+from .configuration import IGNORE_PATTERN, SECURITY_OVERRIDE_ENV
+from .shared import execute, logged
 
 
 @task
@@ -35,8 +30,7 @@ def audit(context: Context, ignore: str | None = None) -> None:
     ignore_args = [
         f'--ignore-vuln {m.group("vulnerability_id")}'
         for m in IGNORE_PATTERN.finditer(combined)
-        if not m.group('expiration_date')
-        or date.fromisoformat(m.group('expiration_date')) > today
+        if not m.group('expiration_date') or date.fromisoformat(m.group('expiration_date')) > today
     ]
     ignore_opts = (' ' + ' '.join(ignore_args)) if ignore_args else ''
     execute(context, f'uv run pip-audit{ignore_opts}')
@@ -44,16 +38,36 @@ def audit(context: Context, ignore: str | None = None) -> None:
 
 @task
 @logged('secure.extract-sbom')
-@run('uv run cyclonedx-py environment --output-file sbom.json')
-def extract_sbom(context: Context) -> None:
-    """Extract a Software Bill of Materials using CycloneDX into sbom.json."""
+def extract_sbom(context: Context, write: bool = False) -> None:
+    """Extract a Software Bill of Materials using CycloneDX.
+
+    By default prints the SBOM to stdout. With --write, writes to sbom.json.
+
+    Args:
+        context: Invoke context.
+        write: Write SBOM to sbom.json instead of printing to stdout.
+    """
+    if write:
+        execute(context, 'uv run cyclonedx-py environment --output-file sbom.json')
+    else:
+        execute(context, 'uv run cyclonedx-py environment')
 
 
 @task
 @logged('secure')
 def secure(context: Context) -> None:
     """Run all security checks; reports all failures before exiting."""
-    run_steps(audit, extract_sbom)(context)
+    failed = False
+    try:
+        audit(context)
+    except SystemExit:
+        failed = True
+    try:
+        extract_sbom(context, write=True)
+    except SystemExit:
+        failed = True
+    if failed:
+        raise SystemExit(1)
 
 
 namespace = Collection('secure')

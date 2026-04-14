@@ -7,12 +7,8 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
+from .configuration import ACT_IMAGE_NAME, IMAGE_NAME, QA_WORKFLOW
 from .shared import container_engine, execute, is_ci, logged
-
-
-IMAGE_NAME = '{{ cookiecutter.project_slug }}-deps'
-ACT_IMAGE_NAME = '{{ cookiecutter.project_slug }}-act'
-QA_WORKFLOW = '.github/workflows/continuous-integration.yaml'
 
 
 def _podman_socket(context: Context) -> str:

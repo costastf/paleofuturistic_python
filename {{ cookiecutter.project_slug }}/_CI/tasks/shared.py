@@ -48,9 +48,6 @@ def container_engine() -> str:
     print('No container engine found. Install docker or podman.')
     raise SystemExit(1)
 
-PATHS = 'src/ _CI/tasks/ tests/'
-SECURITY_OVERRIDE_ENV = '{{ cookiecutter.project_slug | upper }}_SECURITY_OVERRIDE'
-
 
 def execute(context: Context, cmd: str) -> None:
     """Execute a shell command, raising SystemExit(1) on failure."""

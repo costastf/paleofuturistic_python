@@ -7,9 +7,7 @@ from invoke import task
 from _CI import (PROJECT_ROOT_DIRECTORY,
                  emojize_message,
                  make_file_executable)
-
-PROJECT_SLUG = 'paleofuturistic_python_project'
-IGNORE_PATTERNS = shutil.ignore_patterns('.git', '.venv', '__pycache__', '*.pyc', '.cruft.json')
+from _CI.tasks.configuration import IGNORE_PATTERNS, PROJECT_SLUG, QA_STEPS
 
 
 @task
@@ -49,7 +47,7 @@ def test(context):
             context.run('git -c commit.gpgsign=false commit -m "feat: initial project from template" '
                         '--author "ci <ci@localhost>"', echo=True)
             context.run('uv sync --all-extras --dev', echo=True)
-            for step in ('lint', 'test', 'build', 'document'):
+            for step in QA_STEPS:
                 result = context.run(f'./workflow.cmd {step}', warn=True, echo=True, env={'CI': 'true'})
                 if result.failed:
                     print(emojize_message(f'Task "{step}" failed', success=False))

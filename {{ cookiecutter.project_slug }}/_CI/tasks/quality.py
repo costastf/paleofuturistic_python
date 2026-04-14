@@ -5,9 +5,8 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
+from .configuration import PYSCN_REPORTS_DIR
 from .shared import execute, is_ci, logged, open_command, run, run_steps
-
-PYSCN_REPORTS_DIR = Path('.pyscn/reports')
 
 
 def latest_pyscn_report() -> Path:
