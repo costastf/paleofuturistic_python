@@ -25,7 +25,7 @@ def validate(context: Context) -> None:
 @task
 @logged('release.bump')
 def bump(context: Context, increment: str = '') -> None:
-    """Bump the version, update the changelog, and create a git tag.
+    """Bump the version and create a git tag.
 
     Args:
         context: Invoke context.
@@ -42,6 +42,15 @@ def bump(context: Context, increment: str = '') -> None:
         execute(context, f'uv run cz bump --prerelease {increment} --allow-no-commit --yes')
     else:
         execute(context, f'uv run cz bump --increment {increment} --allow-no-commit --yes')
+
+
+@task
+@logged('release.changelog')
+def changelog(context: Context) -> None:
+    """Generate the changelog from all tags and commit it."""
+    execute(context, 'uv run cz changelog')
+    execute(context, 'git add docs/changelog.md')
+    execute(context, 'git commit --no-gpg-sign -m "docs: update changelog"')
 
 
 @task
@@ -73,6 +82,7 @@ def release(context: Context, increment: str = '', no_push: bool = False) -> Non
     """
     validate(context)
     bump(context, increment=increment)
+    changelog(context)
     if no_push:
         print('Skipping push.')
     else:
@@ -85,6 +95,7 @@ namespace = Collection('release')
 namespace.add_task(cast(Task, release), default=True, name='all')
 namespace.add_task(cast(Task, validate))
 namespace.add_task(cast(Task, bump))
+namespace.add_task(cast(Task, changelog))
 namespace.add_task(cast(Task, push))
 namespace.add_task(cast(Task, publish))
 
