@@ -11,6 +11,7 @@ from .shared import container_engine, execute, is_ci, logged
 
 
 IMAGE_NAME = '{{ cookiecutter.project_slug }}-deps'
+ACT_IMAGE_NAME = '{{ cookiecutter.project_slug }}-act'
 QA_WORKFLOW = '.github/workflows/continuous-integration.yaml'
 
 
@@ -51,6 +52,7 @@ def build(context: Context) -> None:
 def act(context: Context) -> None:
     """Run the QA workflow locally using act."""
     engine = container_engine()
+    execute(context, f'{engine} build -f Dockerfile.act -t {ACT_IMAGE_NAME}:latest .')
     if engine == 'podman':
         socket = _podman_socket(context)
         execute(

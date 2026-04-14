@@ -28,6 +28,13 @@ jobs:
           git fetch --depth=1 origin "${GITHUB_SHA}"
           git checkout FETCH_HEAD
 
+      - name: Install uv
+        {#- Escape curly braces for Cookiecutter. -#}
+        {%- raw %}
+        if: ${{ !env.ACT }}
+        {%- endraw %}
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
       - name: Publish deps image
         id: deps
         run: |
