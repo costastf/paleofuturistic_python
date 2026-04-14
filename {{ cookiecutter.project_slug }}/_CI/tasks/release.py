@@ -39,9 +39,9 @@ def bump(context: Context, increment: str = '') -> None:
         print(f'  increment: {", ".join(valid)}')
         raise SystemExit(1)
     if increment in prerelease_types:
-        execute(context, f'uv run cz bump --prerelease {increment} --yes')
+        execute(context, f'uv run cz bump --prerelease {increment} --allow-no-commit --yes')
     else:
-        execute(context, f'uv run cz bump --increment {increment} --yes')
+        execute(context, f'uv run cz bump --increment {increment} --allow-no-commit --yes')
 
 
 @task
