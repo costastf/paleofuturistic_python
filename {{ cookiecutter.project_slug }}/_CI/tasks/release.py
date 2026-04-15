@@ -78,16 +78,21 @@ def push(context: Context) -> None:
 @task
 @logged('release.publish')
 def publish(context: Context) -> None:
-    """Publish the package to PyPI."""
+    """Build, publish, and upload SBOM — the full post-release publishing pipeline."""
+    clean(context)
+    build(context)
     execute(context, 'uv publish')
+    sbom_upload(context)
+    clean(context)
 
 
 @task
 @logged('release')
 def release(context: Context, increment: str = '', no_push: bool = False) -> None:
-    """Run the full release flow: validate, bump, push, build, and publish.
+    """Run the release flow: validate, bump version, update changelog, and push.
 
     Steps execute sequentially — any failure stops the chain.
+    Use ``release.publish`` separately to build, publish, and upload the SBOM.
 
     Args:
         context: Invoke context.
@@ -95,17 +100,12 @@ def release(context: Context, increment: str = '', no_push: bool = False) -> Non
         no_push: Skip push step (useful during development).
     """
     validate(context)
-    clean(context)
     bump(context, increment=increment)
     changelog(context, write=True)
     if no_push:
         print('Skipping push.')
     else:
         push(context)
-    build(context)
-    publish(context)
-    sbom_upload(context)
-    clean(context)
 
 
 @task
