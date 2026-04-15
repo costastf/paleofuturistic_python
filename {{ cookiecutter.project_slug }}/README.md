@@ -1,5 +1,15 @@
 # {{ cookiecutter.project_name }}
 
+[![Python](https://img.shields.io/badge/python-{{ cookiecutter.python_version }}-blue?logo=python&logoColor=white)](https://www.python.org)
+{%- if cookiecutter.include_apache_license %}
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](https://opensource.org/licenses/Apache-2.0)
+{%- endif %}
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
+[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://conventionalcommits.org)
+[![pyscn quality](https://img.shields.io/badge/pyscn-A-brightgreen)](https://pyscn.ludo-tech.org)
+
 {{ cookiecutter.project_description }}
 
 ## Usage
