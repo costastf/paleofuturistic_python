@@ -45,5 +45,5 @@ jobs:
       - name: Publish deps image
         id: deps
         run: |
-          ./workflow.cmd container publish
+          ./workflow.cmd container.publish
           echo "image=$(cat .deps-image)" >> "$GITHUB_OUTPUT"
