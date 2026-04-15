@@ -1,0 +1,85 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-deps-image:
+    name: Build dependency image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      {#- Escape curly braces for Cookiecutter. -#}
+      {%- raw %}
+      image: ${{ steps.deps.outputs.image }}
+      {%- endraw %}
+
+    steps:
+      - name: Checkout repository
+        {#- Escape curly braces for Cookiecutter. -#}
+        {%- raw %}
+        if: ${{ !env.ACT }}
+        {%- endraw %}
+        run: |
+          git init -b main
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "${GITHUB_SHA}"
+          git checkout FETCH_HEAD
+
+      - name: Install uv
+        {#- Escape curly braces for Cookiecutter. -#}
+        {%- raw %}
+        if: ${{ !env.ACT }}
+        {%- endraw %}
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Publish deps image
+        id: deps
+        run: |
+          ./workflow.cmd container publish
+          echo "image=$(cat .deps-image)" >> "$GITHUB_OUTPUT"
+
+  publish:
+    name: Publish package
+    needs: build-deps-image
+    runs-on: ubuntu-latest
+    container:
+      {#- Escape curly braces for Cookiecutter. -#}
+      {%- raw %}
+      image: ${{ needs.build-deps-image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      {%- endraw %}
+    environment: pypi
+
+    steps:
+      - name: Configure git
+        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+
+      - name: Checkout repository
+        {#- Escape curly braces for Cookiecutter. -#}
+        {%- raw %}
+        if: ${{ !env.ACT }}
+        {%- endraw %}
+        run: |
+          git init -b main
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "${GITHUB_SHA}"
+          git checkout FETCH_HEAD
+
+      - name: Publish package and upload SBOM
+        env:
+          {#- Escape curly braces for Cookiecutter. -#}
+          {%- raw %}
+          UV_PUBLISH_URL: ${{ secrets.UV_PUBLISH_URL }}
+          UV_PUBLISH_PASSWORD: ${{ secrets.UV_PUBLISH_PASSWORD }}
+          UV_PUBLISH_USERNAME: ${{ secrets.UV_PUBLISH_USERNAME }}
+          OWASP_DTRACK_URL: ${{ secrets.OWASP_DTRACK_URL }}
+          OWASP_DTRACK_API_KEY: ${{ secrets.OWASP_DTRACK_API_KEY }}
+          {%- endraw %}
+        run: ./workflow.cmd release.publish
