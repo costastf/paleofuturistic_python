@@ -7,41 +7,10 @@ on:
 
 jobs:
   build-deps-image:
-    name: Build dependency image
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/build-deps-image.yaml
     permissions:
       contents: read
       packages: write
-    outputs:
-      {#- Escape curly braces for Cookiecutter. -#}
-      {%- raw %}
-      image: ${{ steps.deps.outputs.image }}
-      {%- endraw %}
-
-    steps:
-      - name: Checkout repository
-        {#- Escape curly braces for Cookiecutter. -#}
-        {%- raw %}
-        if: ${{ !env.ACT }}
-        {%- endraw %}
-        run: |
-          git init -b main
-          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git fetch --depth=1 origin "${GITHUB_SHA}"
-          git checkout FETCH_HEAD
-
-      - name: Install uv
-        {#- Escape curly braces for Cookiecutter. -#}
-        {%- raw %}
-        if: ${{ !env.ACT }}
-        {%- endraw %}
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
-
-      - name: Publish deps image
-        id: deps
-        run: |
-          ./workflow.cmd container publish
-          echo "image=$(cat .deps-image)" >> "$GITHUB_OUTPUT"
 
   publish:
     name: Publish package
