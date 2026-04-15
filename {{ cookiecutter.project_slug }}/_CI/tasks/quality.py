@@ -1,5 +1,7 @@
 """Quality task definitions."""
 
+import json
+import re
 from pathlib import Path
 from typing import cast
 
@@ -8,10 +10,40 @@ from invoke import Collection, Context, Task, task
 from .configuration import PYSCN_REPORTS_DIR
 from .shared import execute, is_ci, logged, open_command, run, run_steps
 
+_GRADE_COLORS = {'A': 'brightgreen', 'B': 'green', 'C': 'yellow', 'D': 'orange', 'F': 'red'}
+_BADGE_PATTERN = re.compile(r'(!\[pyscn quality\]\(https://img\.shields\.io/badge/pyscn-)[^)]+(\)\[)')
+
 
 def latest_pyscn_report() -> Path:
     """Return the most recently created pyscn HTML report."""
     return max(PYSCN_REPORTS_DIR.glob('analyze_*.html'), key=lambda p: p.stat().st_mtime)
+
+
+def _latest_pyscn_json() -> Path:
+    """Return the most recently created pyscn JSON report."""
+    return max(PYSCN_REPORTS_DIR.glob('analyze_*.json'), key=lambda p: p.stat().st_mtime)
+
+
+def _update_pyscn_badge() -> None:
+    """Update the pyscn badge in README.md with the grade from the latest report."""
+    readme = Path('README.md')
+    if not readme.exists():
+        return
+    try:
+        report = json.loads(_latest_pyscn_json().read_text(encoding='utf-8'))
+        grade = report['summary']['grade']
+    except (ValueError, KeyError, FileNotFoundError):
+        return
+    color = _GRADE_COLORS.get(grade, 'lightgrey')
+    content = readme.read_text(encoding='utf-8')
+    updated = re.sub(
+        r'(\[!\[pyscn quality\]\(https://img\.shields\.io/badge/pyscn-)[^)]+(\))',
+        rf'\g<1>{grade}-{color}\2',
+        content,
+    )
+    if updated != content:
+        readme.write_text(updated, encoding='utf-8')
+        print(f'Updated pyscn badge to grade {grade}.')
 
 
 @task
@@ -19,6 +51,7 @@ def latest_pyscn_report() -> Path:
 def pyscn_analyze(context: Context) -> None:
     """Run pyscn comprehensive analysis with HTML report."""
     execute(context, 'uv run pyscn analyze src/')
+    _update_pyscn_badge()
     if not is_ci():
         execute(context, f'{open_command()} {latest_pyscn_report()}')
 
@@ -34,6 +67,7 @@ def pyscn_check(context: Context) -> None:
 def pyscn_analyze_only(context: Context) -> None:
     """Run pyscn analyze without opening the report."""
     execute(context, 'uv run pyscn analyze src/')
+    _update_pyscn_badge()
 
 
 @task
