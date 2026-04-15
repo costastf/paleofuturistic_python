@@ -75,7 +75,9 @@ secure.sbom-upload     Extract SBOM and upload to OWASP Dependency Track
 {%- endif %}
 
 test                   Run all tests
-test.pytest            pytest --strict
+test.pytest            Run pytest with coverage and HTML reports
+test.coverage          Show test coverage report in terminal
+test.view              Open HTML test report in browser
 ```
 
 ## Shared Utilities (`tasks/shared.py`)

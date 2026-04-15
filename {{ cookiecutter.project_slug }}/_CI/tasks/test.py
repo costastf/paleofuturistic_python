@@ -4,14 +4,28 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .shared import logged, run, run_steps
+from .shared import execute, logged, open_command, run, run_steps
 
 
 @task
 @logged('test.pytest')
-@run('uv run pytest --strict')
+@run('uv run pytest')
 def pytest(context: Context) -> None:
     """Run pytest."""
+
+
+@task
+@logged('test.coverage')
+@run('uv run coverage report')
+def coverage(context: Context) -> None:
+    """Show test coverage report in terminal."""
+
+
+@task
+@logged('test.view')
+def view(context: Context) -> None:
+    """Open HTML test report in browser."""
+    execute(context, f'{open_command()} reports/tests.html')
 
 
 @task
@@ -24,3 +38,5 @@ def test(context: Context) -> None:
 namespace = Collection('test')
 namespace.add_task(cast(Task, test), default=True, name='all')
 namespace.add_task(cast(Task, pytest))
+namespace.add_task(cast(Task, coverage))
+namespace.add_task(cast(Task, view))

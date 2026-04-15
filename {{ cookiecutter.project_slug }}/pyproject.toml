@@ -57,7 +57,10 @@ security = [
 ]
 test = [
     "pytest",
+    "pytest-cov",
     "pytest-env",
+    "pytest-html",
+    "pytest-xdist",
 ]
 
 [build-system]
@@ -211,12 +214,37 @@ disable = [
 ]
 
 [tool.pytest.ini_options]
+addopts = [
+    "-n", "auto",
+    "--strict-markers",
+    "--cov", "--cov-report=term-missing",
+    "--cov-report=html:reports/coverage",
+    "--html=reports/tests.html", "--self-contained-html",
+]
 markers = []
 filterwarnings = []
 pythonpath = ["src"]
 testpaths = ["tests"]
 env = []
 env_files = [".env"]
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 0
+
+[tool.coverage.paths]
+source = [
+    "src/",
+    "*/site-packages/",
+]
+
+[tool.coverage.html]
+directory = "reports/coverage"
 
 
 [tool.uv]
