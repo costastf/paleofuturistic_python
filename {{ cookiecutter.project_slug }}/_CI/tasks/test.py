@@ -59,6 +59,7 @@ def pytest(context: Context) -> None:
 def coverage(context: Context) -> None:
     """Show test coverage report in terminal."""
     execute(context, 'uv run coverage report')
+    execute(context, f'uv run coverage json -o {_COVERAGE_REPORT}')
     _update_coverage_badge()
 
 
