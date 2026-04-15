@@ -3,7 +3,7 @@
 import hashlib
 import os
 from pathlib import Path
-from typing import cast
+from typing import NamedTuple, cast
 
 from invoke import Collection, Context, Task, task
 
@@ -70,13 +70,46 @@ def act(context: Context) -> None:
         )
 
 
+class _RegistrySettings(NamedTuple):
+    url: str
+    user: str
+    password_env: str
+    image_prefix: str
+
+
+def _ci_registry_settings() -> _RegistrySettings:
+    """Detect CI platform and return container registry settings.
+
+    Raises:
+        SystemExit: If the CI platform cannot be determined.
+    """
+    if os.environ.get('GITHUB_ACTIONS'):
+        repo = os.environ['GITHUB_REPOSITORY']
+        return _RegistrySettings(
+            url='ghcr.io',
+            user=os.environ['GITHUB_ACTOR'],
+            password_env='GITHUB_TOKEN',
+            image_prefix=f'ghcr.io/{repo}',
+        )
+    if os.environ.get('GITLAB_CI'):
+        return _RegistrySettings(
+            url=os.environ['CI_REGISTRY'],
+            user=os.environ['CI_REGISTRY_USER'],
+            password_env='CI_REGISTRY_PASSWORD',
+            image_prefix=os.environ['CI_REGISTRY_IMAGE'],
+        )
+    print('Unsupported CI platform.')
+    raise SystemExit(1)
+
+
 @task
 @logged('container.publish')
 def publish(context: Context) -> None:
-    """Build the deps image and publish to GHCR (CI) or keep it local.
+    """Build the deps image and publish to a container registry (CI) or keep it local.
 
-    In CI (``GITHUB_ACTIONS=true``): logs into GHCR, checks whether the
-    image already exists, builds and pushes only when missing.
+    In CI: detects the platform (GitHub Actions / GitLab CI), logs into the
+    appropriate registry, checks whether the image already exists, and builds
+    and pushes only when missing.
 
     Locally: builds and tags the image without pushing anywhere.
 
@@ -85,10 +118,11 @@ def publish(context: Context) -> None:
     engine = container_engine()
     tag = hashlib.sha256(Path('uv.lock').read_bytes()).hexdigest()[:16]
     if is_ci() and not os.environ.get('ACT'):
-        repository = os.environ['GITHUB_REPOSITORY']
-        image = f'ghcr.io/{repository}-deps:{tag}'
+        settings = _ci_registry_settings()
+        image = f'{settings.image_prefix}-deps:{tag}'
         context.run(
-            f'echo "$GITHUB_TOKEN" | {engine} login ghcr.io -u "$GITHUB_ACTOR" --password-stdin',
+            f'echo "${settings.password_env}" | {engine} login {settings.url} '
+            f'-u "{settings.user}" --password-stdin',
             hide=True,
         )
         result = context.run(f'{engine} manifest inspect {image}', hide=True, warn=True)

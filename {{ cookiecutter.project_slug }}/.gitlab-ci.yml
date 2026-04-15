@@ -1,0 +1,67 @@
+stages:
+  - deps
+  - ci
+  - publish
+
+build-deps-image:
+  stage: deps
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - apk add --no-cache curl
+    - curl -LsSf https://astral.sh/uv/install.sh | sh
+    - export PATH="$HOME/.local/bin:$PATH"
+  script:
+    - ./workflow.cmd container.publish
+    - echo "DEPS_IMAGE=$(cat .deps-image)" > .deps-image.env
+  artifacts:
+    reports:
+      dotenv: .deps-image.env
+
+lint:
+  stage: ci
+  image: $DEPS_IMAGE
+  needs:
+    - job: build-deps-image
+      artifacts: true
+  before_script:
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+  script:
+    - ./workflow.cmd lint
+
+test:
+  stage: ci
+  image: $DEPS_IMAGE
+  needs:
+    - job: build-deps-image
+      artifacts: true
+  before_script:
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+  script:
+    - ./workflow.cmd test
+
+build:
+  stage: ci
+  image: $DEPS_IMAGE
+  needs:
+    - job: build-deps-image
+      artifacts: true
+  before_script:
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+  script:
+    - ./workflow.cmd build
+
+publish:
+  stage: publish
+  image: $DEPS_IMAGE
+  needs:
+    - job: build-deps-image
+      artifacts: true
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v/
+  environment: pypi
+  before_script:
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+  script:
+    - ./workflow.cmd release.publish
