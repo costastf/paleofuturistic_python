@@ -24,7 +24,8 @@ def coverage(context: Context) -> None:
 @task
 @logged('test.view')
 def view(context: Context) -> None:
-    """Open HTML test and coverage reports in browser."""
+    """Run tests and open HTML test and coverage reports in browser."""
+    test(context)
     execute(context, f'{open_command()} reports/tests.html')
     execute(context, f'{open_command()} reports/coverage/index.html')
 
