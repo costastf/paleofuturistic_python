@@ -219,6 +219,7 @@ addopts = [
     "--strict-markers",
     "--cov", "--cov-report=term-missing",
     "--cov-report=html:reports/coverage",
+    "--cov-report=json:reports/coverage.json",
     "--html=reports/tests.html", "--self-contained-html",
 ]
 markers = []
