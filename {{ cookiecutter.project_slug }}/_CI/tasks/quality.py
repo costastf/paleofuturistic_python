@@ -50,7 +50,7 @@ def _update_pyscn_badge() -> None:
 @logged('quality.pyscn-analyze')
 def pyscn_analyze(context: Context) -> None:
     """Run pyscn comprehensive analysis with HTML report."""
-    execute(context, 'uv run pyscn analyze src/')
+    execute(context, 'uv run pyscn analyze --json src/')
     _update_pyscn_badge()
     if not is_ci():
         execute(context, f'{open_command()} {latest_pyscn_report()}')
@@ -66,7 +66,7 @@ def pyscn_check(context: Context) -> None:
 @logged('quality.pyscn-analyze')
 def pyscn_analyze_only(context: Context) -> None:
     """Run pyscn analyze without opening the report."""
-    execute(context, 'uv run pyscn analyze src/')
+    execute(context, 'uv run pyscn analyze --json src/')
     _update_pyscn_badge()
 
 

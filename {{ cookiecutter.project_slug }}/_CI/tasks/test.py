@@ -56,9 +56,10 @@ def pytest(context: Context) -> None:
 
 @task
 @logged('test.coverage')
-@run('uv run coverage report')
 def coverage(context: Context) -> None:
     """Show test coverage report in terminal."""
+    execute(context, 'uv run coverage report')
+    _update_coverage_badge()
 
 
 @task
