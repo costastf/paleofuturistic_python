@@ -1,5 +1,6 @@
 # {{ cookiecutter.project_name }}
 
+[![Version](https://img.shields.io/badge/version-0.0.0-blue)](https://pypi.org/project/{{ cookiecutter.project_slug }}/)
 [![Python](https://img.shields.io/badge/python-{{ cookiecutter.python_version }}-blue?logo=python&logoColor=white)](https://www.python.org)
 {%- if cookiecutter.include_apache_license %}
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](https://opensource.org/licenses/Apache-2.0)
