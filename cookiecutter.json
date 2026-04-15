@@ -6,5 +6,6 @@
   "email": "me@here.now",
   "python_version": "3.13",
   "include_apache_license": true,
+  "integrate_dependency_track": true,
   "_copy_without_render": ["_CI/lib/*", "*/_CI/lib/*"]
 }

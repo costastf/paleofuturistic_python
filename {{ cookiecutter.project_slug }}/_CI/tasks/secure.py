@@ -6,7 +6,10 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .configuration import IGNORE_PATTERN, OWASP_DTRACK_SETTINGS, PROJECT_NAME, SECURITY_OVERRIDE_ENV
+from .configuration import IGNORE_PATTERN, SECURITY_OVERRIDE_ENV
+{%- if cookiecutter.integrate_dependency_track %}
+from .configuration import OWASP_DTRACK_SETTINGS, PROJECT_NAME
+{%- endif %}
 from .shared import execute, logged
 
 
@@ -53,6 +56,9 @@ def sbom_extract(context: Context, write: bool = False) -> None:
         execute(context, 'uv run cyclonedx-py environment')
 
 
+{%- if cookiecutter.integrate_dependency_track %}
+
+
 @task
 @logged('secure.sbom-upload')
 def sbom_upload(context: Context) -> None:
@@ -78,6 +84,7 @@ def sbom_upload(context: Context) -> None:
         f'--project-version {version} '
         f'--auto-create sbom.json',
     )
+{%- endif %}
 
 
 @task
@@ -101,4 +108,6 @@ namespace = Collection('secure')
 namespace.add_task(cast(Task, secure), default=True, name='all')
 namespace.add_task(cast(Task, audit))
 namespace.add_task(cast(Task, sbom_extract))
+{%- if cookiecutter.integrate_dependency_track %}
 namespace.add_task(cast(Task, sbom_upload))
+{%- endif %}

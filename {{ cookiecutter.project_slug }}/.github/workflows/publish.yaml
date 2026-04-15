@@ -48,7 +48,11 @@ jobs:
           UV_PUBLISH_URL: ${{ secrets.UV_PUBLISH_URL }}
           UV_PUBLISH_PASSWORD: ${{ secrets.UV_PUBLISH_PASSWORD }}
           UV_PUBLISH_USERNAME: ${{ secrets.UV_PUBLISH_USERNAME }}
+          {%- endraw %}
+          {%- if cookiecutter.integrate_dependency_track %}
+          {%- raw %}
           OWASP_DTRACK_URL: ${{ secrets.OWASP_DTRACK_URL }}
           OWASP_DTRACK_API_KEY: ${{ secrets.OWASP_DTRACK_API_KEY }}
           {%- endraw %}
+          {%- endif %}
         run: ./workflow.cmd release.publish

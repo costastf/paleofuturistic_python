@@ -62,13 +62,17 @@ release.bump           Bump version and create git tag
 release.changelog      Print changelog to stdout (--write to persist and commit)
 release.push           Push commit and tags to remote
 release.publish        Publish package to PyPI
+{%- if cookiecutter.integrate_dependency_track %}
 release.sbom-upload    Extract and upload SBOM to Dependency Track
+{%- endif %}
 release.clean          Remove build artifacts (dist/ and sbom.json)
 
 secure                 Run all security checks
 secure.audit           pip-audit (supports --ignore with expiry dates)
 secure.sbom-extract    Generate CycloneDX SBOM (--write to save to sbom.json)
+{%- if cookiecutter.integrate_dependency_track %}
 secure.sbom-upload     Extract SBOM and upload to OWASP Dependency Track
+{%- endif %}
 
 test                   Run all tests
 test.pytest            pytest --strict
@@ -92,8 +96,10 @@ Centralized constants shared across task modules:
 | `PATHS` | Standard directories targeted by linters/formatters: `src/ _CI/tasks/ tests/` |
 | `SECURITY_OVERRIDE_ENV` | Environment variable name for security audit overrides |
 | `IGNORE_PATTERN` | Regex for parsing vulnerability IDs with optional expiry dates |
+{%- if cookiecutter.integrate_dependency_track %}
 | `OWASP_DTRACK_SETTINGS` | Required environment variables for Dependency Track uploads |
 | `PROJECT_NAME` | Project name for SBOM uploads |
+{%- endif %}
 | `IMAGE_NAME` / `ACT_IMAGE_NAME` | Container image names for deps cache and act |
 | `QA_WORKFLOW` | Path to the CI workflow YAML |
 | `PYSCN_REPORTS_DIR` | Directory for pyscn HTML reports |
