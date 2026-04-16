@@ -9,15 +9,15 @@ from invoke import Collection, Context, Task, task
 from .shared import logged, run, run_steps
 from .secure import secure
 
-_STATUS_COLORS = {'passing': 'brightgreen', 'failing': 'red'}
+STATUS_COLORS = {'passing': 'brightgreen', 'failing': 'red'}
 
 
-def _update_build_badge(status: str) -> None:
+def update_build_badge(status: str) -> None:
     """Update the build badge in README.md."""
     readme = Path('README.md')
     if not readme.exists():
         return
-    color = _STATUS_COLORS.get(status, 'lightgrey')
+    color = STATUS_COLORS.get(status, 'lightgrey')
     content = readme.read_text(encoding='utf-8')
     updated = re.sub(
         r'(\[!\[Build\]\(https://img\.shields\.io/badge/build-)[^)]+(\))',
@@ -43,9 +43,9 @@ def build(context: Context) -> None:
     try:
         run_steps(secure, package)(context)
     except SystemExit:
-        _update_build_badge('failing')
+        update_build_badge('failing')
         raise
-    _update_build_badge('passing')
+    update_build_badge('passing')
 
 
 namespace = Collection('build')

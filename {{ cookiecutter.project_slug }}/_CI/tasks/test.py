@@ -9,10 +9,21 @@ from invoke import Collection, Context, Task, task
 
 from .shared import execute, logged, open_command, run, run_steps
 
-_COVERAGE_REPORT = Path('reports/coverage.json')
+COVERAGE_REPORT = Path('reports/coverage.json')
+PYPROJECT = Path('pyproject.toml')
 
 
-def _coverage_color(pct: float) -> str:
+def supported_python_versions() -> list[str]:
+    """Read supported Python versions from pyproject.toml classifiers."""
+    if not PYPROJECT.exists():
+        return []
+    return re.findall(
+        r'"Programming Language :: Python :: (\d+\.\d+)"',
+        PYPROJECT.read_text(encoding='utf-8'),
+    )
+
+
+def coverage_color(pct: float) -> str:
     """Return a badge color for a coverage percentage."""
     if pct >= 90:
         return 'brightgreen'
@@ -25,40 +36,37 @@ def _coverage_color(pct: float) -> str:
     return 'red'
 
 
-_PYPROJECT = Path('pyproject.toml')
-
-
-def _ratchet_fail_under() -> None:
+def ratchet_fail_under() -> None:
     """Bump fail_under in pyproject.toml if coverage improved."""
-    if not _COVERAGE_REPORT.exists() or not _PYPROJECT.exists():
+    if not COVERAGE_REPORT.exists() or not PYPROJECT.exists():
         return
     try:
-        report = json.loads(_COVERAGE_REPORT.read_text(encoding='utf-8'))
+        report = json.loads(COVERAGE_REPORT.read_text(encoding='utf-8'))
         pct = round(report['totals']['percent_covered'])
     except (ValueError, KeyError):
         return
-    content = _PYPROJECT.read_text(encoding='utf-8')
+    content = PYPROJECT.read_text(encoding='utf-8')
     match = re.search(r'^fail_under\s*=\s*(\d+)', content, re.MULTILINE)
     if not match:
         return
     current = int(match.group(1))
     if pct > current:
         updated = content[:match.start()] + f'fail_under = {pct}' + content[match.end():]
-        _PYPROJECT.write_text(updated, encoding='utf-8')
+        PYPROJECT.write_text(updated, encoding='utf-8')
         print(f'Ratcheted fail_under from {current}% to {pct}%.')
 
 
-def _update_coverage_badge() -> None:
+def update_coverage_badge() -> None:
     """Update the coverage badge in README.md from the latest coverage report."""
     readme = Path('README.md')
-    if not readme.exists() or not _COVERAGE_REPORT.exists():
+    if not readme.exists() or not COVERAGE_REPORT.exists():
         return
     try:
-        report = json.loads(_COVERAGE_REPORT.read_text(encoding='utf-8'))
+        report = json.loads(COVERAGE_REPORT.read_text(encoding='utf-8'))
         pct = round(report['totals']['percent_covered'])
     except (ValueError, KeyError):
         return
-    color = _coverage_color(pct)
+    color = coverage_color(pct)
     content = readme.read_text(encoding='utf-8')
     updated = re.sub(
         r'(\[!\[Coverage\]\(https://img\.shields\.io/badge/coverage-)[^)]+(\))',
@@ -82,9 +90,9 @@ def pytest(context: Context) -> None:
 def coverage(context: Context) -> None:
     """Show test coverage report in terminal."""
     execute(context, 'uv run coverage report')
-    execute(context, f'uv run coverage json -o {_COVERAGE_REPORT}')
-    _update_coverage_badge()
-    _ratchet_fail_under()
+    execute(context, f'uv run coverage json -o {COVERAGE_REPORT}')
+    update_coverage_badge()
+    ratchet_fail_under()
 
 
 @task
@@ -97,16 +105,30 @@ def view(context: Context) -> None:
 
 
 @task
+@logged('test.matrix')
+def matrix(context: Context) -> None:
+    """Run pytest across all supported Python versions."""
+    versions = supported_python_versions()
+    if not versions:
+        print('No supported Python versions found in pyproject.toml classifiers.')
+        raise SystemExit(1)
+    for version in versions:
+        print(f'\n--- Python {version} ---')
+        execute(context, f'uv run --python {version} pytest')
+
+
+@task
 @logged('test')
 def test(context: Context) -> None:
     """Run all test steps; reports all failures before exiting."""
     run_steps(pytest)(context)
-    _update_coverage_badge()
-    _ratchet_fail_under()
+    update_coverage_badge()
+    ratchet_fail_under()
 
 
 namespace = Collection('test')
 namespace.add_task(cast(Task, test), default=True, name='all')
 namespace.add_task(cast(Task, pytest))
 namespace.add_task(cast(Task, coverage))
+namespace.add_task(cast(Task, matrix))
 namespace.add_task(cast(Task, view))

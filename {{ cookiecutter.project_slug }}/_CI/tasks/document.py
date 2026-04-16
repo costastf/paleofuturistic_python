@@ -6,12 +6,12 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .quality import _update_pyscn_badge
+from .quality import update_pyscn_badge
 from .shared import execute, is_ci, logged, open_command, run, run_steps
-from .test import _update_coverage_badge
+from .test import update_coverage_badge
 
 
-def _update_package_version_badge() -> None:
+def update_package_version_badge() -> None:
     """Update the package version badge in README.md from pyproject.toml."""
     readme = Path('README.md')
     pyproject = Path('pyproject.toml')
@@ -32,7 +32,7 @@ def _update_package_version_badge() -> None:
         print(f'Updated version badge to {version}.')
 
 
-def _update_python_badge() -> None:
+def update_python_badge() -> None:
     """Update the Python version badge in README.md from pyproject.toml classifiers."""
     readme = Path('README.md')
     pyproject = Path('pyproject.toml')
@@ -76,10 +76,10 @@ def view(context: Context) -> None:
 @logged('document')
 def document(context: Context) -> None:
     """Build and open the documentation; reports all failures before exiting."""
-    _update_package_version_badge()
-    _update_python_badge()
-    _update_coverage_badge()
-    _update_pyscn_badge()
+    update_package_version_badge()
+    update_python_badge()
+    update_coverage_badge()
+    update_pyscn_badge()
     run_steps(build, view)(context)
 
 
