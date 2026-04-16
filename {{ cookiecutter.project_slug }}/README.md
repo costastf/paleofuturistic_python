@@ -1,7 +1,7 @@
 # {{ cookiecutter.project_name }}
 
 [![Version](https://img.shields.io/badge/version-0.0.0-blue)](https://pypi.org/project/{{ cookiecutter.project_slug }}/)
-[![Python](https://img.shields.io/badge/python-{{ cookiecutter.python_version }}-blue?logo=python&logoColor=white)](https://www.python.org)
+[![Python](https://img.shields.io/badge/python-{% for version in cookiecutter._known_python_versions if version >= cookiecutter.min_python_version and version <= cookiecutter.max_python_version %}{{ version }}{% if not loop.last %}%20%7C%20{% endif %}{% endfor %}-blue?logo=python&logoColor=white)](https://www.python.org)
 {%- if cookiecutter.include_apache_license %}
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](https://opensource.org/licenses/Apache-2.0)
 {%- endif %}

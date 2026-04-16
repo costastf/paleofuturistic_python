@@ -33,23 +33,27 @@ def _update_package_version_badge() -> None:
 
 
 def _update_python_badge() -> None:
-    """Update the Python version badge in README.md from .python-version."""
+    """Update the Python version badge in README.md from pyproject.toml classifiers."""
     readme = Path('README.md')
-    python_version_file = Path('.python-version')
-    if not readme.exists() or not python_version_file.exists():
+    pyproject = Path('pyproject.toml')
+    if not readme.exists() or not pyproject.exists():
         return
-    version = python_version_file.read_text(encoding='utf-8').strip()
-    if not version:
+    versions = re.findall(
+        r'"Programming Language :: Python :: (\d+\.\d+)"',
+        pyproject.read_text(encoding='utf-8'),
+    )
+    if not versions:
         return
+    label = '%20%7C%20'.join(versions)
     content = readme.read_text(encoding='utf-8')
     updated = re.sub(
         r'(\[!\[Python\]\(https://img\.shields\.io/badge/python-)[^)]+(\))',
-        rf'\g<1>{version}-blue?logo=python&logoColor=white\2',
+        rf'\g<1>{label}-blue?logo=python&logoColor=white\2',
         content,
     )
     if updated != content:
         readme.write_text(updated, encoding='utf-8')
-        print(f'Updated Python badge to {version}.')
+        print(f'Updated Python badge to {" | ".join(versions)}.')
 
 
 @task
