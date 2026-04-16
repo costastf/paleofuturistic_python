@@ -42,7 +42,7 @@ def _strip_leading_docstring(text: str) -> str:
 def prepend_header(filepath: Path, *, with_logging: bool = False) -> None:
     """Prepend the standard file header to a Python source file."""
     filename = filepath.name
-    content = _strip_leading_docstring(filepath.read_text(encoding='utf-8'))
+    content = _strip_leading_docstring(filepath.read_text(encoding='utf-8')).strip()
     header_lines = []
     if license_header:
         header_lines.append(license_header.rstrip())
@@ -66,8 +66,12 @@ def prepend_header(filepath: Path, *, with_logging: bool = False) -> None:
         header_lines.append('LOGGER = logging.getLogger(LOGGER_BASENAME)')
         header_lines.append('LOGGER.addHandler(logging.NullHandler())')
         header_lines.append('')
-    header = '\n'.join(header_lines) + '\n'
-    filepath.write_text(header + content, encoding='utf-8')
+    header = '\n'.join(header_lines)
+    if content:
+        result = header + '\n' + content + '\n'
+    else:
+        result = header.rstrip() + '\n'
+    filepath.write_text(result, encoding='utf-8')
 
 
 # Add headers to all Python files in src/ and tests/.
