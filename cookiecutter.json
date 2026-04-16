@@ -4,8 +4,11 @@
   "project_description": "Development flow as Paleofuturistic Python",
   "full_name": "Paleofuturistic Python",
   "email": "me@here.now",
-  "python_version": "3.13",
+  "min_python_version": ["3.13", "3.14"],
+  "max_python_version": ["3.14", "3.13"],
+  "python_version": "{{ cookiecutter.min_python_version }}",
   "include_apache_license": true,
   "integrate_dependency_track": true,
+  "_known_python_versions": ["3.13", "3.14"],
   "_copy_without_render": ["_CI/lib/*", "*/_CI/lib/*"]
 }

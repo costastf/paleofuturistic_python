@@ -25,6 +25,29 @@ def _coverage_color(pct: float) -> str:
     return 'red'
 
 
+_PYPROJECT = Path('pyproject.toml')
+
+
+def _ratchet_fail_under() -> None:
+    """Bump fail_under in pyproject.toml if coverage improved."""
+    if not _COVERAGE_REPORT.exists() or not _PYPROJECT.exists():
+        return
+    try:
+        report = json.loads(_COVERAGE_REPORT.read_text(encoding='utf-8'))
+        pct = round(report['totals']['percent_covered'])
+    except (ValueError, KeyError):
+        return
+    content = _PYPROJECT.read_text(encoding='utf-8')
+    match = re.search(r'^fail_under\s*=\s*(\d+)', content, re.MULTILINE)
+    if not match:
+        return
+    current = int(match.group(1))
+    if pct > current:
+        updated = content[:match.start()] + f'fail_under = {pct}' + content[match.end():]
+        _PYPROJECT.write_text(updated, encoding='utf-8')
+        print(f'Ratcheted fail_under from {current}% to {pct}%.')
+
+
 def _update_coverage_badge() -> None:
     """Update the coverage badge in README.md from the latest coverage report."""
     readme = Path('README.md')
@@ -61,6 +84,7 @@ def coverage(context: Context) -> None:
     execute(context, 'uv run coverage report')
     execute(context, f'uv run coverage json -o {_COVERAGE_REPORT}')
     _update_coverage_badge()
+    _ratchet_fail_under()
 
 
 @task
@@ -78,6 +102,7 @@ def test(context: Context) -> None:
     """Run all test steps; reports all failures before exiting."""
     run_steps(pytest)(context)
     _update_coverage_badge()
+    _ratchet_fail_under()
 
 
 namespace = Collection('test')

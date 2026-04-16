@@ -11,7 +11,7 @@ jobs:
       packages: write
 
   ci:
-    name: Continuous Integration
+    name: Lint and build
     needs: build-deps-image
     runs-on: ubuntu-latest
     container:
@@ -41,8 +41,47 @@ jobs:
       - name: Lint code
         run: ./workflow.cmd lint
 
-      - name: Run tests
-        run: ./workflow.cmd test
-
       - name: Build package
         run: ./workflow.cmd build
+
+  test:
+    name: Test (Python {%- raw %}${{ matrix.python-version }}{%- endraw %})
+    needs: build-deps-image
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version:
+{%- for version in cookiecutter._known_python_versions %}
+{%- if version >= cookiecutter.min_python_version and version <= cookiecutter.max_python_version %}
+          - "{{ version }}"
+{%- endif %}
+{%- endfor %}
+    container:
+      {#- Escape curly braces for Cookiecutter. -#}
+      {%- raw %}
+      image: ${{ needs.build-deps-image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      {%- endraw %}
+
+    steps:
+      - name: Configure git
+        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+
+      - name: Checkout repository
+        {#- Escape curly braces for Cookiecutter. -#}
+        {%- raw %}
+        if: ${{ !env.ACT }}
+        {%- endraw %}
+        run: |
+          git init -b main
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "${GITHUB_SHA}"
+          git checkout FETCH_HEAD
+
+      - name: Run tests
+        {#- Escape curly braces for Cookiecutter. -#}
+        {%- raw %}
+        run: uv run --python ${{ matrix.python-version }} pytest
+        {%- endraw %}

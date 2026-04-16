@@ -14,7 +14,11 @@ license-files = ["LICENSE"]
 {%- endif %}
 classifiers = [
     # Python versions supported by the package
-    "Programming Language :: Python :: {{ cookiecutter.python_version }}",
+{%- for version in cookiecutter._known_python_versions %}
+{%- if version >= cookiecutter.min_python_version and version <= cookiecutter.max_python_version %}
+    "Programming Language :: Python :: {{ version }}",
+{%- endif %}
+{%- endfor %}
 ]
 
 # click is a transient dependency of mkdocs, but broken beyond version 8.2.1
@@ -85,7 +89,7 @@ tag_format = "v$version"
 changelog_file = "docs/changelog.md"
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py{{ cookiecutter.python_version | replace('.', '') }}"
 # Exclude a variety of commonly ignored directories.
 exclude = [
     ".bzr",
@@ -237,6 +241,13 @@ branch = true
 show_missing = true
 skip_covered = true
 fail_under = 0
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "@overload",
+]
 
 [tool.coverage.paths]
 source = [
