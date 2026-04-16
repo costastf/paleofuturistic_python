@@ -33,18 +33,20 @@ if license_choice != 'None' and header_file.exists():
 shutil.rmtree(licenses_dir)
 
 
+def _strip_leading_docstring(text: str) -> str:
+    """Remove a leading module docstring from Python source."""
+    import re
+    return re.sub(r'\A\s*("""[^"]*"""|\'\'\'[^\']*\'\'\')\s*\n?', '', text)
+
+
 def prepend_header(filepath: Path, *, with_logging: bool = False) -> None:
     """Prepend the standard file header to a Python source file."""
     filename = filepath.name
-    content = filepath.read_text(encoding='utf-8')
-    header_lines = [
-        '#!/usr/bin/env python',
-        '# -*- coding: utf-8 -*-',
-        f'# File: {filename}',
-    ]
+    content = _strip_leading_docstring(filepath.read_text(encoding='utf-8'))
+    header_lines = []
     if license_header:
         header_lines.append(license_header.rstrip())
-    header_lines.append(f"'''{project_slug}.'''")
+    header_lines.append(f'"""{project_slug}."""')
     header_lines.append('')
     if with_logging:
         header_lines.append('import logging')

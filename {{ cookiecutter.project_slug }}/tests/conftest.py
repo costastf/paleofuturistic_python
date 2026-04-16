@@ -12,7 +12,7 @@ def project_root() -> Path:
 
 
 @pytest.fixture
-def test_data(project_root: Path) -> Path:  # noqa: redefined-outer-name  # pylint: disable=redefined-outer-name
+def test_data(project_root: Path) -> Path:  # pylint: disable=redefined-outer-name
     """Return the test data directory, creating it if needed."""
     data_dir = project_root / 'tests' / 'data'
     data_dir.mkdir(exist_ok=True)
