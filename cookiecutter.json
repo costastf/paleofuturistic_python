@@ -7,7 +7,7 @@
   "min_python_version": ["3.13", "3.14"],
   "max_python_version": ["3.14", "3.13"],
   "python_version": "{{ cookiecutter.min_python_version }}",
-  "include_apache_license": true,
+  "license": ["Apache-2.0", "MIT", "BSD-3-Clause", "None"],
   "integrate_dependency_track": true,
   "_known_python_versions": ["3.13", "3.14"],
   "_copy_without_render": ["_CI/lib/*", "*/_CI/lib/*"]
