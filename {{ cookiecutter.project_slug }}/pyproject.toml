@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     {name = "{{ cookiecutter.full_name }}", email = "{{ cookiecutter.email }}"},
 ]
-requires-python = ">={{ cookiecutter._python_version }}"
+requires-python = ">={{ cookiecutter.min_python_version }}"
 dependencies = []
 {%- if cookiecutter.license != "None" %}
 license = "{{ cookiecutter.license }}"
@@ -89,7 +89,7 @@ tag_format = "v$version"
 changelog_file = "docs/changelog.md"
 
 [tool.ruff]
-target-version = "py{{ cookiecutter._python_version | replace('.', '') }}"
+target-version = "py{{ cookiecutter.min_python_version | replace('.', '') }}"
 # Exclude a variety of commonly ignored directories.
 exclude = [
     ".bzr",
