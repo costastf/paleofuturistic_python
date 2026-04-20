@@ -34,8 +34,17 @@ def python_version(cfg: dict) -> str:
     return match.group(1)
 
 
+def uv_version(cfg: dict) -> str:
+    required = cfg['tool']['uv']['required-version']
+    match = re.search(r'(\d+\.\d+(?:\.\d+)?)', required)
+    if not match:
+        msg = f'cannot parse [tool.uv] required-version: {required!r}'
+        raise KeyError(msg)
+    return match.group(1)
+
+
 DISPATCH = {
-    'info.uv-version': lambda c: walk(c, ('tool', 'docker-versions', 'uv')),
+    'info.uv-version': uv_version,
     'info.base-image': lambda c: walk(c, ('tool', 'docker-versions', 'base-image')),
     'info.uv-image': lambda c: walk(c, ('tool', 'docker-versions', 'uv-image')),
     'info.alpine-image': lambda c: walk(c, ('tool', 'docker-versions', 'alpine-image')),
