@@ -7,6 +7,8 @@ from typing import NamedTuple, cast
 
 from invoke import Collection, Context, Task, task
 
+from _CI.info import read as read_info
+
 from .configuration import ACT_IMAGE_NAME, IMAGE_NAME, QA_WORKFLOW
 from .shared import container_engine, execute, is_ci, logged
 
@@ -40,7 +42,12 @@ def _podman_socket(context: Context) -> str:
 def build(context: Context) -> None:
     """Build the dependency cache container image locally."""
     engine = container_engine()
-    execute(context, f'{engine} build -f Dockerfile.deps -t {IMAGE_NAME}:latest .')
+    base_image = read_info('info.base-image')
+    execute(
+        context,
+        f'{engine} build --build-arg BASE_IMAGE={base_image} '
+        f'-f Dockerfile.deps -t {IMAGE_NAME}:latest .',
+    )
 
 
 @task
@@ -48,7 +55,12 @@ def build(context: Context) -> None:
 def act(context: Context) -> None:
     """Run the QA workflow locally using act."""
     engine = container_engine()
-    execute(context, f'{engine} build -f Dockerfile.act -t {ACT_IMAGE_NAME}:latest .')
+    uv_image = read_info('info.uv-image')
+    execute(
+        context,
+        f'{engine} build --build-arg UV_IMAGE={uv_image} '
+        f'-f Dockerfile.act -t {ACT_IMAGE_NAME}:latest .',
+    )
     if engine == 'podman':
         socket = _podman_socket(context)
         execute(
@@ -110,7 +122,8 @@ def _buildah_publish(settings: _RegistrySettings, image: str, context: Context) 
         f'-u "{settings.user}" --password-stdin',
         hide=True,
     )
-    execute(context, f'buildah bud -f Dockerfile.deps -t {image} .')
+    base_image = read_info('info.base-image')
+    execute(context, f'buildah bud --build-arg BASE_IMAGE={base_image} -f Dockerfile.deps -t {image} .')
     execute(context, f'buildah push {image}')
 
 
@@ -126,7 +139,8 @@ def _docker_publish(settings: _RegistrySettings, image: str, context: Context) -
     if result and not result.failed:
         print(f'Image already exists: {image}')
     else:
-        execute(context, f'{engine} build -f Dockerfile.deps -t {image} .')
+        base_image = read_info('info.base-image')
+        execute(context, f'{engine} build --build-arg BASE_IMAGE={base_image} -f Dockerfile.deps -t {image} .')
         execute(context, f'{engine} push {image}')
 
 
@@ -160,7 +174,8 @@ def publish(context: Context) -> None:
         if result and not result.failed:
             print(f'Image already exists: {image}')
         else:
-            execute(context, f'{engine} build -f Dockerfile.deps -t {image} .')
+            base_image = read_info('info.base-image')
+            execute(context, f'{engine} build --build-arg BASE_IMAGE={base_image} -f Dockerfile.deps -t {image} .')
     Path('.deps-image').write_text(image, encoding='utf-8')
 
 

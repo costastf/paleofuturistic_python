@@ -1,2 +1,3 @@
+ARG UV_IMAGE
 FROM catthehacker/ubuntu:act-latest
-COPY --from=ghcr.io/astral-sh/uv:0.11.1 /uv /usr/local/bin/uv
+COPY --from=${UV_IMAGE} /uv /usr/local/bin/uv

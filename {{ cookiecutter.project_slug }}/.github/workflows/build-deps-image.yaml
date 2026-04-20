@@ -37,12 +37,19 @@ jobs:
           git fetch --depth=1 origin "${GITHUB_SHA}"
           git checkout FETCH_HEAD
 
+      - name: Read uv version
+        id: uv
+        run: echo "version=$(./workflow.cmd info.uv-version)" >> "$GITHUB_OUTPUT"
+
       - name: Install uv
         {#- Escape curly braces for Cookiecutter. -#}
         {%- raw %}
         if: ${{ !env.ACT }}
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ steps.uv.outputs.version }}
+          enable-cache: true
         {%- endraw %}
-        run: curl -LsSf https://astral.sh/uv/0.11.1/install.sh | sh
 
       - name: Publish deps image
         id: deps
@@ -54,3 +61,6 @@ jobs:
         run: |
           ./workflow.cmd container.publish
           echo "image=$(cat .deps-image)" >> "$GITHUB_OUTPUT"
+
+      - name: Minimize uv cache
+        run: uv cache prune --ci
