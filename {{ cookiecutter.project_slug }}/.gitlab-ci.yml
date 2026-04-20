@@ -5,17 +5,18 @@ stages:
 
 build-deps-image:
   stage: deps
-  image:
-    name: gcr.io/kaniko-project/executor:debug
-    entrypoint: [""]
+  image: alpine:latest
   variables:
-    INVOKE_SHELL: /bin/sh
-    UV_PYTHON: cpython-3.13.12-linux-x86_64-musl
+    BUILDAH_ISOLATION: chroot
+    STORAGE_DRIVER: vfs
+    UV_NO_SYNC: "1"
   before_script:
-    - wget -qO- https://github.com/astral-sh/uv/releases/download/0.11.1/uv-x86_64-unknown-linux-musl.tar.gz | tar -xzf -
-    - export PATH="$(pwd)/uv-x86_64-unknown-linux-musl:$PATH"
+    - apk add --no-cache bash buildah curl
+    - curl -LsSf https://astral.sh/uv/0.11.1/install.sh | sh
+    - export PATH="$HOME/.local/bin:$PATH"
+    - uv sync --no-dev
   script:
-    - uv run --python cpython-3.13.12-linux-x86_64-musl --no-dev python _CI/lib/vendor/bin/invoke --search-root _CI container.publish
+    - ./workflow.cmd container.publish
     - echo "DEPS_IMAGE=$(cat .deps-image)" > .deps-image.env
   artifacts:
     reports:
