@@ -31,6 +31,8 @@ jobs:
         {#- Escape curly braces for Cookiecutter. -#}
         {%- raw %}
         if: ${{ !env.ACT }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         {%- endraw %}
         run: |
           git init -b main
@@ -73,6 +75,8 @@ jobs:
         {#- Escape curly braces for Cookiecutter. -#}
         {%- raw %}
         if: ${{ !env.ACT }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         {%- endraw %}
         run: |
           git init -b main
