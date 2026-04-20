@@ -57,7 +57,11 @@ def container_engine() -> str:
 
 def execute(context: Context, cmd: str) -> None:
     """Execute a shell command, raising SystemExit(1) on failure."""
-    result = context.run(cmd, echo=True, warn=True)
+    kwargs: dict[str, object] = {'echo': True, 'warn': True}
+    shell = os.environ.get('INVOKE_SHELL')
+    if shell:
+        kwargs['shell'] = shell
+    result = context.run(cmd, **kwargs)
     if result is None or result.failed:
         raise SystemExit(1)
 

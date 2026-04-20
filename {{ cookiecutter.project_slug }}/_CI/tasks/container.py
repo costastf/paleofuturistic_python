@@ -1,6 +1,8 @@
 """Container task definitions for building and running the deps image."""
 
+import base64
 import hashlib
+import json
 import os
 from pathlib import Path
 from typing import NamedTuple, cast
@@ -102,37 +104,61 @@ def _ci_registry_settings() -> _RegistrySettings:
     raise SystemExit(1)
 
 
+def _kaniko_publish(settings: _RegistrySettings, password: str, image: str, context: Context) -> None:
+    """Write registry credentials for kaniko and run the kaniko executor."""
+    token = base64.b64encode(f'{settings.user}:{password}'.encode()).decode()
+    config = {'auths': {settings.url: {'auth': token}}}
+    config_path = Path('/kaniko/.docker/config.json')
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(json.dumps(config), encoding='utf-8')
+    execute(
+        context,
+        f'/kaniko/executor --dockerfile=Dockerfile.deps --context=. --destination={image}',
+    )
+
+
+def _docker_publish(settings: _RegistrySettings, image: str, context: Context) -> None:
+    """Log into the registry with the detected engine and build+push when missing."""
+    engine = container_engine()
+    context.run(
+        f'echo "${settings.password_env}" | {engine} login {settings.url} '
+        f'-u "{settings.user}" --password-stdin',
+        hide=True,
+    )
+    result = context.run(f'{engine} manifest inspect {image}', hide=True, warn=True)
+    if result and not result.failed:
+        print(f'Image already exists: {image}')
+    else:
+        execute(context, f'{engine} build -f Dockerfile.deps -t {image} .')
+        execute(context, f'{engine} push {image}')
+
+
 @task
 @logged('container.publish')
 def publish(context: Context) -> None:
     """Build the deps image and publish to a container registry (CI) or keep it local.
 
-    In CI: detects the platform (GitHub Actions / GitLab CI), logs into the
-    appropriate registry, checks whether the image already exists, and builds
-    and pushes only when missing.
+    In GitLab CI: uses kaniko (daemonless) to build and push — required where
+    privileged docker-in-docker is unavailable.
+
+    In GitHub Actions: logs into ghcr.io via the host docker, checks whether
+    the image already exists, and builds and pushes only when missing.
 
     Locally: builds and tags the image without pushing anywhere.
 
     Writes the full image reference to ``.deps-image`` for downstream steps.
     """
-    engine = container_engine()
     tag = hashlib.sha256(Path('uv.lock').read_bytes()).hexdigest()[:16]
     if is_ci() and not os.environ.get('ACT'):
         settings = _ci_registry_settings()
         image = f'{settings.image_prefix}-deps:{tag}'
-        context.run(
-            f'echo "${settings.password_env}" | {engine} login {settings.url} '
-            f'-u "{settings.user}" --password-stdin',
-            hide=True,
-        )
-        result = context.run(f'{engine} manifest inspect {image}', hide=True, warn=True)
-        if result and not result.failed:
-            print(f'Image already exists: {image}')
+        if os.environ.get('GITLAB_CI'):
+            _kaniko_publish(settings, os.environ[settings.password_env], image, context)
         else:
-            execute(context, f'{engine} build -f Dockerfile.deps -t {image} .')
-            execute(context, f'{engine} push {image}')
+            _docker_publish(settings, image, context)
     else:
         image = f'{IMAGE_NAME}:{tag}'
+        engine = container_engine()
         result = context.run(f'{engine} image inspect {image}', hide=True, warn=True)
         if result and not result.failed:
             print(f'Image already exists: {image}')
