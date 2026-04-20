@@ -13,7 +13,7 @@ build-deps-image:
     - curl -LsSf https://astral.sh/uv/0.11.1/install.sh | sh
     - export PATH="$HOME/.local/bin:$PATH"
   script:
-    - ./workflow.cmd container.publish
+    - uv run --no-dev python _CI/lib/vendor/bin/invoke --search-root _CI container.publish
     - echo "DEPS_IMAGE=$(cat .deps-image)" > .deps-image.env
   artifacts:
     reports:
