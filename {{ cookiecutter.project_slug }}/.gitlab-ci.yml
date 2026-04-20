@@ -10,11 +10,12 @@ build-deps-image:
     entrypoint: [""]
   variables:
     INVOKE_SHELL: /bin/sh
+    UV_PYTHON: cpython-3.13.12-linux-x86_64-musl
   before_script:
     - wget -qO- https://github.com/astral-sh/uv/releases/download/0.11.1/uv-x86_64-unknown-linux-musl.tar.gz | tar -xzf -
     - export PATH="$(pwd)/uv-x86_64-unknown-linux-musl:$PATH"
   script:
-    - uv run --no-dev python _CI/lib/vendor/bin/invoke --search-root _CI container.publish
+    - uv run --python cpython-3.13.12-linux-x86_64-musl --no-dev python _CI/lib/vendor/bin/invoke --search-root _CI container.publish
     - echo "DEPS_IMAGE=$(cat .deps-image)" > .deps-image.env
   artifacts:
     reports:
