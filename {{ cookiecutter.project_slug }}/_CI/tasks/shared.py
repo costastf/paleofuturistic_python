@@ -3,10 +3,16 @@
 import os
 import platform
 import shutil
+import sys
 from collections.abc import Callable
 from functools import wraps
 
 from invoke import Context
+
+for _stream in (sys.stdout, sys.stderr):
+    reconfigure = getattr(_stream, 'reconfigure', None)
+    if reconfigure is not None:
+        reconfigure(encoding='utf-8', errors='replace')
 
 
 def is_ci() -> bool:
