@@ -84,7 +84,7 @@ def _ci_registry_settings() -> _RegistrySettings:
         SystemExit: If the CI platform cannot be determined.
     """
     if os.environ.get('GITHUB_ACTIONS'):
-        repo = os.environ['GITHUB_REPOSITORY']
+        repo = os.environ['GITHUB_REPOSITORY'].lower()
         return _RegistrySettings(
             url='ghcr.io',
             user=os.environ['GITHUB_ACTOR'],
