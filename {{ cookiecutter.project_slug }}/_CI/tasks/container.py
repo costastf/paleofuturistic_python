@@ -84,6 +84,7 @@ def _ci_registry_settings() -> _RegistrySettings:
         SystemExit: If the CI platform cannot be determined.
     """
     if os.environ.get('GITHUB_ACTIONS'):
+        # ghcr.io rejects uppercase in image paths, but GITHUB_REPOSITORY preserves org/repo case.
         repo = os.environ['GITHUB_REPOSITORY'].lower()
         return _RegistrySettings(
             url='ghcr.io',
