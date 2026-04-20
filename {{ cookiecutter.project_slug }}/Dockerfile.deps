@@ -1,4 +1,4 @@
-FROM ghcr.io/astral-sh/uv:python{{ cookiecutter.min_python_version }}-bookworm-slim
+FROM ghcr.io/astral-sh/uv:0.11.1-python{{ cookiecutter.min_python_version }}-bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 
