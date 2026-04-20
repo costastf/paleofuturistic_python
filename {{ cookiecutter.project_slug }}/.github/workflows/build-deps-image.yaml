@@ -46,6 +46,11 @@ jobs:
 
       - name: Publish deps image
         id: deps
+        {#- Escape curly braces for Cookiecutter. -#}
+        {%- raw %}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        {%- endraw %}
         run: |
           ./workflow.cmd container.publish
           echo "image=$(cat .deps-image)" >> "$GITHUB_OUTPUT"
