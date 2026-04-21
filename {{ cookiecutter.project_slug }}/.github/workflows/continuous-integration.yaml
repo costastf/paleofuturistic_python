@@ -10,8 +10,8 @@ jobs:
       contents: read
       packages: write
 
-  ci:
-    name: Lint and build
+  lint:
+    name: Lint
     needs: build-deps-image
     runs-on: ubuntu-latest
     container:
@@ -42,9 +42,6 @@ jobs:
 
       - name: Lint code
         run: ./workflow.cmd lint
-
-      - name: Build package
-        run: ./workflow.cmd build
 
   test:
     name: Test (tox matrix)
@@ -78,3 +75,36 @@ jobs:
 
       - name: Run tests
         run: ./workflow.cmd test.tox
+
+  build:
+    name: Build
+    needs: build-deps-image
+    runs-on: ubuntu-latest
+    container:
+      {#- Escape curly braces for Cookiecutter. -#}
+      {%- raw %}
+      image: ${{ needs.build-deps-image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      {%- endraw %}
+
+    steps:
+      - name: Configure git
+        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+
+      - name: Checkout repository
+        {#- Escape curly braces for Cookiecutter. -#}
+        {%- raw %}
+        if: ${{ !env.ACT }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        {%- endraw %}
+        run: |
+          git init -b main
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "${GITHUB_SHA}"
+          git checkout FETCH_HEAD
+
+      - name: Build package
+        run: ./workflow.cmd build
