@@ -46,10 +46,7 @@ lint:
   script:
     - ./workflow.cmd lint
 
-{%- for version in cookiecutter._known_python_versions %}
-{%- if version >= cookiecutter.min_python_version and version <= cookiecutter.max_python_version %}
-
-test-{{ version }}:
+test:
   stage: ci
   image: $DEPS_IMAGE
   needs:
@@ -58,9 +55,7 @@ test-{{ version }}:
   before_script:
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
   script:
-    - uv run --python {{ version }} pytest
-{%- endif %}
-{%- endfor %}
+    - ./workflow.cmd test.tox
 
 build:
   stage: ci

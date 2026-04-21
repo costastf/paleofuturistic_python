@@ -13,16 +13,6 @@ COVERAGE_REPORT = Path('reports/coverage.json')
 PYPROJECT = Path('pyproject.toml')
 
 
-def supported_python_versions() -> list[str]:
-    """Read supported Python versions from pyproject.toml classifiers."""
-    if not PYPROJECT.exists():
-        return []
-    return re.findall(
-        r'"Programming Language :: Python :: (\d+\.\d+)"',
-        PYPROJECT.read_text(encoding='utf-8'),
-    )
-
-
 def coverage_color(pct: float) -> str:
     """Return a badge color for a coverage percentage."""
     if pct >= 90:
@@ -105,16 +95,10 @@ def view(context: Context) -> None:
 
 
 @task
-@logged('test.matrix')
-def matrix(context: Context) -> None:
-    """Run pytest across all supported Python versions."""
-    versions = supported_python_versions()
-    if not versions:
-        print('No supported Python versions found in pyproject.toml classifiers.')
-        raise SystemExit(1)
-    for version in versions:
-        print(f'\n--- Python {version} ---')
-        execute(context, f'uv run --python {version} pytest')
+@logged('test.tox')
+@run('uv run tox run-parallel')
+def tox(context: Context) -> None:
+    """Run the pytest matrix across every supported Python version via tox."""
 
 
 @task
@@ -130,5 +114,5 @@ namespace = Collection('test')
 namespace.add_task(cast(Task, test), default=True, name='all')
 namespace.add_task(cast(Task, pytest))
 namespace.add_task(cast(Task, coverage))
-namespace.add_task(cast(Task, matrix))
+namespace.add_task(cast(Task, tox))
 namespace.add_task(cast(Task, view))

@@ -47,17 +47,9 @@ jobs:
         run: ./workflow.cmd build
 
   test:
-    name: Test (Python {%- raw %}${{ matrix.python-version }}{%- endraw %})
+    name: Test (tox matrix)
     needs: build-deps-image
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version:
-{%- for version in cookiecutter._known_python_versions %}
-{%- if version >= cookiecutter.min_python_version and version <= cookiecutter.max_python_version %}
-          - "{{ version }}"
-{%- endif %}
-{%- endfor %}
     container:
       {#- Escape curly braces for Cookiecutter. -#}
       {%- raw %}
@@ -85,7 +77,4 @@ jobs:
           git checkout FETCH_HEAD
 
       - name: Run tests
-        {#- Escape curly braces for Cookiecutter. -#}
-        {%- raw %}
-        run: uv run --python ${{ matrix.python-version }} pytest
-        {%- endraw %}
+        run: ./workflow.cmd test.tox

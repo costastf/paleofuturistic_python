@@ -65,6 +65,8 @@ test = [
     "pytest-env",
     "pytest-html",
     "pytest-xdist",
+    "tox>=4.21",
+    "tox-uv>=1.16",
 ]
 
 [build-system]
@@ -262,6 +264,21 @@ directory = "reports/coverage"
 [tool.uv]
 required-version = "==0.11.1"
 exclude-newer = "1 week"
+
+[tool.tox]
+requires = ["tox>=4.21", "tox-uv>=1.16"]
+env_list = [
+{%- for version in cookiecutter._known_python_versions %}
+{%- if version >= cookiecutter.min_python_version and version <= cookiecutter.max_python_version %}
+    "py{{ version | replace('.', '') }}",
+{%- endif %}
+{%- endfor %}
+]
+
+[tool.tox.env_run_base]
+runner = "uv-venv-lock-runner"
+dependency_groups = ["test"]
+commands = [["pytest", { replace = "posargs", default = [], extend = true }]]
 
 [tool.docker-versions]
 # Container image references consumed by Dockerfiles and CI. The uv version lives in
