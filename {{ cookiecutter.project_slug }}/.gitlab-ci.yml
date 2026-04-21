@@ -6,7 +6,7 @@ stages:
 # Pipeline seed: GitLab cannot evaluate `image:` from pyproject at pipeline-creation time.
 # Keep UV_ALPINE_IMAGE aligned with [tool.docker-versions].alpine-image in pyproject.toml.
 variables:
-  UV_ALPINE_IMAGE: "ghcr.io/astral-sh/uv:0.11.1-alpine3.22"
+  UV_ALPINE_IMAGE: "ghcr.io/astral-sh/uv:0.11.6-alpine3.22"
   UV_CACHE_DIR: .uv-cache
   UV_LINK_MODE: copy
 
