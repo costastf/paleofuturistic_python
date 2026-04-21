@@ -65,6 +65,10 @@ test = [
     "pytest-env",
     "pytest-html",
     "pytest-xdist",
+    # Pin uv to match [tool.uv] required-version — tox-uv depends on the uv
+    # Python package, which installs a uv binary into .venv/bin that would
+    # otherwise shadow the image's /usr/local/bin/uv and break the check.
+    "uv==0.11.1",
     "tox>=4.21",
     "tox-uv>=1.16",
 ]
