@@ -6,11 +6,56 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .configuration import IGNORE_PATTERN, SECURITY_OVERRIDE_ENV
+from .configuration import IGNORE_PATTERN, SECURITY_OVERRIDE_ENV, SECURITY_OVERRIDES_FILE
 {%- if cookiecutter.integrate_dependency_track %}
 from .configuration import OWASP_DTRACK_SETTINGS, PROJECT_NAME
 {%- endif %}
 from .shared import execute, logged
+
+
+def validate_override_entry(entry: str, source: str) -> None:
+    """Abort with a clear message if `entry` is not a valid suppression.
+
+    Format: ``<VULN_ID>[::YYYY-MM-DD]`` — the vulnerability id must match the
+    project-wide ``IGNORE_PATTERN``, and the expiry, when present, must be a
+    real calendar date. ``source`` is prepended to the error for context
+    (e.g. ``.security-overrides:7``).
+
+    Raises:
+        SystemExit: with exit code 1 if the entry is malformed.
+    """
+    expected = (
+        '<VULN_ID>[::YYYY-MM-DD] — e.g. CVE-2024-1234::2026-12-31 (expires, '
+        'forces re-review on the date) or plain CVE-2024-1234 (permanent '
+        'suppression, the audit will never flag this vulnerability again — '
+        'prefer an expiry when you can)'
+    )
+    match = IGNORE_PATTERN.fullmatch(entry)
+    if not match:
+        print(f'{source}: invalid entry {entry!r}; expected {expected}')
+        raise SystemExit(1)
+    expiry = match.group('expiration_date')
+    if not expiry:
+        return
+    try:
+        date.fromisoformat(expiry)
+    except ValueError as exc:
+        print(f'{source}: invalid expiry {expiry!r}: {exc}; expected YYYY-MM-DD (or omit for a permanent suppression)')
+        raise SystemExit(1) from None
+
+
+def load_overrides_file() -> str:
+    """Return comma-joined entries from `.security-overrides`, stripping `#` comments and blanks."""
+    if not SECURITY_OVERRIDES_FILE.exists():
+        return ''
+    entries: list[str] = []
+    for lineno, raw in enumerate(SECURITY_OVERRIDES_FILE.read_text(encoding='utf-8').splitlines(), start=1):
+        entry = raw.split('#', 1)[0].strip()
+        if not entry:
+            continue
+        validate_override_entry(entry, f'{SECURITY_OVERRIDES_FILE}:{lineno}')
+        entries.append(entry)
+    return ','.join(entries)
 
 
 @task
@@ -18,18 +63,21 @@ from .shared import execute, logged
 def audit(context: Context, ignore: str | None = None) -> None:
     """Run pip-audit security scan.
 
+    Suppressions are sourced, in precedence order, from ``--ignore``, the
+    ``{{ cookiecutter.project_slug | upper }}_SECURITY_OVERRIDE`` environment
+    variable, and a ``.security-overrides`` file at the project root. All three
+    are merged and deduplicated. Each entry is a vulnerability ID with an
+    optional expiry (``CVE-2024-1234::2026-12-31``); entries whose expiry has
+    passed are dropped so the audit fails until the suppression is reviewed.
+
     Args:
         context: Invoke context.
-        ignore: Comma-separated vulnerability IDs to ignore, each with an optional
-            expiry date (e.g. ``CVE-2024-1234::2025-12-31,GHSA-xxxx-yyyy-zzzz``).
-            Entries whose expiry date is in the past are applied anyway.
-            Project-level overrides can also be supplied via the
-            ``{{ cookiecutter.project_slug | upper }}_SECURITY_OVERRIDE`` environment
-            variable, which is merged with any ``--ignore`` argument.
+        ignore: Comma-separated vulnerability IDs to ignore.
     """
     today = date.today()  # noqa: DTZ011
     env_override = os.environ.get(SECURITY_OVERRIDE_ENV, '')
-    combined = ','.join(filter(None, [ignore, env_override]))
+    file_override = load_overrides_file()
+    combined = ','.join(filter(None, [ignore, env_override, file_override]))
     ignore_args = [
         f'--ignore-vuln {m.group("vulnerability_id")}'
         for m in IGNORE_PATTERN.finditer(combined)

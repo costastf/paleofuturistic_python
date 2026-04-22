@@ -5,6 +5,7 @@ from pathlib import Path
 
 PATHS = 'src/ _CI/tasks/ tests/'
 SECURITY_OVERRIDE_ENV = '{{ cookiecutter.project_slug | upper }}_SECURITY_OVERRIDE'
+SECURITY_OVERRIDES_FILE = Path('.security-overrides')
 
 PYSCN_REPORTS_DIR = Path('.pyscn/reports')
 
