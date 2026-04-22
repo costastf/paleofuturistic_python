@@ -31,6 +31,8 @@ build-deps-image:
     # write_registry). Create one at Settings → Repository → Deploy tokens,
     # then expose as protected/masked CI variables DEPS_IMAGE_USERNAME and
     # DEPS_IMAGE_PASSWORD.
+    - '[ -n "$DEPS_IMAGE_USERNAME" ] && echo "DEPS_IMAGE_USERNAME length=${#DEPS_IMAGE_USERNAME}" || echo "DEPS_IMAGE_USERNAME EMPTY"'
+    - '[ -n "$DEPS_IMAGE_PASSWORD" ] && echo "DEPS_IMAGE_PASSWORD length=${#DEPS_IMAGE_PASSWORD}" || echo "DEPS_IMAGE_PASSWORD EMPTY"'
     - printf '{"auths":{"%s":{"username":"%s","password":"%s"}}}' "$CI_REGISTRY" "$DEPS_IMAGE_USERNAME" "$DEPS_IMAGE_PASSWORD" > /kaniko/.docker/config.json
     - /kaniko/executor --dockerfile=Dockerfile.deps --context=. --destination="$IMAGE" --build-arg=BASE_IMAGE="$BASE_IMAGE"
     - echo "DEPS_IMAGE=$IMAGE" > .deps-image.env
