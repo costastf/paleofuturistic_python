@@ -20,10 +20,10 @@ build-deps-image:
     entrypoint: [""]
   script:
     - TAG=$(sha256sum uv.lock | cut -c1-16)
-    # GitLab only accepts pushes to $CI_REGISTRY_IMAGE or subpaths under it —
-    # the -deps suffix convention ghcr.io uses would resolve to a separate
-    # (unauthorised) project path, hence /deps.
-    - IMAGE="${CI_REGISTRY_IMAGE}/deps:${TAG}"
+    # Push to $CI_REGISTRY_IMAGE (the project's registry root) with a
+    # deps-prefixed tag. SBP's registry restricts deploy tokens to the
+    # root path only — /deps and -deps subpaths both return DENIED.
+    - IMAGE="${CI_REGISTRY_IMAGE}:deps-${TAG}"
     - BASE_IMAGE=$(sed -n 's/^base-image = "\(.*\)"$/\1/p' pyproject.toml)
     - mkdir -p /kaniko/.docker
     # SBP's registry rejects the default CI_JOB_TOKEN for pushes, so this job
