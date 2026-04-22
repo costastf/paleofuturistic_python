@@ -3,20 +3,25 @@ stages:
   - ci
   - publish
 
-# Pipeline seed: GitLab cannot evaluate `image:` from pyproject at pipeline-creation time.
-# Keep UV_ALPINE_IMAGE aligned with [tool.docker-versions].alpine-image in pyproject.toml.
 variables:
-  UV_ALPINE_IMAGE: "ghcr.io/astral-sh/uv:0.11.6-alpine3.22"
+  # Pipeline seed: bootstrapping uv inside kaniko:debug happens before any
+  # workflow command can run (no python/uv on the image yet). Keep this
+  # aligned with [tool.uv] required-version in pyproject.toml.
+  UV_VERSION: "0.11.6"
   UV_CACHE_DIR: .uv-cache
   UV_LINK_MODE: copy
 
 build-deps-image:
   stage: deps
-  image: $UV_ALPINE_IMAGE
+  # kaniko:debug ships a busybox shell and the kaniko executor — no docker
+  # daemon, no user namespaces, so it works on restricted GitLab runners.
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
   variables:
-    BUILDAH_ISOLATION: chroot
-    STORAGE_DRIVER: vfs
-    UV_NO_SYNC: "1"
+    INVOKE_SHELL: /bin/sh
+    # Force uv to use its managed musl Python build (kaniko:debug has no glibc).
+    UV_PYTHON: cpython-3.13-linux-x86_64-musl
   cache:
     - key:
         files:
@@ -24,7 +29,8 @@ build-deps-image:
       paths:
         - $UV_CACHE_DIR
   before_script:
-    - apk add --no-cache bash buildah git
+    - wget -qO- "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-x86_64-unknown-linux-musl.tar.gz" | tar -xzf -
+    - export PATH="$(pwd)/uv-x86_64-unknown-linux-musl:$PATH"
     - uv sync --no-dev
   script:
     - ./workflow.cmd container.publish

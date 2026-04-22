@@ -56,8 +56,14 @@ def container_engine() -> str:
 
 
 def execute(context: Context, cmd: str) -> None:
-    """Execute a shell command, raising SystemExit(1) on failure."""
-    result = context.run(cmd, echo=True, warn=True)
+    """Execute a shell command, raising SystemExit(1) on failure.
+
+    Honors ``INVOKE_SHELL`` to override the interpreter invoke spawns — needed
+    on minimal CI images like kaniko:debug that ship busybox sh but no bash.
+    """
+    shell = os.environ.get('INVOKE_SHELL')
+    kwargs: dict[str, object] = {'shell': shell} if shell else {}
+    result = context.run(cmd, echo=True, warn=True, **kwargs)
     if result is None or result.failed:
         raise SystemExit(1)
 

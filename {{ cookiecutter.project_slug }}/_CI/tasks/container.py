@@ -1,6 +1,8 @@
 """Container task definitions for building and running the deps image."""
 
+import base64
 import hashlib
+import json
 import os
 from pathlib import Path
 from typing import NamedTuple, cast
@@ -115,16 +117,24 @@ def _ci_registry_settings() -> _RegistrySettings:
     raise SystemExit(1)
 
 
-def _buildah_publish(settings: _RegistrySettings, image: str, context: Context) -> None:
-    """Log into the registry with buildah and build+push the deps image."""
-    context.run(
-        f'echo "${settings.password_env}" | buildah login {settings.url} '
-        f'-u "{settings.user}" --password-stdin',
-        hide=True,
-    )
+def kaniko_publish(settings: _RegistrySettings, password: str, image: str, context: Context) -> None:
+    """Write registry credentials for kaniko and run the kaniko executor.
+
+    kaniko is a daemonless builder that runs entirely in userspace — required
+    on GitLab runners that don't allow privileged docker-in-docker or user
+    namespaces (which rule out docker, buildah, and podman).
+    """
+    token = base64.b64encode(f'{settings.user}:{password}'.encode()).decode()
+    config = {'auths': {settings.url: {'auth': token}}}
+    config_path = Path('/kaniko/.docker/config.json')
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(json.dumps(config), encoding='utf-8')
     base_image = read_info('info.base-image')
-    execute(context, f'buildah bud --build-arg BASE_IMAGE={base_image} -f Dockerfile.deps -t {image} .')
-    execute(context, f'buildah push {image}')
+    execute(
+        context,
+        f'/kaniko/executor --dockerfile=Dockerfile.deps --context=. '
+        f'--destination={image} --build-arg=BASE_IMAGE={base_image}',
+    )
 
 
 def _docker_publish(settings: _RegistrySettings, image: str, context: Context) -> None:
@@ -149,8 +159,8 @@ def _docker_publish(settings: _RegistrySettings, image: str, context: Context) -
 def publish(context: Context) -> None:
     """Build the deps image and publish to a container registry (CI) or keep it local.
 
-    In GitLab CI: uses buildah (daemonless) to build and push — required where
-    privileged docker-in-docker is unavailable.
+    In GitLab CI: uses kaniko (daemonless) to build and push — required where
+    privileged docker-in-docker and user namespaces are unavailable.
 
     In GitHub Actions: logs into ghcr.io via the host docker, checks whether
     the image already exists, and builds and pushes only when missing.
@@ -164,7 +174,7 @@ def publish(context: Context) -> None:
         settings = _ci_registry_settings()
         image = f'{settings.image_prefix}-deps:{tag}'
         if os.environ.get('GITLAB_CI'):
-            _buildah_publish(settings, image, context)
+            kaniko_publish(settings, os.environ[settings.password_env], image, context)
         else:
             _docker_publish(settings, image, context)
     else:
