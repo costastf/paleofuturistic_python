@@ -20,8 +20,9 @@ build-deps-image:
     entrypoint: [""]
   variables:
     INVOKE_SHELL: /bin/sh
-    # Force uv to use its managed musl Python build (kaniko:debug has no glibc).
-    UV_PYTHON: cpython-3.13-linux-x86_64-musl
+    # kaniko:debug ships busybox (static, no ELF interpreter), so uv can't
+    # probe libc. Pin the full managed-python triple to skip detection.
+    UV_PYTHON: cpython-3.13.13-linux-x86_64-musl
   cache:
     - key:
         files:
@@ -31,7 +32,6 @@ build-deps-image:
   before_script:
     - wget -qO- "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-x86_64-unknown-linux-musl.tar.gz" | tar -xzf -
     - export PATH="$(pwd)/uv-x86_64-unknown-linux-musl:$PATH"
-    - uv sync --no-dev
   script:
     - ./workflow.cmd container.publish
     - echo "DEPS_IMAGE=$(cat .deps-image)" > .deps-image.env
