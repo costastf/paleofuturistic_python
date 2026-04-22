@@ -4,39 +4,29 @@ stages:
   - publish
 
 variables:
-  # Pipeline seed: bootstrapping uv inside kaniko:debug happens before any
-  # workflow command can run (no python/uv on the image yet). Keep this
-  # aligned with [tool.uv] required-version in pyproject.toml.
-  UV_VERSION: "0.11.6"
-  UV_CACHE_DIR: .uv-cache
+  # Recommended by uv's GitLab guide — hardlinks can't span GitLab's mount
+  # boundaries, so downstream jobs that run `uv run` need copy mode.
   UV_LINK_MODE: copy
 
 build-deps-image:
   stage: deps
-  # kaniko:debug ships a busybox shell and the kaniko executor — no docker
-  # daemon, no user namespaces, so it works on restricted GitLab runners.
+  # kaniko:debug has no python/uv and its busybox binaries are static, which
+  # uv's libc probe refuses. This is the one pipeline job that can't go
+  # through ./workflow.cmd — the container.publish steps are inlined here so
+  # the bootstrap needs nothing beyond kaniko + busybox. Every other job
+  # runs inside $DEPS_IMAGE (built here) where ./workflow.cmd works normally.
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [""]
-  variables:
-    INVOKE_SHELL: /bin/sh
-    # kaniko:debug ships busybox (static, no ELF interpreter), so uv can't
-    # probe libc. Pin the full managed-python triple to skip detection.
-    UV_PYTHON: cpython-3.13.13-linux-x86_64-musl
-  cache:
-    - key:
-        files:
-          - uv.lock
-      paths:
-        - $UV_CACHE_DIR
-  before_script:
-    - wget -qO- "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-x86_64-unknown-linux-musl.tar.gz" | tar -xzf -
-    - export PATH="$(pwd)/uv-x86_64-unknown-linux-musl:$PATH"
   script:
-    - ./workflow.cmd container.publish
-    - echo "DEPS_IMAGE=$(cat .deps-image)" > .deps-image.env
-  after_script:
-    - uv cache prune --ci
+    - TAG=$(sha256sum uv.lock | cut -c1-16)
+    - IMAGE="${CI_REGISTRY_IMAGE}-deps:${TAG}"
+    - BASE_IMAGE=$(sed -n 's/^base-image = "\(.*\)"$/\1/p' pyproject.toml)
+    - mkdir -p /kaniko/.docker
+    - AUTH=$(printf '%s:%s' "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\n')
+    - printf '{"auths":{"%s":{"auth":"%s"}}}' "$CI_REGISTRY" "$AUTH" > /kaniko/.docker/config.json
+    - /kaniko/executor --dockerfile=Dockerfile.deps --context=. --destination="$IMAGE" --build-arg=BASE_IMAGE="$BASE_IMAGE"
+    - echo "DEPS_IMAGE=$IMAGE" > .deps-image.env
   artifacts:
     reports:
       dotenv: .deps-image.env
