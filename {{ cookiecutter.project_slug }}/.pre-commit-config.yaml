@@ -58,3 +58,10 @@ repos:
         pass_filenames: false
         files: ^(src/|tests/).*\.py$
         stages: [pre-commit]
+      - id: security-overrides
+        name: Validate .security-overrides
+        entry: ./workflow.cmd secure.validate-overrides
+        language: system
+        pass_filenames: false
+        files: ^\.security-overrides$
+        stages: [pre-commit]

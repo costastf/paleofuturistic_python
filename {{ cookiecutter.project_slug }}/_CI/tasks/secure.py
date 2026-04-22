@@ -136,6 +136,18 @@ def sbom_upload(context: Context) -> None:
 
 
 @task
+@logged('secure.validate-overrides')
+def validate_overrides(context: Context) -> None:  # noqa: ARG001
+    """Validate every entry in .security-overrides without running the audit.
+
+    Intended as a pre-commit hook: fails fast with a ``file:line: <reason>``
+    message if any entry is malformed, the expiry is not a real date, or the
+    file contains merge conflict markers. Silent no-op when the file is absent.
+    """
+    load_overrides_file()
+
+
+@task
 @logged('secure')
 def secure(context: Context) -> None:
     """Run all security checks; reports all failures before exiting."""
@@ -156,6 +168,7 @@ namespace = Collection('secure')
 namespace.add_task(cast(Task, secure), default=True, name='all')
 namespace.add_task(cast(Task, audit))
 namespace.add_task(cast(Task, sbom_extract))
+namespace.add_task(cast(Task, validate_overrides))
 {%- if cookiecutter.integrate_dependency_track %}
 namespace.add_task(cast(Task, sbom_upload))
 {%- endif %}
