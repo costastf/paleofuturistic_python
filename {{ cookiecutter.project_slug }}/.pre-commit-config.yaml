@@ -11,49 +11,49 @@ repos:
         stages: [commit-msg]
       - id: format
         name: Format code and sort imports
-        entry: ./workflow.cmd format
+        entry: sh ./workflow.cmd format
         language: system
         pass_filenames: false
         files: ^(_CI/tasks/|src/|tests/).*\.py$
         stages: [pre-commit]
       - id: ruff
         name: Lint with ruff
-        entry: ./workflow.cmd lint.ruff
+        entry: sh ./workflow.cmd lint.ruff
         language: system
         pass_filenames: false
         files: ^(_CI/tasks/|src/|tests/).*\.py$
         stages: [pre-commit]
       - id: pylint
         name: Lint with pylint
-        entry: ./workflow.cmd lint.pylint
+        entry: sh ./workflow.cmd lint.pylint
         language: system
         pass_filenames: false
         files: ^(_CI/tasks/|src/|tests/).*\.py$
         stages: [pre-commit]
       - id: ty
         name: Type check with ty
-        entry: ./workflow.cmd lint.ty
+        entry: sh ./workflow.cmd lint.ty
         language: system
         pass_filenames: false
         files: ^(_CI/tasks/|src/|tests/).*\.py$
         stages: [pre-commit]
       - id: complexipy
         name: Complexity check with complexipy
-        entry: ./workflow.cmd lint.complexipy
+        entry: sh ./workflow.cmd lint.complexipy
         language: system
         pass_filenames: false
         files: ^(src/).*\.py$
         stages: [pre-commit]
       - id: pyscn
         name: Quality check with pyscn
-        entry: ./workflow.cmd quality.pyscn-check
+        entry: sh ./workflow.cmd quality.pyscn-check
         language: system
         pass_filenames: false
         files: ^(src/).*\.py$
         stages: [pre-commit]
       - id: test
         name: Run tests
-        entry: ./workflow.cmd test
+        entry: sh ./workflow.cmd test
         language: system
         pass_filenames: false
         files: ^(src/|tests/).*\.py$
