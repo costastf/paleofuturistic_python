@@ -26,9 +26,12 @@ build-deps-image:
     - IMAGE="${CI_REGISTRY_IMAGE}/deps:${TAG}"
     - BASE_IMAGE=$(sed -n 's/^base-image = "\(.*\)"$/\1/p' pyproject.toml)
     - mkdir -p /kaniko/.docker
-    # GitLab's documented kaniko auth format uses username/password fields
-    # (the combined `auth` base64 field triggers 401 on SBP's registry).
-    - printf '{"auths":{"%s":{"username":"%s","password":"%s"}}}' "$CI_REGISTRY" "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" > /kaniko/.docker/config.json
+    # SBP's registry rejects the default CI_JOB_TOKEN for pushes, so this job
+    # authenticates with a project Deploy Token (scopes: read_registry +
+    # write_registry). Create one at Settings → Repository → Deploy tokens,
+    # then expose as protected/masked CI variables DEPS_IMAGE_USERNAME and
+    # DEPS_IMAGE_PASSWORD.
+    - printf '{"auths":{"%s":{"username":"%s","password":"%s"}}}' "$CI_REGISTRY" "$DEPS_IMAGE_USERNAME" "$DEPS_IMAGE_PASSWORD" > /kaniko/.docker/config.json
     - /kaniko/executor --dockerfile=Dockerfile.deps --context=. --destination="$IMAGE" --build-arg=BASE_IMAGE="$BASE_IMAGE"
     - echo "DEPS_IMAGE=$IMAGE" > .deps-image.env
   artifacts:
