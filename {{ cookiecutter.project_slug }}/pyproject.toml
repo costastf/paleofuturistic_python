@@ -78,6 +78,8 @@ requires = ["uv_build>=0.8.15,<=0.11.6"]
 build-backend = "uv_build"
 
 [tool.pyscn.complexity]
+low_threshold = 5
+medium_threshold = 10
 max_complexity = 15
 
 [tool.pyscn.dead_code]
