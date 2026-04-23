@@ -77,14 +77,13 @@ test = [
 requires = ["uv_build>=0.8.15,<=0.11.6"]
 build-backend = "uv_build"
 
-[tool.pyscn]
-[complexity]
+[tool.pyscn.complexity]
 max_complexity = 15
 
-[dead_code]
+[tool.pyscn.dead_code]
 min_severity = "warning"
 
-[output]
+[tool.pyscn.output]
 directory = "reports"
 
 [tool.commitizen]
