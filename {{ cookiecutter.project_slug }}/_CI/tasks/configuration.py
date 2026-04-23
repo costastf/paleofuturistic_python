@@ -7,7 +7,7 @@ PATHS = 'src/ _CI/tasks/ tests/'
 SECURITY_OVERRIDE_ENV = '{{ cookiecutter.project_slug | upper }}_SECURITY_OVERRIDE'
 SECURITY_OVERRIDES_FILE = Path('.security-overrides')
 
-PYSCN_REPORTS_DIR = Path('.pyscn/reports')
+PYSCN_REPORTS_DIR = Path('reports')
 
 IGNORE_PATTERN = re.compile(
     r'(?P<vulnerability_id>[A-Za-z0-9\-_]+)'

@@ -149,9 +149,6 @@ _CI/.bootstrapped
 # SBOM
 sbom.json
 
-# pyscn reports
-.pyscn/
-
 # act local CI
 .secrets
 
