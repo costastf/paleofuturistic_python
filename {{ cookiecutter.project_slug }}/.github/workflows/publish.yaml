@@ -66,6 +66,18 @@ jobs:
     if: ${{ needs.detect.outputs.tag != '' }}
     {%- endraw %}
     runs-on: ubuntu-latest
+    permissions:
+      # Required for PyPI Trusted Publishing. GitHub Actions only injects
+      # ACTIONS_ID_TOKEN_REQUEST_URL / _TOKEN when the job can write OIDC
+      # tokens; without this, `uv publish` has nothing to exchange and
+      # `release.publish` falls back to legacy UV_PUBLISH_* credentials.
+      id-token: write
+      # Declaring any `permissions:` entry flips every other scope to `none`
+      # for this job. The checkout step needs read access to clone the
+      # release tag via x-access-token:${GITHUB_TOKEN} — without this it 403s.
+      # Kept at `read` (not write) so a compromised build step cannot push
+      # back to the repo.
+      contents: read
     container:
       {#- Escape curly braces for Cookiecutter. -#}
       {%- raw %}

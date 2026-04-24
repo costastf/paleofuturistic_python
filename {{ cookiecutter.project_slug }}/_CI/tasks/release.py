@@ -12,7 +12,7 @@ from typing import cast
 from invoke import Collection, Context, Task, task
 
 from .build import build
-from .configuration import UV_PUBLISH_SETTINGS
+from .configuration import OIDC_ENV_VARS, UV_PUBLISH_SETTINGS
 {%- if cookiecutter.integrate_dependency_track %}
 from .configuration import OWASP_DTRACK_SETTINGS
 from .secure import sbom_upload
@@ -129,13 +129,23 @@ def push(context: Context) -> None:
 @logged('release.publish')
 def publish(context: Context) -> None:
     """Build, publish, and upload SBOM — the full post-release publishing pipeline."""
-    missing = [v for v in UV_PUBLISH_SETTINGS if not os.environ.get(v)]
+    if all(os.environ.get(var) for var in OIDC_ENV_VARS):
+        print('PyPI trusted publishing (OIDC) detected — skipping legacy credential check.')
+    else:
+        missing = [v for v in UV_PUBLISH_SETTINGS if not os.environ.get(v)]
+        if missing:
+            print(
+                f'Missing required environment variables: {", ".join(missing)}.\n'
+                'Either provide them, or grant the publish job '
+                '`permissions: id-token: write` so PyPI trusted publishing can mint a token.'
+            )
+            raise SystemExit(1)
 {%- if cookiecutter.integrate_dependency_track %}
-    missing += [v for v in OWASP_DTRACK_SETTINGS if not os.environ.get(v)]
-{%- endif %}
-    if missing:
-        print(f'Missing required environment variables: {", ".join(missing)}')
+    missing_dtrack = [v for v in OWASP_DTRACK_SETTINGS if not os.environ.get(v)]
+    if missing_dtrack:
+        print(f'Missing Dependency Track environment variables: {", ".join(missing_dtrack)}.')
         raise SystemExit(1)
+{%- endif %}
     clean(context)
     build(context)
     execute(context, 'uv publish')
