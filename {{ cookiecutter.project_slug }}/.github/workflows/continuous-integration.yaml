@@ -36,9 +36,14 @@ jobs:
         {%- endraw %}
         run: |
           git init -b main
-          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          remote_url="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git remote get-url origin >/dev/null 2>&1; then
+            git remote set-url origin "${remote_url}"
+          else
+            git remote add origin "${remote_url}"
+          fi
           git fetch --depth=1 origin "${GITHUB_SHA}"
-          git checkout FETCH_HEAD
+          git checkout --force FETCH_HEAD
 
       - name: Lint code
         run: ./workflow.cmd lint
@@ -69,9 +74,14 @@ jobs:
         {%- endraw %}
         run: |
           git init -b main
-          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          remote_url="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git remote get-url origin >/dev/null 2>&1; then
+            git remote set-url origin "${remote_url}"
+          else
+            git remote add origin "${remote_url}"
+          fi
           git fetch --depth=1 origin "${GITHUB_SHA}"
-          git checkout FETCH_HEAD
+          git checkout --force FETCH_HEAD
 
       - name: Run tests
         run: ./workflow.cmd test.tox
@@ -102,9 +112,14 @@ jobs:
         {%- endraw %}
         run: |
           git init -b main
-          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          remote_url="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git remote get-url origin >/dev/null 2>&1; then
+            git remote set-url origin "${remote_url}"
+          else
+            git remote add origin "${remote_url}"
+          fi
           git fetch --depth=1 origin "${GITHUB_SHA}"
-          git checkout FETCH_HEAD
+          git checkout --force FETCH_HEAD
 
       - name: Build package
         run: ./workflow.cmd build

@@ -90,9 +90,14 @@ jobs:
         {%- endraw %}
         run: |
           git init -b main
-          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git fetch --depth=1 origin "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
-          git checkout "refs/tags/${RELEASE_TAG}"
+          remote_url="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git remote get-url origin >/dev/null 2>&1; then
+            git remote set-url origin "${remote_url}"
+          else
+            git remote add origin "${remote_url}"
+          fi
+          git fetch --depth=1 origin "+refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
+          git checkout --force "refs/tags/${RELEASE_TAG}"
 
       - name: Publish package and upload SBOM
         env:
