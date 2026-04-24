@@ -78,6 +78,11 @@ jobs:
       # Kept at `read` (not write) so a compromised build step cannot push
       # back to the repo.
       contents: read
+      # The job runs inside the deps image from ghcr.io. Pulling that image
+      # uses GITHUB_TOKEN via the `container.credentials` block; without
+      # `packages: read` ghcr returns 403 on the manifest HEAD request.
+      # `read` only — `build-deps-image` is the job that publishes.
+      packages: read
     container:
       {#- Escape curly braces for Cookiecutter. -#}
       {%- raw %}
