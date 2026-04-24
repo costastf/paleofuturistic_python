@@ -1,6 +1,7 @@
 """Release task definitions."""
 
 import os
+import re
 import shutil
 from pathlib import Path
 from typing import cast
@@ -100,26 +101,102 @@ def publish(context: Context) -> None:
     clean(context)
 
 
+def resolve_next_version(context: Context, increment: str) -> str:
+    """Project the next version via ``cz bump --dry-run`` and parse it out.
+
+    Raises SystemExit if the increment is invalid or cz output cannot be parsed.
+    """
+    prerelease_types = ('alpha', 'beta', 'rc')
+    semver_types = ('major', 'minor', 'patch')
+    valid = semver_types + prerelease_types
+    if increment not in valid:
+        print('Usage: ./workflow.cmd release -i <increment>')
+        print(f'  increment: {", ".join(valid)}')
+        raise SystemExit(1)
+    if increment in prerelease_types:
+        cmd = (
+            'uv run cz bump --increment patch --prerelease '
+            f'{increment} --allow-no-commit --yes --dry-run'
+        )
+    else:
+        cmd = f'uv run cz bump --increment {increment} --allow-no-commit --yes --dry-run'
+    result = context.run(cmd, hide=True, warn=True)
+    if result is None or result.failed:
+        print('Could not determine the next version (cz bump --dry-run failed).')
+        if result is not None:
+            print(result.stdout)
+            print(result.stderr)
+        raise SystemExit(1)
+    output = f'{result.stdout}\n{result.stderr}'
+    match = re.search(r'tag to create:\s*v?(\S+)', output)
+    if match is None:
+        match = re.search(r'bump:\s*version\s*\S+\s*\S+\s*(\S+)', output)
+    if match is None:
+        print('Could not parse the next version from cz bump --dry-run output:')
+        print(output)
+        raise SystemExit(1)
+    return match.group(1)
+
+
+def pr_create_url(context: Context, release_branch: str) -> str:
+    """Compose the GitHub PR-create URL for a release branch, or '' if origin isn't GitHub."""
+    remote = context.run('git remote get-url origin', hide=True, warn=True)
+    if remote is None or remote.failed:
+        return ''
+    url = remote.stdout.strip()
+    match = re.match(
+        r'(?:git@github\.com:|https://github\.com/)([^/]+/[^/]+?)(?:\.git)?/?$',
+        url,
+    )
+    if match is None:
+        return ''
+    return f'https://github.com/{match.group(1)}/pull/new/{release_branch}'
+
+
 @task
 @logged('release')
 def release(context: Context, increment: str = '', no_push: bool = False) -> None:
-    """Run the release flow: validate, bump version, update changelog, and push.
+    """Prepare a release on a new ``release/<version>`` branch.
 
-    Steps execute sequentially — any failure stops the chain.
-    Use ``release.publish`` separately to build, publish, and upload the SBOM.
+    Validates a clean tree on ``main``, branches off, bumps the version,
+    commits the changelog, and pushes both the branch and the new tag so
+    the resulting pull request carries the full release snapshot for review.
+    Publish fires from CI once the PR is merged into main.
 
     Args:
         context: Invoke context.
         increment: Version increment type — major, minor, patch, alpha, beta, or rc.
-        no_push: Skip push step (useful during development).
+        no_push: Skip the push step (branch + tag stay local).
     """
     validate(context)
+
+    current = context.run('git rev-parse --abbrev-ref HEAD', hide=True, warn=True)
+    if current is None or current.failed:
+        print('Could not determine the current branch.')
+        raise SystemExit(1)
+    current_branch = current.stdout.strip()
+    if current_branch != 'main':
+        print(f'Releases must start from `main` (currently on `{current_branch}`).')
+        raise SystemExit(1)
+
+    new_version = resolve_next_version(context, increment)
+    release_branch = f'release/{new_version}'
+
+    execute(context, f'git checkout -b {release_branch}')
     bump(context, increment=increment)
     changelog(context, write=True)
+
     if no_push:
-        print('Skipping push.')
-    else:
-        push(context)
+        print(f'Skipping push. Branch `{release_branch}` and tag `v{new_version}` stay local.')
+        return
+
+    execute(context, f'git push -u origin {release_branch}')
+    execute(context, f'git push origin v{new_version}')
+
+    pr_url = pr_create_url(context, release_branch)
+    if pr_url:
+        print()
+        print(f'Open the release pull request: {pr_url}')
 
 
 @task

@@ -54,14 +54,14 @@ quality                Run all quality checks
 quality.pyscn-analyze  Comprehensive analysis with HTML report
 quality.pyscn-check    CI-friendly quality gate
 
-release                Full release flow: validate, bump, changelog, push, build, publish, upload SBOM, clean
+release                Prepare release on `release/<version>` branch: validate, branch off main, bump, changelog, push branch + tag
 release -i <type>      Version increment type: major, minor, patch, alpha, beta, rc
-release --no-push      Skip push step (useful during development)
+release --no-push      Keep the branch + tag local instead of pushing
 release.validate       Ensure working tree is clean
 release.bump           Bump version and create git tag
 release.changelog      Print changelog to stdout (--write to persist and commit)
-release.push           Push commit and tags to remote
-release.publish        Publish package to PyPI
+release.push           Push current branch and tags to remote
+release.publish        Build, publish to PyPI, upload SBOM (invoked by CI on release-tag merge)
 {%- if cookiecutter.integrate_dependency_track %}
 release.sbom-upload    Extract and upload SBOM to Dependency Track
 {%- endif %}

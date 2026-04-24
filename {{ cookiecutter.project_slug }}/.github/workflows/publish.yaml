@@ -2,11 +2,57 @@ name: Publish
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
 
 jobs:
+  detect:
+    name: Detect release tag
+    runs-on: ubuntu-latest
+    outputs:
+      {#- Escape curly braces for Cookiecutter. -#}
+      {%- raw %}
+      tag: ${{ steps.find.outputs.tag }}
+      {%- endraw %}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - id: find
+        env:
+          {#- Escape curly braces for Cookiecutter. -#}
+          {%- raw %}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+          {%- endraw %}
+        run: |
+          if [ "${BEFORE}" = "0000000000000000000000000000000000000000" ]; then
+            range="${AFTER}"
+          else
+            range="${BEFORE}..${AFTER}"
+          fi
+          tag=""
+          for sha in $(git log "${range}" --format='%H'); do
+            candidate=$(git tag --points-at "${sha}" | grep -E '^v[0-9]' | head -n1 || true)
+            if [ -n "${candidate}" ]; then
+              tag="${candidate}"
+              break
+            fi
+          done
+          if [ -n "${tag}" ]; then
+            echo "Release tag detected: ${tag}"
+            echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "No v-prefixed tag on the incoming commits; publish will skip."
+          fi
+
   build-deps-image:
+    needs: detect
+    {#- Escape curly braces for Cookiecutter. -#}
+    {%- raw %}
+    if: ${{ needs.detect.outputs.tag != '' }}
+    {%- endraw %}
     uses: ./.github/workflows/build-deps-image.yaml
     permissions:
       contents: read
@@ -14,7 +60,11 @@ jobs:
 
   publish:
     name: Publish package
-    needs: build-deps-image
+    needs: [detect, build-deps-image]
+    {#- Escape curly braces for Cookiecutter. -#}
+    {%- raw %}
+    if: ${{ needs.detect.outputs.tag != '' }}
+    {%- endraw %}
     runs-on: ubuntu-latest
     container:
       {#- Escape curly braces for Cookiecutter. -#}
@@ -30,18 +80,19 @@ jobs:
       - name: Configure git
         run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
 
-      - name: Checkout repository
+      - name: Checkout release tag
         {#- Escape curly braces for Cookiecutter. -#}
         {%- raw %}
         if: ${{ !env.ACT }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.detect.outputs.tag }}
         {%- endraw %}
         run: |
           git init -b main
           git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git fetch --depth=1 origin "${GITHUB_SHA}"
-          git checkout FETCH_HEAD
+          git fetch --depth=1 origin "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
+          git checkout "refs/tags/${RELEASE_TAG}"
 
       - name: Publish package and upload SBOM
         env:
