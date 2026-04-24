@@ -1,8 +1,11 @@
 """Release task definitions."""
 
+import json
 import os
 import re
 import shutil
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import cast
 
@@ -138,8 +141,8 @@ def resolve_next_version(context: Context, increment: str) -> str:
     return match.group(1)
 
 
-def pr_create_url(context: Context, release_branch: str) -> str:
-    """Compose the GitHub PR-create URL for a release branch, or '' if origin isn't GitHub."""
+def github_slug(context: Context) -> str:
+    """Return the ``owner/repo`` slug of the origin remote, or '' if not GitHub."""
     remote = context.run('git remote get-url origin', hide=True, warn=True)
     if remote is None or remote.failed:
         return ''
@@ -148,33 +151,66 @@ def pr_create_url(context: Context, release_branch: str) -> str:
         r'(?:git@github\.com:|https://github\.com/)([^/]+/[^/]+?)(?:\.git)?/?$',
         url,
     )
-    if match is None:
-        return ''
-    return f'https://github.com/{match.group(1)}/pull/new/{release_branch}'
+    return match.group(1) if match else ''
+
+
+def pr_create_url(context: Context, release_branch: str) -> str:
+    """Compose the GitHub PR-create URL for a release branch, or '' if origin isn't GitHub."""
+    slug = github_slug(context)
+    return f'https://github.com/{slug}/pull/new/{release_branch}' if slug else ''
 
 
 def create_release_pr(context: Context, release_branch: str, new_version: str) -> str:
-    """Create the release pull request via the `gh` CLI. Return PR URL, or '' on failure."""
-    if shutil.which('gh') is None:
-        print('`gh` CLI not found; cannot open PR automatically.')
+    """Create the release pull request via the GitHub REST API. Return PR URL, or '' on failure.
+
+    Requires ``GITHUB_TOKEN`` in the environment (a PAT or fine-grained token
+    with ``Contents: read/write`` and ``Pull requests: read/write`` on the repo).
+    No external CLI dependencies — uses only stdlib.
+    """
+    token = os.environ.get('GITHUB_TOKEN', '').strip()
+    if not token:
+        print(
+            'GITHUB_TOKEN not set — release PR will not be opened automatically. '
+            'Export a token with Pull requests: read/write to have it created for you.'
+        )
         return ''
-    title = f'chore(release): v{new_version}'
-    body = (
-        f'Release v{new_version} prepared by `./workflow.cmd release`. '
-        'Merge this PR with a merge commit so the tag lands on main and '
-        'publish fires in CI.'
-    )
-    cmd = (
-        f'gh pr create --base main --head {release_branch} '
-        f'--title {title!r} --body {body!r}'
-    )
-    result = context.run(cmd, hide=True, warn=True)
-    if result is None or result.failed:
-        print('`gh pr create` failed:')
-        if result is not None and result.stderr:
-            print(result.stderr.strip())
+    slug = github_slug(context)
+    if not slug:
+        print('Origin remote is not GitHub; cannot open PR via API.')
         return ''
-    return result.stdout.strip()
+    payload = json.dumps({
+        'title': f'chore(release): v{new_version}',
+        'body': (
+            f'Release v{new_version} prepared by `./workflow.cmd release`. '
+            'Merge this PR with a merge commit so the tag lands on main and '
+            'publish fires in CI.'
+        ),
+        'head': release_branch,
+        'base': 'main',
+    }).encode('utf-8')
+    request = urllib.request.Request(
+        f'https://api.github.com/repos/{slug}/pulls',
+        data=payload,
+        method='POST',
+        headers={
+            'Accept': 'application/vnd.github+json',
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json',
+            'X-GitHub-Api-Version': '2022-11-28',
+            'User-Agent': 'paleofuturistic-python-release',
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
+            data = json.loads(response.read().decode('utf-8'))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode('utf-8', errors='replace')[:500]
+        print(f'GitHub API returned {exc.code}: {detail}')
+        return ''
+    except OSError as exc:
+        print(f'GitHub API request failed: {exc}')
+        return ''
+    return data.get('html_url', '')
 
 
 @task
