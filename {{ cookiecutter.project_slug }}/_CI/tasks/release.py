@@ -153,6 +153,30 @@ def pr_create_url(context: Context, release_branch: str) -> str:
     return f'https://github.com/{match.group(1)}/pull/new/{release_branch}'
 
 
+def create_release_pr(context: Context, release_branch: str, new_version: str) -> str:
+    """Create the release pull request via the `gh` CLI. Return PR URL, or '' on failure."""
+    if shutil.which('gh') is None:
+        print('`gh` CLI not found; cannot open PR automatically.')
+        return ''
+    title = f'chore(release): v{new_version}'
+    body = (
+        f'Release v{new_version} prepared by `./workflow.cmd release`. '
+        'Merge this PR with a merge commit so the tag lands on main and '
+        'publish fires in CI.'
+    )
+    cmd = (
+        f'gh pr create --base main --head {release_branch} '
+        f'--title {title!r} --body {body!r}'
+    )
+    result = context.run(cmd, hide=True, warn=True)
+    if result is None or result.failed:
+        print('`gh pr create` failed:')
+        if result is not None and result.stderr:
+            print(result.stderr.strip())
+        return ''
+    return result.stdout.strip()
+
+
 @task
 @logged('release')
 def release(context: Context, increment: str = '', no_push: bool = False) -> None:
@@ -193,10 +217,15 @@ def release(context: Context, increment: str = '', no_push: bool = False) -> Non
     execute(context, f'git push -u origin {release_branch}')
     execute(context, f'git push origin v{new_version}')
 
-    pr_url = pr_create_url(context, release_branch)
+    pr_url = create_release_pr(context, release_branch, new_version)
     if pr_url:
         print()
-        print(f'Open the release pull request: {pr_url}')
+        print(f'Release pull request opened: {pr_url}')
+        return
+    manual_url = pr_create_url(context, release_branch)
+    if manual_url:
+        print()
+        print(f'Open the release pull request manually: {manual_url}')
 
 
 @task
