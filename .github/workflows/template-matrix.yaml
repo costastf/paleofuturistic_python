@@ -10,9 +10,21 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.gen.outputs.matrix }}
+      uv-version: ${{ steps.uv-pin.outputs.version }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - id: uv-pin
+        name: Resolve uv pin from template pyproject
+        run: |
+          version=$(sed -nE 's/^required-version = "==([^"]+)".*/\1/p' '{{ cookiecutter.project_slug }}/pyproject.toml')
+          if [ -z "${version}" ]; then
+            echo "Could not resolve uv pin from {{ cookiecutter.project_slug }}/pyproject.toml" >&2
+            exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7.6.0
+        with:
+          version: ${{ steps.uv-pin.outputs.version }}
       - id: gen
         env:
           PYTHONPATH: .
@@ -31,6 +43,8 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7.6.0
+        with:
+          version: ${{ needs.plan.outputs.uv-version }}
       - env:
           PYTHONPATH: .
         run: |
