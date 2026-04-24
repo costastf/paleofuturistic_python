@@ -50,7 +50,8 @@ def prepare_snapshot(tmpdir):
         'git add -A',
         # Force-add the vendored CI lib (gitignored by the broad `lib/` pattern).
         'git add -f "{{ cookiecutter.project_slug }}/_CI/lib/"',
-        ('git -c commit.gpgsign=false commit -m "temp: template snapshot for testing" '
+        ('git -c commit.gpgsign=false -c user.name=ci -c user.email=ci@localhost '
+         'commit -m "temp: template snapshot for testing" '
          '--author "ci <ci@localhost>"'),
     )
     for step in snapshot_steps:
@@ -78,7 +79,8 @@ def run_combo(template_repo, output_root, extra_context, label, log_file=None):
     init_steps = (
         'git init -b main',
         'git add -A',
-        ('git -c commit.gpgsign=false commit -m "feat: initial project from template" '
+        ('git -c commit.gpgsign=false -c user.name=ci -c user.email=ci@localhost '
+         'commit -m "feat: initial project from template" '
          '--author "ci <ci@localhost>"'),
         'uv sync --all-extras --dev',
     )
