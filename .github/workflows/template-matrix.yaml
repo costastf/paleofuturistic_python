@@ -1,0 +1,31 @@
+name: Template matrix
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7.6.0
+      - id: gen
+        run: echo "matrix=$(./workflow.cmd test.list-combos --as-json)" >> "$GITHUB_OUTPUT"
+
+  run:
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        combo: ${{ fromJson(needs.plan.outputs.matrix) }}
+    name: ${{ matrix.combo.label }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7.6.0
+      - run: |
+          ./workflow.cmd test.combo ${{ matrix.combo.integrate_dependency_track && '--dep-track' || '' }}
