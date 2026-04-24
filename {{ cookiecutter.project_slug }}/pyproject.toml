@@ -97,6 +97,17 @@ version_scheme = "pep440"
 tag_format = "v$version"
 changelog_file = "docs/changelog.md"
 
+[tool.commitizen.change_type_map]
+feat = "Features"
+fix = "Bug Fixes"
+perf = "Performance"
+refactor = "Refactoring"
+docs = "Documentation"
+build = "Build"
+ci = "CI"
+chore = "Chores"
+revert = "Reverts"
+
 [tool.ruff]
 target-version = "py{{ cookiecutter.min_python_version | replace('.', '') }}"
 # Exclude a variety of commonly ignored directories.
