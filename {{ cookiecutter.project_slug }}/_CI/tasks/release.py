@@ -131,6 +131,13 @@ def publish(context: Context) -> None:
     """Build, publish, and upload SBOM — the full post-release publishing pipeline."""
     if all(os.environ.get(var) for var in OIDC_ENV_VARS):
         print('PyPI trusted publishing (OIDC) detected — skipping legacy credential check.')
+        # GH Actions injects `secrets.UV_PUBLISH_*` as empty strings when the
+        # secret is undefined, and `uv publish` treats UV_PUBLISH_URL="" as an
+        # explicit --publish-url with no base instead of falling back to PyPI.
+        # Drop empty legacy vars so OIDC users get the default publish URL.
+        for var in UV_PUBLISH_SETTINGS:
+            if not os.environ.get(var, '').strip():
+                os.environ.pop(var, None)
     else:
         missing = [v for v in UV_PUBLISH_SETTINGS if not os.environ.get(v)]
         if missing:
