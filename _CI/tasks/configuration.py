@@ -9,6 +9,24 @@ PROJECT_SLUG = 'paleofuturistic_python_project'
 IGNORE_PATTERNS = shutil.ignore_patterns('.git', '.venv', '__pycache__', '*.pyc', '.cruft.json')
 QA_STEPS = ('format', 'lint', 'test.tox', 'build', 'document')
 TEMPLATE_SECURITY_OVERRIDE_ENV = 'TEMPLATE_SECURITY_OVERRIDE'
+SECURITY_OVERRIDES_FILE = PROJECT_ROOT_DIRECTORY / '.security-overrides'
+
+
+def read_template_overrides():
+    """Return comma-joined entries from the parent `.security-overrides` file.
+
+    Entries are validated and parsed by the inner template's `secure.audit`
+    task when the merged string is forwarded via `<PROJECT>_SECURITY_OVERRIDE`,
+    so the parent only needs to strip `#` comments and blank lines.
+    """
+    if not SECURITY_OVERRIDES_FILE.exists():
+        return ''
+    entries = []
+    for raw in SECURITY_OVERRIDES_FILE.read_text(encoding='utf-8').splitlines():
+        entry = raw.split('#', 1)[0].strip()
+        if entry:
+            entries.append(entry)
+    return ','.join(entries)
 
 
 def version_sort_key(version: str) -> tuple[int, ...]:

@@ -20,7 +20,8 @@ from _CI.tasks.configuration import (IGNORE_PATTERNS,
                                      TEMPLATE_SECURITY_OVERRIDE_ENV,
                                      combo_context,
                                      combo_label,
-                                     matrix_combos)
+                                     matrix_combos,
+                                     read_template_overrides)
 
 REPORTS_DIR = PROJECT_ROOT_DIRECTORY / 'reports' / 'matrix'
 
@@ -89,9 +90,15 @@ def run_combo(template_repo, output_root, extra_context, label, log_file=None):
             return False
 
     step_env = {'CI': 'true'}
-    security_override = os.environ.get(TEMPLATE_SECURITY_OVERRIDE_ENV)
-    if security_override:
-        step_env[f'{PROJECT_SLUG.upper()}_SECURITY_OVERRIDE'] = security_override
+    override_parts = []
+    file_overrides = read_template_overrides()
+    if file_overrides:
+        override_parts.append(file_overrides)
+    env_override = os.environ.get(TEMPLATE_SECURITY_OVERRIDE_ENV, '').strip()
+    if env_override:
+        override_parts.append(env_override)
+    if override_parts:
+        step_env[f'{PROJECT_SLUG.upper()}_SECURITY_OVERRIDE'] = ','.join(override_parts)
 
     for step in QA_STEPS:
         if not run_command(f'./workflow.cmd {step}', cwd=project_dir, env=step_env, log_file=log_file):

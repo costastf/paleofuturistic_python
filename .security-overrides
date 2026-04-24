@@ -1,0 +1,13 @@
+# Security suppressions applied during template testing
+# (`./workflow.cmd test`, `test.combo`, `test.matrix`).
+#
+# Merged with the `TEMPLATE_SECURITY_OVERRIDE` env var and passed to each
+# generated project's `secure.audit` step via the
+# `<PROJECT>_SECURITY_OVERRIDE` env var. The inner template validates the
+# final list — see `{{ cookiecutter.project_slug }}/.security-overrides`
+# for the full format reference (CVE/GHSA/PYSEC IDs, optional `::YYYY-MM-DD`
+# expiry).
+#
+# One entry per line. Blank lines and `#` comments are ignored.
+
+CVE-2026-41066
