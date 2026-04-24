@@ -182,6 +182,41 @@ def resolve_next_version(context: Context, increment: str) -> str:
     return match.group(1)
 
 
+def ensure_refs_are_free(context: Context, new_version: str, release_branch: str) -> None:
+    """Abort before any git mutation if the target tag or branch already exists.
+
+    Checks both local and origin copies so a stale ref on either side halts
+    the release cleanly — rather than failing partway through and leaving a
+    bump commit behind without a tag.
+    """
+    tag_ref = f'v{new_version}'
+    local_tag = context.run(f'git tag --list {tag_ref}', hide=True, warn=True)
+    if local_tag is not None and local_tag.stdout.strip():
+        print(f'Tag `{tag_ref}` already exists locally. Delete it or bump to a different version.')
+        raise SystemExit(1)
+    remote_tag = context.run(
+        f'git ls-remote --tags origin refs/tags/{tag_ref}', hide=True, warn=True,
+    )
+    if remote_tag is not None and remote_tag.stdout.strip():
+        print(f'Tag `{tag_ref}` already exists on origin. Bump to a different version.')
+        raise SystemExit(1)
+
+    local_branch = context.run(
+        f'git show-ref --verify --quiet refs/heads/{release_branch}',
+        hide=True, warn=True,
+    )
+    if local_branch is not None and not local_branch.failed:
+        print(f'Branch `{release_branch}` already exists locally. Delete it before re-running.')
+        raise SystemExit(1)
+    remote_branch = context.run(
+        f'git ls-remote --heads origin refs/heads/{release_branch}',
+        hide=True, warn=True,
+    )
+    if remote_branch is not None and remote_branch.stdout.strip():
+        print(f'Branch `{release_branch}` already exists on origin. Delete it before re-running.')
+        raise SystemExit(1)
+
+
 def github_slug(context: Context) -> str:
     """Return the ``owner/repo`` slug of the origin remote, or '' if not GitHub."""
     remote = context.run('git remote get-url origin', hide=True, warn=True)
@@ -282,6 +317,7 @@ def release(context: Context, increment: str = '', no_push: bool = False) -> Non
 
     new_version = resolve_next_version(context, increment)
     release_branch = f'release/{new_version}'
+    ensure_refs_are_free(context, new_version, release_branch)
 
     execute(context, f'git checkout -b {release_branch}')
     bump(context, increment=increment)
