@@ -7,8 +7,35 @@ from pathlib import Path
 
 min_version = '{{ cookiecutter.min_python_version }}'
 max_version = '{{ cookiecutter.max_python_version }}'
-if max_version < min_version:
+known_versions = {{ cookiecutter._known_python_versions }}
+
+
+def version_tuple(version):
+    """Return a sortable int-tuple for a dotted Python version string."""
+    return tuple(int(part) for part in version.split('.'))
+
+
+try:
+    min_tuple = version_tuple(min_version)
+    max_tuple = version_tuple(max_version)
+except ValueError:
+    print(f'ERROR: min/max python versions must be dotted integers; got {min_version!r} and {max_version!r}.')
+    sys.exit(1)
+
+if max_tuple < min_tuple:
     print(f'ERROR: max_python_version ({max_version}) cannot be less than min_python_version ({min_version}).')
+    sys.exit(1)
+
+for label, chosen in (('min_python_version', min_version), ('max_python_version', max_version)):
+    if chosen not in known_versions:
+        print(f'ERROR: {label} ({chosen}) is not declared in _known_python_versions ({known_versions}).')
+        sys.exit(1)
+
+if min_tuple[0] != max_tuple[0]:
+    print(
+        f'ERROR: min_python_version ({min_version}) and max_python_version ({max_version}) '
+        'must share the same major version; cross-major ranges are not supported.'
+    )
     sys.exit(1)
 
 license_choice = '{{ cookiecutter.license }}'

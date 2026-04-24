@@ -14,10 +14,11 @@ license-files = ["LICENSE"]
 {%- endif %}
 classifiers = [
     # Python versions supported by the package
-{%- for version in cookiecutter._known_python_versions %}
-{%- if version >= cookiecutter.min_python_version and version <= cookiecutter.max_python_version %}
-    "Programming Language :: Python :: {{ version }}",
-{%- endif %}
+{%- set py_major = cookiecutter.min_python_version.split('.')[0] %}
+{%- set py_min_minor = cookiecutter.min_python_version.split('.')[1] | int %}
+{%- set py_max_minor = cookiecutter.max_python_version.split('.')[1] | int %}
+{%- for minor in range(py_min_minor, py_max_minor + 1) %}
+    "Programming Language :: Python :: {{ py_major }}.{{ minor }}",
 {%- endfor %}
 ]
 
@@ -78,6 +79,7 @@ requires = ["uv_build>=0.8.15,<=0.11.6"]
 build-backend = "uv_build"
 
 [tool.pyscn.complexity]
+paths = ["src", "tests", "_CI/tasks"]
 low_threshold = 5
 medium_threshold = 10
 max_complexity = 15
@@ -273,10 +275,11 @@ exclude-newer = "1 week"
 [tool.tox]
 requires = ["tox>=4.21", "tox-uv>=1.16"]
 env_list = [
-{%- for version in cookiecutter._known_python_versions %}
-{%- if version >= cookiecutter.min_python_version and version <= cookiecutter.max_python_version %}
-    "py{{ version | replace('.', '') }}",
-{%- endif %}
+{%- set tox_py_major = cookiecutter.min_python_version.split('.')[0] %}
+{%- set tox_py_min_minor = cookiecutter.min_python_version.split('.')[1] | int %}
+{%- set tox_py_max_minor = cookiecutter.max_python_version.split('.')[1] | int %}
+{%- for minor in range(tox_py_min_minor, tox_py_max_minor + 1) %}
+    "py{{ tox_py_major }}{{ minor }}",
 {%- endfor %}
 ]
 

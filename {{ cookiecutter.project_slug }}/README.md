@@ -1,7 +1,10 @@
 # {{ cookiecutter.project_name }}
 
 [![Version](https://img.shields.io/badge/version-0.0.0-blue)](https://pypi.org/project/{{ cookiecutter.project_slug }}/)
-[![Python](https://img.shields.io/badge/python-{% for version in cookiecutter._known_python_versions if version >= cookiecutter.min_python_version and version <= cookiecutter.max_python_version %}{{ version }}{% if not loop.last %}%20%7C%20{% endif %}{% endfor %}-blue?logo=python&logoColor=white)](https://www.python.org)
+{%- set badge_py_major = cookiecutter.min_python_version.split('.')[0] %}
+{%- set badge_py_min_minor = cookiecutter.min_python_version.split('.')[1] | int %}
+{%- set badge_py_max_minor = cookiecutter.max_python_version.split('.')[1] | int %}
+[![Python](https://img.shields.io/badge/python-{% for minor in range(badge_py_min_minor, badge_py_max_minor + 1) %}{{ badge_py_major }}.{{ minor }}{% if not loop.last %}%20%7C%20{% endif %}{% endfor %}-blue?logo=python&logoColor=white)](https://www.python.org)
 {%- if cookiecutter.license != "None" %}
 [![License](https://img.shields.io/badge/license-{{ cookiecutter.license | replace('-', '--') }}-blue)](https://opensource.org/license/{{ cookiecutter.license | lower }})
 {%- endif %}
