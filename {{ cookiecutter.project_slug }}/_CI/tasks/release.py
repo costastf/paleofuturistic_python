@@ -23,14 +23,55 @@ from .shared import execute, logged
 @task
 @logged('release.validate')
 def validate(context: Context) -> None:
-    """Ensure the working tree is clean before releasing."""
-    result = context.run('git status --porcelain', hide=True, warn=True)
-    if result is None or result.failed:
+    """Ensure the working tree is clean and in sync with origin before releasing.
+
+    Fails if there are staged, unstaged, or untracked files; if the current
+    branch has no upstream configured; or if the local branch is ahead of or
+    behind origin after a fetch.
+    """
+    status = context.run('git status --porcelain', hide=True, warn=True)
+    if status is None or status.failed:
         print('Could not determine git status.')
         raise SystemExit(1)
-    if result.stdout.strip():
-        print('Working tree is dirty. Commit or stash your changes before releasing.')
-        print(result.stdout)
+    if status.stdout.strip():
+        print('Working tree is dirty. Commit, stash, or discard these changes before releasing:')
+        print(status.stdout)
+        raise SystemExit(1)
+
+    fetch = context.run('git fetch --quiet origin', hide=True, warn=True)
+    if fetch is None or fetch.failed:
+        print('Could not fetch origin. Check your remote connection before releasing.')
+        if fetch is not None and fetch.stderr:
+            print(fetch.stderr.strip())
+        raise SystemExit(1)
+
+    upstream = context.run('git rev-parse --abbrev-ref @{upstream}', hide=True, warn=True)
+    if upstream is None or upstream.failed:
+        print(
+            'Current branch has no upstream configured. '
+            'Set one with `git push -u origin <branch>` before releasing.'
+        )
+        raise SystemExit(1)
+
+    counts = context.run('git rev-list --left-right --count @{upstream}...HEAD', hide=True, warn=True)
+    if counts is None or counts.failed:
+        print('Could not compare local branch with upstream.')
+        raise SystemExit(1)
+    behind_str, ahead_str = counts.stdout.strip().split()
+    behind, ahead = int(behind_str), int(ahead_str)
+
+    if ahead > 0:
+        ahead_log = context.run('git log --oneline @{upstream}..HEAD', hide=True, warn=True)
+        print(f'You have {ahead} unpushed commit(s) on this branch. Push them before releasing:')
+        if ahead_log is not None and ahead_log.stdout.strip():
+            print(ahead_log.stdout.rstrip())
+        raise SystemExit(1)
+
+    if behind > 0:
+        print(
+            f'Your branch is {behind} commit(s) behind `{upstream.stdout.strip()}`. '
+            'Pull the latest changes before releasing.'
+        )
         raise SystemExit(1)
 
 
