@@ -11,7 +11,9 @@ import sys
 import tomllib
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = next(
+    parent for parent in Path(__file__).resolve().parents if (parent / '_CI').is_dir()
+)
 PYPROJECT = ROOT / 'pyproject.toml'
 
 

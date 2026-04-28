@@ -5,7 +5,9 @@ import os
 import stat
 from pathlib import Path
 
-PROJECT_ROOT_DIRECTORY = Path(__file__).resolve().parent.parent
+PROJECT_ROOT_DIRECTORY = next(
+    parent for parent in Path(__file__).resolve().parents if (parent / '_CI').is_dir()
+)
 INVOKE_LOGGING_LEVEL = os.environ.get('INVOKE_LOGGING_LEVEL') or 'INFO'
 
 
