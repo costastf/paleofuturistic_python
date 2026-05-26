@@ -37,9 +37,18 @@ def operating_system() -> str:
 def open_command() -> str:
     """Return the shell command to open a file in the default application.
 
-    Returns 'open' on macOS/Linux and 'start' on Windows.
+    Picks 'start' on Windows, 'open' on macOS, 'wslview' on WSL when
+    available (routes to the Windows default handler via interop), and
+    'xdg-open' on plain Linux.
     """
-    return 'start' if operating_system() == 'windows' else 'open'
+    system = operating_system()
+    if system == 'windows':
+        return 'start'
+    if system == 'macos':
+        return 'open'
+    if 'microsoft' in platform.release().lower() and shutil.which('wslview'):
+        return 'wslview'
+    return 'xdg-open'
 
 
 def container_engine() -> str:
