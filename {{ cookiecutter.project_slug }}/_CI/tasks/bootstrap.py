@@ -28,6 +28,15 @@ class BootstrapStep:
     ci_behavior: str = 'skip'
 
 
+@task
+def ensure_git_repo(context: Context) -> None:
+    """Initialise a git repository in the current directory if one does not exist."""
+    result = context.run('git rev-parse --git-dir', hide=True, warn=True)
+    if result is None or result.failed:
+        execute(context, 'git init')
+
+
+@task(pre=[ensure_git_repo])
 def install_pre_commit(context: Context) -> None:
     """Install and activate pre-commit hooks."""
     execute(context, 'uv run pre-commit install')
@@ -37,11 +46,18 @@ def install_pre_commit(context: Context) -> None:
 STEPS: list[BootstrapStep] = [
     BootstrapStep(
         name='pre-commit hooks',
-        action=install_pre_commit,
+        action=cast(Callable[[Context], None], install_pre_commit),
         prompt='Install pre-commit hooks? [y/N] ',
         ci_behavior='skip',
     ),
 ]
+
+
+def run_action(action: Callable[[Context], None], context: Context) -> None:
+    """Execute an action, walking invoke pre-task chains if present."""
+    for pre in getattr(action, 'pre', []):
+        run_action(pre, context)
+    action(context)
 
 
 def run_steps(context: Context) -> None:
@@ -51,14 +67,14 @@ def run_steps(context: Context) -> None:
         if non_interactive:
             if step.ci_behavior == 'run':
                 print(f'  Running {step.name}...')
-                step.action(context)
+                run_action(step.action, context)
             else:
                 print(f'  Skipping {step.name} (non-interactive mode)')
         elif step.prompt:
             if input(step.prompt).strip().lower() in ('y', 'yes'):
-                step.action(context)
+                run_action(step.action, context)
         else:
-            step.action(context)
+            run_action(step.action, context)
 
 
 @task
