@@ -5,6 +5,8 @@ site_description: The Python development workflow your past self had always hope
 repo_url: https://github.com/schubergphilis/paleofuturistic_python
 edit_uri: blob/main/docs/
 
+use_directory_urls: false
+
 theme:
   name: mkdocs
   color_mode: auto
