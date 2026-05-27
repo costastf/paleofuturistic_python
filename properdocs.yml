@@ -15,8 +15,25 @@ theme:
 
 nav:
   - Home: index.md
-  - Walkthrough: walkthrough.md
-  - Extra guides: extra_guides.md
-  - About: about.md
+  - Tutorials:
+    - Generate your first project: tutorials/generate-your-first-project.md
+    - From zero to a published package: tutorials/from-zero-to-published-package.md
+  - How-to:
+    - Update an existing project with cruft: how-to/update-existing-project-with-cruft.md
+    - Choose a git host: how-to/choose-a-git-host.md
+    - Enable Dependency Track integration: how-to/enable-dependency-track.md
+    - Harden the GitHub repository: how-to/harden-github-repository.md
+    - Convert the library into a CLI: how-to/convert-library-to-cli.md
+    - Choose the Python version range: how-to/choose-python-version-range.md
+    - Publish docs to GitHub Pages: how-to/publish-docs-to-github-pages.md
+  - Reference:
+    - Cruft questionnaire variables: reference/cookiecutter-variables.md
+    - The post-generation hook: reference/post-gen-hook.md
+    - Generated project tree: reference/generated-project-tree.md
+    - License options: reference/license-options.md
+  - Explanation:
+    - Why a cruft template: explanation/why-a-cookiecutter.md
+    - Design principles: explanation/design-principles.md
+    - History and lineage: explanation/history-and-lineage.md
 
 copyright: Copyright &copy; 2024 <a href="https://schubergphilis.com/">Schuberg Philis</a>

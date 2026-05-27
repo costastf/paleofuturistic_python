@@ -1,40 +1,49 @@
 # Paleofuturistic Python
 
-> _The Python development workflow your past self had always hoped for is finally here!_
+[![Documentation: Diátaxis](https://img.shields.io/badge/docs-Di%C3%A1taxis-009485?logo=readthedocs&logoColor=white)](https://diataxis.fr/)
+
+> _The Python development workflow your past self had always hoped for is finally here._
 
 <p align="center">
   <img src="./paleofuturistic_python.png?raw=true" alt="Paleofuturistic Environment"/>
 </p>
 
-This project is meant as an enterprise-ready template for developing Python packages.
-If that bar is a bit too high for you, then you can checkout [Straight to the Money 💰](https://github.com/Carlovo/straight_to_the_money).
-Paleofuturistic Python is a detached fork of Straight to the Money 💰.
+This is a [cruft](https://cruft.github.io/cruft/) template that generates a fully-scaffolded, enterprise-ready Python package — uv-managed, ruff-formatted, pytest-tested, properdocs-documented, with vendored CI tooling, SBOM generation, and optional Dependency Track integration.
 
-## Usage
+This documentation is organized around the [Diátaxis](https://diataxis.fr/) framework. Pick the entry that matches what you need right now:
 
-Prerequisite: [uv](https://docs.astral.sh/uv/)  
-(Installing uv should also provide you with uvx.
-Give their docs a look-over before continuing if you want to get a better understanding of what is going on under the hood in the steps below.)
+## Tutorials — learning by doing
 
-### Setup
+Hands-on lessons for newcomers. Start here if you've never used the template.
 
-- Initialize with `uvx cruft create --checkout latest https://github.com/schubergphilis/paleofuturistic_python` and fill in your project details.
-- Optional: validate the setup with `uv run python -c "import paleofuturistic_python; print(paleofuturistic_python.hello())"` (replace `paleofuturistic_python` with your project name/slug).
-- Run `uv sync --all-extras --dev` to download the dependencies and generate a .lock file.
+- [Generate your first project](tutorials/generate-your-first-project.md) — empty directory to a working Python package in ten minutes.
+- [From zero to a published package](tutorials/from-zero-to-published-package.md) — extend the generated project, cut a release, publish to PyPI.
 
-### Workflow
+## How-to guides — recipes for specific problems
 
-- Download dependencies (if you need any): `uv add some_lib_you_need`
-- Develop (optional, tinker: `uvx --with-editable . ptpython`)
-- QA:
-    - Format: `uv run ruff format`
-    - Lint: `uv run ruff check`
-    - Type check: `uv run mypy`
-    - Test: `uv run python -m unittest`
-- Build: `uv build`
-- Document: `uv run properdocs build`
-- Publish: `uv publish`
+Task-focused steps. Reach for these when you know what you need to do.
 
-Can it really be that simple?
-Well, eventually yes, but you will need to set up some connections and credentials still, of course.
-For a slightly more elaborate walkthrough on that, see the [docs](walkthrough.md).
+- [Update an existing project with cruft](how-to/update-existing-project-with-cruft.md)
+- [Choose a git host (GitHub or GitLab)](how-to/choose-a-git-host.md)
+- [Enable Dependency Track integration](how-to/enable-dependency-track.md)
+- [Harden the GitHub repository](how-to/harden-github-repository.md)
+- [Convert the library into a CLI](how-to/convert-library-to-cli.md)
+- [Choose the Python version range](how-to/choose-python-version-range.md)
+- [Publish docs to GitHub Pages](how-to/publish-docs-to-github-pages.md)
+
+## Reference — the facts
+
+Lookup material. Read these when you need to confirm an exact value or behaviour.
+
+- [Cruft questionnaire variables](reference/cookiecutter-variables.md)
+- [The post-generation hook](reference/post-gen-hook.md)
+- [Generated project tree](reference/generated-project-tree.md)
+- [License options](reference/license-options.md)
+
+## Explanation — the why
+
+Background and design rationale. Read these to understand the template's shape.
+
+- [Why a cruft template?](explanation/why-a-cookiecutter.md)
+- [Design principles](explanation/design-principles.md)
+- [History and lineage](explanation/history-and-lineage.md)

@@ -1,5 +1,7 @@
 # Paleofuturistic Python
 
+[![Documentation: Diátaxis](https://img.shields.io/badge/docs-Di%C3%A1taxis-009485?logo=readthedocs&logoColor=white)](https://diataxis.fr/)
+
 > _The Python development workflow your past self had always hoped for is finally here!_
 
 <p align="center">
