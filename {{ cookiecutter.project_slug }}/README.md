@@ -59,7 +59,6 @@ All commands are invoked via `./workflow.cmd <namespace>.<task>`:
 | `./workflow.cmd secure` | Run security audit and generate SBOM |
 | `./workflow.cmd document` | Build and view documentation (properdocs) |
 | `./workflow.cmd container.build` | Build the dependency cache container image |
-| `./workflow.cmd container.act` | Run the CI workflow locally using act |
 | `./workflow.cmd develop.pre-commit` | Run all pre-commit hooks on the codebase |
 | `./workflow.cmd bootstrap --force` | Re-run the development environment setup |
 

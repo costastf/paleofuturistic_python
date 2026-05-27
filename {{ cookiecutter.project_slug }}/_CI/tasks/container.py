@@ -11,32 +11,8 @@ from invoke import Collection, Context, Task, task
 
 from _CI.info import read as read_info
 
-from .configuration import ACT_IMAGE_NAME, IMAGE_NAME, QA_WORKFLOW
+from .configuration import IMAGE_NAME
 from .shared import container_engine, execute, is_ci, logged
-
-
-def _podman_socket(context: Context) -> str:
-    """Discover the podman API socket path.
-
-    Tries ``podman info`` first, then falls back to ``podman machine inspect``
-    for macOS where podman runs inside a VM.
-
-    Raises:
-        SystemExit: If the socket path cannot be determined.
-    """
-    for cmd in (
-        {%- raw %}
-        'podman info --format "{{.Host.RemoteSocket.Path}}"',
-        'podman machine inspect --format "{{.ConnectionInfo.PodmanSocket.Path}}"',
-        {%- endraw %}
-    ):
-        result = context.run(cmd, hide=True, warn=True)
-        if result and not result.failed and result.stdout.strip():
-            socket = result.stdout.strip()
-            if Path(socket).exists():
-                return socket
-    print('Could not determine podman socket path. Is podman machine running?')
-    raise SystemExit(1)
 
 
 @task
@@ -49,37 +25,6 @@ def build(context: Context) -> None:
         context,
         f'{engine} build --build-arg BASE_IMAGE={base_image} -f Dockerfile.deps -t {IMAGE_NAME}:latest .',
     )
-
-
-@task
-@logged('container.act')
-def act(context: Context) -> None:
-    """Run the QA workflow locally using act."""
-    engine = container_engine()
-    uv_image = read_info('info.uv-image')
-    execute(
-        context,
-        f'{engine} build --build-arg UV_IMAGE={uv_image} -f Dockerfile.act -t {ACT_IMAGE_NAME}:latest .',
-    )
-    if engine == 'podman':
-        socket = _podman_socket(context)
-        execute(
-            context,
-            f'DOCKER_HOST=unix://{socket} act push -W {QA_WORKFLOW} --secret-file .secrets '
-            f'--container-architecture linux/amd64 '
-            f'--pull=false '
-            f'--bind '
-            f'--container-daemon-socket /var/run/docker.sock',
-        )
-    else:
-        execute(
-            context,
-            f'act push -W {QA_WORKFLOW} --secret-file .secrets '
-            '--container-architecture linux/amd64 '
-            '--pull=false '
-            '--bind '
-            '--container-options "-v /var/run/docker.sock:/var/run/docker.sock"',
-        )
 
 
 class _RegistrySettings(NamedTuple):
@@ -167,7 +112,7 @@ def publish(context: Context) -> None:
     Writes the full image reference to ``.deps-image`` for downstream steps.
     """
     tag = hashlib.sha256(Path('uv.lock').read_bytes()).hexdigest()[:16]
-    if is_ci() and not os.environ.get('ACT'):
+    if is_ci():
         settings = _ci_registry_settings()
         image = f'{settings.image_prefix}-deps:{tag}'
         if os.environ.get('GITLAB_CI'):
@@ -186,16 +131,6 @@ def publish(context: Context) -> None:
     Path('.deps-image').write_text(image, encoding='utf-8')
 
 
-@task
-@logged('container')
-def container(context: Context) -> None:
-    """Build the deps image and run CI locally via act."""
-    publish(context)
-    act(context)
-
-
 namespace = Collection('container')
-namespace.add_task(cast(Task, container), default=True, name='all')
+namespace.add_task(cast(Task, publish), default=True, name='all')
 namespace.add_task(cast(Task, build))
-namespace.add_task(cast(Task, publish))
-namespace.add_task(cast(Task, act))

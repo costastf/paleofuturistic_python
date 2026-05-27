@@ -149,9 +149,6 @@ _CI/.bootstrapped
 # SBOM
 sbom.json
 
-# act local CI
-.secrets
-
 # properdocs documentation
 /site
 

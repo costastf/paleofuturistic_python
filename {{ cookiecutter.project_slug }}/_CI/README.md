@@ -28,9 +28,8 @@ bootstrap --force      Re-run bootstrap
 build                  Security checks + package build
 build.package          Package only (uv build)
 
-container              Build deps image + run CI via act
+container              Build and publish the deps image (alias for container.publish)
 container.build        Build dependency Docker image locally
-container.act          Run GitHub Actions workflow locally
 container.publish      Build and publish deps image to GHCR (CI) or locally
 
 develop.pre-commit-install   Install pre-commit hooks
@@ -102,8 +101,7 @@ Centralized constants shared across task modules:
 | `OWASP_DTRACK_SETTINGS` | Required environment variables for Dependency Track uploads |
 | `PROJECT_NAME` | Project name for SBOM uploads |
 {%- endif %}
-| `IMAGE_NAME` / `ACT_IMAGE_NAME` | Container image names for deps cache and act |
-| `QA_WORKFLOW` | Path to the CI workflow YAML |
+| `IMAGE_NAME` | Container image name for the deps cache |
 | `PYSCN_REPORTS_DIR` | Directory for pyscn HTML reports |
 | `SENTINEL` | Bootstrap sentinel file path |
 
@@ -135,7 +133,7 @@ _CI/
     shared.py          Core decorators and utilities
     bootstrap.py       One-time setup framework
     build.py           Package build
-    container.py       Docker image + act
+    container.py       Docker image
     develop.py         Pre-commit management
     document.py        ProperDocs documentation
     format_.py         Ruff formatting + import sorting

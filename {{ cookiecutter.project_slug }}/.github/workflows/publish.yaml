@@ -100,7 +100,6 @@ jobs:
       - name: Checkout release tag
         {#- Escape curly braces for Cookiecutter. -#}
         {%- raw %}
-        if: ${{ !env.ACT }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.detect.outputs.tag }}

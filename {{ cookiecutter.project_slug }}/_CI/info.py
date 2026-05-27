@@ -48,7 +48,6 @@ def uv_version(cfg: dict) -> str:
 DISPATCH = {
     'info.uv-version': uv_version,
     'info.base-image': lambda c: walk(c, ('tool', 'docker-versions', 'base-image')),
-    'info.uv-image': lambda c: walk(c, ('tool', 'docker-versions', 'uv-image')),
     'info.alpine-image': lambda c: walk(c, ('tool', 'docker-versions', 'alpine-image')),
     'info.project-name': lambda c: walk(c, ('project', 'name')),
     'info.project-version': lambda c: walk(c, ('project', 'version')),
