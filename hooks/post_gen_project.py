@@ -59,6 +59,19 @@ if license_choice != 'None' and header_file.exists():
 # Clean up the licenses directory.
 shutil.rmtree(licenses_dir)
 
+# Delete the unchosen git-hosting service's artifacts.
+git_hosting_service = '{{ cookiecutter.git_hosting_service }}'
+host_artifacts = {
+    'github': [Path('.github'), Path('_CI/tasks/github.py')],
+    'gitlab': [Path('.gitlab-ci.yml'), Path('_CI/tasks/gitlab.py')],
+}
+unchosen = 'gitlab' if git_hosting_service == 'github' else 'github'
+for path in host_artifacts[unchosen]:
+    if path.is_dir():
+        shutil.rmtree(path)
+    elif path.exists():
+        path.unlink()
+
 
 def _strip_leading_docstring(text: str) -> str:
     """Remove a leading module docstring from Python source."""
