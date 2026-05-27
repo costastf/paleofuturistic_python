@@ -93,6 +93,7 @@ def prepend_header(filepath: Path, *, with_logging: bool = False) -> None:
         header_lines.append('LOGGER = logging.getLogger(LOGGER_BASENAME)')
         header_lines.append('LOGGER.addHandler(logging.NullHandler())')
         header_lines.append('')
+        header_lines.append('')
     header = '\n'.join(header_lines)
     if content:
         result = header + '\n' + content + '\n'

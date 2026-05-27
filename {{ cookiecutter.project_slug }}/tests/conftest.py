@@ -8,9 +8,7 @@ import pytest
 @pytest.fixture
 def project_root() -> Path:
     """Return the project root directory."""
-    return next(
-        parent for parent in Path(__file__).resolve().parents if (parent / '_CI').is_dir()
-    )
+    return next(parent for parent in Path(__file__).resolve().parents if (parent / '_CI').is_dir())
 
 
 @pytest.fixture

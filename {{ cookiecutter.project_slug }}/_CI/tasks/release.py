@@ -12,10 +12,11 @@ from typing import cast
 from invoke import Collection, Context, Task, task
 
 from .build import build
-from .configuration import OIDC_ENV_VARS, UV_PUBLISH_SETTINGS
 {%- if cookiecutter.integrate_dependency_track %}
-from .configuration import OWASP_DTRACK_SETTINGS
+from .configuration import OIDC_ENV_VARS, OWASP_DTRACK_SETTINGS, UV_PUBLISH_SETTINGS
 from .secure import sbom_upload
+{%- else %}
+from .configuration import OIDC_ENV_VARS, UV_PUBLISH_SETTINGS
 {%- endif %}
 from .shared import execute, logged
 
@@ -47,10 +48,7 @@ def validate(context: Context) -> None:
 
     upstream = context.run('git rev-parse --abbrev-ref @{upstream}', hide=True, warn=True)
     if upstream is None or upstream.failed:
-        print(
-            'Current branch has no upstream configured. '
-            'Set one with `git push -u origin <branch>` before releasing.'
-        )
+        print('Current branch has no upstream configured. Set one with `git push -u origin <branch>` before releasing.')
         raise SystemExit(1)
 
     counts = context.run('git rev-list --left-right --count @{upstream}...HEAD', hide=True, warn=True)
@@ -175,10 +173,7 @@ def resolve_next_version(context: Context, increment: str) -> str:
         print(f'  increment: {", ".join(valid)}')
         raise SystemExit(1)
     if increment in prerelease_types:
-        cmd = (
-            'uv run cz bump --increment patch --prerelease '
-            f'{increment} --allow-no-commit --yes --dry-run'
-        )
+        cmd = f'uv run cz bump --increment patch --prerelease {increment} --allow-no-commit --yes --dry-run'
     else:
         cmd = f'uv run cz bump --increment {increment} --allow-no-commit --yes --dry-run'
     result = context.run(cmd, hide=True, warn=True)
@@ -209,7 +204,9 @@ def ensure_refs_are_free(context: Context, new_version: str, release_branch: str
     tag_ref = f'v{new_version}'
     local_tag = context.run(f'git tag --list {tag_ref}', hide=True, warn=True)
     remote_tag = context.run(
-        f'git ls-remote --tags origin refs/tags/{tag_ref}', hide=True, warn=True,
+        f'git ls-remote --tags origin refs/tags/{tag_ref}',
+        hide=True,
+        warn=True,
     )
     local_has = local_tag is not None and local_tag.stdout.strip()
     remote_has = remote_tag is not None and remote_tag.stdout.strip()
@@ -231,11 +228,13 @@ def ensure_refs_are_free(context: Context, new_version: str, release_branch: str
 
     local_branch = context.run(
         f'git show-ref --verify --quiet refs/heads/{release_branch}',
-        hide=True, warn=True,
+        hide=True,
+        warn=True,
     )
     remote_branch = context.run(
         f'git ls-remote --heads origin refs/heads/{release_branch}',
-        hide=True, warn=True,
+        hide=True,
+        warn=True,
     )
     local_branch_has = local_branch is not None and not local_branch.failed
     remote_branch_has = remote_branch is not None and remote_branch.stdout.strip()
@@ -246,8 +245,7 @@ def ensure_refs_are_free(context: Context, new_version: str, release_branch: str
         if remote_branch_has:
             locations.append('on origin')
         print(
-            f'Branch `{release_branch}` already exists {" and ".join(locations)}. '
-            'Remove it everywhere before retrying:'
+            f'Branch `{release_branch}` already exists {" and ".join(locations)}. Remove it everywhere before retrying:'
         )
         if remote_branch_has:
             print(f'  git push origin --delete {release_branch}')
@@ -293,16 +291,18 @@ def create_release_pr(context: Context, release_branch: str, new_version: str) -
     if not slug:
         print('Origin remote is not GitHub; cannot open PR via API.')
         return ''
-    payload = json.dumps({
-        'title': f'chore(release): v{new_version}',
-        'body': (
-            f'Release v{new_version} prepared by `./workflow.cmd release`. '
-            'Merge this PR with a merge commit so the tag lands on main and '
-            'publish fires in CI.'
-        ),
-        'head': release_branch,
-        'base': 'main',
-    }).encode('utf-8')
+    payload = json.dumps(
+        {
+            'title': f'chore(release): v{new_version}',
+            'body': (
+                f'Release v{new_version} prepared by `./workflow.cmd release`. '
+                'Merge this PR with a merge commit so the tag lands on main and '
+                'publish fires in CI.'
+            ),
+            'head': release_branch,
+            'base': 'main',
+        }
+    ).encode('utf-8')
     request = urllib.request.Request(
         f'https://api.github.com/repos/{slug}/pulls',
         data=payload,

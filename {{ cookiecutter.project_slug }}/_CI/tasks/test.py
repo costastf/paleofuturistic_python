@@ -41,7 +41,7 @@ def ratchet_fail_under() -> None:
         return
     current = int(match.group(1))
     if pct > current:
-        updated = content[:match.start()] + f'fail_under = {pct}' + content[match.end():]
+        updated = content[: match.start()] + f'fail_under = {pct}' + content[match.end() :]
         PYPROJECT.write_text(updated, encoding='utf-8')
         print(f'Ratcheted fail_under from {current}% to {pct}%.')
 

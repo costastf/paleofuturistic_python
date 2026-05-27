@@ -47,8 +47,7 @@ def build(context: Context) -> None:
     base_image = read_info('info.base-image')
     execute(
         context,
-        f'{engine} build --build-arg BASE_IMAGE={base_image} '
-        f'-f Dockerfile.deps -t {IMAGE_NAME}:latest .',
+        f'{engine} build --build-arg BASE_IMAGE={base_image} -f Dockerfile.deps -t {IMAGE_NAME}:latest .',
     )
 
 
@@ -60,8 +59,7 @@ def act(context: Context) -> None:
     uv_image = read_info('info.uv-image')
     execute(
         context,
-        f'{engine} build --build-arg UV_IMAGE={uv_image} '
-        f'-f Dockerfile.act -t {ACT_IMAGE_NAME}:latest .',
+        f'{engine} build --build-arg UV_IMAGE={uv_image} -f Dockerfile.act -t {ACT_IMAGE_NAME}:latest .',
     )
     if engine == 'podman':
         socket = _podman_socket(context)
@@ -141,8 +139,7 @@ def _docker_publish(settings: _RegistrySettings, image: str, context: Context) -
     """Log into the registry with the detected engine and build+push when missing."""
     engine = container_engine()
     context.run(
-        f'echo "${settings.password_env}" | {engine} login {settings.url} '
-        f'-u "{settings.user}" --password-stdin',
+        f'echo "${settings.password_env}" | {engine} login {settings.url} -u "{settings.user}" --password-stdin',
         hide=True,
     )
     result = context.run(f'{engine} manifest inspect {image}', hide=True, warn=True)

@@ -6,9 +6,16 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
+{% if cookiecutter.integrate_dependency_track -%}
+from .configuration import (
+    IGNORE_PATTERN,
+    OWASP_DTRACK_SETTINGS,
+    PROJECT_NAME,
+    SECURITY_OVERRIDE_ENV,
+    SECURITY_OVERRIDES_FILE,
+)
+{%- else -%}
 from .configuration import IGNORE_PATTERN, SECURITY_OVERRIDE_ENV, SECURITY_OVERRIDES_FILE
-{%- if cookiecutter.integrate_dependency_track %}
-from .configuration import OWASP_DTRACK_SETTINGS, PROJECT_NAME
 {%- endif %}
 from .shared import execute, logged
 

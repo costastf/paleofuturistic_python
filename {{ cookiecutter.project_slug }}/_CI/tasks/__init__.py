@@ -2,17 +2,7 @@
 
 from invoke import Collection
 
-from . import bootstrap
-from . import build
-from . import container
-from . import develop
-from . import document
-from . import format_
-from . import lint
-from . import quality
-from . import release
-from . import secure
-from . import test
+from . import bootstrap, build, container, develop, document, format_, lint, quality, release, secure, test
 
 namespace = Collection()
 namespace.add_collection(bootstrap.namespace)

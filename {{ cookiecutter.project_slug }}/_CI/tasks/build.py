@@ -6,8 +6,8 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .shared import logged, run, run_steps
 from .secure import secure
+from .shared import logged, run, run_steps
 
 STATUS_COLORS = {'passing': 'brightgreen', 'failing': 'red'}
 
