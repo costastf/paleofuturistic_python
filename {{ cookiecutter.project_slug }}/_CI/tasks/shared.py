@@ -31,6 +31,7 @@ class IndentingStream:
         self.at_line_start = True
 
     def write(self, data: str) -> int:
+        """Write data through, prefixing every line start with ``self.prefix``."""
         if not data:
             return 0
         chunks: list[str] = []
@@ -44,6 +45,7 @@ class IndentingStream:
         return self.inner.write(''.join(chunks))
 
     def flush(self) -> None:
+        """Flush the wrapped stream."""
         self.inner.flush()
 
     def __getattr__(self, name: str) -> Any:
