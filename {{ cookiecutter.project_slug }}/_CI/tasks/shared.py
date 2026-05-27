@@ -5,7 +5,7 @@ import platform
 import shutil
 import sys
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager
 from contextvars import ContextVar
 from functools import wraps
 from typing import IO, Any
@@ -142,9 +142,12 @@ def run(cmd: str) -> Callable[[Callable[[Context], None]], Callable[[Context], N
 def logged(name: str) -> Callable[[Callable[..., None]], Callable[..., None]]:
     """Decorator: print ✅ on success or ❌ on SystemExit failure.
 
-    Nested calls are indented by one ``INDENT`` so a parent workflow command's
-    subcommand output and per-step banners sit under the parent, and only the
-    outermost banner lands flush-left at the end of the run.
+    The outermost ``@logged`` call wraps ``sys.stdout``/``sys.stderr`` so every
+    line of body output — shell echoes, bare prints, nested subcommand banners
+    — is indented by one ``INDENT``. The outermost banner itself is printed
+    outside the wrap and lands flush-left, so a leaf task invoked directly
+    (e.g. ``test.tox``) and a parent that orchestrates children (e.g. ``lint``)
+    render the same way: indented body, flush-left final banner.
     """
 
     def decorator(fn: Callable[..., None]) -> Callable[..., None]:
@@ -152,9 +155,16 @@ def logged(name: str) -> Callable[[Callable[..., None]], Callable[..., None]]:
         def wrapper(context: Context, *args: object, **kwargs: object) -> None:
             depth_before = DEPTH.get()
             token = DEPTH.set(depth_before + 1)
-            ctx = indented_streams(INDENT) if depth_before == 1 else nullcontext()
             try:
-                with ctx:
+                if depth_before == 0:
+                    try:
+                        with indented_streams(INDENT):
+                            fn(context, *args, **kwargs)
+                        print(f'✅ {name} passed 👍')
+                    except SystemExit:
+                        print(f'❌ {name} failed 👎')
+                        raise
+                else:
                     try:
                         fn(context, *args, **kwargs)
                         print(f'✅ {name} passed 👍')
