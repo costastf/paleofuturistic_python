@@ -127,9 +127,9 @@ Eventually the project's pipelines should build and publish for you.
 
 Instructions:
 
-- Execute `uv run mkdocs build`;
+- Execute `uv run properdocs build`;
   gives multiline output, should end with `INFO    -  Documentation built in <X> seconds`.
-- Execute `uv run mkdocs serve`;
+- Execute `uv run properdocs serve`;
   gives multiline output, should end with `INFO    -  <X> Serving on http://127.0.0.1:8000/`;
 - Navigate to `http://127.0.0.1:8000/`;
   some rudimentary documentation should be there.
@@ -143,11 +143,11 @@ Instructions:
 In your project directory go to `docs/index.md` and see how little was needed to produce such a fantastic skeleton for documentation.
 (Of course, you do need to keep every relevant docstring nice and tidy to make that work.)
 I found mkdocstrings works best with numpy style docs, so that's the template's default.
-You can change that and more in the `mkdocs.yaml`.
+You can change that and more in the `properdocs.yml`.
 Don't try to understand all of that at once...
 
-MkDocs offers far more than everything you accomplished above, especially combined with even more plugins.
-[See for yourself.](https://www.mkdocs.org/)
+ProperDocs offers far more than everything you accomplished above, especially combined with even more plugins.
+[See for yourself.](https://properdocs.org/)
 Personal favorite out of the box: watch files.
 Others might particularly like automated publishing to other documentation hosting parties than GitHub Pages.
 
@@ -266,7 +266,7 @@ Now that you went through all the bootstrapping needed only once, your developme
     - Type check: `uv run mypy`
     - Test: `uv run python -m unittest`
 - Build: `uv build` (just to test it works)
-- Preview documentation: `uv run mkdocs serve`
+- Preview documentation: `uv run properdocs serve`
 - Publish package and docs: approve the `chore(main): release x.x.x` pull request from Release Please
 
 Or even better, create your own workflow that exactly caters to your project's needs.

@@ -152,7 +152,7 @@ sbom.json
 # act local CI
 .secrets
 
-# mkdocs documentation
+# properdocs documentation
 /site
 
 # mypy

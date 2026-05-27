@@ -56,7 +56,7 @@ All commands are invoked via `./workflow.cmd <namespace>.<task>`:
 | `./workflow.cmd release -i <type>` | Bump version, tag, push, build, publish, and upload SBOM |
 | `./workflow.cmd quality` | Run code quality analysis (pyscn) |
 | `./workflow.cmd secure` | Run security audit and generate SBOM |
-| `./workflow.cmd document` | Build and view documentation (mkdocs) |
+| `./workflow.cmd document` | Build and view documentation (properdocs) |
 | `./workflow.cmd container.build` | Build the dependency cache container image |
 | `./workflow.cmd container.act` | Run the CI workflow locally using act |
 | `./workflow.cmd develop.pre-commit` | Run all pre-commit hooks on the codebase |

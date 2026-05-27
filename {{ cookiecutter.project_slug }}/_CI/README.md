@@ -37,7 +37,7 @@ develop.pre-commit-install   Install pre-commit hooks
 develop.pre-commit           Run all hooks on entire codebase
 
 document               Build and view documentation
-document.build         Build docs (mkdocs)
+document.build         Build docs (properdocs)
 document.view          Open docs in browser
 
 format                 Format code and sort imports
@@ -137,7 +137,7 @@ _CI/
     build.py           Package build
     container.py       Docker image + act
     develop.py         Pre-commit management
-    document.py        MkDocs documentation
+    document.py        ProperDocs documentation
     format_.py         Ruff formatting + import sorting
     lint.py            Ruff, pylint, ty, complexipy, commitizen
     quality.py         pyscn analysis

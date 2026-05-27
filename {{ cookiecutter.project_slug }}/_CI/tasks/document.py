@@ -58,7 +58,7 @@ def update_python_badge() -> None:
 
 @task
 @logged('document.build')
-@run('uv run mkdocs build')
+@run('uv run properdocs build')
 def build(context: Context) -> None:
     """Build the documentation."""
 
