@@ -25,13 +25,15 @@ git add -A
 git commit -m "feat: greet someone by name"
 ```
 
-The `feat:` prefix is what commitizen reads to decide the version bump (`feat` → minor, `fix` → patch, `feat!` or `BREAKING CHANGE:` → major). The pre-commit hook will reject any message that doesn't parse.
+The prefix does **not** drive the version bump — you'll pass that explicitly in the next step. What it drives is the **release notes**: when commitizen generates the changelog, it groups commits by prefix (`feat:` under "Features", `fix:` under "Bug Fixes", etc.). The lint step rejects any message that doesn't parse as Conventional Commits.
 
 ## Step 3 — Cut the release
 
 ```bash
 ./workflow.cmd release -i minor
 ```
+
+`-i` is your explicit version-increment choice (`major`, `minor`, `patch`, `alpha`, `beta`, or `rc`). The template does not infer it from commit messages.
 
 The `release` task is the orchestrator. In order, it:
 

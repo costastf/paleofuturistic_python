@@ -19,7 +19,7 @@ Paleofuturistic Python added the infrastructure that turns a starter into an ent
 - **Multiple linters and analyzers.** ruff alone wasn't enough — pylint, ty, complexipy, and pyscn cover what ruff doesn't.
 - **Security pipeline.** pip-audit, CycloneDX SBOM generation, optional Dependency Track upload.
 - **Multi-host CI support.** Both GitHub Actions and GitLab CI scaffolding, gated on the `git_hosting_service` answer.
-- **Conventional Commits + commitizen** for automated release flow, replacing Release Please.
+- **Conventional Commits + commitizen** for automated release notes, replacing Release Please. The version bump stays explicit; only the changelog is derived from commit messages.
 - **pytest + tox + xdist** for the test layer, replacing the original `python -m unittest`.
 - **Diátaxis-structured docs** (the structure you're reading right now), replacing the single-page walkthrough.
 

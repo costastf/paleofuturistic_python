@@ -22,20 +22,22 @@ Update the smoke test under `tests/` to match. Run the dev cycle once to confirm
 
 ## Step 2 — Commit using Conventional Commits
 
-The template gates releases on [Conventional Commits](https://www.conventionalcommits.org/). Commit messages must start with a type prefix:
+Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) — the lint step rejects anything that doesn't parse. Start each message with a type prefix:
 
 ```bash
 git add -A
 git commit -m "feat: greet someone by name"
 ```
 
-The `feat:` prefix tells the release tooling to bump the minor version.
+The prefix does **not** drive the version bump — you'll choose that explicitly in the next step. What it does drive is the **release notes**: commitizen reads the commit history when generating the changelog and groups your commits by prefix (`feat:` under "Features", `fix:` under "Bug Fixes", etc.).
 
 ## Step 3 — Cut the release
 
 ```bash
 ./workflow.cmd release -i minor
 ```
+
+The `-i minor` is your explicit choice. Valid values: `major`, `minor`, `patch`, `alpha`, `beta`, `rc`.
 
 This task:
 

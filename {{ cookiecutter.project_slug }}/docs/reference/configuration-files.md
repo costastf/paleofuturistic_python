@@ -17,7 +17,7 @@ The single source of truth for project metadata and tool configuration. Sections
 | `[tool.pytest.ini_options]` | Template (framework), you (markers) | Don't disable coverage; add markers as needed. |
 | `[tool.coverage]` | Template | `fail_under` is ratcheted upward automatically. Don't lower it. |
 | `[tool.tox]` | Template | Generated from `min_python_version` / `max_python_version`. |
-| `[tool.commitizen]` | Template | Conventional-Commits config; the version-bump rules live here. |
+| `[tool.commitizen]` | Template | Conventional-Commits parser config used by `cz changelog` and the lint hook. The template does **not** use commitizen's autorelease — the bump is chosen explicitly via `./workflow.cmd release -i <type>`. |
 | `[tool.docker-versions]` | Template | Image tags consumed by `Dockerfile.deps` and CI. |
 
 ## `uv.lock`

@@ -20,9 +20,11 @@ One tool, one config block, one cache. Ruff doesn't yet cover everything pylint 
 
 The original lineage used `python -m unittest`. We moved to pytest for fixtures, parametrization, coverage integration, and parallel execution via xdist. Unittest test classes still work — pytest discovers them.
 
-## Conventional Commits are mandatory
+## Conventional Commits drive the release notes
 
-Releases are cut by [commitizen](https://commitizen-tools.github.io/commitizen/) reading commit messages. The pre-commit hook rejects messages that don't parse. This is the cost of automated changelogs and SemVer bumps; we think it's worth it.
+Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) — the lint step rejects anything that doesn't parse. We use them for **automatic release notes**: [commitizen](https://commitizen-tools.github.io/commitizen/) reads the commits since the last tag and groups them by prefix (`feat:`, `fix:`, etc.) into a generated changelog.
+
+We do **not** use commitizen's autorelease mode. The version bump is an explicit choice you make at release time: `./workflow.cmd release -i <major|minor|patch|…>`. Commit prefixes inform changelog structure, not the version number.
 
 ## properdocs (not vanilla mkdocs), with mkdocstrings for API docs
 
