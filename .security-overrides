@@ -9,5 +9,3 @@
 # expiry).
 #
 # One entry per line. Blank lines and `#` comments are ignored.
-
-CVE-2026-41066

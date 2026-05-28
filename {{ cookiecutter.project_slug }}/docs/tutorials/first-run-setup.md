@@ -7,7 +7,10 @@ This is the first thing to do after this project was generated. By the end of it
 - [`uv`](https://docs.astral.sh/uv/) on your PATH.
 - A shell. macOS/Linux: bash or zsh. Windows: PowerShell or git-bash.
 
-You do *not* need to pre-install Python — uv will fetch the versions declared in `pyproject.toml`.
+You do *not* need to pre-install Python — uv will fetch the versions declared in `.python-version`.
+
+## This step is a `pre` command of all the other commands so running it manually is not actually required. 
+### It is safe to skip to step 2 immediately.
 
 ## Step 1 — Bootstrap
 
@@ -18,7 +21,7 @@ You do *not* need to pre-install Python — uv will fetch the versions declared 
 This:
 
 1. Creates uv-managed virtualenvs for the `dev`, `lint`, `test`, `document`, `quality`, and `security` dependency groups (see [Reference: dependency groups](../reference/dependency-groups.md)).
-2. Installs pre-commit hooks into `.git/hooks/`.
+2. Asks to install pre-commit hooks into `.git/hooks/`.
 3. Drops a sentinel file (`_CI/.bootstrapped`) so re-runs are no-ops.
 
 Re-running is safe and fast. Pass `--force` to repeat the setup.
