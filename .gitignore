@@ -23,6 +23,10 @@ eggs/
 .eggs/
 lib/
 lib64/
+# Re-include the vendored CI tooling — it ships intentionally so `./workflow.cmd`
+# works on a fresh clone without a global Invoke install.
+!**/_CI/lib/
+!**/_CI/lib/**
 parts/
 sdist/
 var/
