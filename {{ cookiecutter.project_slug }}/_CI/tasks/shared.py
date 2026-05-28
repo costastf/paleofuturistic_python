@@ -8,9 +8,18 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from functools import wraps
-from typing import IO, Any
+from typing import IO, Any, NamedTuple
 
 from invoke import Context
+
+
+class PipelineComponent(NamedTuple):
+    """A CI pipeline component (GitHub Action, container image, …) for inclusion in the SBOM."""
+
+    name: str
+    version: str
+    purl: str
+
 
 for _stream in (sys.stdout, sys.stderr):
     reconfigure = getattr(_stream, 'reconfigure', None)

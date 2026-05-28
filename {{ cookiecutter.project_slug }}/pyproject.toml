@@ -52,6 +52,7 @@ quality = [
 ]
 security = [
     "cyclonedx-bom",
+    "cyclonedx-python-lib[json-validation]",
 {%- if cookiecutter.integrate_dependency_track %}
     "owasp-dependency-track-cli",
 {%- endif %}

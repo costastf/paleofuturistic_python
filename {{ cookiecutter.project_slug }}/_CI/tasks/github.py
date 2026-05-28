@@ -1,17 +1,22 @@
-"""GitHub-specific helpers: container registry publish and release PR creation."""
+"""GitHub-specific helpers: container registry publish, release PR creation, pipeline SBOM components."""
 
 import json
 import os
 import re
 import urllib.error
 import urllib.request
+from collections.abc import Iterator
+from pathlib import Path
 from typing import NamedTuple
 
 from invoke import Context
 
 from _CI.info import read as read_info
 
-from .shared import container_engine, execute
+from .shared import PipelineComponent, container_engine, execute
+
+WORKFLOWS_DIR = Path('.github/workflows')
+USES_PATTERN = re.compile(r'^\s*-?\s*uses:\s*([A-Za-z0-9._\-]+/[A-Za-z0-9._\-]+)@([A-Za-z0-9._\-]+)')
 
 
 class RegistrySettings(NamedTuple):
@@ -130,3 +135,26 @@ def create_release_pr(context: Context, release_branch: str, new_version: str) -
         print(f'GitHub API request failed: {exc}')
         return ''
     return data.get('html_url', '')
+
+
+def iter_pipeline_components() -> Iterator[PipelineComponent]:
+    """Yield CI pipeline components for inclusion in the SBOM.
+
+    Walks every workflow file under `.github/workflows/` and emits one entry per
+    third-party `uses: <owner>/<repo>@<ref>` reference. Local workflow refs
+    (those starting with `./`) and re-usable workflows in the same repo are
+    skipped because they have no external version to record.
+    """
+    if not WORKFLOWS_DIR.is_dir():
+        return
+    seen: set[tuple[str, str]] = set()
+    for workflow in sorted(WORKFLOWS_DIR.glob('*.y*ml')):
+        for line in workflow.read_text(encoding='utf-8').splitlines():
+            match = USES_PATTERN.match(line)
+            if not match:
+                continue
+            name, ref = match.group(1), match.group(2)
+            if (name, ref) in seen:
+                continue
+            seen.add((name, ref))
+            yield PipelineComponent(name=name, version=ref, purl=f'pkg:github/{name}@{ref}')

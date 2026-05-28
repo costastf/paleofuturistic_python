@@ -11,12 +11,14 @@ from .configuration import (
     IGNORE_PATTERN,
     OWASP_DTRACK_SETTINGS,
     PROJECT_NAME,
+    SBOM_FILE,
     SECURITY_OVERRIDE_ENV,
     SECURITY_OVERRIDES_FILE,
 )
 {%- else -%}
-from .configuration import IGNORE_PATTERN, SECURITY_OVERRIDE_ENV, SECURITY_OVERRIDES_FILE
+from .configuration import IGNORE_PATTERN, SBOM_FILE, SECURITY_OVERRIDE_ENV, SECURITY_OVERRIDES_FILE
 {%- endif %}
+from .sbom import render_sbom, validate_sbom, write_sbom
 from .shared import execute, logged
 
 
@@ -96,19 +98,39 @@ def audit(context: Context, ignore: str | None = None) -> None:
 
 @task
 @logged('secure.sbom-extract')
-def sbom_extract(context: Context, write: bool = False) -> None:
-    """Extract a Software Bill of Materials using CycloneDX.
+def sbom_extract(context: Context, write: bool = False) -> None:  # noqa: ARG001
+    """Compose a CycloneDX SBOM covering runtime deps, vendored CI deps, and pipeline components.
 
-    By default prints the SBOM to stdout. With --write, writes to sbom.json.
+    By default prints the SBOM to stdout. With --write, writes the SBOM to the
+    package data path so `uv build` ships it inside the wheel.
 
     Args:
         context: Invoke context.
-        write: Write SBOM to sbom.json instead of printing to stdout.
+        write: Write SBOM to ``src/<package>/sbom.cdx.json`` instead of printing to stdout.
     """
     if write:
-        execute(context, 'uv run cyclonedx-py environment --output-file sbom.json')
+        write_sbom()
+        print(f'Wrote SBOM to {SBOM_FILE}.')
     else:
-        execute(context, 'uv run cyclonedx-py environment')
+        print(render_sbom())
+
+
+@task
+@logged('secure.sbom-validate')
+def sbom_validate(context: Context) -> None:
+    """Validate the generated SBOM against the CycloneDX 1.6 JSON schema.
+
+    Re-runs ``sbom-extract --write`` if the SBOM file is missing so the
+    validation has something to check.
+    """
+    if not SBOM_FILE.exists():
+        sbom_extract(context, write=True)
+    errors = validate_sbom()
+    if errors:
+        for err in errors:
+            print(err)
+        raise SystemExit(1)
+    print(f'SBOM at {SBOM_FILE} validates against CycloneDX 1.6 schema.')
 
 
 {%- if cookiecutter.integrate_dependency_track %}
@@ -137,7 +159,7 @@ def sbom_upload(context: Context) -> None:
         f'uv run owasp-dtrack-cli test '
         f'--project-name {PROJECT_NAME} '
         f'--project-version {version} '
-        f'--auto-create sbom.json',
+        f'--auto-create {SBOM_FILE}',
     )
 {%- endif %}
 
@@ -167,6 +189,10 @@ def secure(context: Context) -> None:
         sbom_extract(context, write=True)
     except SystemExit:
         failed = True
+    try:
+        sbom_validate(context)
+    except SystemExit:
+        failed = True
     if failed:
         raise SystemExit(1)
 
@@ -175,6 +201,7 @@ namespace = Collection('secure')
 namespace.add_task(cast(Task, secure), default=True, name='all')
 namespace.add_task(cast(Task, audit))
 namespace.add_task(cast(Task, sbom_extract))
+namespace.add_task(cast(Task, sbom_validate))
 namespace.add_task(cast(Task, validate_overrides))
 {%- if cookiecutter.integrate_dependency_track %}
 namespace.add_task(cast(Task, sbom_upload))

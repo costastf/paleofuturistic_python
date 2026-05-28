@@ -27,9 +27,10 @@ The release pipeline calls `secure.sbom-upload` after `release.publish` succeeds
 
 What it does:
 
-1. Generates a fresh SBOM via `cyclonedx-py` against the locked dependency set.
-2. POSTs the SBOM to `<OWASP_DT_URL>/api/v1/bom` with the API key and project UUID.
-3. Prints the response.
+1. Composes a fresh CycloneDX 1.6 SBOM via `./workflow.cmd secure.sbom-extract --write` (runtime deps + vendored CI tooling + chosen-host pipeline components).
+2. Writes it to `src/<project_slug>/sbom.cdx.json` — the same file `uv build` later ships inside the wheel.
+3. POSTs that file to `<OWASP_DT_URL>/api/v1/bom` with the API key and project UUID.
+4. Prints the response.
 
 ## Verify
 
@@ -45,7 +46,7 @@ Re-run `uvx cruft update` and answer `y` to `integrate_dependency_track`. See [c
 
 ## What if I don't have a Dependency Track server?
 
-You still get a CycloneDX SBOM on every release — it lands in `dist/sbom.json` alongside the wheel. You can upload it manually elsewhere, or use any other SCA tool that consumes CycloneDX.
+You still get a CycloneDX SBOM on every release — it's embedded **inside the wheel** at `<project_slug>/sbom.cdx.json`. Extract it with `unzip -p <wheel> <project_slug>/sbom.cdx.json` or read it via `importlib.resources.files('<project_slug>') / 'sbom.cdx.json'`. You can upload it manually elsewhere, or use any other SCA tool that consumes CycloneDX.
 
 The Dependency Track integration is an optional automation, not a prerequisite for the security pipeline.
 

@@ -18,6 +18,11 @@ IMAGE_NAME = '{{ cookiecutter.project_slug }}-deps'
 
 PROJECT_NAME = '{{ cookiecutter.project_slug }}'
 
+# SBOM ships inside the wheel via the package data tree, so consumers of the
+# released artefact can extract it via importlib.resources or by unzipping.
+SBOM_FILE = Path('src') / PROJECT_NAME / 'sbom.cdx.json'
+VENDOR_TXT = Path('_CI') / 'lib' / 'vendor.txt'
+
 {%- if cookiecutter.integrate_dependency_track %}
 OWASP_DTRACK_SETTINGS = ('OWASP_DTRACK_URL', 'OWASP_DTRACK_API_KEY')
 {%- endif %}

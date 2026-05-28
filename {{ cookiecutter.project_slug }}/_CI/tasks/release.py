@@ -10,9 +10,9 @@ from invoke import Collection, Context, Task, task
 
 from .build import build
 {%- if cookiecutter.integrate_dependency_track %}
-from .configuration import OIDC_ENV_VARS, OWASP_DTRACK_SETTINGS, UV_PUBLISH_SETTINGS
+from .configuration import OIDC_ENV_VARS, OWASP_DTRACK_SETTINGS, SBOM_FILE, UV_PUBLISH_SETTINGS
 {%- else %}
-from .configuration import OIDC_ENV_VARS, UV_PUBLISH_SETTINGS
+from .configuration import OIDC_ENV_VARS, SBOM_FILE, UV_PUBLISH_SETTINGS
 {%- endif %}
 from .{{ cookiecutter.git_hosting_service }} import create_release_pr, pr_create_url
 {%- if cookiecutter.integrate_dependency_track %}
@@ -308,15 +308,14 @@ def release(context: Context, increment: str = '', no_push: bool = False) -> Non
 
 @task
 @logged('release.clean')
-def clean(context: Context) -> None:
-    """Remove build artifacts (dist/ and sbom.json)."""
+def clean(context: Context) -> None:  # noqa: ARG001
+    """Remove build artifacts (``dist/`` and the package-data SBOM)."""
     if Path('dist').exists():
         shutil.rmtree('dist')
         print('Removed dist/')
-    sbom = Path('sbom.json')
-    if sbom.exists():
-        sbom.unlink()
-        print('Removed sbom.json')
+    if SBOM_FILE.exists():
+        SBOM_FILE.unlink()
+        print(f'Removed {SBOM_FILE}')
 
 
 namespace = Collection('release')

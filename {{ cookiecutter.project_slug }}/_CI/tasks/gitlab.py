@@ -1,9 +1,10 @@
-"""GitLab-specific helpers: container registry publish (kaniko) and release MR helpers."""
+"""GitLab-specific helpers: container registry publish (kaniko), release MR helpers, pipeline SBOM components."""
 
 import base64
 import json
 import os
 import re
+from collections.abc import Iterator
 from pathlib import Path
 from typing import NamedTuple
 
@@ -11,7 +12,13 @@ from invoke import Context
 
 from _CI.info import read as read_info
 
-from .shared import execute
+from .shared import PipelineComponent, execute
+
+CI_FILE = Path('.gitlab-ci.yml')
+# Matches inline `image: foo/bar:tag` and the `name: foo/bar:tag` line inside
+# block-form `image:` mappings. `$VAR`-style values are excluded by the char
+# class — the SBOM only records statically-pinned image references.
+IMAGE_PATTERN = re.compile(r'^\s*(?:image|name):\s*"?([A-Za-z0-9._/\-]+):([A-Za-z0-9._\-]+)"?\s*$')
 
 
 class RegistrySettings(NamedTuple):
@@ -86,3 +93,24 @@ def create_release_pr(context: Context, release_branch: str, new_version: str) -
     """
     print('Auto-creation of GitLab merge requests is not yet implemented. See pr_create_url() for the manual URL.')
     return ''
+
+
+def iter_pipeline_components() -> Iterator[PipelineComponent]:
+    """Yield CI pipeline components for inclusion in the SBOM.
+
+    Reads `.gitlab-ci.yml` and emits one entry per `image: <name>:<tag>`
+    reference. Deduplicated; tag-less references are skipped because the
+    SBOM requires a version field.
+    """
+    if not CI_FILE.exists():
+        return
+    seen: set[tuple[str, str]] = set()
+    for line in CI_FILE.read_text(encoding='utf-8').splitlines():
+        match = IMAGE_PATTERN.match(line)
+        if not match:
+            continue
+        name, tag = match.group(1), match.group(2)
+        if (name, tag) in seen:
+            continue
+        seen.add((name, tag))
+        yield PipelineComponent(name=name, version=tag, purl=f'pkg:docker/{name}@{tag}')

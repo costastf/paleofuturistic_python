@@ -40,9 +40,11 @@ We do **not** use commitizen's autorelease mode. The version bump is an explicit
 
 properdocs is mkdocs with a curated plugin set. mkdocstrings reads the source directly — no `.rst` files in the middle. Sphinx is more capable; we don't need that capability here.
 
-## SBOMs ship by default
+## SBOMs ship inside the wheel
 
-Every release builds a CycloneDX SBOM regardless of whether you've enabled the Dependency Track upload. The SBOM lands in `dist/` alongside the wheel. The cost is one extra build step; the benefit is that supply-chain questions have an answer the day someone asks them.
+Every release composes a CycloneDX 1.6 SBOM covering three sources — runtime dependencies (from `uv export --no-dev` against the lockfile), vendored CI tooling (every package in `_CI/lib/vendor.txt`), and the chosen host's pipeline components (GitHub Actions `uses:` refs or GitLab CI `image:` refs). The SBOM is validated against the CycloneDX 1.6 JSON schema and written to `src/<project_slug>/sbom.cdx.json`, which `uv build` automatically ships **inside the wheel** rather than next to it. A downstream consumer extracts it with `unzip -p <wheel> <project_slug>/sbom.cdx.json` or `importlib.resources` — the SBOM travels with the artefact instead of needing to be re-correlated post-release.
+
+The cost is one Python module (`_CI/tasks/sbom.py`) and one extra build step; the benefit is that supply-chain questions have an answer the day someone asks them, without depending on a separate registry or pinned cyclonedx-cli binary.
 
 ## Vendored CI tooling
 

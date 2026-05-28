@@ -29,17 +29,25 @@ Runs on every CI pipeline. See [Triage a security finding](../how-to/triage-a-se
 
 ## Layer 2 — CycloneDX SBOM
 
-`./workflow.cmd secure.sbom-extract --write` generates a [CycloneDX](https://cyclonedx.org/) bill of materials describing every dependency, transitive included. It ships in `dist/sbom.json` alongside the wheel on every release.
+`./workflow.cmd secure.sbom-extract --write` generates a [CycloneDX](https://cyclonedx.org/) 1.6 bill of materials and writes it to `src/<project_slug>/sbom.cdx.json`. Because that path is inside the package data tree, `uv build` automatically ships the SBOM **inside the wheel** — a downstream consumer unpacks the wheel and finds `<project_slug>/sbom.cdx.json` alongside the Python modules.
 
-What an SBOM is: a machine-readable inventory of components. Each entry has a name, version, license, and (where available) PURL plus SHA-256 hashes.
+What an SBOM is: a machine-readable inventory of components. Each entry carries name, version, and a PURL identifier (PyPI for Python packages, `pkg:github/...` for GitHub Actions, `pkg:docker/...` for container images).
 
-What it enables:
+This template's SBOM has **three sources**, assembled into one document:
 
-- A downstream consumer can search your SBOMs for any component without reading your source.
+1. **Runtime dependencies.** Generated from `uv export --no-dev` against `uv.lock` — what actually lands in the wheel. Dev, lint, test, document, quality, and security groups are excluded; they aren't shipped.
+2. **Vendored CI tooling.** Every package pinned in `_CI/lib/vendor.txt` (the vendored Invoke + its deps) is emitted as a PyPI component. These ship with the source tree even though they don't land in the wheel itself — they make the CI pipeline reproducible from a fresh clone.
+3. **Pipeline components.** GitHub Actions (`uses:` refs across `.github/workflows/*.yaml`) on `github`, container images (`image:` and block-form `name:` refs in `.gitlab-ci.yml`) on `gitlab`. The host-specific code lives in `_CI/tasks/<host>.py` and is pulled in via the same Jinja-substituted import that `container.py` already uses.
+
+`./workflow.cmd secure.sbom-validate` runs the CycloneDX 1.6 JSON-schema validator in a clean `uv run python` subprocess (so the venv-installed validator wins over the older vendored `jsonschema` that the workflow.cmd launcher places earlier on `sys.path`). The aggregate `./workflow.cmd secure` runs all three sub-steps; a clean run means: no known vulns, a fresh SBOM written, validated against the schema.
+
+What this enables:
+
+- A downstream consumer can extract the SBOM from the wheel with `unzip -p <wheel> <project_slug>/sbom.cdx.json` or `importlib.resources` — no separate artefact to track.
 - A security responder can answer "are we affected by X?" against your project in seconds, not hours.
-- Compliance frameworks (SLSA, NIST SSDF) that mandate SBOMs are satisfied.
+- Compliance frameworks (SLSA, NIST SSDF, EU CRA) that mandate SBOMs are satisfied — the SBOM travels with the artefact instead of needing to be re-correlated post-release.
 
-The SBOM exists whether you have a Dependency Track server or not. It's a release artifact.
+The SBOM exists whether you have a Dependency Track server or not. It's part of every release.
 
 ## Layer 3 — Dependency Track (optional)
 
