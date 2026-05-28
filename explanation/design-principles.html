@@ -220,7 +220,7 @@
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-bs-level="2"><a href="#sboms-ship-by-default" class="nav-link">SBOMs ship by default</a>
+            <li class="nav-item" data-bs-level="2"><a href="#sboms-ship-inside-the-wheel" class="nav-link">SBOMs ship inside the wheel</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -268,8 +268,9 @@
 <p>We do <strong>not</strong> use commitizen's autorelease mode. The version bump is an explicit choice you make at release time: <code>./workflow.cmd release -i &lt;major|minor|patch|…&gt;</code>. Commit prefixes inform changelog structure, not the version number.</p>
 <h2 id="properdocs-not-vanilla-mkdocs-with-mkdocstrings-for-api-docs">properdocs (not vanilla mkdocs), with mkdocstrings for API docs</h2>
 <p>properdocs is mkdocs with a curated plugin set. mkdocstrings reads the source directly — no <code>.rst</code> files in the middle. Sphinx is more capable; we don't need that capability here.</p>
-<h2 id="sboms-ship-by-default">SBOMs ship by default</h2>
-<p>Every release builds a CycloneDX SBOM regardless of whether you've enabled the Dependency Track upload. The SBOM lands in <code>dist/</code> alongside the wheel. The cost is one extra build step; the benefit is that supply-chain questions have an answer the day someone asks them.</p>
+<h2 id="sboms-ship-inside-the-wheel">SBOMs ship inside the wheel</h2>
+<p>Every release composes a CycloneDX 1.6 SBOM covering three sources — runtime dependencies (from <code>uv export --no-dev</code> against the lockfile), vendored CI tooling (every package in <code>_CI/lib/vendor.txt</code>), and the chosen host's pipeline components (GitHub Actions <code>uses:</code> refs or GitLab CI <code>image:</code> refs). The SBOM is validated against the CycloneDX 1.6 JSON schema and written to <code>src/&lt;project_slug&gt;/sbom.cdx.json</code>, which <code>uv build</code> automatically ships <strong>inside the wheel</strong> rather than next to it. A downstream consumer extracts it with <code>unzip -p &lt;wheel&gt; &lt;project_slug&gt;/sbom.cdx.json</code> or <code>importlib.resources</code> — the SBOM travels with the artefact instead of needing to be re-correlated post-release.</p>
+<p>The cost is one Python module (<code>_CI/tasks/sbom.py</code>) and one extra build step; the benefit is that supply-chain questions have an answer the day someone asks them, without depending on a separate registry or pinned cyclonedx-cli binary.</p>
 <h2 id="vendored-ci-tooling">Vendored CI tooling</h2>
 <p><code>_CI/lib/vendor/</code> ships Invoke + its dependencies committed to the repo. <code>./workflow.cmd</code> works on a fresh clone with only uv installed — no <code>pip install invoke</code> step, no version drift between contributor machines. The vendoring cost is bytes in the repo; the benefit is that the dev cycle is the same on day one as on day one thousand.</p>
 <h2 id="diataxis-for-our-own-docs">Diátaxis for our own docs</h2>
