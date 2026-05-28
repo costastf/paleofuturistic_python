@@ -1,132 +1,154 @@
 import os
+import re
 import shutil
 import stat
 import sys
 from datetime import date, datetime
 from pathlib import Path
 
-min_version = '{{ cookiecutter.min_python_version }}'
-max_version = '{{ cookiecutter.max_python_version }}'
-known_versions = {{ cookiecutter._known_python_versions }}
+MIN_VERSION = '{{ cookiecutter.min_python_version }}'
+MAX_VERSION = '{{ cookiecutter.max_python_version }}'
+KNOWN_VERSIONS = {{ cookiecutter._known_python_versions }}
+LICENSE_CHOICE = '{{ cookiecutter.license }}'
+AUTHOR = '{{ cookiecutter.full_name }}'
+EMAIL = '{{ cookiecutter.email }}'
+PROJECT_SLUG = '{{ cookiecutter.project_slug }}'
+GIT_HOSTING_SERVICE = '{{ cookiecutter.git_hosting_service }}'
+INTEGRATE_PAGES = '{{ cookiecutter.integrate_pages }}' == 'True'
+
+LICENSES_DIR = Path('licenses')
+PAGES_WORKFLOW = Path('.github/workflows/pages.yaml')
+WORKFLOW_CMD = Path('workflow.cmd')
+HOST_ARTIFACTS = {
+    'github': (Path('.github'), Path('_CI/tasks/github.py')),
+    'gitlab': (Path('.gitlab-ci.yml'), Path('_CI/tasks/gitlab.py')),
+}
+
+YEAR = str(date.today().year)
+RELEASE_DATE = datetime.now().strftime('%d-%m-%Y')
 
 
-def version_tuple(version):
+def version_tuple(version: str) -> tuple[int, ...]:
     """Return a sortable int-tuple for a dotted Python version string."""
     return tuple(int(part) for part in version.split('.'))
 
 
-try:
-    min_tuple = version_tuple(min_version)
-    max_tuple = version_tuple(max_version)
-except ValueError:
-    print(f'ERROR: min/max python versions must be dotted integers; got {min_version!r} and {max_version!r}.')
+def fail(message: str) -> None:
+    """Print `message` and exit non-zero so cookiecutter aborts generation."""
+    print(message)
     sys.exit(1)
 
-if max_tuple < min_tuple:
-    print(f'ERROR: max_python_version ({max_version}) cannot be less than min_python_version ({min_version}).')
-    sys.exit(1)
 
-for label, chosen in (('min_python_version', min_version), ('max_python_version', max_version)):
-    if chosen not in known_versions:
-        print(f'ERROR: {label} ({chosen}) is not declared in _known_python_versions ({known_versions}).')
-        sys.exit(1)
-
-if min_tuple[0] != max_tuple[0]:
-    print(
-        f'ERROR: min_python_version ({min_version}) and max_python_version ({max_version}) '
-        'must share the same major version; cross-major ranges are not supported.'
-    )
-    sys.exit(1)
-
-license_choice = '{{ cookiecutter.license }}'
-author = '{{ cookiecutter.full_name }}'
-email = '{{ cookiecutter.email }}'
-project_slug = '{{ cookiecutter.project_slug }}'
-licenses_dir = Path('licenses')
-year = str(date.today().year)
-release_date = datetime.now().strftime('%d-%m-%Y')
-
-# Copy selected license to project root.
-if license_choice != 'None':
-    shutil.copy2(licenses_dir / license_choice, 'LICENSE')
-
-# Read the short license header if applicable.
-license_header = ''
-header_file = licenses_dir / f'{license_choice}.header'
-if license_choice != 'None' and header_file.exists():
-    license_header = header_file.read_text(encoding='utf-8').format(year=year, author=author)
-
-# Clean up the licenses directory.
-shutil.rmtree(licenses_dir)
-
-# Delete the unchosen git-hosting service's artifacts.
-git_hosting_service = '{{ cookiecutter.git_hosting_service }}'
-host_artifacts = {
-    'github': [Path('.github'), Path('_CI/tasks/github.py')],
-    'gitlab': [Path('.gitlab-ci.yml'), Path('_CI/tasks/gitlab.py')],
-}
-unchosen = 'gitlab' if git_hosting_service == 'github' else 'github'
-for path in host_artifacts[unchosen]:
-    if path.is_dir():
-        shutil.rmtree(path)
-    elif path.exists():
-        path.unlink()
-
-# Drop the Pages workflow when the user opted out, or when no Pages scaffolding
-# exists for the chosen host (gitlab today). Idempotent — the `.github/` tree
-# is already gone when git_hosting_service=gitlab.
-integrate_pages = '{{ cookiecutter.integrate_pages }}' == 'True'
-pages_workflow = Path('.github/workflows/pages.yaml')
-if pages_workflow.exists() and not (integrate_pages and git_hosting_service == 'github'):
-    pages_workflow.unlink()
+def validate_python_versions() -> None:
+    """Sanity-check the cookiecutter python-version inputs."""
+    try:
+        min_tuple = version_tuple(MIN_VERSION)
+        max_tuple = version_tuple(MAX_VERSION)
+    except ValueError:
+        fail(f'ERROR: min/max python versions must be dotted integers; got {MIN_VERSION!r} and {MAX_VERSION!r}.')
+    if max_tuple < min_tuple:
+        fail(f'ERROR: max_python_version ({MAX_VERSION}) cannot be less than min_python_version ({MIN_VERSION}).')
+    for label, chosen in (('min_python_version', MIN_VERSION), ('max_python_version', MAX_VERSION)):
+        if chosen not in KNOWN_VERSIONS:
+            fail(f'ERROR: {label} ({chosen}) is not declared in _known_python_versions ({KNOWN_VERSIONS}).')
+    if min_tuple[0] != max_tuple[0]:
+        fail(
+            f'ERROR: min_python_version ({MIN_VERSION}) and max_python_version ({MAX_VERSION}) '
+            'must share the same major version; cross-major ranges are not supported.'
+        )
 
 
-def _strip_leading_docstring(text: str) -> str:
+def install_license() -> str:
+    """Copy the chosen LICENSE into place and return the short header text (empty if no header)."""
+    header = ''
+    if LICENSE_CHOICE != 'None':
+        shutil.copy2(LICENSES_DIR / LICENSE_CHOICE, 'LICENSE')
+        header_file = LICENSES_DIR / f'{LICENSE_CHOICE}.header'
+        if header_file.exists():
+            header = header_file.read_text(encoding='utf-8').format(year=YEAR, author=AUTHOR)
+    shutil.rmtree(LICENSES_DIR)
+    return header
+
+
+def prune_unchosen_host_artifacts() -> None:
+    """Remove the scaffolding for the git hosting service the user did not pick."""
+    unchosen = 'gitlab' if GIT_HOSTING_SERVICE == 'github' else 'github'
+    for path in HOST_ARTIFACTS[unchosen]:
+        if path.is_dir():
+            shutil.rmtree(path)
+        elif path.exists():
+            path.unlink()
+
+
+def prune_pages_workflow_if_disabled() -> None:
+    """Drop pages.yaml unless the user opted in *and* picked a host with Pages scaffolding."""
+    if PAGES_WORKFLOW.exists() and not (INTEGRATE_PAGES and GIT_HOSTING_SERVICE == 'github'):
+        PAGES_WORKFLOW.unlink()
+
+
+def strip_leading_docstring(text: str) -> str:
     """Remove a leading module docstring from Python source."""
-    import re
     return re.sub(r'\A\s*("""[^"]*"""|\'\'\'[^\']*\'\'\')\s*\n?', '', text)
 
 
-def prepend_header(filepath: Path, *, with_logging: bool = False) -> None:
-    """Prepend the standard file header to a Python source file."""
-    filename = filepath.name
-    content = _strip_leading_docstring(filepath.read_text(encoding='utf-8')).strip()
-    header_lines = []
+def build_header(license_header: str, *, with_logging: bool) -> str:
+    """Compose the dunder-metadata header to prepend to a Python source file."""
+    lines = []
     if license_header:
-        header_lines.append(license_header.rstrip())
-    header_lines.append(f'"""{project_slug}."""')
-    header_lines.append('')
+        lines.append(license_header.rstrip())
+    lines.append(f'"""{PROJECT_SLUG}."""')
+    lines.append('')
     if with_logging:
-        header_lines.append('import logging')
-        header_lines.append('')
-    header_lines.append(f"__author__ = '{author} <{email}>'")
-    header_lines.append("__docformat__ = 'google'")
-    header_lines.append(f"__date__ = '{release_date}'")
-    header_lines.append(f"__copyright__ = 'Copyright {year}, {author}'")
-    header_lines.append(f"__credits__ = ['{author}']")
-    header_lines.append(f"__license__ = '{license_choice}'")
-    header_lines.append(f"__maintainer__ = '{author}'")
-    header_lines.append(f"__email__ = '<{email}>'")
-    header_lines.append("__status__ = 'Development'")
-    header_lines.append('')
+        lines.append('import logging')
+        lines.append('')
+    lines.append(f"__author__ = '{AUTHOR} <{EMAIL}>'")
+    lines.append("__docformat__ = 'google'")
+    lines.append(f"__date__ = '{RELEASE_DATE}'")
+    lines.append(f"__copyright__ = 'Copyright {YEAR}, {AUTHOR}'")
+    lines.append(f"__credits__ = ['{AUTHOR}']")
+    lines.append(f"__license__ = '{LICENSE_CHOICE}'")
+    lines.append(f"__maintainer__ = '{AUTHOR}'")
+    lines.append(f"__email__ = '<{EMAIL}>'")
+    lines.append("__status__ = 'Development'")
+    lines.append('')
     if with_logging:
-        header_lines.append(f"LOGGER_BASENAME = '{project_slug}'")
-        header_lines.append('LOGGER = logging.getLogger(LOGGER_BASENAME)')
-        header_lines.append('LOGGER.addHandler(logging.NullHandler())')
-        header_lines.append('')
-        header_lines.append('')
-    header = '\n'.join(header_lines)
-    if content:
-        result = header + '\n' + content + '\n'
-    else:
-        result = header.rstrip() + '\n'
+        lines.append(f"LOGGER_BASENAME = '{PROJECT_SLUG}'")
+        lines.append('LOGGER = logging.getLogger(LOGGER_BASENAME)')
+        lines.append('LOGGER.addHandler(logging.NullHandler())')
+        lines.append('')
+        lines.append('')
+    return '\n'.join(lines)
+
+
+def prepend_header(filepath: Path, license_header: str, *, with_logging: bool = False) -> None:
+    """Replace the leading module docstring of `filepath` with the standard header."""
+    content = strip_leading_docstring(filepath.read_text(encoding='utf-8')).strip()
+    header = build_header(license_header, with_logging=with_logging)
+    result = f'{header}\n{content}\n' if content else f'{header.rstrip()}\n'
     filepath.write_text(result, encoding='utf-8')
 
 
-# Add headers to all Python files in src/ and tests/.
-main_module = Path('src') / project_slug / f'{project_slug}.py'
-for directory in (Path('src'), Path('tests')):
-    for py_file in directory.rglob('*.py'):
-        prepend_header(py_file, with_logging=(py_file == main_module))
+def apply_headers_to_python_files(license_header: str) -> None:
+    """Prepend the standard header to every .py file under src/ and tests/."""
+    main_module = Path('src') / PROJECT_SLUG / f'{PROJECT_SLUG}.py'
+    for directory in (Path('src'), Path('tests')):
+        for py_file in directory.rglob('*.py'):
+            prepend_header(py_file, license_header, with_logging=(py_file == main_module))
 
-os.chmod('workflow.cmd', os.stat('workflow.cmd').st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+
+def make_workflow_cmd_executable() -> None:
+    """Set the executable bit on workflow.cmd so the Unix launcher works."""
+    mode = os.stat(WORKFLOW_CMD).st_mode
+    os.chmod(WORKFLOW_CMD, mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+
+
+def main() -> None:
+    validate_python_versions()
+    license_header = install_license()
+    prune_unchosen_host_artifacts()
+    prune_pages_workflow_if_disabled()
+    apply_headers_to_python_files(license_header)
+    make_workflow_cmd_executable()
+
+
+main()
