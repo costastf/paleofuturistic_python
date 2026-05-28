@@ -4,21 +4,21 @@ This template uses [uv](https://docs.astral.sh/uv/) for every Python operation: 
 
 ## What uv replaces
 
-In an older lineage of this template, a fresh checkout required: a system Python, pipx, virtualenv, pip-tools, tox-uv, twine, and (in some incarnations) Poetry. Each had its own configuration surface, its own caching behaviour, and its own update cadence.
+In an older lineage of this template, a fresh checkout required: a system Python, pipx, virtualenv, pipenv, pip-tools, tox-uv, and twine. Each had its own configuration surface, its own caching behaviour, and its own update cadence.
 
 uv replaces all of them with a single Rust binary that:
 
 - Installs and pins Python interpreters per project (no system-Python dependency).
-- Resolves and locks dependencies (no `pip-compile`, no Poetry).
+- Resolves and locks dependencies (no `pip-compile`, no `pipenv`).
 - Creates and manages virtualenvs (no `python -m venv`).
 - Publishes to PyPI (no `twine`).
 - Runs tools in ephemeral environments (`uvx`, no global `pipx`).
 
 ## Why this is worth the lock-in
 
-**Speed.** uv resolves a typical lockfile in under a second. pip-tools took tens of seconds; Poetry longer. The dev loop genuinely feels different.
+**Speed.** uv resolves a typical lockfile in under a second. pipenv took tens of seconds — sometimes minutes on large dependency graphs. The dev loop genuinely feels different.
 
-**One config surface.** `pyproject.toml` plus `uv.lock`. Two files. No `requirements.in`, no `requirements.txt`, no `poetry.lock`, no `Pipfile`.
+**One config surface.** `pyproject.toml` plus `uv.lock`. Two files. No `requirements.in`, no `requirements.txt`, no `Pipfile`, no `Pipfile.lock`.
 
 **Reproducibility by default.** uv's lockfile is platform-portable and hash-locked. CI and your laptop get bit-identical environments without opt-in flags.
 
