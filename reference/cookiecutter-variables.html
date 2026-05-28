@@ -280,6 +280,13 @@
 <li><strong>Default</strong>: <code>true</code></li>
 </ul>
 <p>When <code>true</code>, the release pipeline uploads the generated CycloneDX SBOM to an OWASP Dependency Track server (expects <code>OWASP_DT_*</code> environment variables at runtime). See <a href="../how-to/enable-dependency-track.html">Enable Dependency Track integration</a>.</p>
+<h3 id="integrate_pages"><code>integrate_pages</code></h3>
+<ul>
+<li><strong>Type</strong>: bool</li>
+<li><strong>Default</strong>: <code>true</code></li>
+<li><strong>Prompt</strong>: "Integrate Pages with the chosen git hosting service?"</li>
+</ul>
+<p>Controls whether documentation-publishing scaffolding (the Pages workflow file and the matching <code>document.deploy-github</code> task) ships in the generated project. The actual scaffolding is host-specific: today only <code>git_hosting_service=github</code> has shipping Pages scaffolding — picking <code>gitlab</code> with <code>integrate_pages=true</code> is a silent no-op until GitLab Pages support lands. See <a href="../how-to/publish-docs-to-github-pages.html">Publish docs to GitHub Pages</a>.</p>
 <h2 id="private-variables">Private variables</h2>
 <p>Keys starting with <code>_</code> aren't prompted for. They configure the template engine itself.</p>
 <h3 id="_known_python_versions"><code>_known_python_versions</code></h3>

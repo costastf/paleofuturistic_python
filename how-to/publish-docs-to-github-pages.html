@@ -228,7 +228,8 @@
                     <div class="col-md-9" role="main">
 
 <h1 id="publish-docs-to-github-pages">Publish docs to GitHub Pages</h1>
-<p>For GitHub-hosted projects, the template ships <code>.github/workflows/pages.yaml</code>. It runs <code>./workflow.cmd document.deploy-github</code> on every push to <code>main</code>, which delegates to <code>properdocs gh-deploy</code> (no GitHub Pages deploy actions involved — see <a href="../explanation/design-principles.html#pipelines-run-template-commands-only">Design principles</a> for the reasoning). The only manual step is enabling Pages on the GitHub side.</p>
+<p>For GitHub-hosted projects, the template ships <code>.github/workflows/pages.yaml</code> by default. It runs <code>./workflow.cmd document.deploy-github</code> on every push to <code>main</code>, which delegates to <code>properdocs gh-deploy</code> (no GitHub Pages deploy actions involved — see <a href="../explanation/design-principles.html#pipelines-run-template-commands-only">Design principles</a> for the reasoning). The only manual step is enabling Pages on the GitHub side.</p>
+<p>The Pages scaffolding is <strong>opt-in/opt-out at generation time</strong> via the <code>integrate_pages</code> questionnaire answer (default <code>true</code>). Answering <code>false</code> removes both the workflow file and the matching <code>document.deploy-github</code> task from the generated project — see <a href="../reference/cookiecutter-variables.html#integrate_pages">Cookiecutter variables</a>.</p>
 <h2 id="step-1-push-the-template">Step 1 — Push the template</h2>
 <p>Generate the project with <code>git_hosting_service=github</code>, push to GitHub. The first push to <code>main</code> triggers the Pages workflow. The workflow creates the <code>gh-pages</code> branch on its first successful run.</p>
 <h2 id="step-2-enable-pages-on-the-repo">Step 2 — Enable Pages on the repo</h2>
