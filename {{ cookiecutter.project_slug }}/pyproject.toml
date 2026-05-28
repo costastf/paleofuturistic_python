@@ -295,6 +295,11 @@ env_list = [
 [tool.tox.env_run_base]
 runner = "uv-venv-lock-runner"
 dependency_groups = ["test"]
+# Per-env coverage data file so `tox run-parallel` doesn't race two writers
+# (pytest-cov + xdist already produces parallel-mode files; without this each
+# env scans the same project root and combines partially-written DBs from the
+# sibling env, producing intermittent `no such table: file` SQLite errors).
+set_env = { COVERAGE_FILE = ".coverage.{envname}" }
 commands = [["pytest", { replace = "posargs", default = [], extend = true }]]
 
 [tool.docker-versions]
