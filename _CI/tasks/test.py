@@ -129,19 +129,33 @@ def test(context):
         shutil.rmtree(str(tmpdir), ignore_errors=True)
 
 
-@task(help={'dep_track': 'Set integrate_dependency_track=true (omit for false)'})
-def combo(context, dep_track=False):
-    """Run the full QA cycle for one matrix cell (one integrate_dependency_track value)."""
+@task(
+    help={
+        'git_hosting_service': 'github (default) or gitlab',
+        'integrate_dependency_track': 'Bool — opt the SBOM-upload code in (default true)',
+        'integrate_pages': 'Bool — opt the Pages workflow + task in (default true)',
+    }
+)
+def combo(context, git_hosting_service='github', integrate_dependency_track=True, integrate_pages=True):
+    """Run the full QA cycle for one matrix cell across all three template knobs."""
     tmpdir = Path(tempfile.mkdtemp(prefix='paleofuturistic_combo_'))
     try:
         template_repo = prepare_snapshot(tmpdir)
         output_root = tmpdir / 'generated'
         output_root.mkdir()
-        label = combo_label(dep_track)
+        label = combo_label(
+            git_hosting_service=git_hosting_service,
+            integrate_dependency_track=integrate_dependency_track,
+            integrate_pages=integrate_pages,
+        )
         ok = run_combo(
             template_repo,
             output_root,
-            extra_context=combo_context(dep_track),
+            extra_context=combo_context(
+                git_hosting_service=git_hosting_service,
+                integrate_dependency_track=integrate_dependency_track,
+                integrate_pages=integrate_pages,
+            ),
             label=label,
         )
         if not ok:
@@ -183,7 +197,11 @@ def matrix(context, workers=1):
                 ok = run_combo(
                     template_repo,
                     output_root,
-                    extra_context=combo_context(cell['integrate_dependency_track']),
+                    extra_context=combo_context(
+                        git_hosting_service=cell['git_hosting_service'],
+                        integrate_dependency_track=cell['integrate_dependency_track'],
+                        integrate_pages=cell['integrate_pages'],
+                    ),
                     label=label,
                     log_file=log_path,
                 )
@@ -223,6 +241,20 @@ def list_combos(context, as_json=False):
     if as_json:
         print(json.dumps(combos, separators=(',', ':')))
         return
-    print(f'{"label":<8} integrate_dependency_track')
+    print(f'{"label":<18} {"host":<7} {"dep_track":<10} {"pages":<6}')
     for cell in combos:
-        print(f'{cell["label"]:<8} {cell["integrate_dependency_track"]}')
+        print(
+            f'{cell["label"]:<18} '
+            f'{cell["git_hosting_service"]:<7} '
+            f'{str(cell["integrate_dependency_track"]):<10} '
+            f'{str(cell["integrate_pages"]):<6}'
+        )
+
+
+@task
+def invariants(context):
+    """Run the fast pytest invariants against the cartesian-product matrix."""
+    if not run_command('uv run --group test pytest tests/ -v', cwd=PROJECT_ROOT_DIRECTORY):
+        print(emojize_message('Template invariants failed', success=False))
+        raise SystemExit(1)
+    print(emojize_message('Template invariants passed'))

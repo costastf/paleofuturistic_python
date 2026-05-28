@@ -42,19 +42,36 @@ def base_context() -> dict:
     return {'min_python_version': known_versions[0], 'max_python_version': known_versions[-1]}
 
 
-def combo_context(dep_track: bool) -> dict:
-    """Matrix cell context: widest Python range plus the dep-track boolean under test."""
-    return {**base_context(), 'integrate_dependency_track': dep_track}
+def combo_context(*, git_hosting_service: str, integrate_dependency_track: bool, integrate_pages: bool) -> dict:
+    """Matrix-cell context: widest Python range plus the three binary template knobs."""
+    return {
+        **base_context(),
+        'git_hosting_service': git_hosting_service,
+        'integrate_dependency_track': integrate_dependency_track,
+        'integrate_pages': integrate_pages,
+    }
 
 
-def combo_label(dep_track: bool) -> str:
-    """Stable short label for log files and CI job names."""
-    return 'dep1' if dep_track else 'dep0'
+def combo_label(*, git_hosting_service: str, integrate_dependency_track: bool, integrate_pages: bool) -> str:
+    """Stable short label for log files and CI job names: e.g. ``gh-dep1-pages0``."""
+    host_short = 'gh' if git_hosting_service == 'github' else 'gl'
+    return f'{host_short}-dep{int(integrate_dependency_track)}-pages{int(integrate_pages)}'
 
 
 def matrix_combos() -> list[dict]:
-    """All combos the matrix should exercise."""
+    """Cartesian product over git_hosting_service x integrate_dependency_track x integrate_pages."""
     return [
-        {'label': combo_label(dep_track), 'integrate_dependency_track': dep_track}
+        {
+            'label': combo_label(
+                git_hosting_service=host,
+                integrate_dependency_track=dep_track,
+                integrate_pages=pages,
+            ),
+            'git_hosting_service': host,
+            'integrate_dependency_track': dep_track,
+            'integrate_pages': pages,
+        }
+        for host in ('github', 'gitlab')
         for dep_track in (False, True)
+        for pages in (False, True)
     ]
