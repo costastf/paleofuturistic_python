@@ -10,17 +10,12 @@ runner pick it up automatically.
 import json
 import os
 import subprocess
-import sys
 import tomllib
-from pathlib import Path
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT / '_CI' / 'lib' / 'vendor'))
-sys.path.insert(0, str(REPO_ROOT / '_CI'))
-sys.path.insert(0, str(REPO_ROOT))
-
+# conftest.py wires sys.path so _CI.tasks.* is importable; pytest loads it
+# before this module, which is why no path setup is needed here.
 from _CI.tasks.configuration import PROJECT_SLUG
 
 

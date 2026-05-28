@@ -12,7 +12,15 @@ import pytest
 # suite can import _CI.tasks.* (which pulls vendored libs at module load).
 # The vendored libs cross-reference each other via ``lib.vendor.<x>``, so we
 # need both ``_CI/`` and ``_CI/lib/vendor/`` on the path.
-REPO_ROOT = Path(__file__).resolve().parent.parent
+def find_repo_root() -> Path:
+    """Walk up from this file until a directory containing ``_CI/`` is found."""
+    for candidate in Path(__file__).resolve().parents:
+        if (candidate / '_CI').is_dir():
+            return candidate
+    raise RuntimeError("Could not locate repo root: no '_CI/' found above conftest.py")
+
+
+REPO_ROOT = find_repo_root()
 sys.path.insert(0, str(REPO_ROOT / '_CI' / 'lib' / 'vendor'))
 sys.path.insert(0, str(REPO_ROOT / '_CI'))
 sys.path.insert(0, str(REPO_ROOT))
