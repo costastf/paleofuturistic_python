@@ -27,8 +27,14 @@ REPORTS_DIR = PROJECT_ROOT_DIRECTORY / 'reports' / 'matrix'
 
 
 def run_command(cmd, cwd=None, env=None, log_file=None):
-    """Run a shell command. Return True on exit 0. Stream to log_file if given, else stdout."""
-    proc_env = {**os.environ, **(env or {})}
+    """Run a shell command. Return True on exit 0. Stream to log_file if given, else stdout.
+
+    `VIRTUAL_ENV` is stripped from the inherited environment so each combo's
+    generated project sees a clean slate and uv resolves the project-local
+    `.venv` without warning about a mismatched parent-shell export.
+    """
+    inherited = {key: value for key, value in os.environ.items() if key != 'VIRTUAL_ENV'}
+    proc_env = {**inherited, **(env or {})}
     cwd_str = str(cwd) if cwd else None
     if log_file is not None:
         with log_file.open('a', encoding='utf-8') as handle:
