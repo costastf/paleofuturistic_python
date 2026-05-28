@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="auto">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        <meta name="author" content="Carlo 'carlovo' van Overbeek">
+        
+        <link rel="shortcut icon" href="../img/favicon.ico">
+        <title>History and lineage - Paleofuturistic Python</title>
+        <link href="../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../css/brands.min.css" rel="stylesheet">
+        <link href="../css/solid.min.css" rel="stylesheet">
+        <link href="../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" disabled>
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="../index.html">Paleofuturistic Python</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href="../index.html" class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Tutorials</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../tutorials/generate-your-first-project.html" class="dropdown-item">Generate your first project</a>
+</li>
+                                    
+<li>
+    <a href="../tutorials/from-zero-to-published-package.html" class="dropdown-item">From zero to a published package</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">How-to</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../how-to/update-existing-project-with-cruft.html" class="dropdown-item">Update an existing project with cruft</a>
+</li>
+                                    
+<li>
+    <a href="../how-to/choose-a-git-host.html" class="dropdown-item">Choose a git host</a>
+</li>
+                                    
+<li>
+    <a href="../how-to/enable-dependency-track.html" class="dropdown-item">Enable Dependency Track integration</a>
+</li>
+                                    
+<li>
+    <a href="../how-to/harden-github-repository.html" class="dropdown-item">Harden the GitHub repository</a>
+</li>
+                                    
+<li>
+    <a href="../how-to/convert-library-to-cli.html" class="dropdown-item">Convert the library into a CLI</a>
+</li>
+                                    
+<li>
+    <a href="../how-to/choose-python-version-range.html" class="dropdown-item">Choose the Python version range</a>
+</li>
+                                    
+<li>
+    <a href="../how-to/publish-docs-to-github-pages.html" class="dropdown-item">Publish docs to GitHub Pages</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Reference</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../reference/cookiecutter-variables.html" class="dropdown-item">Cruft questionnaire variables</a>
+</li>
+                                    
+<li>
+    <a href="../reference/post-gen-hook.html" class="dropdown-item">The post-generation hook</a>
+</li>
+                                    
+<li>
+    <a href="../reference/generated-project-tree.html" class="dropdown-item">Generated project tree</a>
+</li>
+                                    
+<li>
+    <a href="../reference/license-options.html" class="dropdown-item">License options</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Explanation</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="why-a-cookiecutter.html" class="dropdown-item">Why a cruft template</a>
+</li>
+                                    
+<li>
+    <a href="design-principles.html" class="dropdown-item">Design principles</a>
+</li>
+                                    
+<li>
+    <a href="history-and-lineage.html" class="dropdown-item active" aria-current="page">History and lineage</a>
+</li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#properdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="design-principles.html" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" class="nav-link disabled">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="https://github.com/schubergphilis/paleofuturistic_python/blob/main/docs/explanation/history-and-lineage.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                              <button id="theme-menu" aria-expanded="false" data-bs-toggle="dropdown" data-bs-display="static" aria-label="Toggle theme" class="nav-link dropdown-toggle">
+                                <i class="fa-solid fa-circle-half-stroke fa-fw"></i>
+                                <span class="d-lg-none ms-2">Toggle theme</span>
+                              </button>
+                              <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                  <button class="dropdown-item d-flex align-items-center" data-bs-theme-value="light" aria-pressed="false">
+                                    <i class="fa-solid fa-sun fa-fw"></i>
+                                    <span class="ms-2">Light</span>
+                                    <i class="fa-solid fa-check ms-auto d-none"></i>
+                                  </button>
+                                </li>
+                                <li>
+                                  <button class="dropdown-item d-flex align-items-center" data-bs-theme-value="dark" aria-pressed="false">
+                                    <i class="fa-solid fa-moon fa-fw"></i>
+                                    <span class="ms-2">Dark</span>
+                                    <i class="fa-solid fa-check ms-auto d-none"></i>
+                                  </button>
+                                </li>
+                                <li>
+                                  <button class="dropdown-item d-flex align-items-center" data-bs-theme-value="auto" aria-pressed="true">
+                                    <i class="fa-solid fa-circle-half-stroke fa-fw"></i>
+                                    <span class="ms-2">Auto</span>
+                                    <i class="fa-solid fa-check ms-auto"></i>
+                                  </button>
+                                </li>
+                              </ul>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <script src="../js/darkmode.js"></script>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#history-and-lineage" class="nav-link">History and lineage</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#what-we-inherited" class="nav-link">What we inherited</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#what-we-changed" class="nav-link">What we changed</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#what-we-kept-identical" class="nav-link">What we kept identical</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#what-the-name-means" class="nav-link">What the name means</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#ownership" class="nav-link">Ownership</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#see-also" class="nav-link">See also</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<h1 id="history-and-lineage">History and lineage</h1>
+<p>This template is a detached fork of <a href="https://github.com/Carlovo/straight_to_the_money">Straight to the Money 💰</a>. Both share the same north-star — "the Python development workflow your past self had always hoped for is finally here" — but the forks diverged on what "enterprise-ready" means in practice.</p>
+<h2 id="what-we-inherited">What we inherited</h2>
+<p>From Straight to the Money:</p>
+<ul>
+<li>uv-first toolchain, ruff for formatting and linting.</li>
+<li>A practical walkthrough as the primary documentation surface (now split across <a href="../tutorials/generate-your-first-project.html">Tutorials</a> and <a href="../how-to/update-existing-project-with-cruft.html">How-to</a>).</li>
+<li>Cookiecutter + cruft as the delivery mechanism.</li>
+<li>A bias toward making the happy path short.</li>
+</ul>
+<h2 id="what-we-changed">What we changed</h2>
+<p>Paleofuturistic Python added the infrastructure that turns a starter into an enterprise scaffold:</p>
+<ul>
+<li><strong>Vendored CI tooling.</strong> <code>_CI/lib/vendor/</code> ships Invoke and its deps; <code>./workflow.cmd</code> works on a fresh clone.</li>
+<li><strong>Multiple linters and analyzers.</strong> ruff alone wasn't enough — pylint, ty, complexipy, and pyscn cover what ruff doesn't.</li>
+<li><strong>Security pipeline.</strong> pip-audit, CycloneDX SBOM generation, optional Dependency Track upload.</li>
+<li><strong>Multi-host CI support.</strong> Both GitHub Actions and GitLab CI scaffolding, gated on the <code>git_hosting_service</code> answer.</li>
+<li><strong>Conventional Commits + commitizen</strong> for automated release notes, replacing Release Please. The version bump stays explicit; only the changelog is derived from commit messages.</li>
+<li><strong>pytest + tox + xdist</strong> for the test layer, replacing the original <code>python -m unittest</code>.</li>
+<li><strong>Diátaxis-structured docs</strong> (the structure you're reading right now), replacing the single-page walkthrough.</li>
+</ul>
+<h2 id="what-we-kept-identical">What we kept identical</h2>
+<ul>
+<li><strong>The license menu.</strong> Apache-2.0 default, MIT/BSD-3/None as alternatives.</li>
+<li><strong>The python-version range model.</strong> Min/max prompts, validated to share a major.</li>
+<li><strong>Headers prepended to every source file.</strong> Dunder metadata + license boilerplate.</li>
+</ul>
+<h2 id="what-the-name-means">What the name means</h2>
+<p>"Paleofuturistic" — past-meets-future. The template's job is to take the practices that should have been default in 2015 (uv-equivalents, opinionated formatting, supply-chain attestations) and ship them as the boring default for 2025+. The contradiction in the name is the point.</p>
+<h2 id="ownership">Ownership</h2>
+<p>The template is maintained at <a href="https://github.com/schubergphilis/paleofuturistic_python">github.com/schubergphilis/paleofuturistic_python</a>. Issues and pull requests welcome.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="design-principles.html">Design principles</a> — what we kept opinionated on purpose.</li>
+<li><a href="why-a-cookiecutter.html">Why a cruft template?</a> — why this delivery format.</li>
+</ul></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+                <p>Copyright &copy; 2024 <a href="https://schubergphilis.com/">Schuberg Philis</a></p>
+            <p>Documentation built with <a href="https://properdocs.org/">ProperDocs</a>.</p>
+        </footer>
+        <script src="../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../js/base.js"></script>
+        <script src="../search/main.js"></script>
+
+        <div class="modal" id="properdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="properdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="properdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="properdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>

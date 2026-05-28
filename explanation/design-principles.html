@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="auto">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        <meta name="author" content="Carlo 'carlovo' van Overbeek">
+        
+        <link rel="shortcut icon" href="../img/favicon.ico">
+        <title>Design principles - Paleofuturistic Python</title>
+        <link href="../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../css/brands.min.css" rel="stylesheet">
+        <link href="../css/solid.min.css" rel="stylesheet">
+        <link href="../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" disabled>
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="../index.html">Paleofuturistic Python</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href="../index.html" class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Tutorials</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../tutorials/generate-your-first-project.html" class="dropdown-item">Generate your first project</a>
+</li>
+                                    
+<li>
+    <a href="../tutorials/from-zero-to-published-package.html" class="dropdown-item">From zero to a published package</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">How-to</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../how-to/update-existing-project-with-cruft.html" class="dropdown-item">Update an existing project with cruft</a>
+</li>
+                                    
+<li>
+    <a href="../how-to/choose-a-git-host.html" class="dropdown-item">Choose a git host</a>
+</li>
+                                    
+<li>
+    <a href="../how-to/enable-dependency-track.html" class="dropdown-item">Enable Dependency Track integration</a>
+</li>
+                                    
+<li>
+    <a href="../how-to/harden-github-repository.html" class="dropdown-item">Harden the GitHub repository</a>
+</li>
+                                    
+<li>
+    <a href="../how-to/convert-library-to-cli.html" class="dropdown-item">Convert the library into a CLI</a>
+</li>
+                                    
+<li>
+    <a href="../how-to/choose-python-version-range.html" class="dropdown-item">Choose the Python version range</a>
+</li>
+                                    
+<li>
+    <a href="../how-to/publish-docs-to-github-pages.html" class="dropdown-item">Publish docs to GitHub Pages</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Reference</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../reference/cookiecutter-variables.html" class="dropdown-item">Cruft questionnaire variables</a>
+</li>
+                                    
+<li>
+    <a href="../reference/post-gen-hook.html" class="dropdown-item">The post-generation hook</a>
+</li>
+                                    
+<li>
+    <a href="../reference/generated-project-tree.html" class="dropdown-item">Generated project tree</a>
+</li>
+                                    
+<li>
+    <a href="../reference/license-options.html" class="dropdown-item">License options</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Explanation</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="why-a-cookiecutter.html" class="dropdown-item">Why a cruft template</a>
+</li>
+                                    
+<li>
+    <a href="design-principles.html" class="dropdown-item active" aria-current="page">Design principles</a>
+</li>
+                                    
+<li>
+    <a href="history-and-lineage.html" class="dropdown-item">History and lineage</a>
+</li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#properdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="why-a-cookiecutter.html" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" href="history-and-lineage.html" class="nav-link">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="https://github.com/schubergphilis/paleofuturistic_python/blob/main/docs/explanation/design-principles.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                              <button id="theme-menu" aria-expanded="false" data-bs-toggle="dropdown" data-bs-display="static" aria-label="Toggle theme" class="nav-link dropdown-toggle">
+                                <i class="fa-solid fa-circle-half-stroke fa-fw"></i>
+                                <span class="d-lg-none ms-2">Toggle theme</span>
+                              </button>
+                              <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                  <button class="dropdown-item d-flex align-items-center" data-bs-theme-value="light" aria-pressed="false">
+                                    <i class="fa-solid fa-sun fa-fw"></i>
+                                    <span class="ms-2">Light</span>
+                                    <i class="fa-solid fa-check ms-auto d-none"></i>
+                                  </button>
+                                </li>
+                                <li>
+                                  <button class="dropdown-item d-flex align-items-center" data-bs-theme-value="dark" aria-pressed="false">
+                                    <i class="fa-solid fa-moon fa-fw"></i>
+                                    <span class="ms-2">Dark</span>
+                                    <i class="fa-solid fa-check ms-auto d-none"></i>
+                                  </button>
+                                </li>
+                                <li>
+                                  <button class="dropdown-item d-flex align-items-center" data-bs-theme-value="auto" aria-pressed="true">
+                                    <i class="fa-solid fa-circle-half-stroke fa-fw"></i>
+                                    <span class="ms-2">Auto</span>
+                                    <i class="fa-solid fa-check ms-auto"></i>
+                                  </button>
+                                </li>
+                              </ul>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <script src="../js/darkmode.js"></script>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#design-principles" class="nav-link">Design principles</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#pipelines-run-template-commands-only" class="nav-link">Pipelines run template commands only</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#uv-is-the-only-tool-you-install" class="nav-link">uv is the only tool you install</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#ruff-replaces-black-isort-flake8-and-most-of-pylint" class="nav-link">Ruff replaces Black + isort + flake8 (and most of pylint)</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#ty-replaces-mypy" class="nav-link">ty replaces mypy</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#pytest-not-unittest" class="nav-link">pytest, not unittest</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#conventional-commits-drive-the-release-notes" class="nav-link">Conventional Commits drive the release notes</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#properdocs-not-vanilla-mkdocs-with-mkdocstrings-for-api-docs" class="nav-link">properdocs (not vanilla mkdocs), with mkdocstrings for API docs</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#sboms-ship-by-default" class="nav-link">SBOMs ship by default</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#vendored-ci-tooling" class="nav-link">Vendored CI tooling</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#diataxis-for-our-own-docs" class="nav-link">Diátaxis for our own docs</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#what-we-deliberately-do-not-do" class="nav-link">What we deliberately do not do</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#see-also" class="nav-link">See also</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<h1 id="design-principles">Design principles</h1>
+<p>The template is opinionated. The choices below were made deliberately, not by accumulation — each replaces something an earlier revision relied on.</p>
+<h2 id="pipelines-run-template-commands-only">Pipelines run template commands only</h2>
+<p>Every CI step is a <code>./workflow.cmd &lt;task&gt;</code> call — no inline <code>uv …</code>, <code>pip install …</code>, ad-hoc <code>properdocs …</code>, or other business logic in YAML. Behaviour changes happen in <code>_CI/tasks/</code>; workflow files are glue.</p>
+<p>Two side-effects of this rule earn it its own section:</p>
+<p><strong>Parity.</strong> What CI runs is exactly what you can run locally. Debugging a failing CI step means running the same <code>./workflow.cmd</code> command on your laptop. No "but it worked on my machine" gap, no separate path to maintain.</p>
+<p><strong>And those commands lean on tracked dependencies.</strong> When a <code>properdocs</code> / <code>uv</code> / <code>pytest</code> invocation can do a CI step, we prefer it over a GitHub Action, because every Python dependency is pinned in <code>uv.lock</code> and surfaces in the project SBOM. Action dependencies are hidden inside <code>uses:</code> references and never appear in the supply-chain picture. Concretely: <code>properdocs gh-deploy</code> over <code>actions/upload-pages-artifact</code> + <code>actions/deploy-pages</code>; <code>./workflow.cmd test</code> over inline <code>pytest</code> invocations; and so on. Two scaffolding actions are unavoidable (<code>actions/checkout</code> to fetch the repo, <code>astral-sh/setup-uv</code> to bootstrap the toolchain itself when the deps image isn't used) — beyond that, prefer commands.</p>
+<h2 id="uv-is-the-only-tool-you-install">uv is the only tool you install</h2>
+<p>Earlier revisions asked users to install Python, then <code>pipx</code>, then <code>tox</code>, then <code>pre-commit</code>, then <code>commitizen</code>. Today, every one of those is a uv-managed dependency group inside the generated project. You install uv; uv installs the rest.</p>
+<p><strong>Tradeoff:</strong> the template is now bound to uv's lifecycle. If uv goes away or changes lock format incompatibly, the template needs work. We accept that risk because uv has compressed the toolchain to a single binary that's fast enough to run on every commit.</p>
+<h2 id="ruff-replaces-black-isort-flake8-and-most-of-pylint">Ruff replaces Black + isort + flake8 (and most of pylint)</h2>
+<p>One tool, one config block, one cache. Ruff doesn't yet cover everything pylint does — so pylint stays, but only for the checks Ruff doesn't have. We expect pylint's role to shrink as Ruff grows.</p>
+<h2 id="ty-replaces-mypy">ty replaces mypy</h2>
+<p><a href="https://github.com/astral-sh/ty">ty</a> is Astral's type checker, written in Rust. It's faster than mypy and shares the Ruff/uv codebase's quality bar. Mypy compatibility issues still surface occasionally; we accept that trade for the speed and consistency.</p>
+<h2 id="pytest-not-unittest">pytest, not unittest</h2>
+<p>The original lineage used <code>python -m unittest</code>. We moved to pytest for fixtures, parametrization, coverage integration, and parallel execution via xdist. Unittest test classes still work — pytest discovers them.</p>
+<h2 id="conventional-commits-drive-the-release-notes">Conventional Commits drive the release notes</h2>
+<p>Commit messages must follow <a href="https://www.conventionalcommits.org/">Conventional Commits</a> — the lint step rejects anything that doesn't parse. We use them for <strong>automatic release notes</strong>: <a href="https://commitizen-tools.github.io/commitizen/">commitizen</a> reads the commits since the last tag and groups them by prefix (<code>feat:</code>, <code>fix:</code>, etc.) into a generated changelog.</p>
+<p>We do <strong>not</strong> use commitizen's autorelease mode. The version bump is an explicit choice you make at release time: <code>./workflow.cmd release -i &lt;major|minor|patch|…&gt;</code>. Commit prefixes inform changelog structure, not the version number.</p>
+<h2 id="properdocs-not-vanilla-mkdocs-with-mkdocstrings-for-api-docs">properdocs (not vanilla mkdocs), with mkdocstrings for API docs</h2>
+<p>properdocs is mkdocs with a curated plugin set. mkdocstrings reads the source directly — no <code>.rst</code> files in the middle. Sphinx is more capable; we don't need that capability here.</p>
+<h2 id="sboms-ship-by-default">SBOMs ship by default</h2>
+<p>Every release builds a CycloneDX SBOM regardless of whether you've enabled the Dependency Track upload. The SBOM lands in <code>dist/</code> alongside the wheel. The cost is one extra build step; the benefit is that supply-chain questions have an answer the day someone asks them.</p>
+<h2 id="vendored-ci-tooling">Vendored CI tooling</h2>
+<p><code>_CI/lib/vendor/</code> ships Invoke + its dependencies committed to the repo. <code>./workflow.cmd</code> works on a fresh clone with only uv installed — no <code>pip install invoke</code> step, no version drift between contributor machines. The vendoring cost is bytes in the repo; the benefit is that the dev cycle is the same on day one as on day one thousand.</p>
+<h2 id="diataxis-for-our-own-docs">Diátaxis for our own docs</h2>
+<p>The four sections — Tutorials, How-to, Reference, Explanation — exist because the template's documentation has historically conflated "I want to start" with "I want to understand", and readers got annoyed at both. Diátaxis splits the audiences. This page is in <em>Explanation</em> because it tells you <em>why</em>; it won't show you <em>how</em> to change anything.</p>
+<h2 id="what-we-deliberately-do-not-do">What we deliberately do not do</h2>
+<ul>
+<li><strong>No framework choice.</strong> This is a library scaffold. It does not know about FastAPI, Django, or Click. Add what you need.</li>
+<li><strong>No monorepo support.</strong> One package, one repo. If you want a monorepo, use a different template.</li>
+<li><strong>No Python below 3.11.</strong> Async, exception groups, and tomllib are load-bearing.</li>
+<li><strong>No GitHub-only or GitLab-only assumptions in the dev cycle.</strong> Host-specific code lives in <code>_CI/tasks/&lt;host&gt;.py</code>; the rest of the workflow runs identically.</li>
+</ul>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="why-a-cookiecutter.html">Why a cruft template?</a> — why we picked the template format we did.</li>
+<li><a href="history-and-lineage.html">History and lineage</a> — what this template was forked from and why.</li>
+</ul></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+                <p>Copyright &copy; 2024 <a href="https://schubergphilis.com/">Schuberg Philis</a></p>
+            <p>Documentation built with <a href="https://properdocs.org/">ProperDocs</a>.</p>
+        </footer>
+        <script src="../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../js/base.js"></script>
+        <script src="../search/main.js"></script>
+
+        <div class="modal" id="properdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="properdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="properdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="properdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>
