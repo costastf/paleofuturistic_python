@@ -70,6 +70,7 @@ def view(context: Context) -> None:
     if is_ci():
         return
     execute(context, f'{open_command()} site/index.html')
+{%- if cookiecutter.integrate_pages and cookiecutter.git_hosting_service == 'github' %}
 
 
 @task
@@ -77,6 +78,7 @@ def view(context: Context) -> None:
 @run('uv run properdocs gh-deploy --force')
 def deploy_github(context: Context) -> None:
     """Build the docs and push them to the `gh-pages` branch for GitHub Pages."""
+{%- endif %}
 
 
 @task
@@ -94,4 +96,6 @@ namespace = Collection('document')
 namespace.add_task(cast(Task, document), default=True, name='all')
 namespace.add_task(cast(Task, build))
 namespace.add_task(cast(Task, view))
+{%- if cookiecutter.integrate_pages and cookiecutter.git_hosting_service == 'github' %}
 namespace.add_task(cast(Task, deploy_github), name='deploy-github')
+{%- endif %}

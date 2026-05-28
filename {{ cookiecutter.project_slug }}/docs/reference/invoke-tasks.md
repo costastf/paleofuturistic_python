@@ -68,6 +68,17 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 | `secure.sbom-upload` | — | Generate SBOM, write to `src/<slug>/sbom.cdx.json`, POST to Dependency Track. |
 {%- endif %}
 
+## `document` — documentation site
+
+| Task | Args | What it does |
+| --- | --- | --- |
+| `document.build` | — | `properdocs build` — generate the static site under `site/`. |
+| `document.view` | — | Open the rendered site in the default browser (skipped in CI). |
+| `document` (aggregator) | — | Update badges, then `build` + `view`. |
+{%- if cookiecutter.integrate_pages and cookiecutter.git_hosting_service == 'github' %}
+| `document.deploy-github` | — | `properdocs gh-deploy --force` — build and publish to the `gh-pages` branch (consumed by the shipped Pages workflow). Only present when `integrate_pages=true` and `git_hosting_service=github`. |
+{%- endif %}
+
 ## `container` — OCI deps image
 
 | Task | What it does |

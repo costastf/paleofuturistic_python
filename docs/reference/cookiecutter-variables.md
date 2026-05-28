@@ -76,6 +76,14 @@ Determines which CI scaffolding ships and which host-specific submodule lives at
 
 When `true`, the release pipeline uploads the generated CycloneDX SBOM to an OWASP Dependency Track server (expects `OWASP_DT_*` environment variables at runtime). See [Enable Dependency Track integration](../how-to/enable-dependency-track.md).
 
+### `integrate_pages`
+
+- **Type**: bool
+- **Default**: `true`
+- **Prompt**: "Integrate Pages with the chosen git hosting service?"
+
+Controls whether documentation-publishing scaffolding (the Pages workflow file and the matching `document.deploy-github` task) ships in the generated project. The actual scaffolding is host-specific: today only `git_hosting_service=github` has shipping Pages scaffolding — picking `gitlab` with `integrate_pages=true` is a silent no-op until GitLab Pages support lands. See [Publish docs to GitHub Pages](../how-to/publish-docs-to-github-pages.md).
+
 ## Private variables
 
 Keys starting with `_` aren't prompted for. They configure the template engine itself.

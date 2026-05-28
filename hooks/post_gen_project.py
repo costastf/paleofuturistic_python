@@ -72,6 +72,14 @@ for path in host_artifacts[unchosen]:
     elif path.exists():
         path.unlink()
 
+# Drop the Pages workflow when the user opted out, or when no Pages scaffolding
+# exists for the chosen host (gitlab today). Idempotent — the `.github/` tree
+# is already gone when git_hosting_service=gitlab.
+integrate_pages = '{{ cookiecutter.integrate_pages }}' == 'True'
+pages_workflow = Path('.github/workflows/pages.yaml')
+if pages_workflow.exists() and not (integrate_pages and git_hosting_service == 'github'):
+    pages_workflow.unlink()
+
 
 def _strip_leading_docstring(text: str) -> str:
     """Remove a leading module docstring from Python source."""

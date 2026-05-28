@@ -1,6 +1,8 @@
 # Publish docs to GitHub Pages
 
-For GitHub-hosted projects, the template ships `.github/workflows/pages.yaml`. It runs `./workflow.cmd document.deploy-github` on every push to `main`, which delegates to `properdocs gh-deploy` (no GitHub Pages deploy actions involved — see [Design principles](../explanation/design-principles.md#pipelines-run-template-commands-only) for the reasoning). The only manual step is enabling Pages on the GitHub side.
+For GitHub-hosted projects, the template ships `.github/workflows/pages.yaml` by default. It runs `./workflow.cmd document.deploy-github` on every push to `main`, which delegates to `properdocs gh-deploy` (no GitHub Pages deploy actions involved — see [Design principles](../explanation/design-principles.md#pipelines-run-template-commands-only) for the reasoning). The only manual step is enabling Pages on the GitHub side.
+
+The Pages scaffolding is **opt-in/opt-out at generation time** via the `integrate_pages` questionnaire answer (default `true`). Answering `false` removes both the workflow file and the matching `document.deploy-github` task from the generated project — see [Cookiecutter variables](../reference/cookiecutter-variables.md#integrate_pages).
 
 ## Step 1 — Push the template
 
