@@ -1,0 +1,14 @@
+[project]
+name = "paleofuturistic-python-template"
+version = "0.0.0"
+description = "Repository scaffolding for the cruft template; not a publishable package."
+requires-python = ">=3.12"
+
+[tool.uv]
+package = false
+required-version = "==0.11.15"
+exclude-newer = "1 week"
+
+[tool.properdocs]
+version = "1.6.7"
+theme-mkdocs-version = "1.6.7"

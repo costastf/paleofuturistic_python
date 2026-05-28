@@ -2,6 +2,16 @@
 
 The template is opinionated. The choices below were made deliberately, not by accumulation — each replaces something an earlier revision relied on.
 
+## Pipelines run template commands only
+
+Every CI step is a `./workflow.cmd <task>` call — no inline `uv …`, `pip install …`, ad-hoc `properdocs …`, or other business logic in YAML. Behaviour changes happen in `_CI/tasks/`; workflow files are glue.
+
+Two side-effects of this rule earn it its own section:
+
+**Parity.** What CI runs is exactly what you can run locally. Debugging a failing CI step means running the same `./workflow.cmd` command on your laptop. No "but it worked on my machine" gap, no separate path to maintain.
+
+**And those commands lean on tracked dependencies.** When a `properdocs` / `uv` / `pytest` invocation can do a CI step, we prefer it over a GitHub Action, because every Python dependency is pinned in `uv.lock` and surfaces in the project SBOM. Action dependencies are hidden inside `uses:` references and never appear in the supply-chain picture. Concretely: `properdocs gh-deploy` over `actions/upload-pages-artifact` + `actions/deploy-pages`; `./workflow.cmd test` over inline `pytest` invocations; and so on. Two scaffolding actions are unavoidable (`actions/checkout` to fetch the repo, `astral-sh/setup-uv` to bootstrap the toolchain itself when the deps image isn't used) — beyond that, prefer commands.
+
 ## uv is the only tool you install
 
 Earlier revisions asked users to install Python, then `pipx`, then `tox`, then `pre-commit`, then `commitizen`. Today, every one of those is a uv-managed dependency group inside the generated project. You install uv; uv installs the rest.

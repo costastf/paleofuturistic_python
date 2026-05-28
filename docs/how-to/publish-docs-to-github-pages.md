@@ -1,61 +1,51 @@
 # Publish docs to GitHub Pages
 
-For GitHub-hosted projects, you can serve the generated properdocs site as a GitHub Pages site.
+For GitHub-hosted projects, the template ships `.github/workflows/pages.yaml`. It runs `./workflow.cmd document.deploy-github` on every push to `main`, which delegates to `properdocs gh-deploy` (no GitHub Pages deploy actions involved — see [Design principles](../explanation/design-principles.md#pipelines-run-template-commands-only) for the reasoning). The only manual step is enabling Pages on the GitHub side.
 
-## Step 1 — Enable Pages
+## Step 1 — Push the template
 
-In your repo on GitHub:
+Generate the project with `git_hosting_service=github`, push to GitHub. The first push to `main` triggers the Pages workflow. The workflow creates the `gh-pages` branch on its first successful run.
+
+## Step 2 — Enable Pages on the repo
+
+On GitHub:
 
 1. **Settings → Pages**.
-2. **Source**: GitHub Actions.
+2. **Source**: **Deploy from a branch**.
+3. **Branch**: `gh-pages` / `/ (root)`.
 
-Don't pick "Deploy from a branch" — the template's workflow will push the built site itself.
+The branch only appears after the first workflow run completes — wait for the Actions tab to show a green Pages run, then configure.
 
-## Step 2 — The deploy workflow
+That's it. Subsequent pushes to `main` redeploy automatically. The site lives at `https://<owner>.github.io/<repo>/`.
 
-The template ships `.github/workflows/` with a publish workflow that runs `properdocs build` and publishes the result to Pages on every tag push. If you don't see a `pages.yaml` or equivalent there yet, add one along these lines (adjust if the template gains its own):
+## Why `gh-pages` branch instead of the Actions-source flow?
 
-```yaml
-name: Pages
-on:
-  push:
-    tags: ['v*']
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v7
-      - run: ./workflow.cmd document
-      - uses: actions/upload-pages-artifact@v3
-        with: { path: site }
-      - id: deploy
-        uses: actions/deploy-pages@v4
-```
+Two related design principles drive this choice:
 
-## Step 3 — `use_directory_urls`
+- **Pipelines run template commands only.** The workflow's only substantive step is `./workflow.cmd document.deploy-github`. Every behaviour change happens in `_CI/tasks/document.py`, not in the YAML.
+- **Track every dependency in the SBOM.** `properdocs gh-deploy` is a Python command resolved from the locked `document` dependency group. `actions/upload-pages-artifact` and `actions/deploy-pages` would bring transitive dependencies that don't appear in `uv.lock` or the CycloneDX SBOM. Avoiding them keeps the supply-chain story honest.
 
-The template's `properdocs.yml` sets `use_directory_urls: false`. This produces `tutorials/foo.html` rather than `tutorials/foo/index.html`. Pages serves both fine; pick whichever you prefer (the template default is more portable to file://-served previews).
+See [Design principles](../explanation/design-principles.md#pipelines-run-template-commands-only).
 
-## Step 4 — Verify
+## Concurrency
 
-Push a tag and watch the Pages workflow in the Actions tab. The deploy URL appears in the job summary — your docs will be at `https://<user-or-org>.github.io/<repo>/`.
+The workflow uses `concurrency: { group: pages, cancel-in-progress: false }`. If you push twice in quick succession, the second deploy waits for the first to finish rather than racing it. Cancelling mid-deploy would leave the `gh-pages` branch in an indeterminate state.
 
 ## Custom domain
 
-After the first successful deploy:
+After the first deploy:
 
-1. Add a `CNAME` file with your domain to the `docs/` directory.
-2. Configure DNS (ALIAS/ANAME for apex, CNAME for subdomain) to point at `<user-or-org>.github.io`.
+1. Add a `CNAME` file containing your domain to the `docs/` directory.
+2. Configure DNS — ALIAS/ANAME for an apex domain, CNAME for a subdomain — pointing at `<owner>.github.io`.
 3. **Settings → Pages → Custom domain** to set it on the GitHub side.
+
+The next push to `main` redeploys with the custom domain.
 
 ## GitLab Pages instead
 
-For GitLab-hosted projects, the equivalent is a Pages job in `.gitlab-ci.yml` that publishes the `site/` directory. The template doesn't ship one yet; it's a reasonable contribution to make.
+For GitLab-hosted projects, the equivalent is a `pages:` job in `.gitlab-ci.yml` that publishes the `site/` directory. The template doesn't ship one yet — it's the logical follow-up to this workflow.
+
+## See also
+
+- [The shipped workflow](https://github.com/schubergphilis/paleofuturistic_python/blob/main/%7B%7B%20cookiecutter.project_slug%20%7D%7D/.github/workflows/pages.yaml) — the actual YAML, kept short on purpose.
+- [Design principles](../explanation/design-principles.md) — the two rules behind the workflow's shape.
