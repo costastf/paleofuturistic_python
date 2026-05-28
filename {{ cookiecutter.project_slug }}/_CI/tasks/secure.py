@@ -118,7 +118,7 @@ def sbom_extract(context: Context, write: bool = False) -> None:  # noqa: ARG001
 @task
 @logged('secure.sbom-validate')
 def sbom_validate(context: Context) -> None:
-    """Validate the generated SBOM against the CycloneDX 1.6 JSON schema.
+    """Validate the generated SBOM against the CycloneDX 1.7 JSON schema.
 
     Re-runs ``sbom-extract --write`` if the SBOM file is missing so the
     validation has something to check.
@@ -130,7 +130,7 @@ def sbom_validate(context: Context) -> None:
         for err in errors:
             print(err)
         raise SystemExit(1)
-    print(f'SBOM at {SBOM_FILE} validates against CycloneDX 1.6 schema.')
+    print(f'SBOM at {SBOM_FILE} validates against CycloneDX 1.7 schema.')
 
 
 {%- if cookiecutter.integrate_dependency_track %}

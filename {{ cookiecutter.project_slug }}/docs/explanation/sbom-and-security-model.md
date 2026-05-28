@@ -29,19 +29,49 @@ Runs on every CI pipeline. See [Triage a security finding](../how-to/triage-a-se
 
 ## Layer 2 — CycloneDX SBOM
 
-`./workflow.cmd secure.sbom-extract --write` generates a [CycloneDX](https://cyclonedx.org/) 1.6 bill of materials and writes it to `src/<project_slug>/sbom.cdx.json`. Because that path is inside the package data tree, `uv build` automatically ships the SBOM **inside the wheel** — a downstream consumer unpacks the wheel and finds `<project_slug>/sbom.cdx.json` alongside the Python modules.
+`./workflow.cmd secure.sbom-extract --write` generates a [CycloneDX](https://cyclonedx.org/) 1.7 bill of materials and writes it to `src/<project_slug>/sbom.cdx.json`. Because that path is inside the package data tree, `uv build` automatically ships the SBOM **inside the wheel** — a downstream consumer unpacks the wheel and finds `<project_slug>/sbom.cdx.json` alongside the Python modules.
 
-What an SBOM is: a machine-readable inventory of components. Each entry carries name, version, and a PURL identifier (PyPI for Python packages, `pkg:github/...` for GitHub Actions, `pkg:docker/...` for container images).
+### What's in it
 
-This template's SBOM has **three sources**, assembled into one document:
+**Metadata header** declares:
 
-1. **Runtime dependencies.** Generated from `uv export --no-dev` against `uv.lock` — what actually lands in the wheel. Dev, lint, test, document, quality, and security groups are excluded; they aren't shipped.
-2. **Vendored CI tooling.** Every package pinned in `_CI/lib/vendor.txt` (the vendored Invoke + its deps) is emitted as a PyPI component. These ship with the source tree even though they don't land in the wheel itself — they make the CI pipeline reproducible from a fresh clone.
-3. **Pipeline components.** GitHub Actions (`uses:` refs across `.github/workflows/*.yaml`) on `github`, container images (`image:` and block-form `name:` refs in `.gitlab-ci.yml`) on `gitlab`. The host-specific code lives in `_CI/tasks/<host>.py` and is pulled in via the same Jinja-substituted import that `container.py` already uses.
+- A `lifecycles` entry of `phase: build` — this SBOM was produced during the build, not as a post-shipment inventory.
+- A `tools.components` list naming what produced the SBOM (cyclonedx-python-lib, uv, the project's own generator), each with a version pin.
+- `supplier` + `authors` derived from `pyproject.toml`'s `[project.authors]`.
+- A `properties` entry recording the chosen `git_hosting_service` for downstream tools that want template-aware context.
 
-`./workflow.cmd secure.sbom-validate` runs the CycloneDX 1.6 JSON-schema validator in a clean `uv run python` subprocess (so the venv-installed validator wins over the older vendored `jsonschema` that the workflow.cmd launcher places earlier on `sys.path`). The aggregate `./workflow.cmd secure` runs all three sub-steps; a clean run means: no known vulns, a fresh SBOM written, validated against the schema.
+**Components** are organised by **scope** so a consumer can distinguish what ships from what doesn't:
 
-What this enables:
+| Source | CycloneDX `scope` | Source path |
+| --- | --- | --- |
+| Project itself (root) | `required` | `[project]` block in pyproject.toml; root carries the project's licence and a `vcs` external_reference pointing at the git remote when present |
+| Runtime dependencies | `required` | `uv export --no-dev` against `uv.lock` — exactly what ships in the wheel |
+| Dev / lint / test / docs / quality / security groups | `optional` | full lockfile via `uv export --all-groups`, minus the runtime set |
+| Vendored CI tooling | `excluded` | every package in `_CI/lib/vendor.txt` |
+| Pipeline components | `excluded` | GitHub Actions (`uses:`) or GitLab CI images, sourced from `_CI/tasks/<host>.py`'s `iter_pipeline_components()` |
+
+Plus one **synthetic build-environment component** (type `platform`, scope `excluded`) that groups the vendored + pipeline material into a single sub-graph.
+
+**Dependencies** form a two-level graph:
+
+- The project root depends on each runtime + dev component and on the build-environment.
+- The build-environment depends on the vendored + pipeline components.
+
+Reading top-down: "the project depends on these runtime + dev components for itself, and on the build-environment to be assembled. The build-environment in turn depends on these vendored + pipeline components."
+
+### Per-component enrichment
+
+Each PyPI component (runtime, dev, vendored) carries:
+
+- **`licenses`** — declared SPDX expression. The lookup walks `PEP 639 License-Expression → legacy License header → LICENSE-File text → Trove classifier mapping`. Vendored entries first try text-detection over the `_CI/lib/vendor/<name>/LICENSE*` files (the vendoring tool drops dist-info but keeps the LICENSE), then defer to the venv-installed copy when the same package is also a transitive dev dep. A handful of packages with no licence-bearing file locally end up with `licenses: []` — graceful degradation rather than failure.
+- **`hashes`** — SHA-256 from `uv.lock`'s `wheels[*].hash` (or `sdist.hash` fallback). Pipeline and vendored components carry no hash here — the GitHub-Action PURL already encodes the commit SHA, and vendored entries aren't in the lockfile.
+- **`external_references`** — every PyPI component points at its PyPI project page (`type=website`); GitHub Actions point at their repo (`type=vcs`); GitLab images point at their registry (`type=distribution`).
+
+### Validation
+
+`./workflow.cmd secure.sbom-validate` runs the CycloneDX 1.7 JSON-schema validator in a clean `uv run python` subprocess (so the venv-installed validator wins over the older vendored `jsonschema` that the workflow.cmd launcher places earlier on `sys.path`). The aggregate `./workflow.cmd secure` runs all three sub-steps; a clean run means: no known vulns, a fresh SBOM written, validated against the schema.
+
+### What this enables
 
 - A downstream consumer can extract the SBOM from the wheel with `unzip -p <wheel> <project_slug>/sbom.cdx.json` or `importlib.resources` — no separate artefact to track.
 - A security responder can answer "are we affected by X?" against your project in seconds, not hours.

@@ -27,7 +27,7 @@ The release pipeline calls `secure.sbom-upload` after `release.publish` succeeds
 
 What it does:
 
-1. Composes a fresh CycloneDX 1.6 SBOM via `./workflow.cmd secure.sbom-extract --write` (runtime deps + vendored CI tooling + chosen-host pipeline components).
+1. Composes a fresh CycloneDX 1.7 SBOM via `./workflow.cmd secure.sbom-extract --write` (runtime deps + vendored CI tooling + chosen-host pipeline components).
 2. Writes it to `src/<project_slug>/sbom.cdx.json` — the same file `uv build` later ships inside the wheel.
 3. POSTs that file to `<OWASP_DT_URL>/api/v1/bom` with the API key and project UUID.
 4. Prints the response.

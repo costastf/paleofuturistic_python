@@ -22,6 +22,8 @@ PROJECT_NAME = '{{ cookiecutter.project_slug }}'
 # released artefact can extract it via importlib.resources or by unzipping.
 SBOM_FILE = Path('src') / PROJECT_NAME / 'sbom.cdx.json'
 VENDOR_TXT = Path('_CI') / 'lib' / 'vendor.txt'
+VENDOR_DIR = Path('_CI') / 'lib' / 'vendor'
+UV_LOCK = Path('uv.lock')
 
 {%- if cookiecutter.integrate_dependency_track %}
 OWASP_DTRACK_SETTINGS = ('OWASP_DTRACK_URL', 'OWASP_DTRACK_API_KEY')

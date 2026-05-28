@@ -62,8 +62,8 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 | Task | Args | What it does |
 | --- | --- | --- |
 | `secure.audit` | — | pip-audit honoring `.security-overrides`. |
-| `secure.sbom-extract` | `--write` | Compose a CycloneDX 1.6 SBOM (runtime deps + `_CI/lib/vendor.txt` + chosen-host pipeline components). Prints to stdout; with `--write` lands at `src/<slug>/sbom.cdx.json` so `uv build` ships it inside the wheel. |
-| `secure.sbom-validate` | — | Validate the SBOM against the CycloneDX 1.6 JSON schema (runs the validator in a clean `uv run python` subprocess so the venv-installed `jsonschema` wins over the older vendored one). Re-runs sbom-extract first if the file is missing. |
+| `secure.sbom-extract` | `--write` | Compose a CycloneDX 1.7 SBOM with metadata header (lifecycles, tools, supplier, authors), a two-level dependency graph (project → runtime + dev + build-environment; build-environment → vendored + pipeline), and per-component licence + hash + external-reference enrichment. Prints to stdout; with `--write` lands at `src/<slug>/sbom.cdx.json` so `uv build` ships it inside the wheel. |
+| `secure.sbom-validate` | — | Validate the SBOM against the CycloneDX 1.7 JSON schema (runs the validator in a clean `uv run python` subprocess so the venv-installed `jsonschema` wins over the older vendored one). Re-runs sbom-extract first if the file is missing. |
 {%- if cookiecutter.integrate_dependency_track %}
 | `secure.sbom-upload` | — | Generate SBOM, write to `src/<slug>/sbom.cdx.json`, POST to Dependency Track. |
 {%- endif %}
