@@ -29,6 +29,16 @@ Two related design principles drive this choice:
 
 See [Design principles](../explanation/design-principles.md#pipelines-run-template-commands-only).
 
+## About the Node.js deprecation warning
+
+After every push to `main` you may see a deprecation warning on the **`pages build and deployment`** workflow run — *not* on our `Pages` workflow. The warning reads:
+
+> Node.js 20 actions are deprecated. The following actions are running on Node.js 20 and may not work as expected: actions/checkout@v4, actions/upload-artifact@v4.
+
+That run is a GitHub-managed pipeline (`dynamic/pages/pages-build-deployment`) that the platform auto-triggers whenever the `gh-pages` branch updates. It is not defined in `.github/workflows/` and we cannot edit it. The deprecated `actions/checkout@v4` and `actions/upload-artifact@v4` references live inside that internal pipeline, not in our own workflow files — every action we *do* control is already pinned to its latest immutable release.
+
+The warning is expected and intentionally not addressed. Silencing it would require switching to the `actions/upload-pages-artifact` + `actions/deploy-pages` flow, which would violate both design principles above. We accept the warning as the cost of keeping deploy logic in `_CI/tasks/document.py` and outside the SBOM-tracked dependency surface. GitHub will update their internal pipeline on their own timeline.
+
 ## Concurrency
 
 The workflow uses `concurrency: { group: pages, cancel-in-progress: false }`. If you push twice in quick succession, the second deploy waits for the first to finish rather than racing it. Cancelling mid-deploy would leave the `gh-pages` branch in an indeterminate state.
