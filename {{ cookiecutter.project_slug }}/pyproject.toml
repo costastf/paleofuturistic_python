@@ -276,6 +276,22 @@ source = [
 [tool.coverage.html]
 directory = "reports/coverage"
 
+[tool.test-ratchet]
+# `auto-detect` (default): the coverage ratchet stays dormant while the scaffolded
+# `test_sanity` function is still present in `tests/test_<slug>.py`. That trivial smoke
+# test produces 100% coverage out of the box, so engaging the ratchet on day one would
+# lock the bar at 100 and fail every subsequent real change. The ratchet activates the
+# moment you remove or rename `test_sanity` — once `[tool.coverage.report] fail_under`
+# is bumped above 0, it never drops back to dormant.
+#
+# `strict`: the ratchet engages immediately, even with the scaffold in place. Useful
+# when you're seeding the template into an existing codebase whose coverage is already
+# meaningful, or when you genuinely want a 100% floor from the first run.
+#
+# Either way, once engaged, the bar only goes up. See
+# docs/explanation/testing-strategy.md for the full design rationale.
+mode = "auto-detect"
+
 
 [tool.uv]
 required-version = "==0.11.15"

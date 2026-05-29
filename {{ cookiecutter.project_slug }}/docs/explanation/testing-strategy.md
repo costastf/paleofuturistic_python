@@ -17,9 +17,23 @@ The template ships pytest + a small set of plugins (coverage, xdist, html, env, 
 
 `pytest-cov` runs alongside pytest. The template tracks branch coverage (not just line coverage) and writes HTML + JSON reports under `reports/`.
 
-`pyproject.toml`'s `[tool.coverage.report]` has `fail_under` set, and the test task **ratchets** this value upward after each green run: if your latest coverage was 87% and `fail_under` was 80%, the task bumps `fail_under` to 87% and commits. The bar only goes up.
+`pyproject.toml`'s `[tool.coverage.report]` has `fail_under` set, and the test task **ratchets** this value upward after each green run: if your latest coverage was 87% and `fail_under` was 80%, the task bumps `fail_under` to 87%. Once engaged, the bar only goes up — lowering `fail_under` is a deliberate, reviewable change that shows up in the diff.
 
-Lowering `fail_under` is a deliberate, reviewable change — it shows up in the diff. Coverage regressions can't slip in silently.
+### Dormant during scaffold
+
+The ratchet starts **dormant**. The smoke test (`def test_sanity` in `tests/test_<slug>.py`) drives the scaffolded project to 100% coverage on its very first run; if the ratchet engaged on that signal, your first real change would crash the build at a 100% floor. So the test task checks for the presence of `def test_sanity` and, while it's still there, prints a status line on every run explaining the dormant state and how to engage:
+
+```
+[ratchet] coverage=100% — scaffold still pristine (test_sanity present); ratchet dormant
+[ratchet]   ratchet engages when you remove `test_sanity` in tests/test_<slug>.py
+[ratchet]   to engage immediately, set [tool.test-ratchet] mode = "strict" in pyproject.toml
+```
+
+The moment you delete or rename `test_sanity` — i.e., the moment you start writing real tests — the ratchet engages and works exactly as described above. Once any non-zero `fail_under` is written, dormancy is over for good; re-adding `test_sanity` later doesn't reactivate it.
+
+If you're seeding the template into a codebase that's already covered, set `[tool.test-ratchet] mode = "strict"` in `pyproject.toml` to bypass the dormancy check entirely.
+
+Coverage regressions still can't slip in silently — they just can't slip in *or out* during the scaffold phase.
 
 ## Layer 3 — tox
 
@@ -38,7 +52,7 @@ See [Run tests for one Python version](../how-to/run-tests-for-one-python-versio
 
 ## Smoke tests vs. real tests
 
-The template generates one smoke test per project — a single `test_hello.py` that exercises the example `hello()` function. Keep it or delete it; either is fine. The point is to have the test infrastructure proven before you write anything else.
+The template generates one smoke test per project — a `tests/test_<slug>.py` that exercises the example `hello()` function with two functions: `test_sanity` (an `assert True` placeholder) and `test_integration` (the actual call). Keep them or delete them; either is fine, but `test_sanity` doubles as the [ratchet dormancy marker](#dormant-during-scaffold), so removing it engages the ratchet.
 
 ## Parallel execution
 

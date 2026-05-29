@@ -82,6 +82,21 @@ def test_sbom_file_path_is_inside_package(generated_project):
     assert "SBOM_FILE = Path('src') / PROJECT_NAME / 'sbom.cdx.json'" in configuration
 
 
+def test_ratchet_defaults_to_auto_detect(generated_project):
+    """`[tool.test-ratchet] mode = "auto-detect"` ships by default so the ratchet starts dormant."""
+    project, _ = generated_project
+    data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
+    assert data['tool']['test-ratchet']['mode'] == 'auto-detect'
+
+
+def test_scaffold_test_sanity_marker_present(generated_project):
+    """`def test_sanity` ships in the scaffolded test file — it doubles as the ratchet dormancy marker."""
+    project, _ = generated_project
+    slug = project.name
+    test_file = project / 'tests' / f'test_{slug}.py'
+    assert 'def test_sanity' in test_file.read_text(encoding='utf-8')
+
+
 @pytest.mark.parametrize('license_choice', ['Apache-2.0', 'MIT', 'BSD-3-Clause', 'None'])
 def test_license_file_matches_choice(template_snapshot, tmp_path_factory, license_choice):
     """Each license choice produces (or skips) a LICENSE file at the project root."""
