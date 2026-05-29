@@ -1,0 +1,32 @@
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-deps-image:
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/build-deps-image.yaml
+
+  deploy:
+    needs: build-deps-image
+    runs-on: ubuntu-latest
+    container: ${{ needs.build-deps-image.outputs.image }}
+    permissions:
+      contents: write
+      packages: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 0
+      - name: Build and deploy docs
+        run: ./workflow.cmd document.deploy-github

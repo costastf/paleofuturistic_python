@@ -1,5 +1,0 @@
-# API Reference
-
-::: {{ cookiecutter.project_slug }}
-    options:
-      show_submodules: true

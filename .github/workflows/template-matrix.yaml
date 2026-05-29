@@ -16,9 +16,9 @@ jobs:
       - id: uv-pin
         name: Resolve uv pin from template pyproject
         run: |
-          version=$(sed -nE 's/^required-version = "==([^"]+)".*/\1/p' '{{ cookiecutter.project_slug }}/pyproject.toml')
+          version=$(sed -nE 's/^required-version = "==([^"]+)".*/\1/p' 'template/pyproject.toml.jinja')
           if [ -z "${version}" ]; then
-            echo "Could not resolve uv pin from {{ cookiecutter.project_slug }}/pyproject.toml" >&2
+            echo "Could not resolve uv pin from template/pyproject.toml.jinja" >&2
             exit 1
           fi
           echo "version=${version}" >> "$GITHUB_OUTPUT"

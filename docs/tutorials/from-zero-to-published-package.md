@@ -69,5 +69,5 @@ A tagged release exists, a wheel is on PyPI, and your docs are live.
 
 Where to go next:
 
-- [Update an existing project with cruft](../how-to/update-existing-project-with-cruft.md) — bring future template improvements into this project.
+- [Update an existing project with copier](../how-to/update-existing-project-with-copier.md) — bring future template improvements into this project.
 - [Design principles](../explanation/design-principles.md) — why the template made the choices it did.

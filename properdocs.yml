@@ -19,7 +19,7 @@ nav:
     - Generate your first project: tutorials/generate-your-first-project.md
     - From zero to a published package: tutorials/from-zero-to-published-package.md
   - How-to:
-    - Update an existing project with cruft: how-to/update-existing-project-with-cruft.md
+    - Update an existing project with copier: how-to/update-existing-project-with-copier.md
     - Choose a git host: how-to/choose-a-git-host.md
     - Enable Dependency Track integration: how-to/enable-dependency-track.md
     - Harden the GitHub repository: how-to/harden-github-repository.md
@@ -27,12 +27,12 @@ nav:
     - Choose the Python version range: how-to/choose-python-version-range.md
     - Publish docs to GitHub Pages: how-to/publish-docs-to-github-pages.md
   - Reference:
-    - Cruft questionnaire variables: reference/cookiecutter-variables.md
-    - The post-generation hook: reference/post-gen-hook.md
+    - Copier questions: reference/copier-questions.md
+    - Generation internals: reference/generation-internals.md
     - Generated project tree: reference/generated-project-tree.md
     - License options: reference/license-options.md
   - Explanation:
-    - Why a cruft template: explanation/why-a-cookiecutter.md
+    - Why copier: explanation/why-copier.md
     - Design principles: explanation/design-principles.md
     - History and lineage: explanation/history-and-lineage.md
 

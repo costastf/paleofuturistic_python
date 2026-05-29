@@ -9,12 +9,12 @@ The questionnaire's `license` answer picks one of four entries. Each maps to a f
 | `BSD-3-Clause` | `BSD-3-Clause` | Yes | Permissive, includes attribution clause. |
 | `None` | — | No | No `LICENSE` file, no header in source files. Useful for proprietary code or when you'll add a license later. |
 
-## What the post-gen hook does with each
+## What `tasks_render.py` does with each
 
-For non-`None` choices, `hooks/post_gen_project.py` performs three actions:
+For non-`None` choices, `tasks_render.py` performs three actions at copy time:
 
 1. Copies `licenses/<choice>` to `LICENSE` in the project root.
-2. Reads `licenses/<choice>.header`, interpolates `{year}` and `{author}` from the current date and `cookiecutter.full_name`, and stores the result.
+2. Reads `licenses/<choice>.header`, interpolates `{year}` (current calendar year) and `{author}` from `full_name`, and stores the result.
 3. Prepends the interpolated header (plus dunder metadata) to every `.py` under `src/` and `tests/`.
 
 Then it deletes the `licenses/` directory regardless of choice.
@@ -29,7 +29,7 @@ For `None`, only the directory cleanup runs — source files get the `__license_
 2. Set `pyproject.toml`'s `license = "<SPDX-ID>"` (or `license-file = "LICENSE"`).
 3. Optionally prepend a header block to source files by hand.
 
-This works but `cruft update` won't manage the headers for you — you're outside the template's automation for that file.
+This works but `copier update` won't manage the headers for you — you're outside the template's automation for that file.
 
 ## PyPI classifiers
 

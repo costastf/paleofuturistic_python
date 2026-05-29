@@ -2,7 +2,7 @@
 
 For GitHub-hosted projects, the template ships `.github/workflows/pages.yaml` by default. It runs `./workflow.cmd document.deploy-github` on every push to `main`, which delegates to `properdocs gh-deploy` (no GitHub Pages deploy actions involved — see [Design principles](../explanation/design-principles.md#pipelines-run-template-commands-only) for the reasoning). The only manual step is enabling Pages on the GitHub side.
 
-The Pages scaffolding is **opt-in/opt-out at generation time** via the `integrate_pages` questionnaire answer (default `true`). Answering `false` removes both the workflow file and the matching `document.deploy-github` task from the generated project — see [Cookiecutter variables](../reference/cookiecutter-variables.md#integrate_pages).
+The Pages scaffolding is **opt-in/opt-out at generation time** via the `integrate_pages` question (default `true`). Answering `false` omits both the workflow file and the matching `document.deploy-github` task from the generated project — see [Copier questions](../reference/copier-questions.md#integrate_pages).
 
 ## Step 1 — Push the template
 
@@ -59,5 +59,5 @@ For GitLab-hosted projects, the equivalent is a `pages:` job in `.gitlab-ci.yml`
 
 ## See also
 
-- [The shipped workflow](https://github.com/schubergphilis/paleofuturistic_python/blob/main/%7B%7B%20cookiecutter.project_slug%20%7D%7D/.github/workflows/pages.yaml) — the actual YAML, kept short on purpose.
+- [The shipped workflow](https://github.com/schubergphilis/paleofuturistic_python/blob/main/template/.github/workflows/pages.yaml.jinja) — the actual YAML, kept short on purpose.
 - [Design principles](../explanation/design-principles.md) — the two rules behind the workflow's shape.

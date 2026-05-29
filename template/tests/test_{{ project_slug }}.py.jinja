@@ -1,0 +1,13 @@
+"""Smoke tests for {{ project_slug }}."""
+
+from {{ project_slug }} import hello
+
+
+def test_sanity() -> None:
+    """Sanity check."""
+    assert True
+
+
+def test_integration() -> None:
+    """Integration test for hello function."""
+    assert hello() == 'Hello you from {{ project_slug }}!'

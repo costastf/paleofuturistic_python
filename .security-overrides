@@ -4,7 +4,7 @@
 # Merged with the `TEMPLATE_SECURITY_OVERRIDE` env var and passed to each
 # generated project's `secure.audit` step via the
 # `<PROJECT>_SECURITY_OVERRIDE` env var. The inner template validates the
-# final list — see `{{ cookiecutter.project_slug }}/.security-overrides`
+# final list — see `template/.security-overrides`
 # for the full format reference (CVE/GHSA/PYSEC IDs, optional `::YYYY-MM-DD`
 # expiry).
 #

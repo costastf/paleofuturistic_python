@@ -7,8 +7,8 @@ This template is a detached fork of [Straight to the Money 💰](https://github.
 From Straight to the Money:
 
 - uv-first toolchain, ruff for formatting and linting.
-- A practical walkthrough as the primary documentation surface (now split across [Tutorials](../tutorials/generate-your-first-project.md) and [How-to](../how-to/update-existing-project-with-cruft.md)).
-- Cookiecutter + cruft as the delivery mechanism.
+- A practical walkthrough as the primary documentation surface (now split across [Tutorials](../tutorials/generate-your-first-project.md) and [How-to](../how-to/update-existing-project-with-copier.md)).
+- Cookiecutter + cruft as the original delivery mechanism (later migrated to copier).
 - A bias toward making the happy path short.
 
 ## What we changed
@@ -40,4 +40,4 @@ The template is maintained at [github.com/schubergphilis/paleofuturistic_python]
 ## See also
 
 - [Design principles](design-principles.md) — what we kept opinionated on purpose.
-- [Why a cruft template?](why-a-cookiecutter.md) — why this delivery format.
+- [Why copier?](why-copier.md) — why this delivery format.

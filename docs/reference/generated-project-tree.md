@@ -1,10 +1,10 @@
 # Generated project tree
 
-An annotated tour of what cruft creates. Tree is for a project named `example_project` with `git_hosting_service=github` and `integrate_dependency_track=true`. Differences for `gitlab` and DT-off variants are noted inline.
+An annotated tour of what copier creates. Tree is for a project named `example_project` with `git_hosting_service=github` and `integrate_dependency_track=true`. Differences for `gitlab` and DT-off variants are noted inline.
 
 ```
 example_project/
-├── .cruft.json                  Cruft state — template URL + answers + revision
+├── .copier-answers.yml          Copier state — template URL + answers + revision
 ├── .gitignore
 ├── .pre-commit-config.yaml      Hooks: ruff, pylint, commitizen
 ├── .security-overrides          pip-audit allow-list (vuln id → expiry)
@@ -66,11 +66,11 @@ example_project/
 | --- | --- |
 | **You** | `src/`, `tests/`, `README.md`, `docs/` (after first edit), `.security-overrides` (curated list) |
 | **The template** | `_CI/`, `pyproject.toml`'s framework sections, `Dockerfile.deps`, `workflow.cmd*`, CI workflow files |
-| **Tooling** | `uv.lock` (managed by uv), `.cruft.json` (managed by cruft), `dist/` (build output) |
+| **Tooling** | `uv.lock` (managed by uv), `.copier-answers.yml` (managed by copier), `dist/` (build output) |
 
-The template-owned files are the ones `cruft update` will reach for. Customising them is fine but introduces merge work on every update — list specific paths under `skip` in `.cruft.json` to opt out per file.
+The template-owned files are the ones `copier update` will reach for. Customising them is fine but introduces merge work on every update.
 
 ## See also
 
-- [Cruft questionnaire variables](cookiecutter-variables.md) — which answer creates which directories.
-- [The post-generation hook](post-gen-hook.md) — what happens after the tree is laid down.
+- [Copier questions](copier-questions.md) — which answer creates which directories.
+- [Generation internals](generation-internals.md) — what happens after the tree is laid down.

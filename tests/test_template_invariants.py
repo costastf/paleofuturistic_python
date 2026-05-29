@@ -1,4 +1,4 @@
-"""Per-axis invariants over the cartesian product of cookiecutter combinations.
+"""Per-axis invariants over the cartesian product of copier answer combinations.
 
 Each test below receives one generated project per matrix cell via the
 ``generated_project`` fixture in ``conftest.py``. Adding a new assertion is one
@@ -100,23 +100,25 @@ def test_scaffold_test_sanity_marker_present(generated_project):
 @pytest.mark.parametrize('license_choice', ['Apache-2.0', 'MIT', 'BSD-3-Clause', 'None'])
 def test_license_file_matches_choice(template_snapshot, tmp_path_factory, license_choice):
     """Each license choice produces (or skips) a LICENSE file at the project root."""
-    output_dir = tmp_path_factory.mktemp(f'license-{license_choice}')
+    workdir = tmp_path_factory.mktemp(f'license-{license_choice}')
+    data_file = workdir / 'data.json'
+    data_file.write_text(json.dumps({'license': license_choice}), encoding='utf-8')
+    project = workdir / PROJECT_SLUG
     subprocess.run(
         [
             'uvx',
-            'cruft',
-            'create',
-            '--no-input',
-            '--output-dir',
-            str(output_dir),
-            '--extra-context',
-            json.dumps({'license': license_choice}),
+            'copier',
+            'copy',
+            '--defaults',
+            '--trust',
+            '--data-file',
+            str(data_file),
             str(template_snapshot),
+            str(project),
         ],
         check=True,
         capture_output=True,
     )
-    project = output_dir / PROJECT_SLUG
     if license_choice == 'None':
         assert not (project / 'LICENSE').exists()
     else:

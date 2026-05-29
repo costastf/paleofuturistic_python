@@ -11,13 +11,13 @@ The questionnaire asks for `min_python_version` and `max_python_version`. They d
 
 ## Constraints enforced at generation time
 
-`hooks/post_gen_project.py` validates:
+A `validator` on the `max_python_version` question in `copier.yml` checks:
 
-1. Both values are in `_known_python_versions` (currently `["3.13", "3.14"]`).
+1. Both values are in the choices list (currently `["3.13", "3.14"]`).
 2. `max_python_version >= min_python_version`.
 3. Both share the same major version — `3.x` to `4.x` ranges are not supported.
 
-A violation aborts generation with a clear error message.
+A violation aborts generation immediately with a clear error message. No partial output is left on disk.
 
 ## Widening the range later
 
@@ -28,7 +28,7 @@ To support additional minor versions after generation:
 3. Add the new version to the CI matrix (the host-specific workflow file).
 4. Run `./workflow.cmd test` against each version to catch incompatibilities.
 
-For a cleaner re-derivation, `uvx cruft update` after the template's `_known_python_versions` list expands will regenerate all four locations in lockstep — see [Update an existing project with cruft](update-existing-project-with-cruft.md).
+For a cleaner re-derivation, `uvx copier update --trust` after the template's choices list expands will regenerate all four locations in lockstep — see [Update an existing project with copier](update-existing-project-with-copier.md).
 
 ## Picking a sensible minimum
 
@@ -39,4 +39,4 @@ If you need to support 3.10 or earlier for downstream consumers, generate at the
 ## See also
 
 - [Design principles](../explanation/design-principles.md) — the reasoning behind the floor (see "What we deliberately do not do").
-- [Cruft questionnaire variables](../reference/cookiecutter-variables.md#min_python_version) — the exact prompt definitions.
+- [Copier questions](../reference/copier-questions.md#min_python_version) — the exact question definitions.

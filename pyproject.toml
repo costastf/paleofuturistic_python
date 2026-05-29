@@ -1,7 +1,7 @@
 [project]
 name = "paleofuturistic-python-template"
 version = "0.0.0"
-description = "Repository scaffolding for the cruft template; not a publishable package."
+description = "Repository scaffolding for the copier template; not a publishable package."
 requires-python = ">=3.12"
 
 [tool.uv]
@@ -10,6 +10,11 @@ required-version = "==0.11.15"
 exclude-newer = "1 week"
 
 [dependency-groups]
+# PyYAML parses copier.yml in _CI.tasks.configuration.base_context; the `dev` group is
+# auto-synced by `uv run` (invoke tasks) and included alongside `--group test` (pytest).
+dev = [
+    "pyyaml",
+]
 test = [
     "pytest",
 ]
