@@ -53,5 +53,5 @@ def publish(context: Context) -> None:
 
 
 namespace = Collection('container')
-namespace.add_task(cast(Task, publish), default=True, name='all')
+namespace.add_task(cast(Task, publish), default=True)
 namespace.add_task(cast(Task, build))
