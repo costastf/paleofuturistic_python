@@ -5,7 +5,7 @@ import platform
 import shutil
 import sys
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from contextvars import ContextVar
 from functools import wraps
 from typing import IO, Any, NamedTuple
@@ -29,6 +29,13 @@ for _stream in (sys.stdout, sys.stderr):
 
 INDENT = '    '
 DEPTH: ContextVar[int] = ContextVar('logged_depth', default=0)
+
+OPEN_COMMAND = {
+    'linux': 'xdg-open',
+    'macos': 'open',
+    'windows': 'start',
+    'wsl': 'wslview',  # from the wslu package; falls back to xdg-open if not installed
+}
 
 
 class IndentingStream:
@@ -78,16 +85,28 @@ def is_ci() -> bool:
     return os.environ.get('CI', '').lower() == 'true'
 
 
-def operating_system() -> str:
-    """Return the current operating system ('windows', 'macos', or 'linux').
+def get_operating_system() -> str:
+    """Return the current operating system ('windows', 'macos', 'linux', or 'wsl').
+
+    Linux running under WSL is reported as 'wsl' (detected via /proc/version).
 
     Raises:
         SystemExit: If the operating system is not recognized.
     """
-    systems = {'windows': 'windows', 'darwin': 'macos', 'linux': 'linux'}
-    system = platform.system().lower()
-    if system in systems:
-        return systems[system]
+    system = platform.system()
+
+    if system == 'Linux':
+        with suppress(OSError), open('/proc/version', encoding='utf-8') as proc_version:
+            if any(marker in proc_version.read().lower() for marker in ('microsoft', 'wsl')):
+                return 'wsl'
+        return 'linux'
+
+    if system == 'Darwin':
+        return 'macos'
+
+    if system == 'Windows':
+        return 'windows'
+
     print(f'Unsupported operating system: {system}')
     raise SystemExit(1)
 
@@ -99,14 +118,11 @@ def open_command() -> str:
     available (routes to the Windows default handler via interop), and
     'xdg-open' on plain Linux.
     """
-    system = operating_system()
-    if system == 'windows':
-        return 'start'
-    if system == 'macos':
-        return 'open'
-    if 'microsoft' in platform.release().lower() and shutil.which('wslview'):
-        return 'wslview'
-    return 'xdg-open'
+    system = get_operating_system()
+    if system == 'wsl' and not shutil.which('wslview'):
+        print('wslview not found; install the wslu package for `open` to work. Falling back to xdg-open.')
+        return OPEN_COMMAND['linux']
+    return OPEN_COMMAND[system]
 
 
 def container_engine() -> str:
