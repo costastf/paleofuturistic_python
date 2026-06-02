@@ -16,6 +16,13 @@ def ruff_lint(context: Context) -> None:
 
 
 @task
+@logged('lint.format')
+@run(f'uv run ruff format --check {PATHS}')
+def format_check(context: Context) -> None:
+    """Report code that is not correctly formatted, without modifying any files."""
+
+
+@task
 @logged('lint.pylint')
 @run(f'uv run pylint {PATHS}')
 def pylint(context: Context) -> None:
@@ -58,12 +65,13 @@ def commitizen(context: Context, commit_msg_file: str | None = None) -> None:
 @logged('lint')
 def lint(context: Context) -> None:
     """Run all linting steps; reports all failures before exiting."""
-    run_steps(ruff_lint, pylint, ty, complexipy, commitizen)(context)
+    run_steps(ruff_lint, format_check, pylint, ty, complexipy, commitizen)(context)
 
 
 namespace = Collection('lint')
 namespace.add_task(cast(Task, lint), default=True, name='all')
 namespace.add_task(cast(Task, ruff_lint), name='ruff')
+namespace.add_task(cast(Task, format_check), name='format-check')
 namespace.add_task(cast(Task, pylint))
 namespace.add_task(cast(Task, ty))
 namespace.add_task(cast(Task, complexipy))
