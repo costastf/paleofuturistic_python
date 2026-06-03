@@ -55,7 +55,7 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="../how-to/update-existing-project-with-cruft.html" class="dropdown-item">Update an existing project with cruft</a>
+    <a href="../how-to/update-existing-project-with-copier.html" class="dropdown-item">Update an existing project with copier</a>
 </li>
                                     
 <li>
@@ -88,11 +88,11 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="cookiecutter-variables.html" class="dropdown-item">Cruft questionnaire variables</a>
+    <a href="copier-questions.html" class="dropdown-item">Copier questions</a>
 </li>
                                     
 <li>
-    <a href="post-gen-hook.html" class="dropdown-item">The post-generation hook</a>
+    <a href="generation-internals.html" class="dropdown-item">Generation internals</a>
 </li>
                                     
 <li>
@@ -109,7 +109,7 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="../explanation/why-a-cookiecutter.html" class="dropdown-item">Why a cruft template</a>
+    <a href="../explanation/why-copier.html" class="dropdown-item">Why copier</a>
 </li>
                                     
 <li>
@@ -135,7 +135,7 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a rel="next" href="../explanation/why-a-cookiecutter.html" class="nav-link">
+                                <a rel="next" href="../explanation/why-copier.html" class="nav-link">
                                     Next <i class="fa fa-arrow-right"></i>
                                 </a>
                             </li>
@@ -192,7 +192,7 @@
             
             <li class="nav-item" data-bs-level="1"><a href="#license-options" class="nav-link">License options</a>
               <ul class="nav flex-column">
-            <li class="nav-item" data-bs-level="2"><a href="#what-the-post-gen-hook-does-with-each" class="nav-link">What the post-gen hook does with each</a>
+            <li class="nav-item" data-bs-level="2"><a href="#what-tasks_renderpy-does-with-each" class="nav-link">What tasks_render.py does with each</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -249,11 +249,11 @@
 </tr>
 </tbody>
 </table>
-<h2 id="what-the-post-gen-hook-does-with-each">What the post-gen hook does with each</h2>
-<p>For non-<code>None</code> choices, <code>hooks/post_gen_project.py</code> performs three actions:</p>
+<h2 id="what-tasks_renderpy-does-with-each">What <code>tasks_render.py</code> does with each</h2>
+<p>For non-<code>None</code> choices, <code>tasks_render.py</code> performs three actions at copy time:</p>
 <ol>
 <li>Copies <code>licenses/&lt;choice&gt;</code> to <code>LICENSE</code> in the project root.</li>
-<li>Reads <code>licenses/&lt;choice&gt;.header</code>, interpolates <code>{year}</code> and <code>{author}</code> from the current date and <code>cookiecutter.full_name</code>, and stores the result.</li>
+<li>Reads <code>licenses/&lt;choice&gt;.header</code>, interpolates <code>{year}</code> (current calendar year) and <code>{author}</code> from <code>full_name</code>, and stores the result.</li>
 <li>Prepends the interpolated header (plus dunder metadata) to every <code>.py</code> under <code>src/</code> and <code>tests/</code>.</li>
 </ol>
 <p>Then it deletes the <code>licenses/</code> directory regardless of choice.</p>
@@ -265,7 +265,7 @@
 <li>Set <code>pyproject.toml</code>'s <code>license = "&lt;SPDX-ID&gt;"</code> (or <code>license-file = "LICENSE"</code>).</li>
 <li>Optionally prepend a header block to source files by hand.</li>
 </ol>
-<p>This works but <code>cruft update</code> won't manage the headers for you — you're outside the template's automation for that file.</p>
+<p>This works but <code>copier update</code> won't manage the headers for you — you're outside the template's automation for that file.</p>
 <h2 id="pypi-classifiers">PyPI classifiers</h2>
 <p>If you want PyPI to display a license badge, add the matching classifier to <code>pyproject.toml</code>'s <code>[project] classifiers</code> list. Recognized strings are listed at <a href="https://pypi.org/classifiers/">pypi.org/classifiers/</a> — look under <code>License :: OSI Approved</code>.</p>
 <p>The template doesn't auto-add classifiers because they're orthogonal to the license metadata field and not all licenses have a classifier.</p></div>

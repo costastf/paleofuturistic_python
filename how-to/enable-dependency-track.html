@@ -55,7 +55,7 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="update-existing-project-with-cruft.html" class="dropdown-item">Update an existing project with cruft</a>
+    <a href="update-existing-project-with-copier.html" class="dropdown-item">Update an existing project with copier</a>
 </li>
                                     
 <li>
@@ -88,11 +88,11 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="../reference/cookiecutter-variables.html" class="dropdown-item">Cruft questionnaire variables</a>
+    <a href="../reference/copier-questions.html" class="dropdown-item">Copier questions</a>
 </li>
                                     
 <li>
-    <a href="../reference/post-gen-hook.html" class="dropdown-item">The post-generation hook</a>
+    <a href="../reference/generation-internals.html" class="dropdown-item">Generation internals</a>
 </li>
                                     
 <li>
@@ -109,7 +109,7 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="../explanation/why-a-cookiecutter.html" class="dropdown-item">Why a cruft template</a>
+    <a href="../explanation/why-copier.html" class="dropdown-item">Why copier</a>
 </li>
                                     
 <li>
@@ -224,7 +224,7 @@
 <h2 id="when-to-use-this">When to use this</h2>
 <p>You already run a Dependency Track instance (self-hosted or managed) and want this project's releases to appear there automatically. If you don't have a server, see <a href="#">SBOM and security model</a> (inner-project explanation) for what you're missing first.</p>
 <h2 id="at-generation-time">At generation time</h2>
-<p>When <code>cruft create</code> asks:</p>
+<p>When <code>copier copy</code> asks:</p>
 <pre><code>integrate_dependency_track [y]:
 </code></pre>
 <p>answer <code>y</code>. This adds the Dependency Track upload step to the security workflow and the <code>OWASP_DTRACK_SETTINGS</code> block to <code>_CI/tasks/configuration.py</code>.</p>
@@ -262,7 +262,7 @@
 <h2 id="verify-it-works">Verify it works</h2>
 <p>After running <code>secure.sbom-upload</code>, the task prints the upload response. In the DT UI, the project's "Components" tab should refresh within a few seconds.</p>
 <h2 id="i-picked-the-wrong-answer-at-generation-time">I picked the wrong answer at generation time</h2>
-<p>Re-run <code>uvx cruft update</code> and change <code>integrate_dependency_track</code> when prompted. See <a href="update-existing-project-with-cruft.html">Update an existing project with cruft</a> for the full flow.</p></div>
+<p>Re-run <code>uvx copier update --trust</code> and change <code>integrate_dependency_track</code> when prompted. See <a href="update-existing-project-with-copier.html">Update an existing project with copier</a> for the full flow.</p></div>
             </div>
         </div>
 

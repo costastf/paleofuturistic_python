@@ -8,7 +8,7 @@
         <meta name="author" content="Carlo 'carlovo' van Overbeek">
         
         <link rel="shortcut icon" href="../img/favicon.ico">
-        <title>The post-generation hook - Paleofuturistic Python</title>
+        <title>Copier questions - Paleofuturistic Python</title>
         <link href="../css/bootstrap.min.css" rel="stylesheet">
         <link href="../css/fontawesome.min.css" rel="stylesheet">
         <link href="../css/brands.min.css" rel="stylesheet">
@@ -55,7 +55,7 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="../how-to/update-existing-project-with-cruft.html" class="dropdown-item">Update an existing project with cruft</a>
+    <a href="../how-to/update-existing-project-with-copier.html" class="dropdown-item">Update an existing project with copier</a>
 </li>
                                     
 <li>
@@ -88,11 +88,11 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="cookiecutter-variables.html" class="dropdown-item">Cruft questionnaire variables</a>
+    <a href="copier-questions.html" class="dropdown-item active" aria-current="page">Copier questions</a>
 </li>
                                     
 <li>
-    <a href="post-gen-hook.html" class="dropdown-item active" aria-current="page">The post-generation hook</a>
+    <a href="generation-internals.html" class="dropdown-item">Generation internals</a>
 </li>
                                     
 <li>
@@ -109,7 +109,7 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="../explanation/why-a-cookiecutter.html" class="dropdown-item">Why a cruft template</a>
+    <a href="../explanation/why-copier.html" class="dropdown-item">Why copier</a>
 </li>
                                     
 <li>
@@ -130,17 +130,17 @@
                             </a>
                         </li>
                             <li class="nav-item">
-                                <a rel="prev" href="cookiecutter-variables.html" class="nav-link">
+                                <a rel="prev" href="../how-to/publish-docs-to-github-pages.html" class="nav-link">
                                     <i class="fa fa-arrow-left"></i> Previous
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a rel="next" href="generated-project-tree.html" class="nav-link">
+                                <a rel="next" href="generation-internals.html" class="nav-link">
                                     Next <i class="fa fa-arrow-right"></i>
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a href="https://github.com/schubergphilis/paleofuturistic_python/blob/main/docs/reference/post-gen-hook.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
+                                <a href="https://github.com/schubergphilis/paleofuturistic_python/blob/main/docs/reference/copier-questions.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
                             </li>
                             <li class="nav-item dropdown">
                               <button id="theme-menu" aria-expanded="false" data-bs-toggle="dropdown" data-bs-display="static" aria-label="Toggle theme" class="nav-link dropdown-toggle">
@@ -190,17 +190,13 @@
     <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
         <ul class="nav flex-column">
             
-            <li class="nav-item" data-bs-level="1"><a href="#the-post-generation-hook" class="nav-link">The post-generation hook</a>
+            <li class="nav-item" data-bs-level="1"><a href="#copier-questions" class="nav-link">Copier questions</a>
               <ul class="nav flex-column">
-            <li class="nav-item" data-bs-level="2"><a href="#sequence-of-actions" class="nav-link">Sequence of actions</a>
-              <ul class="nav flex-column">
-              </ul>
-            </li>
-            <li class="nav-item" data-bs-level="2"><a href="#why-a-hook-instead-of-jinja" class="nav-link">Why a hook instead of Jinja</a>
+            <li class="nav-item" data-bs-level="2"><a href="#user-facing-questions" class="nav-link">User-facing questions</a>
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-bs-level="2"><a href="#if-validation-fails" class="nav-link">If validation fails</a>
+            <li class="nav-item" data-bs-level="2"><a href="#validation" class="nav-link">Validation</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -215,69 +211,89 @@
 </div></div>
                     <div class="col-md-9" role="main">
 
-<h1 id="the-post-generation-hook">The post-generation hook</h1>
-<p><code>hooks/post_gen_project.py</code> runs once in the freshly-generated project's directory immediately after cookiecutter writes the templated files. It applies validations and edits that aren't expressible through Jinja alone.</p>
-<h2 id="sequence-of-actions">Sequence of actions</h2>
-<p>The hook executes in the order below. Any step that raises aborts the hook (and therefore the generation).</p>
-<h3 id="1-validate-python-version-range">1. Validate Python version range</h3>
+<h1 id="copier-questions">Copier questions</h1>
+<p>Every question in <code>copier.yml</code>, what it does, and how it's validated. The template config file is <code>copier.yml</code> at the repo root; the tool you invoke is copier.</p>
+<h2 id="user-facing-questions">User-facing questions</h2>
+<h3 id="project_name"><code>project_name</code></h3>
 <ul>
-<li>Parse <code>min_python_version</code> and <code>max_python_version</code> into integer tuples.</li>
-<li>Fail if either is unparseable.</li>
-<li>Fail if <code>max &lt; min</code>.</li>
-<li>Fail if either value isn't in <code>_known_python_versions</code>.</li>
-<li>Fail if they don't share the same major version.</li>
+<li><strong>Type</strong>: string</li>
+<li><strong>Default</strong>: <code>Paleofuturistic Python Project</code></li>
 </ul>
-<h3 id="2-install-the-chosen-license">2. Install the chosen license</h3>
+<p>Human-readable name. Appears in <code>pyproject.toml</code>'s <code>name</code> field, the README title, the docs <code>site_name</code>, and source-file headers.</p>
+<h3 id="project_slug"><code>project_slug</code></h3>
 <ul>
-<li>Copy <code>licenses/&lt;chosen-license&gt;</code> to <code>LICENSE</code> (unless the answer was <code>None</code>).</li>
-<li>Read <code>licenses/&lt;chosen-license&gt;.header</code> (if present) and format it with the current year + author.</li>
-<li>Delete the <code>licenses/</code> directory entirely.</li>
+<li><strong>Type</strong>: derived</li>
+<li><strong>Default</strong>: <code>project_name</code> lowercased with spaces and hyphens replaced by underscores.</li>
 </ul>
-<h3 id="3-delete-the-unchosen-git-hosts-artifacts">3. Delete the unchosen git-host's artifacts</h3>
-<p>This is the host-isolation logic added with the <code>git_hosting_service</code> questionnaire variable:</p>
-<table>
-<thead>
-<tr>
-<th>Chosen</th>
-<th>Deleted</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>github</code></td>
-<td><code>.gitlab-ci.yml</code>, <code>_CI/tasks/gitlab.py</code></td>
-</tr>
-<tr>
-<td><code>gitlab</code></td>
-<td><code>.github/</code> (entire directory), <code>_CI/tasks/github.py</code></td>
-</tr>
-</tbody>
-</table>
-<p>After this step the project contains only the chosen host's CI config and submodule. The <code>from .{{ cookiecutter.git_hosting_service }} import …</code> line in <code>_CI/tasks/container.py</code> and <code>_CI/tasks/release.py</code> was already Jinja-substituted at copy time to name the surviving module.</p>
-<h3 id="4-prepend-headers-to-source-py-files">4. Prepend headers to source <code>.py</code> files</h3>
-<p>For each <code>.py</code> file under <code>src/</code> and <code>tests/</code>:</p>
+<p>Python package name and source-tree directory name. Must be a valid Python identifier — the lowercase/replace transformation guarantees that for typical inputs.</p>
+<h3 id="project_description"><code>project_description</code></h3>
 <ul>
-<li>Strip any pre-existing module docstring.</li>
-<li>Prepend the license header (year + author interpolated).</li>
-<li>Add <code>"""&lt;project_slug&gt;."""</code> as the module docstring.</li>
-<li>Add the dunder-metadata block (<code>__author__</code>, <code>__copyright__</code>, etc.).</li>
-<li>For the main module file (<code>src/&lt;slug&gt;/&lt;slug&gt;.py</code>) only: also prepend <code>import logging</code> and the <code>LOGGER</code> setup.</li>
+<li><strong>Type</strong>: string</li>
+<li><strong>Default</strong>: <code>Development flow as Paleofuturistic Python</code></li>
 </ul>
-<h3 id="5-make-workflowcmd-executable">5. Make <code>workflow.cmd</code> executable</h3>
-<p><code>chmod +x workflow.cmd</code> (and the equivalent on Windows). On Windows the <code>.cmd</code> extension is sufficient; on Unix this step is what lets <code>./workflow.cmd …</code> work.</p>
-<h2 id="why-a-hook-instead-of-jinja">Why a hook instead of Jinja</h2>
-<p>Three things make a post-gen hook strictly necessary:</p>
+<p>One-line summary. Lands in <code>pyproject.toml</code>'s <code>description</code> and the README lead paragraph.</p>
+<h3 id="full_name"><code>full_name</code></h3>
 <ul>
-<li><strong>Whole-file deletion.</strong> Jinja can produce an empty file, but it can't delete one. The host-artifact removal needs filesystem operations.</li>
-<li><strong>Path-aware logic.</strong> Prepending headers to every <code>.py</code> under <code>src/</code> and <code>tests/</code> requires walking the tree; Jinja doesn't iterate filesystems.</li>
-<li><strong>Conditional <code>chmod</code>.</strong> File permissions aren't part of the Jinja-rendered content.</li>
+<li><strong>Type</strong>: string</li>
+<li><strong>Default</strong>: <code>John Doe</code></li>
 </ul>
-<h2 id="if-validation-fails">If validation fails</h2>
-<p>The hook prints a clear error and exits with status 1. <strong>The partial output directory remains on disk</strong> — cookiecutter doesn't roll back. Inspect or delete it before retrying.</p>
+<p>Author name. Appears in <code>pyproject.toml</code> authors metadata, the chosen <code>LICENSE</code> file, and the <code>__author__</code> header of every source <code>.py</code>.</p>
+<h3 id="email"><code>email</code></h3>
+<ul>
+<li><strong>Type</strong>: string</li>
+<li><strong>Default</strong>: <code>me@here.now</code></li>
+</ul>
+<p>Author email. Same locations as <code>full_name</code>.</p>
+<h3 id="min_python_version"><code>min_python_version</code></h3>
+<ul>
+<li><strong>Type</strong>: choice</li>
+<li><strong>Default</strong>: <code>3.13</code></li>
+<li><strong>Allowed</strong>: <code>"3.13"</code>, <code>"3.14"</code></li>
+</ul>
+<p>Lower bound. Drives <code>requires-python</code>, classifier list, tox envs, and CI matrix. See <a href="../how-to/choose-python-version-range.html">Choose the Python version range</a>.</p>
+<h3 id="max_python_version"><code>max_python_version</code></h3>
+<ul>
+<li><strong>Type</strong>: choice</li>
+<li><strong>Default</strong>: <code>3.14</code></li>
+<li><strong>Allowed</strong>: <code>"3.13"</code>, <code>"3.14"</code></li>
+</ul>
+<p>Upper bound. Must be <code>&gt;= min_python_version</code> and share the same major version. A validator on this question in <code>copier.yml</code> enforces both constraints at generation time and aborts with a clear error if they are violated.</p>
+<h3 id="license"><code>license</code></h3>
+<ul>
+<li><strong>Type</strong>: choice</li>
+<li><strong>Default</strong>: <code>Apache-2.0</code></li>
+<li><strong>Allowed</strong>: <code>Apache-2.0</code>, <code>MIT</code>, <code>BSD-3-Clause</code>, <code>None</code></li>
+</ul>
+<p>Selects which license file is installed to <code>LICENSE</code> and which header is prepended to source files by <code>tasks_render.py</code>. See <a href="license-options.html">License options</a>.</p>
+<h3 id="git_hosting_service"><code>git_hosting_service</code></h3>
+<ul>
+<li><strong>Type</strong>: choice</li>
+<li><strong>Default</strong>: <code>github</code></li>
+<li><strong>Allowed</strong>: <code>github</code>, <code>gitlab</code></li>
+</ul>
+<p>Determines which CI scaffolding ships and which host-specific submodule lives at <code>_CI/tasks/&lt;host&gt;.py</code>. The unchosen host's files are omitted at generation time via copier conditional filenames — a file or directory whose rendered name is empty string is simply not created. See <a href="../how-to/choose-a-git-host.html">Choose a git host</a>.</p>
+<h3 id="integrate_dependency_track"><code>integrate_dependency_track</code></h3>
+<ul>
+<li><strong>Type</strong>: bool</li>
+<li><strong>Default</strong>: <code>true</code></li>
+</ul>
+<p>When <code>true</code>, the release pipeline uploads the generated CycloneDX SBOM to an OWASP Dependency Track server (expects <code>OWASP_DT_*</code> environment variables at runtime). See <a href="../how-to/enable-dependency-track.html">Enable Dependency Track integration</a>.</p>
+<h3 id="integrate_pages"><code>integrate_pages</code></h3>
+<ul>
+<li><strong>Type</strong>: bool</li>
+<li><strong>Default</strong>: <code>true</code></li>
+</ul>
+<p>Controls whether documentation-publishing scaffolding (the Pages workflow file and the matching <code>document.deploy-github</code> task) ships in the generated project. The actual scaffolding is host-specific: today only <code>git_hosting_service=github</code> has shipping Pages scaffolding — picking <code>gitlab</code> with <code>integrate_pages=true</code> is a silent no-op until GitLab Pages support lands. See <a href="../how-to/publish-docs-to-github-pages.html">Publish docs to GitHub Pages</a>.</p>
+<h2 id="validation">Validation</h2>
+<p>Validation is split between copier's built-in mechanisms and the <code>tasks_render.py</code> copy-time script:</p>
+<ol>
+<li><strong>Python version range</strong> — a <code>validator</code> on the <code>max_python_version</code> question in <code>copier.yml</code> checks that <code>max &gt;= min</code>, that both values share the same major version, and that both appear in the choices list. Any failure aborts generation immediately before any files are written.</li>
+<li><strong>License installation</strong> — <code>tasks_render.py</code> installs the chosen license file (substituting author/year tokens) and removes the <code>licenses/</code> staging directory. It runs only on <code>copier copy</code>, not on <code>copier update</code>.</li>
+</ol>
 <h2 id="see-also">See also</h2>
 <ul>
-<li><a href="cookiecutter-variables.html">Cruft questionnaire variables</a> — what feeds into the hook.</li>
-<li><a href="../how-to/choose-a-git-host.html">Choose a git host</a> — the prompt that drives step 3.</li>
+<li><a href="generation-internals.html">Generation internals</a> — what runs after these answers are collected.</li>
+<li><a href="generated-project-tree.html">Generated project tree</a> — what each answer ends up shaping in the output.</li>
 </ul></div>
             </div>
         </div>

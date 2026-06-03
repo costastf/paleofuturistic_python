@@ -55,7 +55,7 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="update-existing-project-with-cruft.html" class="dropdown-item">Update an existing project with cruft</a>
+    <a href="update-existing-project-with-copier.html" class="dropdown-item">Update an existing project with copier</a>
 </li>
                                     
 <li>
@@ -88,11 +88,11 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="../reference/cookiecutter-variables.html" class="dropdown-item">Cruft questionnaire variables</a>
+    <a href="../reference/copier-questions.html" class="dropdown-item">Copier questions</a>
 </li>
                                     
 <li>
-    <a href="../reference/post-gen-hook.html" class="dropdown-item">The post-generation hook</a>
+    <a href="../reference/generation-internals.html" class="dropdown-item">Generation internals</a>
 </li>
                                     
 <li>
@@ -109,7 +109,7 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="../explanation/why-a-cookiecutter.html" class="dropdown-item">Why a cruft template</a>
+    <a href="../explanation/why-copier.html" class="dropdown-item">Why copier</a>
 </li>
                                     
 <li>
@@ -229,13 +229,13 @@
 <li><strong>PyPI classifiers</strong> (<code>Programming Language :: Python :: 3.X</code>) match the range.</li>
 </ul>
 <h2 id="constraints-enforced-at-generation-time">Constraints enforced at generation time</h2>
-<p><code>hooks/post_gen_project.py</code> validates:</p>
+<p>A <code>validator</code> on the <code>max_python_version</code> question in <code>copier.yml</code> checks:</p>
 <ol>
-<li>Both values are in <code>_known_python_versions</code> (currently <code>["3.13", "3.14"]</code>).</li>
+<li>Both values are in the choices list (currently <code>["3.13", "3.14"]</code>).</li>
 <li><code>max_python_version &gt;= min_python_version</code>.</li>
 <li>Both share the same major version — <code>3.x</code> to <code>4.x</code> ranges are not supported.</li>
 </ol>
-<p>A violation aborts generation with a clear error message.</p>
+<p>A violation aborts generation immediately with a clear error message. No partial output is left on disk.</p>
 <h2 id="widening-the-range-later">Widening the range later</h2>
 <p>To support additional minor versions after generation:</p>
 <ol>
@@ -244,14 +244,14 @@
 <li>Add the new version to the CI matrix (the host-specific workflow file).</li>
 <li>Run <code>./workflow.cmd test</code> against each version to catch incompatibilities.</li>
 </ol>
-<p>For a cleaner re-derivation, <code>uvx cruft update</code> after the template's <code>_known_python_versions</code> list expands will regenerate all four locations in lockstep — see <a href="update-existing-project-with-cruft.html">Update an existing project with cruft</a>.</p>
+<p>For a cleaner re-derivation, <code>uvx copier update --trust</code> after the template's choices list expands will regenerate all four locations in lockstep — see <a href="update-existing-project-with-copier.html">Update an existing project with copier</a>.</p>
 <h2 id="picking-a-sensible-minimum">Picking a sensible minimum</h2>
 <p>The template's floor is 3.11+ for a reason: it relies on <code>tomllib</code>, <code>ExceptionGroup</code>, and PEP 604 type unions. Older floors would require shims; the template doesn't ship them.</p>
 <p>If you need to support 3.10 or earlier for downstream consumers, generate at the template's minimum and patch the generated <code>pyproject.toml</code> manually — you're then off the template's update path for that file.</p>
 <h2 id="see-also">See also</h2>
 <ul>
 <li><a href="../explanation/design-principles.html">Design principles</a> — the reasoning behind the floor (see "What we deliberately do not do").</li>
-<li><a href="../reference/cookiecutter-variables.html#min_python_version">Cruft questionnaire variables</a> — the exact prompt definitions.</li>
+<li><a href="../reference/copier-questions.html#min_python_version">Copier questions</a> — the exact question definitions.</li>
 </ul></div>
             </div>
         </div>

@@ -55,7 +55,7 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="../how-to/update-existing-project-with-cruft.html" class="dropdown-item">Update an existing project with cruft</a>
+    <a href="../how-to/update-existing-project-with-copier.html" class="dropdown-item">Update an existing project with copier</a>
 </li>
                                     
 <li>
@@ -88,11 +88,11 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="cookiecutter-variables.html" class="dropdown-item">Cruft questionnaire variables</a>
+    <a href="copier-questions.html" class="dropdown-item">Copier questions</a>
 </li>
                                     
 <li>
-    <a href="post-gen-hook.html" class="dropdown-item">The post-generation hook</a>
+    <a href="generation-internals.html" class="dropdown-item">Generation internals</a>
 </li>
                                     
 <li>
@@ -109,7 +109,7 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="../explanation/why-a-cookiecutter.html" class="dropdown-item">Why a cruft template</a>
+    <a href="../explanation/why-copier.html" class="dropdown-item">Why copier</a>
 </li>
                                     
 <li>
@@ -130,7 +130,7 @@
                             </a>
                         </li>
                             <li class="nav-item">
-                                <a rel="prev" href="post-gen-hook.html" class="nav-link">
+                                <a rel="prev" href="generation-internals.html" class="nav-link">
                                     <i class="fa fa-arrow-left"></i> Previous
                                 </a>
                             </li>
@@ -208,9 +208,9 @@
                     <div class="col-md-9" role="main">
 
 <h1 id="generated-project-tree">Generated project tree</h1>
-<p>An annotated tour of what cruft creates. Tree is for a project named <code>example_project</code> with <code>git_hosting_service=github</code> and <code>integrate_dependency_track=true</code>. Differences for <code>gitlab</code> and DT-off variants are noted inline.</p>
+<p>An annotated tour of what copier creates. Tree is for a project named <code>example_project</code> with <code>git_hosting_service=github</code> and <code>integrate_dependency_track=true</code>. Differences for <code>gitlab</code> and DT-off variants are noted inline.</p>
 <pre><code>example_project/
-├── .cruft.json                  Cruft state — template URL + answers + revision
+├── .copier-answers.yml          Copier state — template URL + answers + revision
 ├── .gitignore
 ├── .pre-commit-config.yaml      Hooks: ruff, pylint, commitizen
 ├── .security-overrides          pip-audit allow-list (vuln id → expiry)
@@ -284,15 +284,15 @@
 </tr>
 <tr>
 <td><strong>Tooling</strong></td>
-<td><code>uv.lock</code> (managed by uv), <code>.cruft.json</code> (managed by cruft), <code>dist/</code> (build output)</td>
+<td><code>uv.lock</code> (managed by uv), <code>.copier-answers.yml</code> (managed by copier), <code>dist/</code> (build output)</td>
 </tr>
 </tbody>
 </table>
-<p>The template-owned files are the ones <code>cruft update</code> will reach for. Customising them is fine but introduces merge work on every update — list specific paths under <code>skip</code> in <code>.cruft.json</code> to opt out per file.</p>
+<p>The template-owned files are the ones <code>copier update</code> will reach for. Customising them is fine but introduces merge work on every update.</p>
 <h2 id="see-also">See also</h2>
 <ul>
-<li><a href="cookiecutter-variables.html">Cruft questionnaire variables</a> — which answer creates which directories.</li>
-<li><a href="post-gen-hook.html">The post-generation hook</a> — what happens after the tree is laid down.</li>
+<li><a href="copier-questions.html">Copier questions</a> — which answer creates which directories.</li>
+<li><a href="generation-internals.html">Generation internals</a> — what happens after the tree is laid down.</li>
 </ul></div>
             </div>
         </div>

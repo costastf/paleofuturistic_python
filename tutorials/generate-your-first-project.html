@@ -55,7 +55,7 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="../how-to/update-existing-project-with-cruft.html" class="dropdown-item">Update an existing project with cruft</a>
+    <a href="../how-to/update-existing-project-with-copier.html" class="dropdown-item">Update an existing project with copier</a>
 </li>
                                     
 <li>
@@ -88,11 +88,11 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="../reference/cookiecutter-variables.html" class="dropdown-item">Cruft questionnaire variables</a>
+    <a href="../reference/copier-questions.html" class="dropdown-item">Copier questions</a>
 </li>
                                     
 <li>
-    <a href="../reference/post-gen-hook.html" class="dropdown-item">The post-generation hook</a>
+    <a href="../reference/generation-internals.html" class="dropdown-item">Generation internals</a>
 </li>
                                     
 <li>
@@ -109,7 +109,7 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="../explanation/why-a-cookiecutter.html" class="dropdown-item">Why a cruft template</a>
+    <a href="../explanation/why-copier.html" class="dropdown-item">Why copier</a>
 </li>
                                     
 <li>
@@ -226,20 +226,20 @@
 <h1 id="generate-your-first-project">Generate your first project</h1>
 <p>This tutorial walks you from an empty directory to a working Python project generated from this template, in about ten minutes. You will not customise anything — the goal is to see the whole cycle once.</p>
 <h2 id="prerequisites">Prerequisites</h2>
-<p>You need <a href="https://docs.astral.sh/uv/"><code>uv</code></a> installed. uv is the only tool you need; it can run cruft for you and will manage every other tool the generated project uses.</p>
+<p>You need <a href="https://docs.astral.sh/uv/"><code>uv</code></a> installed. uv is the only tool you need; it can run copier for you and will manage every other tool the generated project uses.</p>
 <pre><code class="language-bash">curl -LsSf https://astral.sh/uv/install.sh | sh
 </code></pre>
 <h2 id="step-1-generate-the-project">Step 1 — Generate the project</h2>
 <p>Pick an empty directory and run:</p>
-<pre><code class="language-bash">uvx cruft create --checkout latest https://github.com/schubergphilis/paleofuturistic_python
+<pre><code class="language-bash">uvx copier copy --trust https://github.com/schubergphilis/paleofuturistic_python &lt;destination-dir&gt;
 </code></pre>
-<p>You will be asked a series of questions. Press Enter to accept the defaults for every one — they're documented in <a href="../reference/cookiecutter-variables.html">Cruft questionnaire variables</a>. Three answers worth thinking about:</p>
+<p><code>--trust</code> is required because the template runs a post-copy task. You will be asked a series of questions. Press Enter to accept the defaults for every one — they're documented in <a href="../reference/copier-questions.html">Copier questions</a>. Three answers worth thinking about:</p>
 <ul>
 <li><code>project_name</code> — pick something memorable; everything else is derived.</li>
 <li><code>git_hosting_service</code> — <code>github</code> (default) or <code>gitlab</code>; see <a href="../how-to/choose-a-git-host.html">Choose a git host</a>.</li>
 <li><code>license</code> — defaults to Apache-2.0; pick whatever fits.</li>
 </ul>
-<p>When the command finishes you'll have a new directory named after your project, with a complete Python project inside.</p>
+<p>When the command finishes you'll have a complete Python project inside <code>&lt;destination-dir&gt;</code>.</p>
 <h2 id="step-2-bootstrap-it">Step 2 — Bootstrap it</h2>
 <pre><code class="language-bash">cd &lt;your-project-slug&gt;
 ./workflow.cmd bootstrap

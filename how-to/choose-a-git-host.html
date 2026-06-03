@@ -55,7 +55,7 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="update-existing-project-with-cruft.html" class="dropdown-item">Update an existing project with cruft</a>
+    <a href="update-existing-project-with-copier.html" class="dropdown-item">Update an existing project with copier</a>
 </li>
                                     
 <li>
@@ -88,11 +88,11 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="../reference/cookiecutter-variables.html" class="dropdown-item">Cruft questionnaire variables</a>
+    <a href="../reference/copier-questions.html" class="dropdown-item">Copier questions</a>
 </li>
                                     
 <li>
-    <a href="../reference/post-gen-hook.html" class="dropdown-item">The post-generation hook</a>
+    <a href="../reference/generation-internals.html" class="dropdown-item">Generation internals</a>
 </li>
                                     
 <li>
@@ -109,7 +109,7 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="../explanation/why-a-cookiecutter.html" class="dropdown-item">Why a cruft template</a>
+    <a href="../explanation/why-copier.html" class="dropdown-item">Why copier</a>
 </li>
                                     
 <li>
@@ -130,7 +130,7 @@
                             </a>
                         </li>
                             <li class="nav-item">
-                                <a rel="prev" href="update-existing-project-with-cruft.html" class="nav-link">
+                                <a rel="prev" href="update-existing-project-with-copier.html" class="nav-link">
                                     <i class="fa fa-arrow-left"></i> Previous
                                 </a>
                             </li>
@@ -216,7 +216,7 @@
                     <div class="col-md-9" role="main">
 
 <h1 id="choose-a-git-host-github-or-gitlab">Choose a git host (GitHub or GitLab)</h1>
-<p>The cruft questionnaire asks <code>git_hosting_service</code> with two choices: <code>github</code> (default) or <code>gitlab</code>. The answer determines which CI scaffolding and host-specific code is generated; the other host's artifacts are removed automatically.</p>
+<p>The copier questionnaire asks <code>git_hosting_service</code> with two choices: <code>github</code> (default) or <code>gitlab</code>. The answer determines which CI scaffolding and host-specific code is generated; the other host's files are omitted automatically via conditional filenames.</p>
 <h2 id="what-changes-per-choice">What changes per choice</h2>
 <table>
 <thead>
@@ -266,16 +266,16 @@
 </table>
 <p>Everything else — the package layout, <code>pyproject.toml</code>, dependency groups, <code>./workflow.cmd</code> tasks, tests, docs — is identical.</p>
 <h2 id="switching-later">Switching later</h2>
-<p>If you guessed wrong at generation time, the change is reversible via cruft:</p>
-<pre><code class="language-bash">uvx cruft update
+<p>If you guessed wrong at generation time, the change is reversible via copier:</p>
+<pre><code class="language-bash">uvx copier update --trust
 </code></pre>
-<p>When prompted, change <code>git_hosting_service</code> to the other value. Cruft diffs against your project and proposes a patch that:</p>
+<p>When prompted, change <code>git_hosting_service</code> to the other value. Copier performs a three-way merge against your project that:</p>
 <ul>
 <li>Adds the new host's CI config + submodule.</li>
 <li>Removes the old host's CI config + submodule.</li>
 <li>Flips the import line in <code>_CI/tasks/container.py</code> (and <code>release.py</code>) from <code>.github</code> to <code>.gitlab</code> (or back).</li>
 </ul>
-<p>Review the patch carefully — if you've already customised the host-specific CI files, your changes will need manual reconciliation.</p>
+<p>Review the result carefully — if you've already customised the host-specific CI files, your changes will need manual reconciliation.</p>
 <h2 id="gitlab-limitations-to-be-aware-of">GitLab limitations to be aware of</h2>
 <p>The GitLab path currently has two stubs:</p>
 <ul>
@@ -285,8 +285,8 @@
 <p>PRs implementing the GitLab MR auto-creation are welcome — the seam exists exactly so contributors don't have to touch <code>release.py</code>.</p>
 <h2 id="see-also">See also</h2>
 <ul>
-<li><a href="../reference/cookiecutter-variables.html#git_hosting_service">Cruft questionnaire variables</a> — the prompt's full reference entry.</li>
-<li><a href="update-existing-project-with-cruft.html">Update an existing project with cruft</a> — the mechanics of <code>cruft update</code>.</li>
+<li><a href="../reference/copier-questions.html#git_hosting_service">Copier questions</a> — the prompt's full reference entry.</li>
+<li><a href="update-existing-project-with-copier.html">Update an existing project with copier</a> — the mechanics of <code>copier update</code>.</li>
 </ul></div>
             </div>
         </div>

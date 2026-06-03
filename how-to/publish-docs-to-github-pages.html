@@ -55,7 +55,7 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="update-existing-project-with-cruft.html" class="dropdown-item">Update an existing project with cruft</a>
+    <a href="update-existing-project-with-copier.html" class="dropdown-item">Update an existing project with copier</a>
 </li>
                                     
 <li>
@@ -88,11 +88,11 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="../reference/cookiecutter-variables.html" class="dropdown-item">Cruft questionnaire variables</a>
+    <a href="../reference/copier-questions.html" class="dropdown-item">Copier questions</a>
 </li>
                                     
 <li>
-    <a href="../reference/post-gen-hook.html" class="dropdown-item">The post-generation hook</a>
+    <a href="../reference/generation-internals.html" class="dropdown-item">Generation internals</a>
 </li>
                                     
 <li>
@@ -109,7 +109,7 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="../explanation/why-a-cookiecutter.html" class="dropdown-item">Why a cruft template</a>
+    <a href="../explanation/why-copier.html" class="dropdown-item">Why copier</a>
 </li>
                                     
 <li>
@@ -135,7 +135,7 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a rel="next" href="../reference/cookiecutter-variables.html" class="nav-link">
+                                <a rel="next" href="../reference/copier-questions.html" class="nav-link">
                                     Next <i class="fa fa-arrow-right"></i>
                                 </a>
                             </li>
@@ -233,7 +233,7 @@
 
 <h1 id="publish-docs-to-github-pages">Publish docs to GitHub Pages</h1>
 <p>For GitHub-hosted projects, the template ships <code>.github/workflows/pages.yaml</code> by default. It runs <code>./workflow.cmd document.deploy-github</code> on every push to <code>main</code>, which delegates to <code>properdocs gh-deploy</code> (no GitHub Pages deploy actions involved — see <a href="../explanation/design-principles.html#pipelines-run-template-commands-only">Design principles</a> for the reasoning). The only manual step is enabling Pages on the GitHub side.</p>
-<p>The Pages scaffolding is <strong>opt-in/opt-out at generation time</strong> via the <code>integrate_pages</code> questionnaire answer (default <code>true</code>). Answering <code>false</code> removes both the workflow file and the matching <code>document.deploy-github</code> task from the generated project — see <a href="../reference/cookiecutter-variables.html#integrate_pages">Cookiecutter variables</a>.</p>
+<p>The Pages scaffolding is <strong>opt-in/opt-out at generation time</strong> via the <code>integrate_pages</code> question (default <code>true</code>). Answering <code>false</code> omits both the workflow file and the matching <code>document.deploy-github</code> task from the generated project — see <a href="../reference/copier-questions.html#integrate_pages">Copier questions</a>.</p>
 <h2 id="step-1-push-the-template">Step 1 — Push the template</h2>
 <p>Generate the project with <code>git_hosting_service=github</code>, push to GitHub. The first push to <code>main</code> triggers the Pages workflow. The workflow creates the <code>gh-pages</code> branch on its first successful run.</p>
 <h2 id="step-2-enable-pages-on-the-repo">Step 2 — Enable Pages on the repo</h2>
@@ -273,7 +273,7 @@
 <p>For GitLab-hosted projects, the equivalent is a <code>pages:</code> job in <code>.gitlab-ci.yml</code> that publishes the <code>site/</code> directory. The template doesn't ship one yet — it's the logical follow-up to this workflow.</p>
 <h2 id="see-also">See also</h2>
 <ul>
-<li><a href="https://github.com/schubergphilis/paleofuturistic_python/blob/main/%7B%7B%20cookiecutter.project_slug%20%7D%7D/.github/workflows/pages.yaml">The shipped workflow</a> — the actual YAML, kept short on purpose.</li>
+<li><a href="https://github.com/schubergphilis/paleofuturistic_python/blob/main/template/.github/workflows/pages.yaml.jinja">The shipped workflow</a> — the actual YAML, kept short on purpose.</li>
 <li><a href="../explanation/design-principles.html">Design principles</a> — the two rules behind the workflow's shape.</li>
 </ul></div>
             </div>

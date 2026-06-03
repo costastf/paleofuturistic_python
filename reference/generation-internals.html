@@ -8,7 +8,7 @@
         <meta name="author" content="Carlo 'carlovo' van Overbeek">
         
         <link rel="shortcut icon" href="../img/favicon.ico">
-        <title>Why a cruft template - Paleofuturistic Python</title>
+        <title>Generation internals - Paleofuturistic Python</title>
         <link href="../css/bootstrap.min.css" rel="stylesheet">
         <link href="../css/fontawesome.min.css" rel="stylesheet">
         <link href="../css/brands.min.css" rel="stylesheet">
@@ -55,7 +55,7 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="../how-to/update-existing-project-with-cruft.html" class="dropdown-item">Update an existing project with cruft</a>
+    <a href="../how-to/update-existing-project-with-copier.html" class="dropdown-item">Update an existing project with copier</a>
 </li>
                                     
 <li>
@@ -84,40 +84,40 @@
                                 </ul>
                             </li>
                             <li class="nav-item dropdown">
-                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Reference</a>
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Reference</a>
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="../reference/cookiecutter-variables.html" class="dropdown-item">Cruft questionnaire variables</a>
+    <a href="copier-questions.html" class="dropdown-item">Copier questions</a>
 </li>
                                     
 <li>
-    <a href="../reference/post-gen-hook.html" class="dropdown-item">The post-generation hook</a>
+    <a href="generation-internals.html" class="dropdown-item active" aria-current="page">Generation internals</a>
 </li>
                                     
 <li>
-    <a href="../reference/generated-project-tree.html" class="dropdown-item">Generated project tree</a>
+    <a href="generated-project-tree.html" class="dropdown-item">Generated project tree</a>
 </li>
                                     
 <li>
-    <a href="../reference/license-options.html" class="dropdown-item">License options</a>
+    <a href="license-options.html" class="dropdown-item">License options</a>
 </li>
                                 </ul>
                             </li>
                             <li class="nav-item dropdown">
-                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Explanation</a>
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Explanation</a>
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="why-a-cookiecutter.html" class="dropdown-item active" aria-current="page">Why a cruft template</a>
+    <a href="../explanation/why-copier.html" class="dropdown-item">Why copier</a>
 </li>
                                     
 <li>
-    <a href="design-principles.html" class="dropdown-item">Design principles</a>
+    <a href="../explanation/design-principles.html" class="dropdown-item">Design principles</a>
 </li>
                                     
 <li>
-    <a href="history-and-lineage.html" class="dropdown-item">History and lineage</a>
+    <a href="../explanation/history-and-lineage.html" class="dropdown-item">History and lineage</a>
 </li>
                                 </ul>
                             </li>
@@ -130,17 +130,17 @@
                             </a>
                         </li>
                             <li class="nav-item">
-                                <a rel="prev" href="../reference/license-options.html" class="nav-link">
+                                <a rel="prev" href="copier-questions.html" class="nav-link">
                                     <i class="fa fa-arrow-left"></i> Previous
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a rel="next" href="design-principles.html" class="nav-link">
+                                <a rel="next" href="generated-project-tree.html" class="nav-link">
                                     Next <i class="fa fa-arrow-right"></i>
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a href="https://github.com/schubergphilis/paleofuturistic_python/blob/main/docs/explanation/why-a-cookiecutter.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
+                                <a href="https://github.com/schubergphilis/paleofuturistic_python/blob/main/docs/reference/generation-internals.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
                             </li>
                             <li class="nav-item dropdown">
                               <button id="theme-menu" aria-expanded="false" data-bs-toggle="dropdown" data-bs-display="static" aria-label="Toggle theme" class="nav-link dropdown-toggle">
@@ -190,17 +190,21 @@
     <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
         <ul class="nav flex-column">
             
-            <li class="nav-item" data-bs-level="1"><a href="#why-a-cruft-template" class="nav-link">Why a cruft template?</a>
+            <li class="nav-item" data-bs-level="1"><a href="#generation-internals" class="nav-link">Generation internals</a>
               <ul class="nav flex-column">
-            <li class="nav-item" data-bs-level="2"><a href="#what-cookiecutter-cruft-buys-us" class="nav-link">What cookiecutter + cruft buys us</a>
-              <ul class="nav flex-column">
-              </ul>
-            </li>
-            <li class="nav-item" data-bs-level="2"><a href="#what-we-considered" class="nav-link">What we considered</a>
+            <li class="nav-item" data-bs-level="2"><a href="#1-python-version-validation-copier-validator" class="nav-link">1. Python-version validation (copier validator)</a>
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-bs-level="2"><a href="#what-we-gave-up" class="nav-link">What we gave up</a>
+            <li class="nav-item" data-bs-level="2"><a href="#2-conditional-filenames-copier-rendering" class="nav-link">2. Conditional filenames (copier rendering)</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#3-copy-time-script-tasks_renderpy" class="nav-link">3. Copy-time script (tasks_render.py)</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#rendering-model" class="nav-link">Rendering model</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -215,42 +219,82 @@
 </div></div>
                     <div class="col-md-9" role="main">
 
-<h1 id="why-a-cruft-template">Why a cruft template?</h1>
-<p>The template is delivered as a <a href="https://cookiecutter.readthedocs.io/">cookiecutter</a> project consumed via <a href="https://cruft.github.io/cruft/">cruft</a>. This page explains why, and what we considered as alternatives.</p>
-<h2 id="what-cookiecutter-cruft-buys-us">What cookiecutter + cruft buys us</h2>
-<p><strong>Cookiecutter</strong> is the underlying engine: a Jinja-templated directory tree with a <code>cookiecutter.json</code> questionnaire and optional Python pre/post hooks. It's mature, ubiquitous in the Python ecosystem, and trivial to inspect — the template is just files.</p>
-<p><strong>Cruft</strong> is a thin wrapper that adds one critical capability: <strong>updates</strong>. A project generated via cookiecutter alone is a one-way fork — the template can improve, but the generated project has no way to pull those improvements in. Cruft tracks the template revision in <code>.cruft.json</code> and lets you replay later versions of the template over the existing project with a reviewable diff.</p>
-<p>The combination gives us:</p>
+<h1 id="generation-internals">Generation internals</h1>
+<p>What happens between answering the questionnaire and receiving a finished project directory. The work that was previously a single <code>hooks/post_gen_project.py</code> script is now split three ways across copier's own mechanisms and a dedicated copy-time script.</p>
+<h2 id="1-python-version-validation-copier-validator">1. Python-version validation (copier validator)</h2>
+<p>A <code>validator</code> expression on the <code>max_python_version</code> question in <code>copier.yml</code> runs before any files are written. It checks:</p>
 <ul>
-<li>A familiar prompt-driven generation flow.</li>
-<li>A standard format other templates already follow (low surprise).</li>
-<li>A working update path — generated projects don't ossify.</li>
-<li>Per-file opt-out via <code>.cruft.json</code>'s <code>skip</code> list — divergence is supported.</li>
+<li><code>max_python_version &gt;= min_python_version</code></li>
+<li>Both values share the same major version (no cross-major ranges).</li>
+<li>Both values appear in the choices list (currently <code>["3.13", "3.14"]</code>).</li>
 </ul>
-<h2 id="what-we-considered">What we considered</h2>
-<h3 id="copier">Copier</h3>
-<p><a href="https://copier.readthedocs.io/">Copier</a> covers the same ground (Jinja templates + updates) with a more sophisticated update algorithm and richer questionnaire types. It's a credible choice. We picked cruft because:</p>
+<p>Any failure aborts generation immediately with a clear error message. Because this runs before file output begins, there is no partial directory left on disk to clean up.</p>
+<h2 id="2-conditional-filenames-copier-rendering">2. Conditional filenames (copier rendering)</h2>
+<p>Copier skips any file or directory whose rendered name is an empty string. The template uses this mechanism to omit unchosen scaffolding at generation time — no post-generation deletion step needed.</p>
+<p>Examples currently used:</p>
+<table>
+<thead>
+<tr>
+<th>Template path</th>
+<th>Condition</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>template/{% if git_hosting_service == 'github' %}.github{% endif %}/</code></td>
+<td><code>git_hosting_service != 'github'</code> → name is <code>''</code></td>
+<td>Entire <code>.github/</code> tree absent for GitLab projects</td>
+</tr>
+<tr>
+<td><code>template/{% if git_hosting_service == 'gitlab' %}.gitlab-ci.yml{% endif %}</code></td>
+<td><code>git_hosting_service != 'gitlab'</code> → name is <code>''</code></td>
+<td><code>.gitlab-ci.yml</code> absent for GitHub projects</td>
+</tr>
+<tr>
+<td><code>template/_CI/tasks/{% if git_hosting_service == 'github' %}github.py{% endif %}.jinja</code></td>
+<td><code>git_hosting_service != 'github'</code> → name is <code>''</code></td>
+<td><code>_CI/tasks/github.py</code> absent for GitLab projects</td>
+</tr>
+<tr>
+<td><code>template/_CI/tasks/{% if git_hosting_service == 'gitlab' %}gitlab.py{% endif %}.jinja</code></td>
+<td><code>git_hosting_service != 'gitlab'</code> → name is <code>''</code></td>
+<td><code>_CI/tasks/gitlab.py</code> absent for GitHub projects</td>
+</tr>
+<tr>
+<td><code>template/{% if git_hosting_service == 'github' %}.github{% endif %}/workflows/{% if integrate_pages %}pages.yaml{% endif %}</code></td>
+<td>either condition false → name is <code>''</code></td>
+<td>Pages workflow absent when not GitHub or pages disabled</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>from .{{ git_hosting_service }} import …</code> line in <code>_CI/tasks/container.py</code> and <code>_CI/tasks/release.py</code> is Jinja-substituted at copy time to name the surviving module — exactly one code path remains, no runtime branching.</p>
+<h2 id="3-copy-time-script-tasks_renderpy">3. Copy-time script (<code>tasks_render.py</code>)</h2>
+<p><code>tasks_render.py</code> at the repo root is run via copier's <code>_tasks</code> configuration. It is <strong>gated to the copy operation only</strong> — <code>copier update</code> does not re-run it, so re-generation side-effects (like stamping the copyright year) don't fire on every update.</p>
+<p>It performs three actions, in order:</p>
+<h3 id="install-the-chosen-license">Install the chosen license</h3>
 <ul>
-<li>Cookiecutter has wider Python-community familiarity; new contributors don't need to learn a second tool.</li>
-<li>Cruft's <code>.cruft.json</code> is simpler than Copier's <code>.copier-answers.yml</code> for our needs.</li>
-<li>The template's existing audience already used cruft when this lineage was established.</li>
+<li>Copies <code>licenses/&lt;chosen-license&gt;</code> to <code>LICENSE</code> in the project root (skipped if answer was <code>None</code>).</li>
+<li>Reads <code>licenses/&lt;chosen-license&gt;.header</code>, interpolates <code>{year}</code> (current calendar year) and <code>{author}</code> (<code>full_name</code> answer), and stores the result for the next step.</li>
+<li>Deletes the <code>licenses/</code> directory entirely.</li>
 </ul>
-<p>Copier remains the alternative we'd reach for if cookiecutter or cruft stalled.</p>
-<h3 id="hatch-new-poetry-new-uv-init">Hatch new / poetry new / uv init</h3>
-<p>These commands generate single-file or minimal-layout starts. They don't carry CI scaffolding, vendored tooling, or update paths. Useful for prototypes, not for the "enterprise-ready package" use case the template targets.</p>
-<h3 id="a-custom-shell-or-python-script">A custom shell or Python script</h3>
-<p>Some teams write a <code>bootstrap-project.sh</code> instead of using a templating tool. It works, but reinvents update tracking, questionnaire handling, and Jinja rendering — and locks the format into a bespoke shape no one else recognises.</p>
-<h3 id="a-scaffolding-monorepo-one-repo-with-all-templates">A scaffolding monorepo (one repo with all templates)</h3>
-<p>Considered for variants (CLI vs. library vs. service). Rejected because cruft handles variation through questionnaire branches (e.g. <code>git_hosting_service</code>, <code>integrate_dependency_track</code>) without forking the template. Variants live as code paths inside one repo.</p>
-<h2 id="what-we-gave-up">What we gave up</h2>
+<h3 id="prepend-headers-to-source-py-files">Prepend headers to source <code>.py</code> files</h3>
+<p>For each <code>.py</code> under <code>src/</code> and <code>tests/</code>:</p>
 <ul>
-<li><strong>Per-file ownership tracking.</strong> Cruft's diff is at the file level; it doesn't know "this section of pyproject.toml is template-owned, that section is yours." We compensate by structuring template-owned files so user edits land in predictable, non-overlapping locations (e.g. dependency groups vs. project metadata).</li>
-<li><strong>Multi-template composition.</strong> Cruft tracks one template at a time. You can't <code>cruft update</code> from both this template and a separate <code>docs-only</code> template in the same project.</li>
+<li>Prepends the SPDX license header (year + author interpolated).</li>
+<li>Adds <code>"""&lt;project_slug&gt;."""</code> as the module docstring.</li>
+<li>Adds the dunder-metadata block (<code>__author__</code>, <code>__copyright__</code>, etc.).</li>
+<li>For the main module file (<code>src/&lt;slug&gt;/&lt;slug&gt;.py</code>) only: also prepends <code>import logging</code> and the <code>LOGGER</code> setup.</li>
 </ul>
+<p>For <code>license=None</code>, source files receive the <code>__license__ = 'None'</code> dunder but no copyright header line.</p>
+<h3 id="make-workflowcmd-executable">Make <code>workflow.cmd</code> executable</h3>
+<p>Sets the executable bit on <code>workflow.cmd</code>. On Windows the <code>.cmd</code> extension is sufficient; on Unix this step is what lets <code>./workflow.cmd …</code> work.</p>
+<h2 id="rendering-model">Rendering model</h2>
+<p>Copier renders only files whose names end in <code>.jinja</code> (the suffix is stripped from the output filename). Every other file — vendored <code>_CI/lib/**</code>, binaries, static configs — is copied verbatim. Jinja delimiters are unchanged (<code>{{ }}</code> / <code>{% %}</code>); <code>{% raw %}</code> blocks protect GitHub Actions <code>${{ }}</code> expressions in rendered workflow files.</p>
 <h2 id="see-also">See also</h2>
 <ul>
-<li><a href="design-principles.html">Design principles</a> — what the template chose to opinionate.</li>
-<li><a href="../how-to/update-existing-project-with-cruft.html">Update an existing project with cruft</a> — the practical update flow.</li>
+<li><a href="copier-questions.html">Copier questions</a> — what feeds into generation.</li>
+<li><a href="../how-to/choose-a-git-host.html">Choose a git host</a> — the prompt that drives the conditional filename logic.</li>
 </ul></div>
             </div>
         </div>

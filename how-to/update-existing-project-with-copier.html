@@ -8,7 +8,7 @@
         <meta name="author" content="Carlo 'carlovo' van Overbeek">
         
         <link rel="shortcut icon" href="../img/favicon.ico">
-        <title>Update an existing project with cruft - Paleofuturistic Python</title>
+        <title>Update an existing project with copier - Paleofuturistic Python</title>
         <link href="../css/bootstrap.min.css" rel="stylesheet">
         <link href="../css/fontawesome.min.css" rel="stylesheet">
         <link href="../css/brands.min.css" rel="stylesheet">
@@ -55,7 +55,7 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="update-existing-project-with-cruft.html" class="dropdown-item active" aria-current="page">Update an existing project with cruft</a>
+    <a href="update-existing-project-with-copier.html" class="dropdown-item active" aria-current="page">Update an existing project with copier</a>
 </li>
                                     
 <li>
@@ -88,11 +88,11 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="../reference/cookiecutter-variables.html" class="dropdown-item">Cruft questionnaire variables</a>
+    <a href="../reference/copier-questions.html" class="dropdown-item">Copier questions</a>
 </li>
                                     
 <li>
-    <a href="../reference/post-gen-hook.html" class="dropdown-item">The post-generation hook</a>
+    <a href="../reference/generation-internals.html" class="dropdown-item">Generation internals</a>
 </li>
                                     
 <li>
@@ -109,7 +109,7 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="../explanation/why-a-cookiecutter.html" class="dropdown-item">Why a cruft template</a>
+    <a href="../explanation/why-copier.html" class="dropdown-item">Why copier</a>
 </li>
                                     
 <li>
@@ -140,7 +140,7 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a href="https://github.com/schubergphilis/paleofuturistic_python/blob/main/docs/how-to/update-existing-project-with-cruft.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
+                                <a href="https://github.com/schubergphilis/paleofuturistic_python/blob/main/docs/how-to/update-existing-project-with-copier.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
                             </li>
                             <li class="nav-item dropdown">
                               <button id="theme-menu" aria-expanded="false" data-bs-toggle="dropdown" data-bs-display="static" aria-label="Toggle theme" class="nav-link dropdown-toggle">
@@ -190,13 +190,13 @@
     <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
         <ul class="nav flex-column">
             
-            <li class="nav-item" data-bs-level="1"><a href="#update-an-existing-project-with-cruft" class="nav-link">Update an existing project with cruft</a>
+            <li class="nav-item" data-bs-level="1"><a href="#update-an-existing-project-with-copier" class="nav-link">Update an existing project with copier</a>
               <ul class="nav flex-column">
             <li class="nav-item" data-bs-level="2"><a href="#the-basic-update" class="nav-link">The basic update</a>
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-bs-level="2"><a href="#when-prompts-have-changed" class="nav-link">When prompts have changed</a>
+            <li class="nav-item" data-bs-level="2"><a href="#when-questions-have-changed" class="nav-link">When questions have changed</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -204,7 +204,7 @@
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-bs-level="2"><a href="#skip-a-file-entirely" class="nav-link">Skip a file entirely</a>
+            <li class="nav-item" data-bs-level="2"><a href="#pinning-a-specific-template-version" class="nav-link">Pinning a specific template version</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -223,41 +223,36 @@
 </div></div>
                     <div class="col-md-9" role="main">
 
-<h1 id="update-an-existing-project-with-cruft">Update an existing project with cruft</h1>
-<p>When this template ships a new version, you can pull the changes into an existing generated project without re-generating from scratch. <a href="https://cruft.github.io/cruft/">cruft</a> tracks the template revision your project was generated from and produces a reviewable diff against the latest.</p>
+<h1 id="update-an-existing-project-with-copier">Update an existing project with copier</h1>
+<p>When this template ships a new version, you can pull the changes into an existing generated project without re-generating from scratch. <a href="https://copier.readthedocs.io/">copier</a> tracks the template revision your project was generated from in <code>.copier-answers.yml</code> and produces a reviewable diff against the latest.</p>
 <h2 id="the-basic-update">The basic update</h2>
 <p>From the root of your generated project:</p>
-<pre><code class="language-bash">uvx cruft update --checkout latest
+<pre><code class="language-bash">uvx copier update --trust
 </code></pre>
-<p>cruft:</p>
+<p><code>--trust</code> is required because the template runs a post-copy task (<code>tasks_render.py</code>). Copier will not execute tasks from a template it doesn't trust.</p>
+<p>copier:</p>
 <ol>
-<li>Re-renders the template at the new revision using your stored answers (<code>.cruft.json</code>).</li>
-<li>Diffs the result against your current files.</li>
-<li>Applies the diff, prompting for conflicts.</li>
+<li>Re-renders the template at the new revision using your stored answers (<code>.copier-answers.yml</code>).</li>
+<li>Performs a three-way merge against your current files.</li>
+<li>Applies the result, flagging conflicts for manual resolution.</li>
 </ol>
 <p>Review the changes with <code>git diff</code>, run the dev cycle (<code>./workflow.cmd format &amp;&amp; lint &amp;&amp; test &amp;&amp; build</code>), and commit when happy.</p>
-<h2 id="when-prompts-have-changed">When prompts have changed</h2>
-<p>If the new template version added or renamed a questionnaire variable (for example <code>git_hosting_service</code> was added recently), cruft will prompt for any missing answers. Provide them — your <code>.cruft.json</code> is updated in place.</p>
+<h2 id="when-questions-have-changed">When questions have changed</h2>
+<p>If the new template version added or renamed a question (for example <code>git_hosting_service</code> was added in an earlier revision), copier will prompt for any missing answers during the update. Provide them — your <code>.copier-answers.yml</code> is updated in place.</p>
 <h2 id="resolving-conflicts">Resolving conflicts</h2>
-<p>cruft uses <code>.rej</code> files for hunks it couldn't apply cleanly. The most common cause is that you customised a file the template also changed. Resolve them by hand, delete the <code>.rej</code>, and re-run <code>./workflow.cmd test</code>.</p>
-<h2 id="skip-a-file-entirely">Skip a file entirely</h2>
-<p>If you've deliberately diverged from the template for a specific file, list it in <code>.cruft.json</code> under <code>skip</code>:</p>
-<pre><code class="language-json">{
-  &quot;skip&quot;: [
-    &quot;src/your_package/your_package.py&quot;,
-    &quot;README.md&quot;
-  ]
-}
+<p>Copier uses a three-way merge; conflicts appear as standard conflict markers in the affected files. The most common cause is that you customised a file the template also changed. Resolve them by hand and re-run <code>./workflow.cmd test</code>.</p>
+<h2 id="pinning-a-specific-template-version">Pinning a specific template version</h2>
+<p>By default <code>copier update</code> fetches the latest tagged release. To pin to a specific ref:</p>
+<pre><code class="language-bash">uvx copier update --trust --vcs-ref &lt;tag-or-commit&gt;
 </code></pre>
-<p>Cruft will leave those files alone on every future update.</p>
 <h2 id="when-the-upstream-is-unreachable">When the upstream is unreachable</h2>
-<p><code>cruft update</code> needs network access to fetch the template. In an air-gapped environment, clone the template repo separately and point <code>cruft</code> at the local path:</p>
-<pre><code class="language-bash">uvx cruft update --checkout latest --variables-to-update-file /tmp/answers.json /path/to/local/clone
+<p><code>copier update</code> needs network access to fetch the template. In an air-gapped environment, clone the template repo separately and point copier at the local path:</p>
+<pre><code class="language-bash">uvx copier update --trust /path/to/local/clone
 </code></pre>
 <h2 id="see-also">See also</h2>
 <ul>
-<li><a href="https://cruft.github.io/cruft/#updating-a-project">Cruft documentation</a> — the full update workflow.</li>
-<li><a href="../reference/cookiecutter-variables.html">Cruft questionnaire variables</a> — what each answer in <code>.cruft.json</code> controls.</li>
+<li><a href="https://copier.readthedocs.io/en/stable/updating/">Copier documentation</a> — the full update workflow.</li>
+<li><a href="../reference/copier-questions.html">Copier questions</a> — what each answer in <code>.copier-answers.yml</code> controls.</li>
 </ul></div>
             </div>
         </div>
