@@ -1,6 +1,6 @@
 # Choose a git host (GitHub or GitLab)
 
-The cruft questionnaire asks `git_hosting_service` with two choices: `github` (default) or `gitlab`. The answer determines which CI scaffolding and host-specific code is generated; the other host's artifacts are removed automatically.
+The copier questionnaire asks `git_hosting_service` with two choices: `github` (default) or `gitlab`. The answer determines which CI scaffolding and host-specific code is generated; the other host's files are omitted automatically via conditional filenames.
 
 ## What changes per choice
 
@@ -18,19 +18,19 @@ Everything else — the package layout, `pyproject.toml`, dependency groups, `./
 
 ## Switching later
 
-If you guessed wrong at generation time, the change is reversible via cruft:
+If you guessed wrong at generation time, the change is reversible via copier:
 
 ```bash
-uvx cruft update
+uvx copier update --trust
 ```
 
-When prompted, change `git_hosting_service` to the other value. Cruft diffs against your project and proposes a patch that:
+When prompted, change `git_hosting_service` to the other value. Copier performs a three-way merge against your project that:
 
 - Adds the new host's CI config + submodule.
 - Removes the old host's CI config + submodule.
 - Flips the import line in `_CI/tasks/container.py` (and `release.py`) from `.github` to `.gitlab` (or back).
 
-Review the patch carefully — if you've already customised the host-specific CI files, your changes will need manual reconciliation.
+Review the result carefully — if you've already customised the host-specific CI files, your changes will need manual reconciliation.
 
 ## GitLab limitations to be aware of
 
@@ -43,5 +43,5 @@ PRs implementing the GitLab MR auto-creation are welcome — the seam exists exa
 
 ## See also
 
-- [Cruft questionnaire variables](../reference/cookiecutter-variables.md#git_hosting_service) — the prompt's full reference entry.
-- [Update an existing project with cruft](update-existing-project-with-cruft.md) — the mechanics of `cruft update`.
+- [Copier questions](../reference/copier-questions.md#git_hosting_service) — the prompt's full reference entry.
+- [Update an existing project with copier](update-existing-project-with-copier.md) — the mechanics of `copier update`.

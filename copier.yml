@@ -1,0 +1,89 @@
+_subdirectory: template
+_answers_file: .copier-answers.yml
+# _templates_suffix defaults to ".jinja"; we rely on that. Files lacking the suffix
+# are copied verbatim (vendored _CI/lib/**, binaries, static configs), which removes
+# the need for a copy-without-render exclusion list.
+
+_tasks:
+  - command: >-
+      {{ _copier_python }} {{ _copier_conf.src_path }}/tasks_render.py
+      --license "{{ license }}"
+      --author "{{ full_name }}"
+      --email "{{ email }}"
+      --project-slug "{{ project_slug }}"
+    when: "{{ _copier_operation == 'copy' }}"
+
+project_name:
+  type: str
+  default: "Paleofuturistic Python Project"
+  help: A descriptive name for the project
+
+project_slug:
+  type: str
+  default: "{{ project_name|lower|replace(' ', '_')|replace('-', '_') }}"
+  help: The slugified name for the project
+
+project_description:
+  type: str
+  default: "Development flow as Paleofuturistic Python"
+  help: Provide a short, clear description
+
+full_name:
+  type: str
+  default: "John Doe"
+  help: What is the owner's full name
+
+email:
+  type: str
+  default: "me@here.now"
+  help: What is the owner's email
+
+min_python_version:
+  type: str
+  choices:
+    - "3.13"
+    - "3.14"
+  default: "3.13"
+  help: Minimum supported Python version
+
+max_python_version:
+  type: str
+  choices:
+    - "3.13"
+    - "3.14"
+  default: "3.14"
+  help: Maximum supported Python version (must be >= the minimum and share its major)
+  validator: >-
+    {% if max_python_version.split('.')[0] != min_python_version.split('.')[0] %}
+    min and max Python versions must share a major version
+    {% elif (max_python_version.split('.')[1] | int) < (min_python_version.split('.')[1] | int) %}
+    max_python_version must be greater than or equal to min_python_version
+    {% endif %}
+
+license:
+  type: str
+  choices:
+    - "Apache-2.0"
+    - "MIT"
+    - "BSD-3-Clause"
+    - "None"
+  default: "Apache-2.0"
+  help: Which license to apply (None ships no LICENSE file)
+
+git_hosting_service:
+  type: str
+  choices:
+    - "github"
+    - "gitlab"
+  default: "github"
+  help: Which git hosting service the project targets
+
+integrate_dependency_track:
+  type: bool
+  default: true
+  help: Integrate OWASP Dependency Track for SBOM upload?
+
+integrate_pages:
+  type: bool
+  default: true
+  help: Integrate GitHub Pages for documentation deployment?

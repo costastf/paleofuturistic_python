@@ -4,7 +4,7 @@ This tutorial walks you from an empty directory to a working Python project gene
 
 ## Prerequisites
 
-You need [`uv`](https://docs.astral.sh/uv/) installed. uv is the only tool you need; it can run cruft for you and will manage every other tool the generated project uses.
+You need [`uv`](https://docs.astral.sh/uv/) installed. uv is the only tool you need; it can run copier for you and will manage every other tool the generated project uses.
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -15,16 +15,16 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 Pick an empty directory and run:
 
 ```bash
-uvx cruft create --checkout latest https://github.com/schubergphilis/paleofuturistic_python
+uvx copier copy --trust https://github.com/schubergphilis/paleofuturistic_python <destination-dir>
 ```
 
-You will be asked a series of questions. Press Enter to accept the defaults for every one — they're documented in [Cruft questionnaire variables](../reference/cookiecutter-variables.md). Three answers worth thinking about:
+`--trust` is required because the template runs a post-copy task. You will be asked a series of questions. Press Enter to accept the defaults for every one — they're documented in [Copier questions](../reference/copier-questions.md). Three answers worth thinking about:
 
 - `project_name` — pick something memorable; everything else is derived.
 - `git_hosting_service` — `github` (default) or `gitlab`; see [Choose a git host](../how-to/choose-a-git-host.md).
 - `license` — defaults to Apache-2.0; pick whatever fits.
 
-When the command finishes you'll have a new directory named after your project, with a complete Python project inside.
+When the command finishes you'll have a complete Python project inside `<destination-dir>`.
 
 ## Step 2 — Bootstrap it
 

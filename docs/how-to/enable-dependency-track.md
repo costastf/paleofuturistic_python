@@ -8,7 +8,7 @@ You already run a Dependency Track instance (self-hosted or managed) and want th
 
 ## At generation time
 
-When `cruft create` asks:
+When `copier copy` asks:
 
 ```
 integrate_dependency_track [y]:
@@ -38,4 +38,4 @@ After running `secure.sbom-upload`, the task prints the upload response. In the 
 
 ## I picked the wrong answer at generation time
 
-Re-run `uvx cruft update` and change `integrate_dependency_track` when prompted. See [Update an existing project with cruft](update-existing-project-with-cruft.md) for the full flow.
+Re-run `uvx copier update --trust` and change `integrate_dependency_track` when prompted. See [Update an existing project with copier](update-existing-project-with-copier.md) for the full flow.

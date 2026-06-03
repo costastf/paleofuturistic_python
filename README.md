@@ -8,7 +8,7 @@
   <img src="./docs/paleofuturistic_python.png?raw=true" alt="Paleofuturistic Environment"/>
 </p>
 
-This is a [cruft](https://cruft.github.io/cruft/) template that generates a fully-scaffolded, enterprise-ready Python package — uv-managed, ruff-formatted, pytest-tested, properdocs-documented, with vendored CI tooling, SBOM generation, and optional Dependency Track integration.
+This is a [copier](https://copier.readthedocs.io/) template that generates a fully-scaffolded, enterprise-ready Python package — uv-managed, ruff-formatted, pytest-tested, properdocs-documented, with vendored CI tooling, SBOM generation, and optional Dependency Track integration.
 
 The rest of this README is split into two parts: **[Using the template](#using-the-template)** (generating a project and working in it) and **[Developing the template](#developing-the-template)** (working on this repo itself). For longer-form material, the full [documentation](docs/index.md) is organized around the [Diátaxis](https://diataxis.fr/) framework. The project's history and its lineage as a detached fork of [Straight to the Money 💰](https://github.com/Carlovo/straight_to_the_money) live in [History and lineage](docs/explanation/history-and-lineage.md).
 
@@ -20,7 +20,7 @@ Give their docs a look-over before continuing if you want to get a better unders
 
 ### Setup
 
-- Initialize with `uvx cruft create --checkout latest https://github.com/schubergphilis/paleofuturistic_python` and fill in your project details.
+- Initialize with `uvx copier copy --trust https://github.com/schubergphilis/paleofuturistic_python <destination-dir>` and fill in your project details.
 - On first run of any workflow command, the bootstrap step will prompt to install pre-commit hooks.
 
 ### Workflow (in the generated project)
@@ -55,7 +55,7 @@ For longer-form walkthroughs, start with the tutorials in the [docs](docs/index.
 
 ### Template knobs
 
-The cruft questionnaire exposes these switches; defaults in **bold**.
+The copier questions expose these switches; defaults in **bold**.
 
 | Knob | Choices | Effect |
 |------|---------|--------|
@@ -65,7 +65,7 @@ The cruft questionnaire exposes these switches; defaults in **bold**.
 | `integrate_pages` | **`true`** \| `false` | Opts the Pages workflow and `document.deploy-github` task in (effective only when `git_hosting_service = github`). |
 | `min_python_version` / `max_python_version` | dotted version | Bounds the supported Python range for the generated package metadata. |
 
-See [Cruft questionnaire variables](docs/reference/cookiecutter-variables.md) for the full reference and [Choose a git host](docs/how-to/choose-a-git-host.md) / [Enable Dependency Track](docs/how-to/enable-dependency-track.md) / [Publish docs to GitHub Pages](docs/how-to/publish-docs-to-github-pages.md) for the per-knob how-tos.
+See [Copier questions](docs/reference/copier-questions.md) for the full reference and [Choose a git host](docs/how-to/choose-a-git-host.md) / [Enable Dependency Track](docs/how-to/enable-dependency-track.md) / [Publish docs to GitHub Pages](docs/how-to/publish-docs-to-github-pages.md) for the per-knob how-tos.
 
 ## Developing the template
 

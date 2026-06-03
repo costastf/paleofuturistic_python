@@ -1,12 +1,13 @@
 """Centralized constants for CI task definitions."""
 
-import json
 import shutil
+
+import yaml
 
 from _CI import PROJECT_ROOT_DIRECTORY
 
 PROJECT_SLUG = 'paleofuturistic_python_project'
-IGNORE_PATTERNS = shutil.ignore_patterns('.git', '.venv', '__pycache__', '*.pyc', '.cruft.json')
+IGNORE_PATTERNS = shutil.ignore_patterns('.git', '.venv', '__pycache__', '*.pyc', '.copier-answers.yml')
 QA_STEPS = ('format', 'lint', 'test.tox', 'build', 'document')
 TEMPLATE_SECURITY_OVERRIDE_ENV = 'TEMPLATE_SECURITY_OVERRIDE'
 SECURITY_OVERRIDES_FILE = PROJECT_ROOT_DIRECTORY / '.security-overrides'
@@ -35,10 +36,9 @@ def version_sort_key(version: str) -> tuple[int, ...]:
 
 
 def base_context() -> dict:
-    """Widest supported cookiecutter context, derived from cookiecutter.json."""
-    cookiecutter_path = PROJECT_ROOT_DIRECTORY / 'cookiecutter.json'
-    cookiecutter_data = json.loads(cookiecutter_path.read_text(encoding='utf-8'))
-    known_versions = sorted(cookiecutter_data['_known_python_versions'], key=version_sort_key)
+    """Widest supported context, derived from copier.yml's python-version choices."""
+    copier_data = yaml.safe_load((PROJECT_ROOT_DIRECTORY / 'copier.yml').read_text(encoding='utf-8'))
+    known_versions = sorted(copier_data['min_python_version']['choices'], key=version_sort_key)
     return {'min_python_version': known_versions[0], 'max_python_version': known_versions[-1]}
 
 

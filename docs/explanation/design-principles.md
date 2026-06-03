@@ -65,5 +65,5 @@ The four sections — Tutorials, How-to, Reference, Explanation — exist becaus
 
 ## See also
 
-- [Why a cruft template?](why-a-cookiecutter.md) — why we picked the template format we did.
+- [Why copier?](why-copier.md) — why we picked the template format we did.
 - [History and lineage](history-and-lineage.md) — what this template was forked from and why.

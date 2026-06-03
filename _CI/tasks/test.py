@@ -49,38 +49,30 @@ def run_command(cmd, cwd=None, env=None, log_file=None):
 
 
 def prepare_snapshot(tmpdir):
-    """Copy the template into a temp git repo so cruft sees all current files."""
+    """Copy the template into a plain temp dir so copier sees all current files.
+
+    Copier copies happily from a non-git local directory, so no git snapshot is needed.
+    """
     template_repo = tmpdir / 'template'
     shutil.copytree(str(PROJECT_ROOT_DIRECTORY), str(template_repo), ignore=IGNORE_PATTERNS)
-    snapshot_steps = (
-        'git init -b main',
-        'git add -A',
-        # Force-add the vendored CI lib (gitignored by the broad `lib/` pattern).
-        'git add -f "{{ cookiecutter.project_slug }}/_CI/lib/"',
-        ('git -c commit.gpgsign=false -c user.name=ci -c user.email=ci@localhost '
-         'commit -m "temp: template snapshot for testing" '
-         '--author "ci <ci@localhost>"'),
-    )
-    for step in snapshot_steps:
-        if not run_command(step, cwd=template_repo):
-            raise SystemExit(f'Snapshot step failed: {step}')
     return template_repo
 
 
 def run_combo(template_repo, output_root, extra_context, label, log_file=None):
     """Generate the template with extra_context and run QA_STEPS. Return True on success."""
-    output_dir = output_root / label / 'generated'
-    output_dir.mkdir(parents=True, exist_ok=True)
+    combo_root = output_root / label
+    combo_root.mkdir(parents=True, exist_ok=True)
 
-    cruft_parts = ['uvx cruft create --no-input']
-    if extra_context:
-        cruft_parts.append(f"--extra-context '{json.dumps(extra_context)}'")
-    cruft_parts.append(f'--output-dir {output_dir}')
-    cruft_parts.append(str(template_repo))
-    if not run_command(' '.join(cruft_parts), log_file=log_file):
+    data_file = combo_root / 'data.json'
+    data_file.write_text(json.dumps(extra_context or {}), encoding='utf-8')
+    project_dir = combo_root / 'generated' / PROJECT_SLUG
+    copier_cmd = (
+        f'uvx copier copy --defaults --trust '
+        f'--data-file {data_file} {template_repo} {project_dir}'
+    )
+    if not run_command(copier_cmd, log_file=log_file):
         return False
 
-    project_dir = output_dir / PROJECT_SLUG
     make_file_executable(project_dir / 'workflow.cmd')
 
     init_steps = (
