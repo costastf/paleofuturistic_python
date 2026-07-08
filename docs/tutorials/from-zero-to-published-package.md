@@ -2,22 +2,30 @@
 
 This tutorial picks up where [Generate your first project](generate-your-first-project.md) left you: a freshly-generated project with a green dev cycle. We'll make a real change, cut a release, and publish to PyPI.
 
-You'll need a [PyPI account](https://pypi.org/account/register/) before the publish step.
+You'll need a [PyPI account](https://pypi.org/account/register/) and a public [git remote](https://docs.github.com/en/get-started/git-basics/about-remote-repositories#creating-remote-repositories) before the publish step.
 
 ## Step 1 — Write a feature
 
 Open `src/<your_project_slug>/<your_project_slug>.py` and replace the body of `hello()` with something more interesting:
 
 ```python
-def hello(someone: str = 'you') -> str:
-    """Greet `someone` and announce the project."""
-    return f'Hello {someone} from <your_project_slug>!'
+def hello(greeting: str = 'Hello', someone: str = 'you') -> str:
+    """Greet someone.
+
+    Args:
+        greeting: The greeting message.
+        someone: The name of the person to greet.
+
+    Returns:
+        A greeting message.
+    """
+    return f'{greeting} {someone} from test_260708!'
 ```
 
-Update the smoke test under `tests/` to match. Run the dev cycle once to confirm it's still green:
+Update the smoke test under `tests/` to match if needed. Run the dev cycle once to confirm it's still green:
 
 ```bash
-./workflow.cmd format && ./workflow.cmd lint && ./workflow.cmd test
+./workflow.cmd develop.pre-commit
 ```
 
 ## Step 2 — Commit using Conventional Commits
@@ -26,7 +34,7 @@ Commit messages must follow [Conventional Commits](https://www.conventionalcommi
 
 ```bash
 git add -A
-git commit -m "feat: greet someone by name"
+git commit -m "feat: greet someone with a specific word"
 ```
 
 The prefix does **not** drive the version bump — you'll choose that explicitly in the next step. What it does drive is the **release notes**: commitizen reads the commit history when generating the changelog and groups your commits by prefix (`feat:` under "Features", `fix:` under "Bug Fixes", etc.).

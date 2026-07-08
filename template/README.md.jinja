@@ -50,7 +50,7 @@ Prerequisite: [uv](https://docs.astral.sh/uv/)
 
 ### Workflow
 
-All commands are invoked via `./workflow.cmd <namespace>.<task>`:
+All workflow commands are invoked via `./workflow.cmd <namespace>.<task>`:
 
 | Command | Description |
 |---------|-------------|
@@ -67,11 +67,14 @@ All commands are invoked via `./workflow.cmd <namespace>.<task>`:
 
 ### Development cycle
 
-- Add dependencies: `uv add some_lib_you_need`
+- Download dependencies (if you need any): `uv add some_lib_you_need`
 - Develop (optional, tinker: `uvx --with-editable . ptpython`)
-- Format: `./workflow.cmd format`
-- Lint: `./workflow.cmd lint`
-- Test: `./workflow.cmd test`
+- QA (perform `./workflow.cmd develop.pre-commit` to run them all at once):
+    - Format: `./workflow.cmd format`
+    - Lint: `./workflow.cmd lint`
+    - Analyze: `./workflow.cmd quality`
+    - Audit: `./workflow.cmd secure`
+    - Test: `./workflow.cmd test`
 - Build: `./workflow.cmd build`
 - Review docs: `./workflow.cmd document`
 - Make a pull request.
