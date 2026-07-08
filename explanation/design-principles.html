@@ -81,6 +81,14 @@
 <li>
     <a href="../how-to/publish-docs-to-github-pages.html" class="dropdown-item">Publish docs to GitHub Pages</a>
 </li>
+                                    
+<li>
+    <a href="../how-to/add-a-workflow-task.html" class="dropdown-item">Add a workflow task</a>
+</li>
+                                    
+<li>
+    <a href="../how-to/customize-the-bootstrap.html" class="dropdown-item">Customize the bootstrap</a>
+</li>
                                 </ul>
                             </li>
                             <li class="nav-item dropdown">
@@ -118,6 +126,22 @@
                                     
 <li>
     <a href="history-and-lineage.html" class="dropdown-item">History and lineage</a>
+</li>
+                                    
+<li>
+    <a href="how-uv-is-used.html" class="dropdown-item">How uv is used</a>
+</li>
+                                    
+<li>
+    <a href="the-ci-tasks-architecture.html" class="dropdown-item">The CI tasks architecture</a>
+</li>
+                                    
+<li>
+    <a href="sbom-and-security-model.html" class="dropdown-item">SBOM and security model</a>
+</li>
+                                    
+<li>
+    <a href="testing-strategy.html" class="dropdown-item">Testing strategy</a>
 </li>
                                 </ul>
                             </li>
@@ -200,6 +224,10 @@
               <ul class="nav flex-column">
               </ul>
             </li>
+            <li class="nav-item" data-bs-level="2"><a href="#why-groups-not-extras" class="nav-link">Why groups, not extras</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
             <li class="nav-item" data-bs-level="2"><a href="#ruff-replaces-black-isort-flake8-and-most-of-pylint" class="nav-link">Ruff replaces Black + isort + flake8 (and most of pylint)</a>
               <ul class="nav flex-column">
               </ul>
@@ -257,6 +285,13 @@
 <h2 id="uv-is-the-only-tool-you-install">uv is the only tool you install</h2>
 <p>Earlier revisions asked users to install Python, then <code>pipx</code>, then <code>tox</code>, then <code>pre-commit</code>, then <code>commitizen</code>. Today, every one of those is a uv-managed dependency group inside the generated project. You install uv; uv installs the rest.</p>
 <p><strong>Tradeoff:</strong> the template is now bound to uv's lifecycle. If uv goes away or changes lock format incompatibly, the template needs work. We accept that risk because uv has compressed the toolchain to a single binary that's fast enough to run on every commit.</p>
+<h2 id="why-groups-not-extras">Why groups, not extras</h2>
+<p>The template used to put dev tools under <code>[project.optional-dependencies]</code> (PEP 621 extras). Those work but they conflate two ideas:</p>
+<ul>
+<li><strong>Optional features</strong> of the library (e.g. an <code>excel</code> extra for openpyxl support).</li>
+<li><strong>Internal dev concerns</strong> (lint, test, docs).</li>
+</ul>
+<p><a href="https://peps.python.org/pep-0735/">PEP 735 dependency groups</a> — uv's first-class support for them — are explicitly for the second category. They never ship in the wheel and are never user-installable via <code>pip install &lt;pkg&gt;[&lt;extra&gt;]</code>. Cleaner contract, less to explain to users.</p>
 <h2 id="ruff-replaces-black-isort-flake8-and-most-of-pylint">Ruff replaces Black + isort + flake8 (and most of pylint)</h2>
 <p>One tool, one config block, one cache. Ruff doesn't yet cover everything pylint does — so pylint stays, but only for the checks Ruff doesn't have. We expect pylint's role to shrink as Ruff grows.</p>
 <h2 id="ty-replaces-mypy">ty replaces mypy</h2>
@@ -280,7 +315,7 @@
 <ul>
 <li><strong>No framework choice.</strong> This is a library scaffold. It does not know about FastAPI, Django, or Click. Add what you need.</li>
 <li><strong>No monorepo support.</strong> One package, one repo. If you want a monorepo, use a different template.</li>
-<li><strong>No Python below 3.11.</strong> Async, exception groups, and tomllib are load-bearing.</li>
+<li><strong>No Python below the project's chosen <code>min_python_version</code> (as low as 3.10).</strong> <code>tomllib</code> is imported via a 3.10-compatible fallback, so it's no longer a reason to require a higher floor.</li>
 <li><strong>No GitHub-only or GitLab-only assumptions in the dev cycle.</strong> Host-specific code lives in <code>_CI/tasks/&lt;host&gt;.py</code>; the rest of the workflow runs identically.</li>
 </ul>
 <h2 id="see-also">See also</h2>
