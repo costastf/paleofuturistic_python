@@ -88,6 +88,6 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 
 ## Shared helpers (not tasks)
 
-Functions in `_CI/tasks/shared.py` (notably the `@logged` decorator, the `IndentingStream` plumbing, `execute`, `run_steps`) are used *by* tasks and not directly callable. See [The _CI tasks architecture](../explanation/the-ci-tasks-architecture.md).
+Functions in `_CI/tasks/shared.py` (notably the `@logged` decorator, the `IndentingStream` plumbing, `execute`, `run_steps`) are used *by* tasks and not directly callable. See [The _CI tasks architecture](https://schubergphilis.github.io/paleofuturistic_python/explanation/the-ci-tasks-architecture.html) in the template's docs.
 
 Host-specific helpers live in `_CI/tasks/{{ git_hosting_service }}.py` and are imported by `container.py` and `release.py` via a Jinja-substituted import.

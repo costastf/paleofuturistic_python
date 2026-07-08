@@ -1,6 +1,6 @@
 # Add a workflow task
 
-The `./workflow.cmd <namespace>.<task>` interface is backed by Invoke. Adding a new task is one of:
+The `./workflow.cmd <namespace>.<task>` interface is backed by Invoke. Adding a new task to a generated project is one of:
 
 - A new task inside an existing module (e.g. another step in `lint`).
 - A new module entirely (e.g. `_CI/tasks/benchmarks.py`).
@@ -89,5 +89,5 @@ def my_thing(context):
 
 ## See also
 
-- [Reference: Invoke task catalog](../reference/invoke-tasks.md) — what already exists.
+- [Generated project tree](../reference/generated-project-tree.md) — the full `_CI/tasks/` file listing.
 - [The _CI tasks architecture](../explanation/the-ci-tasks-architecture.md) — design rationale for the `@logged` + `IndentingStream` plumbing.

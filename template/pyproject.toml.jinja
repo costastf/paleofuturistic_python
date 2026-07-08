@@ -33,6 +33,10 @@ dev = [
 ]
 develop = [
     "pre-commit",
+    # TOML parsing for the _CI tooling on Python < 3.11, which has no stdlib
+    # `tomllib`. Imported via a version-guarded fallback in _CI/info.py,
+    # _CI/tasks/sbom.py and _CI/tasks/test.py.
+    "tomli ; python_version < '3.11'",
 ]
 document = [
     "properdocs==1.6.7",
@@ -53,9 +57,6 @@ quality = [
 security = [
     "cyclonedx-bom",
     "cyclonedx-python-lib[json-validation]",
-{%- if integrate_dependency_track %}
-    "owasp-dependency-track-cli",
-{%- endif %}
     "pip-audit",
 ]
 test = [
@@ -288,8 +289,8 @@ directory = "reports/coverage"
 # when you're seeding the template into an existing codebase whose coverage is already
 # meaningful, or when you genuinely want a 100% floor from the first run.
 #
-# Either way, once engaged, the bar only goes up. See
-# docs/explanation/testing-strategy.md for the full design rationale.
+# Either way, once engaged, the bar only goes up. See docs/explanation/the-scaffold.md
+# (and the template's testing-strategy page) for the full design rationale.
 mode = "auto-detect"
 
 

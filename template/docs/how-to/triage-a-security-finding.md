@@ -53,4 +53,4 @@ If `integrate_dependency_track` was enabled at generation time, every successful
 ## See also
 
 - [Upload an SBOM to Dependency Track](upload-an-sbom-to-dependency-track.md) — wiring the upload step.
-- [SBOM and security model](../explanation/sbom-and-security-model.md) — why pip-audit + SBOM + DT layer together.
+- [SBOM and security model](https://schubergphilis.github.io/paleofuturistic_python/explanation/sbom-and-security-model.html) — why pip-audit + SBOM + DT layer together (in the template's docs).

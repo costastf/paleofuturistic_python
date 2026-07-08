@@ -16,7 +16,7 @@ The single source of truth for project metadata and tool configuration. Sections
 | `[tool.pylint]` | Template | Strict-by-default. Per-message disables go in code. |
 | `[tool.pytest.ini_options]` | Template (framework), you (markers) | Don't disable coverage; add markers as needed. |
 | `[tool.coverage]` | Template | `fail_under` is ratcheted upward automatically once the ratchet engages. Don't lower it. |
-| `[tool.test-ratchet]` | Template (knob), you (mode) | `mode = "auto-detect"` (default) keeps the coverage ratchet dormant while the scaffolded `test_sanity` is in place; `mode = "strict"` engages it on run #1. See [Testing strategy](../explanation/testing-strategy.md#dormant-during-scaffold). |
+| `[tool.test-ratchet]` | Template (knob), you (mode) | `mode = "auto-detect"` (default) keeps the coverage ratchet dormant while the scaffolded `test_sanity` is in place; `mode = "strict"` engages it on run #1. See [Testing strategy](https://schubergphilis.github.io/paleofuturistic_python/explanation/testing-strategy.html#dormant-during-scaffold) in the template's docs. |
 | `[tool.tox]` | Template | Generated from `min_python_version` / `max_python_version`. |
 | `[tool.commitizen]` | Template | Conventional-Commits parser config used by `cz changelog` and the lint hook. The template does **not** use commitizen's autorelease — the bump is chosen explicitly via `./workflow.cmd release -i <type>`. |
 | `[tool.docker-versions]` | Template | Image tags consumed by `Dockerfile.deps` and CI. |

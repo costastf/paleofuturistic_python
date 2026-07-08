@@ -5,13 +5,18 @@ from __future__ import annotations
 import re
 import subprocess
 import sys
-import tomllib
 import warnings
 from collections.abc import Iterable, Iterator
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+from email.message import Message
 from importlib.metadata import PackageNotFoundError, distribution, metadata, version
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, cast
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 from cyclonedx.model import ExternalReference, ExternalReferenceType, HashAlgorithm, HashType, Property, XsUri
 from cyclonedx.model.bom import Bom
@@ -210,7 +215,10 @@ def lookup_pypi_license(name: str) -> LicenseRepository | None:
         4. A ``License :: …`` Trove classifier mapped via ``CLASSIFIER_TO_SPDX``.
     """
     try:
-        meta = metadata(name)
+        # metadata() returns an email.message.Message at runtime; typeshed only
+        # exposes `.get` on the PackageMetadata protocol from 3.12, so cast to the
+        # concrete type to keep the type checker happy on the 3.10/3.11 floor.
+        meta = cast(Message, metadata(name))
     except PackageNotFoundError:
         return None
     expression = meta.get('License-Expression')
@@ -463,7 +471,7 @@ def build_bom():
     build_env = build_build_environment_component()
 
     bom = Bom()
-    bom.metadata.timestamp = datetime.now(UTC)
+    bom.metadata.timestamp = datetime.now(timezone.utc)
     bom.metadata.component = root
     bom.metadata.tools = build_metadata_tools()
     bom.metadata.lifecycles = build_lifecycles()

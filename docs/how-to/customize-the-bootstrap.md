@@ -46,7 +46,7 @@ BootstrapStep(
 
 ## Idempotency
 
-Every action must be idempotent. The bootstrap sentinel (`_CI/.bootstrapped`) skips the *whole* bootstrap on re-runs, but `--force` re-runs everything — and your action will fire again. Use marker files or `if not installed: install` checks.
+Every action must be idempotent. The bootstrap sentinel (`_CI/.bootstrapped`) skips the *whole* bootstrap on re-runs, but `--force` re-runs everything — and the action will fire again. Use marker files or `if not installed: install` checks.
 
 ## Skip in CI
 
@@ -61,4 +61,4 @@ Most one-time interactive setup (pre-commit hooks, certificate install, IDE conf
 ## See also
 
 - [The _CI tasks architecture](../explanation/the-ci-tasks-architecture.md) — why bootstrap is wired as a pre-task on every other task.
-- [Reference: Invoke task catalog](../reference/invoke-tasks.md) — the full task list.
+- [Generated project tree](../reference/generated-project-tree.md) — the full `_CI/tasks/` file listing.

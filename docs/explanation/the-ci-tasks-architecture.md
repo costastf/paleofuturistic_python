@@ -82,16 +82,16 @@ This makes CI runs informative — you see every issue per run instead of fixing
 
 ## Host-specific code isolation
 
-The host (`github` or `gitlab`) chosen at generation time determines which of `_CI/tasks/github.py` or `_CI/tasks/gitlab.py` is shipped. Both expose the same contract:
+Whichever host was chosen at generation time — GitHub or GitLab — determines whether `_CI/tasks/github.py` or `_CI/tasks/gitlab.py` ships in the generated project. Both expose the same contract:
 
 - `registry_settings() -> RegistrySettings`
 - `publish_deps_image(context, tag) -> str`
 - `create_release_pr(context, branch, version) -> str`
 - `pr_create_url(context, branch) -> str`
 
-`container.py` and `release.py` import these via a Jinja-substituted relative import — `from .{{ git_hosting_service }} import …` — which renders at generation time to a concrete `from .github import …` or `from .gitlab import …`. Because the unchosen module is omitted at generation time via a copier conditional filename (the file's rendered name is empty when not selected), there's exactly one code path and no runtime branching.
+`container.py` and `release.py` import whichever module survived generation via a relative import that's rendered concrete at copy time: a GitHub project ends up with `from .github import …`, a GitLab project with `from .gitlab import …`. Because the unchosen module is omitted entirely at generation time via a copier conditional filename (its rendered name is empty when not selected), the generated project has exactly one code path and no runtime branching between hosts.
 
 ## See also
 
 - [Add a workflow task](../how-to/add-a-workflow-task.md) — practical recipe for extending the framework.
-- [Reference: Invoke task catalog](../reference/invoke-tasks.md) — what's already there.
+- [Generated project tree](../reference/generated-project-tree.md) — the full `_CI/tasks/` file listing.

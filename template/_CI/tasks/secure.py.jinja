@@ -1,8 +1,18 @@
 """Security task definitions."""
 
+{% if integrate_dependency_track -%}
+import base64
+import json
+import os
+import urllib.error
+import urllib.request
+from datetime import date
+from typing import cast
+{%- else -%}
 import os
 from datetime import date
 from typing import cast
+{%- endif %}
 
 from invoke import Collection, Context, Task, task
 
@@ -139,9 +149,16 @@ def sbom_validate(context: Context) -> None:
 @task
 @logged('secure.sbom-upload')
 def sbom_upload(context: Context) -> None:
-    """Extract and upload SBOM to OWASP Dependency Track.
+    """Extract and upload the CycloneDX SBOM to OWASP Dependency Track.
 
-    Requires the OWASP_DTRACK_URL and OWASP_DTRACK_API_KEY environment variables to be set.
+    Uploads the SBOM to Dependency Track's ``/api/v1/bom`` REST endpoint over
+    the standard library — no external CLI required. ``autoCreate`` creates the
+    project on the server if it does not exist yet. Requires the
+    ``OWASP_DTRACK_URL`` and ``OWASP_DTRACK_API_KEY`` environment variables.
+
+    Raises:
+        SystemExit: if the required environment variables are unset, the project
+            version cannot be determined, or Dependency Track rejects the upload.
     """
     missing = [v for v in OWASP_DTRACK_SETTINGS if not os.environ.get(v)]
     if missing:
@@ -154,13 +171,34 @@ def sbom_upload(context: Context) -> None:
         print('Could not determine project version.')
         raise SystemExit(1)
     version = result.stdout.strip()
-    execute(
-        context,
-        f'uv run owasp-dtrack-cli test '
-        f'--project-name {PROJECT_NAME} '
-        f'--project-version {version} '
-        f'--auto-create {SBOM_FILE}',
+    payload = json.dumps(
+        {
+            'projectName': PROJECT_NAME,
+            'projectVersion': version,
+            'autoCreate': True,
+            'bom': base64.b64encode(SBOM_FILE.read_bytes()).decode(),
+        }
+    ).encode()
+    request = urllib.request.Request(  # noqa: S310
+        f'{os.environ["OWASP_DTRACK_URL"].rstrip("/")}/api/v1/bom',
+        data=payload,
+        method='PUT',
+        headers={'Content-Type': 'application/json', 'X-Api-Key': os.environ['OWASP_DTRACK_API_KEY']},
     )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
+            token = json.loads(response.read() or b'{}').get('token', '')
+    except urllib.error.HTTPError as exc:
+        print(f'Dependency Track rejected the upload: HTTP {exc.code} {exc.reason}')
+        print(exc.read().decode(errors='replace'))
+        raise SystemExit(1) from exc
+    except urllib.error.URLError as exc:
+        print(f'Could not reach Dependency Track at {os.environ["OWASP_DTRACK_URL"]}: {exc.reason}')
+        raise SystemExit(1) from exc
+    message = f'Uploaded SBOM for {PROJECT_NAME} {version} to Dependency Track.'
+    if token:
+        message += f' Processing token: {token}'
+    print(message)
 {%- endif %}
 
 

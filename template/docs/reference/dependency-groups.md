@@ -32,15 +32,6 @@ uv add --group <group-name> <package>
 
 This updates both `pyproject.toml` and `uv.lock`. Commit both. See [How-to: add a dependency](../how-to/add-a-dependency.md) for the full flow.
 
-## Why groups, not extras
-
-The template used to put dev tools under `[project.optional-dependencies]` (PEP 621 extras). Those work but they conflate two ideas:
-
-- **Optional features** of the library (e.g. an `excel` extra for openpyxl support).
-- **Internal dev concerns** (lint, test, docs).
-
-Dependency groups are explicitly for the second category. They never ship in the wheel and are never user-installable via `pip install <pkg>[<extra>]`. Cleaner contract, less to explain to users.
-
 ## How CI picks them up
 
 The CI workflow installs only the group it needs for each job — `lint` job installs the `lint` group, `test` job installs `test`. This keeps job containers small and parallel-safe.

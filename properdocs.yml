@@ -26,6 +26,8 @@ nav:
     - Convert the library into a CLI: how-to/convert-library-to-cli.md
     - Choose the Python version range: how-to/choose-python-version-range.md
     - Publish docs to GitHub Pages: how-to/publish-docs-to-github-pages.md
+    - Add a workflow task: how-to/add-a-workflow-task.md
+    - Customize the bootstrap: how-to/customize-the-bootstrap.md
   - Reference:
     - Copier questions: reference/copier-questions.md
     - Generation internals: reference/generation-internals.md
@@ -35,5 +37,9 @@ nav:
     - Why copier: explanation/why-copier.md
     - Design principles: explanation/design-principles.md
     - History and lineage: explanation/history-and-lineage.md
+    - How uv is used: explanation/how-uv-is-used.md
+    - The CI tasks architecture: explanation/the-ci-tasks-architecture.md
+    - SBOM and security model: explanation/sbom-and-security-model.md
+    - Testing strategy: explanation/testing-strategy.md
 
 copyright: Copyright &copy; 2024 <a href="https://schubergphilis.com/">Schuberg Philis</a>

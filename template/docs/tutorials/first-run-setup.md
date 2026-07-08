@@ -53,8 +53,11 @@ Produces a wheel and an sdist under `dist/`. You can `uv pip install dist/<your-
 
 ## You're ready
 
-You now have the loop you'll run hundreds of times: format → lint → test → build. Three places to go next:
+You now have the loop you'll run hundreds of times: format → lint → test → build. Places to go next:
 
 - **Make a real change** — write a function, then [Make your first release](make-your-first-release.md).
 - **Add dependencies** — [Add a dependency](../how-to/add-a-dependency.md).
-- **Understand what just happened** — [The _CI tasks architecture](../explanation/the-ci-tasks-architecture.md) explains how `workflow.cmd` dispatches into Invoke tasks.
+- **Document it** — [Document your project](../how-to/document-your-project.md) shows how to write docs for
+  your software and get an API reference from your docstrings.
+- **Understand what just happened** — [The scaffold](../explanation/the-scaffold.md) tours the tooling
+  (uv, the `_CI` task runner, testing, security) and links the template's docs for the full detail.
