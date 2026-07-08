@@ -13,7 +13,7 @@ else:
 
 from invoke import Collection, Context, Task, task
 
-from .shared import execute, logged, open_command, run, run_steps
+from .shared import execute, logged, open_command, run_steps
 
 COVERAGE_REPORT = Path('reports/coverage.json')
 PYPROJECT = Path('pyproject.toml')
@@ -127,9 +127,15 @@ def update_coverage_badge() -> None:
 
 @task
 @logged('test.pytest')
-@run('uv run pytest')
-def pytest(context: Context) -> None:
-    """Run pytest."""
+def pytest(context: Context, args: str = '') -> None:
+    """Run pytest on the active interpreter.
+
+    Args:
+        context: Invoke context.
+        args: Extra arguments forwarded verbatim to pytest, e.g.
+            ``--args="-k test_hello"`` or ``--args="-m 'not slow'"``.
+    """
+    execute(context, f'uv run pytest {args}'.rstrip())
 
 
 @task
@@ -153,9 +159,15 @@ def view(context: Context) -> None:
 
 @task
 @logged('test.tox')
-@run('uv run tox run-parallel')
-def tox(context: Context) -> None:
-    """Run the pytest matrix across every supported Python version via tox."""
+def tox(context: Context, env: str = '') -> None:
+    """Run the pytest matrix across supported Python versions via tox.
+
+    Args:
+        context: Invoke context.
+        env: A single tox environment to run, e.g. ``--env=py313``. When
+            omitted, the full matrix runs in parallel.
+    """
+    execute(context, f'uv run tox run -e {env}' if env else 'uv run tox run-parallel')
 
 
 @task

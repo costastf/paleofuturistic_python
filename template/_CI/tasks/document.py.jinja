@@ -64,6 +64,13 @@ def build(context: Context) -> None:
 
 
 @task
+@logged('document.serve')
+@run('uv run properdocs serve')
+def serve(context: Context) -> None:
+    """Serve the documentation locally with live reload. Ctrl-C to stop."""
+
+
+@task
 @logged('document.view')
 def view(context: Context) -> None:
     """Open the built documentation in the default browser. Skipped in CI."""
@@ -95,6 +102,7 @@ def document(context: Context) -> None:
 namespace = Collection('document')
 namespace.add_task(cast(Task, document), default=True, name='all')
 namespace.add_task(cast(Task, build))
+namespace.add_task(cast(Task, serve))
 namespace.add_task(cast(Task, view))
 {%- if integrate_pages and git_hosting_service == 'github' %}
 namespace.add_task(cast(Task, deploy_github), name='deploy-github')

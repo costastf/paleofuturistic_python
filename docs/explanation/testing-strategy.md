@@ -11,7 +11,7 @@ Why pytest and not unittest:
 - **Markers**. `@pytest.mark.slow`, `@pytest.mark.integration`, sliced via `-m`.
 - **Plugin ecosystem**. xdist (parallel), coverage, hypothesis, asyncio, ...
 
-The template ships pytest + a small set of plugins (coverage, xdist, html, env, metadata). Discover with `pytest --markers` after bootstrap.
+The template ships pytest + a small set of plugins (coverage, xdist, html, env, metadata). Discover the registered markers with `./workflow.cmd test.pytest --args="--markers"` after bootstrap.
 
 ## Layer 2 — Coverage
 
@@ -39,7 +39,7 @@ Coverage regressions still can't slip in silently — they just can't slip in *o
 
 tox + tox-uv runs the test suite against every Python version in the project's range. Configured in `pyproject.toml`'s `[tool.tox]`, generated from `min_python_version` / `max_python_version` at template-render time.
 
-`./workflow.cmd test` runs only one Python version (whichever the active uv venv resolved to). The full matrix runs in CI per shipped workflow, or locally via `uv run tox`. See [Choose the Python version range](../how-to/choose-python-version-range.md) for how the matrix is derived.
+`./workflow.cmd test` runs only one Python version (whichever the active uv venv resolved to). The full matrix runs in CI per shipped workflow, or locally via `./workflow.cmd test.tox` (add `--env=py310` to run a single version). See [Choose the Python version range](../how-to/choose-python-version-range.md) for how the matrix is derived.
 
 ## What we don't ship
 

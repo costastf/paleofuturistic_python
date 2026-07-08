@@ -26,6 +26,11 @@ reproducible environments on your laptop and in CI.
 so a fresh clone works immediately with no extra install step. See the
 [Invoke task catalog](../reference/invoke-tasks.md) for the full list.
 
+Prefer `./workflow.cmd` for everything it covers — it's what CI runs, so your local results match. Running
+a tool directly with `uv run <tool>` is an *advanced* escape hatch: fine for a one-off it doesn't cover,
+but you then own the environment and flags. If you reach for one regularly, model it as a task instead
+(a two-minute change — see *Add a workflow task* below).
+
 → How it's built: [The _CI tasks architecture]({{ template_docs }}/explanation/the-ci-tasks-architecture.html)
 · [Add a workflow task]({{ template_docs }}/how-to/add-a-workflow-task.html)
 · [Customize the bootstrap]({{ template_docs }}/how-to/customize-the-bootstrap.html)
