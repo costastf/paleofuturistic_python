@@ -29,7 +29,7 @@ jobs:
         env:
           PYTHONPATH: .
         run: |
-          matrix=$(uvx --from invoke --with coloredlogs invoke --search-root _CI test.list-combos --as-json)
+          matrix=$(uvx --from invoke --with coloredlogs --with pyyaml invoke --search-root _CI test.list-combos --as-json)
           echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
 
   invariants:
@@ -42,7 +42,7 @@ jobs:
           version: ${{ needs.plan.outputs.uv-version }}
       - env:
           PYTHONPATH: .
-        run: uvx --from invoke --with coloredlogs invoke --search-root _CI test.invariants
+        run: uvx --from invoke --with coloredlogs --with pyyaml invoke --search-root _CI test.invariants
 
   run:
     needs: plan
@@ -60,7 +60,7 @@ jobs:
       - env:
           PYTHONPATH: .
         run: |
-          uvx --from invoke --with coloredlogs invoke --search-root _CI test.combo \
+          uvx --from invoke --with coloredlogs --with pyyaml invoke --search-root _CI test.combo \
             --git-hosting-service ${{ matrix.combo.git_hosting_service }} \
             ${{ matrix.combo.integrate_dependency_track && '' || '--no-integrate-dependency-track' }} \
             ${{ matrix.combo.integrate_pages && '' || '--no-integrate-pages' }}
