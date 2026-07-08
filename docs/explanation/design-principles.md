@@ -18,6 +18,15 @@ Earlier revisions asked users to install Python, then `pipx`, then `tox`, then `
 
 **Tradeoff:** the template is now bound to uv's lifecycle. If uv goes away or changes lock format incompatibly, the template needs work. We accept that risk because uv has compressed the toolchain to a single binary that's fast enough to run on every commit.
 
+## Why groups, not extras
+
+The template used to put dev tools under `[project.optional-dependencies]` (PEP 621 extras). Those work but they conflate two ideas:
+
+- **Optional features** of the library (e.g. an `excel` extra for openpyxl support).
+- **Internal dev concerns** (lint, test, docs).
+
+[PEP 735 dependency groups](https://peps.python.org/pep-0735/) — uv's first-class support for them — are explicitly for the second category. They never ship in the wheel and are never user-installable via `pip install <pkg>[<extra>]`. Cleaner contract, less to explain to users.
+
 ## Ruff replaces Black + isort + flake8 (and most of pylint)
 
 One tool, one config block, one cache. Ruff doesn't yet cover everything pylint does — so pylint stays, but only for the checks Ruff doesn't have. We expect pylint's role to shrink as Ruff grows.
@@ -60,7 +69,7 @@ The four sections — Tutorials, How-to, Reference, Explanation — exist becaus
 
 - **No framework choice.** This is a library scaffold. It does not know about FastAPI, Django, or Click. Add what you need.
 - **No monorepo support.** One package, one repo. If you want a monorepo, use a different template.
-- **No Python below 3.11.** Async, exception groups, and tomllib are load-bearing.
+- **No Python below the project's chosen `min_python_version` (as low as 3.10).** `tomllib` is imported via a 3.10-compatible fallback, so it's no longer a reason to require a higher floor.
 - **No GitHub-only or GitLab-only assumptions in the dev cycle.** Host-specific code lives in `_CI/tasks/<host>.py`; the rest of the workflow runs identically.
 
 ## See also

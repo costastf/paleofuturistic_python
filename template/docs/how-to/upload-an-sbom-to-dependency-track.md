@@ -6,9 +6,11 @@ If `integrate_dependency_track` was enabled at generation time, the release pipe
 
 | Variable | Example | Source |
 | --- | --- | --- |
-| `OWASP_DT_URL` | `https://dt.example.com` | Your Dependency Track instance |
-| `OWASP_DT_API_KEY` | `odt_…` | DT → Administration → Access Management → Teams |
-| `OWASP_DT_PROJECT_UUID` | UUID | DT → Projects → your project |
+| `OWASP_DTRACK_URL` | `https://dt.example.com` | Your Dependency Track instance |
+| `OWASP_DTRACK_API_KEY` | `odt_…` | DT → Administration → Access Management → Teams |
+
+No project UUID is needed — the upload identifies the project by name and version and auto-creates it in
+Dependency Track on first upload.
 
 In CI, set these as secrets:
 
@@ -29,8 +31,8 @@ What it does:
 
 1. Composes a fresh CycloneDX 1.7 SBOM via `./workflow.cmd secure.sbom-extract --write` (runtime deps + vendored CI tooling + chosen-host pipeline components).
 2. Writes it to `src/<project_slug>/sbom.cdx.json` — the same file `uv build` later ships inside the wheel.
-3. POSTs that file to `<OWASP_DT_URL>/api/v1/bom` with the API key and project UUID.
-4. Prints the response.
+3. PUTs that SBOM to `<OWASP_DTRACK_URL>/api/v1/bom` with the `X-Api-Key` header, tagged with the project name and version and `autoCreate` enabled. This is a plain HTTPS request from the Python standard library — no CLI or extra dependency is installed.
+4. Prints the Dependency Track processing token on success, or the server's error on failure.
 
 ## Verify
 
@@ -52,5 +54,5 @@ The Dependency Track integration is an optional automation, not a prerequisite f
 
 ## See also
 
-- [SBOM and security model](../explanation/sbom-and-security-model.md) — what an SBOM is for and why we ship one by default.
+- [The scaffold](../explanation/the-scaffold.md) — the security model overview, with a link to the template's in-depth SBOM and security page.
 - [Triage a security finding](triage-a-security-finding.md) — what to do when DT (or pip-audit) finds something.

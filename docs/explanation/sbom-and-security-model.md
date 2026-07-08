@@ -4,12 +4,12 @@ The template's security pipeline has three layers: known-vulnerability scanning,
 
 ## The threat model
 
-The template assumes:
+The template assumes a generated project:
 
-- You publish a Python package consumed by people you mostly don't know.
-- Your dependency graph is large and changes frequently.
-- Some of your dependencies will, eventually, ship a vulnerability.
-- Your downstream consumers will eventually ask "is your software affected by CVE-X?" — and they'll ask faster than you can audit by hand.
+- Publishes a Python package consumed by people its maintainers mostly don't know.
+- Has a dependency graph that's large and changes frequently.
+- Will, eventually, have one of its dependencies ship a vulnerability.
+- Will eventually get asked by a downstream consumer "is your software affected by CVE-X?" — faster than anyone could audit by hand.
 
 The pipeline answers those questions before the questions are asked.
 
@@ -17,19 +17,19 @@ The pipeline answers those questions before the questions are asked.
 
 `./workflow.cmd secure.audit` runs [pip-audit](https://github.com/pypa/pip-audit) against `uv.lock`, comparing every pinned package against the [PyPI advisory database](https://github.com/pypa/advisory-database).
 
-What it catches: a vulnerability with a known CVE/PYSEC ID affecting a version in your lockfile.
+What it catches: a vulnerability with a known CVE/PYSEC ID affecting a version in the lockfile.
 
 What it doesn't catch:
 
 - Zero-days (no advisory exists yet).
-- Vulnerabilities in your *own* code.
+- Vulnerabilities in the project's *own* code.
 - Misuse of a safe dependency.
 
-Runs on every CI pipeline. See [Triage a security finding](../how-to/triage-a-security-finding.md) for the response workflow.
+Runs on every CI pipeline.
 
 ## Layer 2 — CycloneDX SBOM
 
-`./workflow.cmd secure.sbom-extract --write` generates a [CycloneDX](https://cyclonedx.org/) 1.7 bill of materials and writes it to `src/<project_slug>/sbom.cdx.json`. Because that path is inside the package data tree, `uv build` automatically ships the SBOM **inside the wheel** — a downstream consumer unpacks the wheel and finds `<project_slug>/sbom.cdx.json` alongside the Python modules.
+`./workflow.cmd secure.sbom-extract --write` generates a [CycloneDX](https://cyclonedx.org/) 1.7 bill of materials and writes it to `src/<your_package>/sbom.cdx.json`. Because that path is inside the package data tree, `uv build` automatically ships the SBOM **inside the wheel** — a downstream consumer unpacks the wheel and finds `<your_package>/sbom.cdx.json` alongside the Python modules.
 
 ### What's in it
 
@@ -38,7 +38,7 @@ Runs on every CI pipeline. See [Triage a security finding](../how-to/triage-a-se
 - A `lifecycles` entry of `phase: build` — this SBOM was produced during the build, not as a post-shipment inventory.
 - A `tools.components` list naming what produced the SBOM (cyclonedx-python-lib, uv, the project's own generator), each with a version pin.
 - `supplier` + `authors` derived from `pyproject.toml`'s `[project.authors]`.
-- A `properties` entry recording the chosen `git_hosting_service` for downstream tools that want template-aware context.
+- A `properties` entry recording the chosen `git_hosting_service` answer for downstream tools that want template-aware context.
 
 **Components** are organised by **scope** so a consumer can distinguish what ships from what doesn't:
 
@@ -73,26 +73,26 @@ Each PyPI component (runtime, dev, vendored) carries:
 
 ### What this enables
 
-- A downstream consumer can extract the SBOM from the wheel with `unzip -p <wheel> <project_slug>/sbom.cdx.json` or `importlib.resources` — no separate artefact to track.
-- A security responder can answer "are we affected by X?" against your project in seconds, not hours.
+- A downstream consumer can extract the SBOM from the wheel with `unzip -p <wheel> <your_package>/sbom.cdx.json` or `importlib.resources` — no separate artefact to track.
+- A security responder can answer "are we affected by X?" against a project built from this template in seconds, not hours.
 - Compliance frameworks (SLSA, NIST SSDF, EU CRA) that mandate SBOMs are satisfied — the SBOM travels with the artefact instead of needing to be re-correlated post-release.
 
-The SBOM exists whether you have a Dependency Track server or not. It's part of every release.
+The SBOM exists whether a project has a Dependency Track server or not. It's part of every release.
 
 ## Layer 3 — Dependency Track (optional)
 
-If `integrate_dependency_track` was enabled at generation time, `./workflow.cmd secure.sbom-upload` POSTs the SBOM to an OWASP Dependency Track instance.
+If `integrate_dependency_track` was enabled at generation time, `./workflow.cmd secure.sbom-upload` uploads the SBOM straight to Dependency Track's `/api/v1/bom` REST endpoint, using nothing beyond the Python standard library's `urllib` — no extra dependency is pulled in just to make that one HTTP call.
 
 What DT adds on top of layer 2:
 
-- Continuous re-evaluation. DT re-checks your project against new CVEs every time the advisory database updates — without you re-running anything.
+- Continuous re-evaluation. DT re-checks the project against new CVEs every time the advisory database updates — without anyone re-running anything.
 - Aggregation. One pane of glass across many projects in the same DT instance.
-- Policy. You can set DT to fail builds based on policies (e.g. "no critical CVEs older than 30 days").
+- Policy. DT can be set to fail builds based on policies (e.g. "no critical CVEs older than 30 days").
 - Notification. DT can email/Slack on new findings against any tracked project.
 
-Without DT, you only see what `pip-audit` reports at the moment you ran it. With DT, your release is *continuously* re-assessed against the world.
+Without DT, only what `pip-audit` reported at the moment it ran is visible. With DT, every release is *continuously* re-assessed against the world.
 
-See [Upload an SBOM to Dependency Track](../how-to/upload-an-sbom-to-dependency-track.md) for setup.
+See [Enable Dependency Track integration](../how-to/enable-dependency-track.md) for setup.
 
 ## What about overrides?
 
@@ -102,11 +102,10 @@ The expiry dates are load-bearing: a stale override is a security regression hid
 
 ## What's deliberately out of scope
 
-- **SAST**: Bandit / Semgrep / pyright security rules are not shipped. Add them as a `secure.*` task if you want them.
-- **Container scanning**: Trivy / Grype are not shipped. The deps image built by `container.publish` is a dev convenience, not a published artifact, so we don't gate releases on it.
-- **License compliance**: SBOM includes license metadata, but the template doesn't enforce license policies. DT does, if you turn it on there.
+- **SAST**: Bandit / Semgrep / pyright security rules are not shipped. Add them as a `secure.*` task if needed.
+- **Container scanning**: Trivy / Grype are not shipped. The deps image built by `container.publish` is a dev convenience, not a published artifact, so releases aren't gated on it.
+- **License compliance**: SBOM includes license metadata, but the template doesn't enforce license policies. DT does, if turned on.
 
 ## See also
 
-- [Triage a security finding](../how-to/triage-a-security-finding.md) — response playbook.
-- [Upload an SBOM to Dependency Track](../how-to/upload-an-sbom-to-dependency-track.md) — wiring up layer 3.
+- [Enable Dependency Track integration](../how-to/enable-dependency-track.md) — wiring up layer 3.

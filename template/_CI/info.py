@@ -8,8 +8,12 @@ from __future__ import annotations
 
 import re
 import sys
-import tomllib
 from pathlib import Path
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 ROOT = next(
     parent for parent in Path(__file__).resolve().parents if (parent / '_CI').is_dir()
