@@ -265,7 +265,7 @@
 <li><strong>Markers</strong>. <code>@pytest.mark.slow</code>, <code>@pytest.mark.integration</code>, sliced via <code>-m</code>.</li>
 <li><strong>Plugin ecosystem</strong>. xdist (parallel), coverage, hypothesis, asyncio, ...</li>
 </ul>
-<p>The template ships pytest + a small set of plugins (coverage, xdist, html, env, metadata). Discover with <code>pytest --markers</code> after bootstrap.</p>
+<p>The template ships pytest + a small set of plugins (coverage, xdist, html, env, metadata). Discover the registered markers with <code>./workflow.cmd test.pytest --args="--markers"</code> after bootstrap.</p>
 <h2 id="layer-2-coverage">Layer 2 — Coverage</h2>
 <p><code>pytest-cov</code> runs alongside pytest. The template tracks branch coverage (not just line coverage) and writes HTML + JSON reports under <code>reports/</code>.</p>
 <p><code>pyproject.toml</code>'s <code>[tool.coverage.report]</code> has <code>fail_under</code> set, and the test task <strong>ratchets</strong> this value upward after each green run: if the latest coverage run was 87% and <code>fail_under</code> was 80%, the task bumps <code>fail_under</code> to 87%. Once engaged, the bar only goes up — lowering <code>fail_under</code> is a deliberate, reviewable change that shows up in the diff.</p>
@@ -280,7 +280,7 @@
 <p>Coverage regressions still can't slip in silently — they just can't slip in <em>or out</em> during the scaffold phase.</p>
 <h2 id="layer-3-tox">Layer 3 — tox</h2>
 <p>tox + tox-uv runs the test suite against every Python version in the project's range. Configured in <code>pyproject.toml</code>'s <code>[tool.tox]</code>, generated from <code>min_python_version</code> / <code>max_python_version</code> at template-render time.</p>
-<p><code>./workflow.cmd test</code> runs only one Python version (whichever the active uv venv resolved to). The full matrix runs in CI per shipped workflow, or locally via <code>uv run tox</code>. See <a href="../how-to/choose-python-version-range.html">Choose the Python version range</a> for how the matrix is derived.</p>
+<p><code>./workflow.cmd test</code> runs only one Python version (whichever the active uv venv resolved to). The full matrix runs in CI per shipped workflow, or locally via <code>./workflow.cmd test.tox</code> (add <code>--env=py310</code> to run a single version). See <a href="../how-to/choose-python-version-range.html">Choose the Python version range</a> for how the matrix is derived.</p>
 <h2 id="what-we-dont-ship">What we don't ship</h2>
 <ul>
 <li><strong>A testing pyramid.</strong> The template doesn't pre-create unit/integration/e2e folders. The example smoke test lives directly in <code>tests/</code>. Structure tests how the project warrants.</li>
