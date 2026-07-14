@@ -32,24 +32,14 @@ The `from .{{ git_hosting_service }} import …` line in `_CI/tasks/container.py
 
 `tasks_render.py` at the repo root is run via copier's `_tasks` configuration. It is **gated to the copy operation only** — `copier update` does not re-run it, so re-generation side-effects (like stamping the copyright year) don't fire on every update.
 
-It performs three actions, in order:
+It performs two actions, in order:
 
 ### Install the chosen license
 
-- Copies `licenses/<chosen-license>` to `LICENSE` in the project root (skipped if answer was `None`).
-- Reads `licenses/<chosen-license>.header`, interpolates `{year}` (current calendar year) and `{author}` (`full_name` answer), and stores the result for the next step.
+- Copies `licenses/<chosen-license>` to `LICENSE` in the project root, interpolating `{year}` (current calendar year) and `{author}` (`full_name` answer). Skipped if the answer was `None`.
 - Deletes the `licenses/` directory entirely.
 
-### Prepend headers to source `.py` files
-
-For each `.py` under `src/` and `tests/`:
-
-- Prepends the SPDX license header (year + author interpolated).
-- Adds `"""<project_slug>."""` as the module docstring.
-- Adds the dunder-metadata block (`__author__`, `__copyright__`, etc.).
-- For the main module file (`src/<slug>/<slug>.py`) only: also prepends `import logging` and the `LOGGER` setup.
-
-For `license=None`, source files receive the `__license__ = 'None'` dunder but no copyright header line.
+No license header or dunder metadata is added to individual source files. The main module (`src/<slug>/<slug>.py`) ships its `import logging` + `LOGGER` setup directly from the template, so it needs no copy-time injection.
 
 ### Make `workflow.cmd` executable
 

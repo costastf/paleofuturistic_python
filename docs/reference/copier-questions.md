@@ -9,7 +9,7 @@ Every question in `copier.yml`, what it does, and how it's validated. The templa
 - **Type**: string
 - **Default**: `Paleofuturistic Python Project`
 
-Human-readable name. Appears in `pyproject.toml`'s `name` field, the README title, the docs `site_name`, and source-file headers.
+Human-readable name. Appears in `pyproject.toml`'s `name` field, the README title, and the docs `site_name`.
 
 ### `project_slug`
 
@@ -30,14 +30,14 @@ One-line summary. Lands in `pyproject.toml`'s `description` and the README lead 
 - **Type**: string
 - **Default**: `John Doe`
 
-Author name. Appears in `pyproject.toml` authors metadata, the chosen `LICENSE` file, and the `__author__` header of every source `.py`.
+Author name. Appears in `pyproject.toml` authors metadata and the chosen `LICENSE` file.
 
 ### `email`
 
 - **Type**: string
 - **Default**: `me@here.now`
 
-Author email. Same locations as `full_name`.
+Author email. Appears in `pyproject.toml` authors metadata.
 
 ### `min_python_version`
 
@@ -61,7 +61,7 @@ Upper bound. Must be `>= min_python_version` and share the same major version. A
 - **Default**: `Apache-2.0`
 - **Allowed**: `Apache-2.0`, `MIT`, `BSD-3-Clause`, `None`
 
-Selects which license file is installed to `LICENSE` and which header is prepended to source files by `tasks_render.py`. See [License options](license-options.md).
+Selects which license file is installed to `LICENSE` by `tasks_render.py`. See [License options](license-options.md).
 
 ### `git_hosting_service`
 
@@ -90,7 +90,7 @@ Controls whether documentation-publishing scaffolding (the Pages workflow file a
 Validation is split between copier's built-in mechanisms and the `tasks_render.py` copy-time script:
 
 1. **Python version range** — a `validator` on the `max_python_version` question in `copier.yml` checks that `max >= min`, that both values share the same major version, and that both appear in the choices list. Any failure aborts generation immediately before any files are written.
-2. **License installation** — `tasks_render.py` installs the chosen license file (substituting author/year tokens) and removes the `licenses/` staging directory. It runs only on `copier copy`, not on `copier update`.
+2. **License installation** — `tasks_render.py` installs the chosen `LICENSE` file (substituting author/year tokens) and removes the `licenses/` staging directory. It runs only on `copier copy`, not on `copier update`.
 
 ## See also
 

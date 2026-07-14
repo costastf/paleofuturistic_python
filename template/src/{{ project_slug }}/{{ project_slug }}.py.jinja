@@ -1,5 +1,10 @@
 """{{ project_slug }} module."""
 
+import logging
+
+LOGGER = logging.getLogger('{{ project_slug }}')
+LOGGER.addHandler(logging.NullHandler())
+
 
 def hello(someone: str = 'you') -> str:
     """Greet someone.

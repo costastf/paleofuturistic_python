@@ -9,8 +9,6 @@ _tasks:
       {{ _copier_python }} {{ _copier_conf.src_path }}/tasks_render.py
       --license "{{ license }}"
       --author "{{ full_name }}"
-      --email "{{ email }}"
-      --project-slug "{{ project_slug }}"
     when: "{{ _copier_operation == 'copy' }}"
 
 project_name:
