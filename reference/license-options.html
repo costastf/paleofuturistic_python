@@ -236,13 +236,12 @@
                     <div class="col-md-9" role="main">
 
 <h1 id="license-options">License options</h1>
-<p>The questionnaire's <code>license</code> answer picks one of four entries. Each maps to a file shipped to <code>LICENSE</code> and (for the three non-<code>None</code> choices) a <code>&lt;license&gt;.header</code> template that gets prepended to every source <code>.py</code>.</p>
+<p>The questionnaire's <code>license</code> answer picks one of four entries. Each maps to a file shipped to <code>LICENSE</code>. No license header or metadata is added to individual source files.</p>
 <table>
 <thead>
 <tr>
 <th>Choice</th>
 <th>SPDX ID</th>
-<th>Header in source files?</th>
 <th>Notes</th>
 </tr>
 </thead>
@@ -250,46 +249,37 @@
 <tr>
 <td><code>Apache-2.0</code></td>
 <td><code>Apache-2.0</code></td>
-<td>Yes</td>
 <td>Default. Permissive, includes explicit patent grant.</td>
 </tr>
 <tr>
 <td><code>MIT</code></td>
 <td><code>MIT</code></td>
-<td>Yes</td>
 <td>Permissive, minimal.</td>
 </tr>
 <tr>
 <td><code>BSD-3-Clause</code></td>
 <td><code>BSD-3-Clause</code></td>
-<td>Yes</td>
 <td>Permissive, includes attribution clause.</td>
 </tr>
 <tr>
 <td><code>None</code></td>
 <td>—</td>
-<td>No</td>
-<td>No <code>LICENSE</code> file, no header in source files. Useful for proprietary code or when you'll add a license later.</td>
+<td>No <code>LICENSE</code> file. Useful for proprietary code or when you'll add a license later.</td>
 </tr>
 </tbody>
 </table>
 <h2 id="what-tasks_renderpy-does-with-each">What <code>tasks_render.py</code> does with each</h2>
-<p>For non-<code>None</code> choices, <code>tasks_render.py</code> performs three actions at copy time:</p>
+<p>For non-<code>None</code> choices, <code>tasks_render.py</code> at copy time:</p>
 <ol>
-<li>Copies <code>licenses/&lt;choice&gt;</code> to <code>LICENSE</code> in the project root.</li>
-<li>Reads <code>licenses/&lt;choice&gt;.header</code>, interpolates <code>{year}</code> (current calendar year) and <code>{author}</code> from <code>full_name</code>, and stores the result.</li>
-<li>Prepends the interpolated header (plus dunder metadata) to every <code>.py</code> under <code>src/</code> and <code>tests/</code>.</li>
+<li>Copies <code>licenses/&lt;choice&gt;</code> to <code>LICENSE</code> in the project root, interpolating <code>{year}</code> (current calendar year) and <code>{author}</code> from <code>full_name</code>.</li>
 </ol>
-<p>Then it deletes the <code>licenses/</code> directory regardless of choice.</p>
-<p>For <code>None</code>, only the directory cleanup runs — source files get the <code>__license__ = 'None'</code> dunder but no copyright header line.</p>
+<p>Then it deletes the <code>licenses/</code> directory regardless of choice. For <code>None</code>, only the directory cleanup runs — no <code>LICENSE</code> file is written.</p>
 <h2 id="picking-later">Picking later</h2>
 <p><code>License: None</code> at generation time, then deciding later:</p>
 <ol>
 <li>Add a <code>LICENSE</code> file at the project root.</li>
 <li>Set <code>pyproject.toml</code>'s <code>license = "&lt;SPDX-ID&gt;"</code> (or <code>license-file = "LICENSE"</code>).</li>
-<li>Optionally prepend a header block to source files by hand.</li>
 </ol>
-<p>This works but <code>copier update</code> won't manage the headers for you — you're outside the template's automation for that file.</p>
 <h2 id="pypi-classifiers">PyPI classifiers</h2>
 <p>If you want PyPI to display a license badge, add the matching classifier to <code>pyproject.toml</code>'s <code>[project] classifiers</code> list. Recognized strings are listed at <a href="https://pypi.org/classifiers/">pypi.org/classifiers/</a> — look under <code>License :: OSI Approved</code>.</p>
 <p>The template doesn't auto-add classifiers because they're orthogonal to the license metadata field and not all licenses have a classifier.</p></div>
