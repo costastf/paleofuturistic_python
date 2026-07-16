@@ -8,7 +8,7 @@
   <img src="./paleofuturistic_python.png?raw=true" alt="Paleofuturistic Environment"/>
 </p>
 
-This is a [copier](https://copier.readthedocs.io/) template that generates a fully-scaffolded, enterprise-ready Python package — uv-managed, ruff-formatted, pytest-tested, properdocs-documented, with vendored CI tooling, SBOM generation, and optional Dependency Track integration.
+This is a [copier](https://copier.readthedocs.io/) template that generates a fully scaffolded, enterprise-ready Python package — uv-managed, ruff-formatted, pytest-tested, properdocs-documented, with vendored CI tooling, SBOM generation, and optional Dependency Track integration.
 
 This documentation is organized around the [Diátaxis](https://diataxis.fr/) framework. Pick the entry that matches what you need right now:
 

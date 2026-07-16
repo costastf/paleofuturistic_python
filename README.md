@@ -8,7 +8,7 @@
   <img src="./docs/paleofuturistic_python.png?raw=true" alt="Paleofuturistic Environment"/>
 </p>
 
-This is a [copier](https://copier.readthedocs.io/) template that generates a fully-scaffolded, enterprise-ready Python package — uv-managed, ruff-formatted, pytest-tested, properdocs-documented, with vendored CI tooling, SBOM generation, and optional Dependency Track integration.
+This is a [copier](https://copier.readthedocs.io/) template that generates a fully scaffolded, enterprise-ready Python package — uv-managed, ruff-formatted, pytest-tested, properdocs-documented, with vendored CI tooling, SBOM generation, and optional Dependency Track integration.
 
 The rest of this README is split into two parts: **[Using the template](#using-the-template)** (generating a project and working in it) and **[Developing the template](#developing-the-template)** (working on this repo itself). For longer-form material, the full [documentation](docs/index.md) is organized around the [Diátaxis](https://diataxis.fr/) framework. The project's history and its lineage as a detached fork of [Straight to the Money 💰](https://github.com/Carlovo/straight_to_the_money) live in [History and lineage](docs/explanation/history-and-lineage.md).
 
