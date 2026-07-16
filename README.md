@@ -12,6 +12,16 @@ This is a [copier](https://copier.readthedocs.io/) template that generates a ful
 
 The rest of this README is split into two parts: **[Using the template](#using-the-template)** (generating a project and working in it) and **[Developing the template](#developing-the-template)** (working on this repo itself). For longer-form material, the full [documentation](docs/index.md) is organized around the [Diátaxis](https://diataxis.fr/) framework. The project's history and its lineage as a detached fork of [Straight to the Money 💰](https://github.com/Carlovo/straight_to_the_money) live in [History and lineage](docs/explanation/history-and-lineage.md).
 
+## Contents
+
+- [Using the template](#using-the-template)
+  - [Setup](#setup)
+  - [Workflow (in the generated project)](#workflow-in-the-generated-project)
+  - [Features](#features)
+  - [Template knobs](#template-knobs)
+- [Developing the template](#developing-the-template)
+  - [Test entry points](#test-entry-points)
+
 ## Using the template
 
 Prerequisite: [uv](https://docs.astral.sh/uv/)
