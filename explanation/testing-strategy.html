@@ -283,7 +283,7 @@
 <p><code>./workflow.cmd test</code> runs only one Python version (whichever the active uv venv resolved to). The full matrix runs in CI per shipped workflow, or locally via <code>./workflow.cmd test.tox</code> (add <code>--env=py310</code> to run a single version). See <a href="../how-to/choose-python-version-range.html">Choose the Python version range</a> for how the matrix is derived.</p>
 <h2 id="what-we-dont-ship">What we don't ship</h2>
 <ul>
-<li><strong>A testing pyramid.</strong> The template doesn't pre-create unit/integration/e2e folders. The example smoke test lives directly in <code>tests/</code>. Structure tests how the project warrants.</li>
+<li><strong>A testing pyramid.</strong> The template doesn't pre-create unit/integration/e2e folders. The example smoke test lives directly in <code>tests/</code>. Structure tests as the project warrants.</li>
 <li><strong>Hypothesis or other property-based tooling.</strong> Add it as a <code>test</code> group dep if wanted.</li>
 <li><strong>Mutation testing.</strong> Mutmut or cosmic-ray. Add them as a <code>quality</code> group concern if a project reaches for them.</li>
 <li><strong>A "tests" service in <code>docker-compose</code>.</strong> The deps cache image (<code>Dockerfile.deps</code>) is for CI deps, not for app testing.</li>

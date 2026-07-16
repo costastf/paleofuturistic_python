@@ -295,7 +295,7 @@
 <li><strong>Default</strong>: <code>github</code></li>
 <li><strong>Allowed</strong>: <code>github</code>, <code>gitlab</code></li>
 </ul>
-<p>Determines which CI scaffolding ships and which host-specific submodule lives at <code>_CI/tasks/&lt;host&gt;.py</code>. The unchosen host's files are omitted at generation time via copier conditional filenames — a file or directory whose rendered name is empty string is simply not created. See <a href="../how-to/choose-a-git-host.html">Choose a git host</a>.</p>
+<p>Determines which CI scaffolding ships and which host-specific submodule lives at <code>_CI/tasks/&lt;host&gt;.py</code>. The unchosen host's files are omitted at generation time via copier conditional filenames — a file or directory whose rendered name is an empty string is simply not created. See <a href="../how-to/choose-a-git-host.html">Choose a git host</a>.</p>
 <h3 id="integrate_dependency_track"><code>integrate_dependency_track</code></h3>
 <ul>
 <li><strong>Type</strong>: bool</li>

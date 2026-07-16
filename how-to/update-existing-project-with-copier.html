@@ -248,7 +248,7 @@
                     <div class="col-md-9" role="main">
 
 <h1 id="update-an-existing-project-with-copier">Update an existing project with copier</h1>
-<p>When this template ships a new version, you can pull the changes into an existing generated project without re-generating from scratch. <a href="https://copier.readthedocs.io/">copier</a> tracks the template revision your project was generated from in <code>.copier-answers.yml</code> and produces a reviewable diff against the latest.</p>
+<p>When this template ships a new version, you can pull the changes into an existing generated project without re-generating from scratch. <a href="https://copier.readthedocs.io/">copier</a> records the template revision your project was generated from — it's stored in <code>.copier-answers.yml</code> — and produces a reviewable diff against the latest version.</p>
 <h2 id="the-basic-update">The basic update</h2>
 <p>From the root of your generated project:</p>
 <pre><code class="language-bash">uvx copier update --trust

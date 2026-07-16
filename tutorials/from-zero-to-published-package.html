@@ -248,7 +248,7 @@
                     <div class="col-md-9" role="main">
 
 <h1 id="from-zero-to-a-published-package">From zero to a published package</h1>
-<p>This tutorial picks up where <a href="generate-your-first-project.html">Generate your first project</a> left you: a freshly-generated project with a green dev cycle. We'll make a real change, cut a release, and publish to PyPI.</p>
+<p>This tutorial picks up where <a href="generate-your-first-project.html">Generate your first project</a> left off: a freshly generated project with a green dev cycle. We'll make a real change, cut a release, and publish to PyPI.</p>
 <p>You'll need a <a href="https://pypi.org/account/register/">PyPI account</a> before the publish step.</p>
 <h2 id="step-1-write-a-feature">Step 1 — Write a feature</h2>
 <p>Open <code>src/&lt;your_project_slug&gt;/&lt;your_project_slug&gt;.py</code> and replace the body of <code>hello()</code> with something more interesting:</p>
@@ -257,7 +257,7 @@
     return f'Hello {someone} from &lt;your_project_slug&gt;!'
 </code></pre>
 <p>Update the smoke test under <code>tests/</code> to match. Run the dev cycle once to confirm it's still green:</p>
-<pre><code class="language-bash">./workflow.cmd format &amp;&amp; ./workflow.cmd lint &amp;&amp; ./workflow.cmd test
+<pre><code class="language-bash">./workflow.cmd format &amp;&amp; ./workflow.cmd lint &amp;&amp; ./workflow.cmd test &amp;&amp; ./workflow.cmd build
 </code></pre>
 <h2 id="step-2-commit-using-conventional-commits">Step 2 — Commit using Conventional Commits</h2>
 <p>Commit messages must follow <a href="https://www.conventionalcommits.org/">Conventional Commits</a> — the lint step rejects anything that doesn't parse. Start each message with a type prefix:</p>
