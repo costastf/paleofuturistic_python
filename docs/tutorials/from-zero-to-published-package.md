@@ -17,7 +17,7 @@ def hello(someone: str = 'you') -> str:
 Update the smoke test under `tests/` to match. Run the dev cycle once to confirm it's still green:
 
 ```bash
-./workflow.cmd format && ./workflow.cmd lint && ./workflow.cmd test
+./workflow.cmd format && ./workflow.cmd lint && ./workflow.cmd test && ./workflow.cmd build
 ```
 
 ## Step 2 — Commit using Conventional Commits
