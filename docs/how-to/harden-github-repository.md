@@ -29,7 +29,7 @@ The workflow grants `id-token: write` on the publish job — that's what makes t
 ## Hardening against insider mistakes
 
 - Add **Required reviewers** under **Settings → Environments → pypi → Deployment protection rules**. Even a self-merge can't publish unless a designated reviewer approves the deployment.
-- Avoid personal-account ownership of org repos. Org/repo admin access should require 4-eyes approval for assumption.
+- Avoid personal-account ownership of org repos. Assuming org/repo admin access should require four-eyes approval.
 - Enable Dependabot alerts and secret scanning (free for public repos).
 
 ## Verify the workflows still pass

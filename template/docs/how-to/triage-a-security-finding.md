@@ -1,6 +1,6 @@
 # Triage a security finding
 
-`./workflow.cmd secure` runs [pip-audit](https://github.com/pypa/pip-audit) against the lockfile. When it reports a vulnerability you have three responses: upgrade, override with an expiry, or accept and document.
+`./workflow.cmd secure` runs [pip-audit](https://github.com/pypa/pip-audit) against the lockfile. When it reports a vulnerability, you have three responses: upgrade, override with an expiry, or accept and document.
 
 ## 1. Upgrade if possible
 

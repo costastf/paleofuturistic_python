@@ -42,7 +42,7 @@ After upload, in the DT UI:
 2. The **Components** tab should refresh within a few seconds; the count matches your lockfile.
 3. **Audit Vulnerabilities** lists any CVEs DT knows about for your dependency set.
 
-## Wasn't enabled at generation time
+## If it wasn't enabled at generation time
 
 Re-run `uvx copier update --trust` and answer `y` to `integrate_dependency_track`. See [copier's update docs](https://copier.readthedocs.io/en/stable/updating/) for the full workflow.
 

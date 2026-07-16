@@ -71,7 +71,7 @@ The copier questions expose these switches; defaults in **bold**.
 |------|---------|--------|
 | `git_hosting_service` | **`github`** \| `gitlab` | Selects the CI host scaffolding and the matching `_CI/tasks/<host>.py` submodule. |
 | `license` | **`Apache-2.0`** \| `MIT` \| `BSD-3-Clause` \| `None` | Ships the matching `LICENSE` file (`None` ships none). |
-| `integrate_dependency_track` | **`true`** \| `false` | Opts the SBOM-upload code in `_CI/tasks/secure.py` in. |
+| `integrate_dependency_track` | **`true`** \| `false` | Toggles the SBOM-upload code in `_CI/tasks/secure.py`. |
 | `integrate_pages` | **`true`** \| `false` | Opts the Pages workflow and `document.deploy-github` task in (effective only when `git_hosting_service = github`). |
 | `min_python_version` / `max_python_version` | dotted version | Bounds the supported Python range for the generated package metadata. |
 

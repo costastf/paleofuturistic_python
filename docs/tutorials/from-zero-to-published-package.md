@@ -1,6 +1,6 @@
 # From zero to a published package
 
-This tutorial picks up where [Generate your first project](generate-your-first-project.md) left you: a freshly generated project with a green dev cycle. We'll make a real change, cut a release, and publish to PyPI.
+This tutorial picks up where [Generate your first project](generate-your-first-project.md) left off: a freshly generated project with a green dev cycle. We'll make a real change, cut a release, and publish to PyPI.
 
 You'll need a [PyPI account](https://pypi.org/account/register/) before the publish step.
 
