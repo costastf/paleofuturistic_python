@@ -43,7 +43,7 @@ tox + tox-uv runs the test suite against every Python version in the project's r
 
 ## What we don't ship
 
-- **A testing pyramid.** The template doesn't pre-create unit/integration/e2e folders. The example smoke test lives directly in `tests/`. Structure tests how the project warrants.
+- **A testing pyramid.** The template doesn't pre-create unit/integration/e2e folders. The example smoke test lives directly in `tests/`. Structure tests as the project warrants.
 - **Hypothesis or other property-based tooling.** Add it as a `test` group dep if wanted.
 - **Mutation testing.** Mutmut or cosmic-ray. Add them as a `quality` group concern if a project reaches for them.
 - **A "tests" service in `docker-compose`.** The deps cache image (`Dockerfile.deps`) is for CI deps, not for app testing.

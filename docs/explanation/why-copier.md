@@ -10,7 +10,7 @@ The key capabilities that drove the choice:
 
 - **Robust update algorithm.** Copier records the template source, revision, and all answers in `.copier-answers.yml` and replays later template versions over the existing project with a three-way merge. The merge is more accurate than a plain diff because copier knows the base revision and both sides of the change.
 - **Richer questionnaire types.** Choices, booleans, computed defaults, and per-question validators are all first-class — no custom hook code needed for the questionnaire layer.
-- **Native conditional filenames.** A file or directory whose rendered name is empty string is simply skipped. The unchosen git-host scaffolding, the optional Pages workflow, and similar variants are expressed as filename conditions — no filesystem-walking post-gen hook to delete the wrong files.
+- **Native conditional filenames.** A file or directory whose rendered name is an empty string is simply skipped. The unchosen git-host scaffolding, the optional Pages workflow, and similar variants are expressed as filename conditions — no filesystem-walking post-gen hook to delete the wrong files.
 - **Per-file `.jinja` rendering.** Only files whose names end in `.jinja` are rendered through Jinja (suffix stripped on output); everything else is copied verbatim. This replaces cookiecutter's `_copy_without_render` glob list and makes the rendering boundary explicit and per-file.
 
 ## What we considered

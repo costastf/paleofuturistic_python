@@ -1,6 +1,6 @@
 # Update an existing project with copier
 
-When this template ships a new version, you can pull the changes into an existing generated project without re-generating from scratch. [copier](https://copier.readthedocs.io/) tracks the template revision your project was generated from in `.copier-answers.yml` and produces a reviewable diff against the latest.
+When this template ships a new version, you can pull the changes into an existing generated project without re-generating from scratch. [copier](https://copier.readthedocs.io/) records the template revision your project was generated from — it's stored in `.copier-answers.yml` — and produces a reviewable diff against the latest version.
 
 ## The basic update
 

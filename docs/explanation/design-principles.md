@@ -6,7 +6,7 @@ The template is opinionated. The choices below were made deliberately, not by ac
 
 Every CI step is a `./workflow.cmd <task>` call — no inline `uv …`, `pip install …`, ad-hoc `properdocs …`, or other business logic in YAML. Behaviour changes happen in `_CI/tasks/`; workflow files are glue.
 
-Two side-effects of this rule earn it its own section:
+Two side-effects of this rule earn the rule a section of its own:
 
 **Parity.** What CI runs is exactly what you can run locally. Debugging a failing CI step means running the same `./workflow.cmd` command on your laptop. No "but it worked on my machine" gap, no separate path to maintain.
 

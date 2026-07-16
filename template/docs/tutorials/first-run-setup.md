@@ -9,7 +9,7 @@ This is the first thing to do after this project was generated. By the end of it
 
 You do *not* need to pre-install Python — uv will fetch the versions declared in `.python-version`.
 
-## This step is a `pre` command of all the other commands so running it manually is not actually required. 
+## This step is a `pre` command of all the other commands, so running it manually is not actually required.
 ### It is safe to skip to step 2 immediately.
 
 ## Step 1 — Bootstrap

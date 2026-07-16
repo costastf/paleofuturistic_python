@@ -58,6 +58,6 @@ A browser tab opens with the generated project's documentation — its own Diát
 
 ## You're done
 
-You have a fully-scaffolded Python project with tests, linting, packaging, and docs all wired up.
+You have a fully scaffolded Python project with tests, linting, packaging, and docs all wired up.
 
 **Next:** [From zero to a published package](from-zero-to-published-package.md) — write a function, cut a release, push to PyPI.

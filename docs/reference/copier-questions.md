@@ -69,7 +69,7 @@ Selects which license file is installed to `LICENSE` by `tasks_render.py`. See [
 - **Default**: `github`
 - **Allowed**: `github`, `gitlab`
 
-Determines which CI scaffolding ships and which host-specific submodule lives at `_CI/tasks/<host>.py`. The unchosen host's files are omitted at generation time via copier conditional filenames — a file or directory whose rendered name is empty string is simply not created. See [Choose a git host](../how-to/choose-a-git-host.md).
+Determines which CI scaffolding ships and which host-specific submodule lives at `_CI/tasks/<host>.py`. The unchosen host's files are omitted at generation time via copier conditional filenames — a file or directory whose rendered name is an empty string is simply not created. See [Choose a git host](../how-to/choose-a-git-host.md).
 
 ### `integrate_dependency_track`
 
