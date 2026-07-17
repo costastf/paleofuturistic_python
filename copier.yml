@@ -18,8 +18,15 @@ project_name:
 
 project_slug:
   type: str
-  default: "{{ project_name|lower|replace(' ', '_')|replace('-', '_') }}"
-  help: The slugified name for the project
+  default: >-
+    {{ project_name | lower
+       | regex_replace('[^a-z0-9_]+', '_')
+       | regex_replace('_+', '_')
+       | trim('_') }}
+  help: The slugified name for the project (must be a valid Python identifier)
+  validator: >-
+    {% if not project_slug %}project_slug cannot be empty
+    {% elif not (project_slug | regex_search('^[a-z]([a-z0-9_]*[a-z0-9])?$')) %}'{{ project_slug }}' must be a valid import name and PyPI project name: lowercase ASCII letters, digits and underscores, starting with a letter and ending with a letter or digit{% endif %}
 
 project_description:
   type: str
