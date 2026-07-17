@@ -9,6 +9,7 @@ runner pick it up automatically.
 
 import json
 import os
+import re
 import subprocess
 import tomllib
 
@@ -95,6 +96,37 @@ def test_scaffold_test_sanity_marker_present(generated_project):
     slug = project.name
     test_file = project / 'tests' / f'test_{slug}.py'
     assert 'def test_sanity' in test_file.read_text(encoding='utf-8')
+
+
+def test_project_slug_sanitizes_punctuated_name(template_snapshot, tmp_path_factory):
+    """A project_name with punctuation (here an apostrophe) still derives a slug that is
+    both a valid Python identifier and a valid (normalizable) PyPI project name."""
+    workdir = tmp_path_factory.mktemp('slug-punctuation')
+    data_file = workdir / 'data.json'
+    data_file.write_text(json.dumps({'project_name': "Username's Toolkit"}), encoding='utf-8')
+    project = workdir / 'out'
+    subprocess.run(
+        [
+            'uvx',
+            'copier',
+            'copy',
+            '--defaults',
+            '--trust',
+            '--data-file',
+            str(data_file),
+            str(template_snapshot),
+            str(project),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    slug = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))['project']['name']
+    assert slug == 'username_s_toolkit'
+    # Valid import name (Python identifier) and valid PyPI name per name-normalization spec:
+    # start with a letter, end with a letter/digit, only lowercase letters/digits/underscores.
+    assert slug.isidentifier()
+    assert re.fullmatch(r'[a-z]([a-z0-9_]*[a-z0-9])?', slug)
+    assert (project / 'src' / slug).is_dir()
 
 
 @pytest.mark.parametrize('license_choice', ['Apache-2.0', 'MIT', 'BSD-3-Clause', 'None'])
