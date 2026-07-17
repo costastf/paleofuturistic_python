@@ -129,6 +129,43 @@ def test_project_slug_sanitizes_punctuated_name(template_snapshot, tmp_path_fact
     assert (project / 'src' / slug).is_dir()
 
 
+@pytest.mark.parametrize(
+    'bad_data',
+    [
+        pytest.param({'project_slug': '3d_vision'}, id='leading-digit'),
+        pytest.param({'project_slug': 'bad-slug!'}, id='punctuation'),
+        pytest.param({'project_slug': '_foo'}, id='leading-underscore'),
+        pytest.param({'project_slug': 'foo_'}, id='trailing-underscore'),
+        pytest.param({'project_slug': ''}, id='empty'),
+        pytest.param({'project_name': '3D Vision'}, id='derived-leading-digit'),
+    ],
+)
+def test_project_slug_validator_rejects_invalid(template_snapshot, tmp_path_factory, bad_data):
+    """The project_slug validator aborts generation for values that aren't both a valid
+    Python identifier and a valid PyPI name — whether supplied directly or derived from
+    project_name — instead of writing a broken project."""
+    workdir = tmp_path_factory.mktemp('slug-invalid')
+    data_file = workdir / 'data.json'
+    data_file.write_text(json.dumps(bad_data), encoding='utf-8')
+    project = workdir / 'out'
+    result = subprocess.run(
+        [
+            'uvx',
+            'copier',
+            'copy',
+            '--defaults',
+            '--trust',
+            '--data-file',
+            str(data_file),
+            str(template_snapshot),
+            str(project),
+        ],
+        capture_output=True,
+    )
+    assert result.returncode != 0, 'copier should have aborted on an invalid project_slug'
+    assert not (project / 'pyproject.toml').exists(), 'no project should be written on validation failure'
+
+
 @pytest.mark.parametrize('license_choice', ['Apache-2.0', 'MIT', 'BSD-3-Clause', 'None'])
 def test_license_file_matches_choice(template_snapshot, tmp_path_factory, license_choice):
     """Each license choice produces (or skips) a LICENSE file at the project root."""
