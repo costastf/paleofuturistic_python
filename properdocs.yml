@@ -15,31 +15,39 @@ theme:
 
 nav:
   - Home: index.md
-  - Tutorials:
-    - Generate your first project: tutorials/generate-your-first-project.md
-    - From zero to a published package: tutorials/from-zero-to-published-package.md
-  - How-to:
-    - Update an existing project with copier: how-to/update-existing-project-with-copier.md
-    - Choose a git host: how-to/choose-a-git-host.md
-    - Enable Dependency Track integration: how-to/enable-dependency-track.md
-    - Harden the GitHub repository: how-to/harden-github-repository.md
-    - Convert the library into a CLI: how-to/convert-library-to-cli.md
-    - Choose the Python version range: how-to/choose-python-version-range.md
-    - Publish docs to GitHub Pages: how-to/publish-docs-to-github-pages.md
-    - Add a workflow task: how-to/add-a-workflow-task.md
-    - Customize the bootstrap: how-to/customize-the-bootstrap.md
-  - Reference:
-    - Copier questions: reference/copier-questions.md
-    - Generation internals: reference/generation-internals.md
-    - Generated project tree: reference/generated-project-tree.md
-    - License options: reference/license-options.md
-  - Explanation:
-    - Why copier: explanation/why-copier.md
-    - Design principles: explanation/design-principles.md
-    - History and lineage: explanation/history-and-lineage.md
-    - How uv is used: explanation/how-uv-is-used.md
-    - The CI tasks architecture: explanation/the-ci-tasks-architecture.md
-    - SBOM and security model: explanation/sbom-and-security-model.md
-    - Testing strategy: explanation/testing-strategy.md
+  - Using the template:
+    - Tutorials:
+      - Generate your first project: using/tutorials/generate-your-first-project.md
+      - From zero to a published package: using/tutorials/from-zero-to-published-package.md
+    - How-to:
+      - Update an existing project with copier: using/how-to/update-existing-project-with-copier.md
+      - Choose a git host: using/how-to/choose-a-git-host.md
+      - Enable Dependency Track integration: using/how-to/enable-dependency-track.md
+      - Harden the GitHub repository: using/how-to/harden-github-repository.md
+      - Convert the library into a CLI: using/how-to/convert-library-to-cli.md
+      - Choose the Python version range: using/how-to/choose-python-version-range.md
+      - Publish docs to GitHub Pages: using/how-to/publish-docs-to-github-pages.md
+    - Reference:
+      - Copier questions: using/reference/copier-questions.md
+      - Generated project tree: using/reference/generated-project-tree.md
+      - License options: using/reference/license-options.md
+    - Explanation:
+      - How uv is used: using/explanation/how-uv-is-used.md
+      - SBOM and security model: using/explanation/sbom-and-security-model.md
+      - Testing strategy: using/explanation/testing-strategy.md
+  - Maintaining the template:
+    - Tutorials:
+      - Make your first template change: maintaining/tutorials/make-your-first-template-change.md
+    - How-to:
+      - Test the template: maintaining/how-to/test-the-template.md
+      - Extend the template workflow tasks: maintaining/how-to/extend-the-template-tasks.md
+      - Keep shipped docs in sync: maintaining/how-to/sync-shipped-docs.md
+    - Reference:
+      - Generation internals: maintaining/reference/generation-internals.md
+    - Explanation:
+      - Design principles: maintaining/explanation/design-principles.md
+      - Why copier: maintaining/explanation/why-copier.md
+      - The CI tasks architecture: maintaining/explanation/the-ci-tasks-architecture.md
+      - History and lineage: maintaining/explanation/history-and-lineage.md
 
 copyright: Copyright &copy; 2024 <a href="https://schubergphilis.com/">Schuberg Philis</a>

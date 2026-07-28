@@ -1,0 +1,40 @@
+# Configuration
+
+<!-- coaching: This is a REFERENCE page (Diátaxis) — dry, complete, lookup-oriented facts about
+     your software's configuration surface: environment variables, config-file keys, CLI flags,
+     defaults. No instructions (that's how-to) and no rationale (that's explanation). Tables win.
+     Note: the [API](api.md) page is generated from your docstrings by mkdocstrings, so everything
+     that lives in code is documented there automatically — this page is for the configuration
+     knobs that docstrings can't reach. Delete these coaching comments as you fill in the tables,
+     and delete any table that doesn't apply. See ../developer/how-to/document-your-project.md
+     for the full authoring guide. -->
+
+_One sentence on how {{ project_name }} is configured (env vars? a config file? both?) and the precedence between them._
+
+## Environment variables
+
+| Variable | Required | Default | Effect |
+|----------|----------|---------|--------|
+| `_EXAMPLE_VAR_` | no | `_default_` | _What it changes._ |
+
+## Configuration file
+
+<!-- coaching: If your software reads a config file, document its location, format, and every key.
+     Group keys by section and keep one row per key. -->
+
+| Key | Type | Default | Effect |
+|-----|------|---------|--------|
+| `_example.key_` | `str` | `_default_` | _What it changes._ |
+
+## Command-line flags
+
+<!-- coaching: Only if your package ships a CLI. One row per flag; long and short forms in the
+     same cell. -->
+
+| Flag | Default | Effect |
+|------|---------|--------|
+| `--example` | off | _What it changes._ |
+
+## See also
+
+- [API](api.md) — the full API reference, generated from docstrings.

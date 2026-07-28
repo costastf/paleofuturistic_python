@@ -13,25 +13,43 @@ use_directory_urls: false
 nav:
   - Home: index.md
   - Tutorials:
-    - First-run setup: tutorials/first-run-setup.md
-    - Make your first release: tutorials/make-your-first-release.md
+    - Getting started: tutorials/getting-started.md
   - How-to:
-    - Document your project: how-to/document-your-project.md
-    - Add a dependency: how-to/add-a-dependency.md
-    - Preview docs locally: how-to/preview-docs-locally.md
-    - Run tests for one Python version: how-to/run-tests-for-one-python-version.md
-    - Triage a security finding: how-to/triage-a-security-finding.md
-    - Build and push a container: how-to/build-and-push-a-container.md
-    - Upload an SBOM to Dependency Track: how-to/upload-an-sbom-to-dependency-track.md
+    - Solve a real task: how-to/solve-a-real-task.md
   - Reference:
     - API: reference/api.md
-    - Invoke task catalog: reference/invoke-tasks.md
-    - Dependency groups: reference/dependency-groups.md
-    - Configuration files: reference/configuration-files.md
+    - Configuration: reference/configuration.md
     - Changelog: reference/changelog.md
   - Explanation:
     - About your project: explanation/about-your-project.md
-    - The scaffold: explanation/the-scaffold.md
+  - Developer:
+    - The scaffold: developer/index.md
+    - Tutorials:
+      - First-run setup: developer/tutorials/first-run-setup.md
+      - Make your first release: developer/tutorials/make-your-first-release.md
+    - How-to:
+      - Document your project: developer/how-to/document-your-project.md
+      - Add a dependency: developer/how-to/add-a-dependency.md
+      - Add a workflow task: developer/how-to/add-a-workflow-task.md
+      - Customize the bootstrap: developer/how-to/customize-the-bootstrap.md
+      - Preview docs locally: developer/how-to/preview-docs-locally.md
+      - Run tests for one Python version: developer/how-to/run-tests-for-one-python-version.md
+      - Triage a security finding: developer/how-to/triage-a-security-finding.md
+      - Build and push a container: developer/how-to/build-and-push-a-container.md
+      {%- if integrate_dependency_track %}
+      - Upload an SBOM to Dependency Track: developer/how-to/upload-an-sbom-to-dependency-track.md
+      {%- endif %}
+    - Reference:
+      - Invoke task catalog: developer/reference/invoke-tasks.md
+      - Dependency groups: developer/reference/dependency-groups.md
+      - Configuration files: developer/reference/configuration-files.md
+      - CI framework internals: developer/reference/ci-framework.md
+    - Explanation:
+      - Design principles: developer/explanation/design-principles.md
+      - The CI tasks architecture: developer/explanation/the-ci-tasks-architecture.md
+      - How uv is used: developer/explanation/how-uv-is-used.md
+      - SBOM and security model: developer/explanation/sbom-and-security-model.md
+      - Testing strategy: developer/explanation/testing-strategy.md
 
 watch:
   - src

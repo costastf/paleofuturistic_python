@@ -10,40 +10,18 @@
 
 This is a [copier](https://copier.readthedocs.io/) template that generates a fully scaffolded, enterprise-ready Python package — uv-managed, ruff-formatted, pytest-tested, properdocs-documented, with vendored CI tooling, SBOM generation, and optional Dependency Track integration.
 
-This documentation is organized around the [Diátaxis](https://diataxis.fr/) framework. Pick the entry that matches what you need right now:
+The documentation is split by what you're here to do; each area is organized around the [Diátaxis](https://diataxis.fr/) framework, and the sidebar is the full map.
 
-## Tutorials — learning by doing
+## Using the template
 
-Hands-on lessons for newcomers. Start here if you've never used the template.
+You want to generate a Python project and pick the right knobs while doing so.
 
-- [Generate your first project](tutorials/generate-your-first-project.md) — empty directory to a working Python package in ten minutes.
-- [From zero to a published package](tutorials/from-zero-to-published-package.md) — extend the generated project, cut a release, publish to PyPI.
+Start with [Generate your first project](using/tutorials/generate-your-first-project.md), then [From zero to a published package](using/tutorials/from-zero-to-published-package.md). The [Copier questions](using/reference/copier-questions.md) reference covers every knob.
 
-## How-to guides — recipes for specific problems
+Once your project exists, its **own docs ship with it**: the scaffold manual (daily workflow, extending tasks, design rationale) lives in the generated docs' *Developer* section — run `./workflow.cmd document` inside your project.
 
-Task-focused steps. Reach for these when you know what you need to do.
+## Maintaining the template
 
-- [Update an existing project with copier](how-to/update-existing-project-with-copier.md)
-- [Choose a git host (GitHub or GitLab)](how-to/choose-a-git-host.md)
-- [Enable Dependency Track integration](how-to/enable-dependency-track.md)
-- [Harden the GitHub repository](how-to/harden-github-repository.md)
-- [Convert the library into a CLI](how-to/convert-library-to-cli.md)
-- [Choose the Python version range](how-to/choose-python-version-range.md)
-- [Publish docs to GitHub Pages](how-to/publish-docs-to-github-pages.md)
+You want to change what this template generates.
 
-## Reference — the facts
-
-Lookup material. Read these when you need to confirm an exact value or behaviour.
-
-- [Copier questions](reference/copier-questions.md)
-- [Generation internals](reference/generation-internals.md)
-- [Generated project tree](reference/generated-project-tree.md)
-- [License options](reference/license-options.md)
-
-## Explanation — the why
-
-Background and design rationale. Read these to understand the template's shape.
-
-- [Why copier?](explanation/why-copier.md)
-- [Design principles](explanation/design-principles.md)
-- [History and lineage](explanation/history-and-lineage.md)
+Start with [Make your first template change](maintaining/tutorials/make-your-first-template-change.md) for the edit-test loop, [Test the template](maintaining/how-to/test-the-template.md) for the four test entry points, and [Design principles](maintaining/explanation/design-principles.md) for the constraints every change should respect.

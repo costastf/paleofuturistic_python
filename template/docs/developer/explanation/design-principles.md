@@ -1,0 +1,75 @@
+<!-- canonical: synced from docs/maintaining/explanation/design-principles.md in the paleofuturistic_python template repo. Edit there first. -->
+# Design principles
+
+The scaffold this project inherited is opinionated. The choices below were made deliberately, not by accumulation — each replaces something an earlier revision of the template relied on.
+
+## Pipelines run template commands only
+
+Every CI step is a `./workflow.cmd <task>` call — no inline `uv …`, `pip install …`, ad-hoc `properdocs …`, or other business logic in YAML. Behaviour changes happen in `_CI/tasks/`; workflow files are glue.
+
+Two side-effects of this rule earn it its own section:
+
+**Parity.** What CI runs is exactly what you can run locally. Debugging a failing CI step means running the same `./workflow.cmd` command on your laptop. No "but it worked on my machine" gap, no separate path to maintain.
+
+**And those commands lean on tracked dependencies.** When a `properdocs` / `uv` / `pytest` invocation can do a CI step, it's preferred over a GitHub Action, because every Python dependency is pinned in `uv.lock` and surfaces in the project SBOM. Action dependencies are hidden inside `uses:` references and never appear in the supply-chain picture. Concretely: `properdocs gh-deploy` over `actions/upload-pages-artifact` + `actions/deploy-pages`; `./workflow.cmd test` over inline `pytest` invocations; and so on. Two scaffolding actions are unavoidable (`actions/checkout` to fetch the repo, `astral-sh/setup-uv` to bootstrap the toolchain itself when the deps image isn't used) — beyond that, prefer commands.
+
+## uv is the only tool you install
+
+Earlier template revisions asked users to install Python, then `pipx`, then `tox`, then `pre-commit`, then `commitizen`. Today, every one of those is a uv-managed dependency group inside this project. You install uv; uv installs the rest.
+
+**Tradeoff:** the scaffold is bound to uv's lifecycle. If uv goes away or changes lock format incompatibly, the template needs work. That risk is accepted because uv has compressed the toolchain to a single binary that's fast enough to run on every commit.
+
+## Why groups, not extras
+
+The template used to put dev tools under `[project.optional-dependencies]` (PEP 621 extras). Those work but they conflate two ideas:
+
+- **Optional features** of the library (e.g. an `excel` extra for openpyxl support).
+- **Internal dev concerns** (lint, test, docs).
+
+[PEP 735 dependency groups](https://peps.python.org/pep-0735/) — uv's first-class support for them — are explicitly for the second category. They never ship in the wheel and are never user-installable via `pip install <pkg>[<extra>]`. Cleaner contract, less to explain to users.
+
+## Ruff replaces Black + isort + flake8 (and most of pylint)
+
+One tool, one config block, one cache. Ruff doesn't yet cover everything pylint does — so pylint stays, but only for the checks Ruff doesn't have. Expect pylint's role to shrink as Ruff grows.
+
+## ty replaces mypy
+
+[ty](https://github.com/astral-sh/ty) is Astral's type checker, written in Rust. It's faster than mypy and shares the Ruff/uv codebase's quality bar. Mypy compatibility issues still surface occasionally; that trade is accepted for the speed and consistency.
+
+## pytest, not unittest
+
+The template's original lineage used `python -m unittest`. It moved to pytest for fixtures, parametrization, coverage integration, and parallel execution via xdist. Unittest test classes still work — pytest discovers them.
+
+## Conventional Commits drive the release notes
+
+Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) — the lint step rejects anything that doesn't parse. They're used for **automatic release notes**: [commitizen](https://commitizen-tools.github.io/commitizen/) reads the commits since the last tag and groups them by prefix (`feat:`, `fix:`, etc.) into a generated changelog.
+
+Commitizen's autorelease mode is **not** used. The version bump is an explicit choice you make at release time: `./workflow.cmd release -i <major|minor|patch|…>`. Commit prefixes inform changelog structure, not the version number.
+
+## properdocs (not vanilla mkdocs), with mkdocstrings for API docs
+
+properdocs is mkdocs with a curated plugin set. mkdocstrings reads the source directly — no `.rst` files in the middle. Sphinx is more capable; that capability isn't needed here.
+
+## SBOMs ship inside the wheel
+
+Every release composes a CycloneDX 1.7 SBOM covering four sources — runtime dependencies (from `uv export --no-dev` against the lockfile), dev / lint / test / docs / quality / security groups (the lockfile minus the runtime set), vendored CI tooling (every package in `_CI/lib/vendor.txt`), and the chosen host's pipeline components (GitHub Actions `uses:` refs or GitLab CI `image:` refs). Each component carries an SPDX-identified licence, a SHA-256 hash where the lockfile provides one, and an external_reference pointing at its upstream page. CycloneDX `scope` (`required` / `optional` / `excluded`) distinguishes what ships in the wheel from what builds it. A two-level dependency graph (project → runtime + dev + a synthetic `build-environment` → vendored + pipeline) makes "what's in the wheel" vs "what built the wheel" walkable from the root bom-ref.
+
+The SBOM is validated against the CycloneDX 1.7 JSON schema and written to `src/<project_slug>/sbom.cdx.json`, which `uv build` automatically ships **inside the wheel** rather than next to it. A downstream consumer extracts it with `unzip -p <wheel> <project_slug>/sbom.cdx.json` or `importlib.resources` — the SBOM travels with the artefact instead of needing to be re-correlated post-release.
+
+The cost is one Python module (`_CI/tasks/sbom.py`) and one extra build step; the benefit is that supply-chain questions have an answer the day someone asks them, without depending on a separate registry or pinned cyclonedx-cli binary.
+
+## Vendored CI tooling
+
+`_CI/lib/vendor/` ships Invoke + its dependencies committed to the repo. `./workflow.cmd` works on a fresh clone with only uv installed — no `pip install invoke` step, no version drift between contributor machines. The vendoring cost is bytes in the repo; the benefit is that the dev cycle is the same on day one as on day one thousand.
+
+## What we deliberately do not do
+
+- **No framework choice.** This is a library scaffold. It does not know about FastAPI, Django, or Click. Add what you need.
+- **No monorepo support.** One package, one repo.
+- **No Python below the project's chosen minimum version (as low as 3.10).** `tomllib` is imported via a 3.10-compatible fallback, so it's no longer a reason to require a higher floor.
+- **No GitHub-only or GitLab-only assumptions in the dev cycle.** Host-specific code lives in `_CI/tasks/<host>.py`; the rest of the workflow runs identically.
+
+## See also
+
+- [The scaffold](../index.md) — the tour of everything these principles produced.
+- [The _CI tasks architecture](the-ci-tasks-architecture.md) — the task-runner design in depth.
