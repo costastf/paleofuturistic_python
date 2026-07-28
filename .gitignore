@@ -218,3 +218,5 @@ cython_debug/
 *.tmp
 .omc/
 .claude/settings.local.json
+.recall/
+.serena/
