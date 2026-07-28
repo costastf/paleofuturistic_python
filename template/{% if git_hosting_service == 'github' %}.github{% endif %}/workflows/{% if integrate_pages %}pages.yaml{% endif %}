@@ -23,6 +23,7 @@ jobs:
     permissions:
       contents: write
       packages: read
+      pages: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -30,3 +31,5 @@ jobs:
           fetch-depth: 0
       - name: Build and deploy docs
         run: ./workflow.cmd document.deploy-github
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

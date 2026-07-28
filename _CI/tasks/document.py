@@ -2,6 +2,8 @@
 
 import os
 import tomllib
+import urllib.error
+import urllib.request
 import webbrowser
 
 from invoke import task
@@ -59,10 +61,46 @@ def view(context):  # noqa: ARG001
     webbrowser.open(SITE_INDEX.as_uri())
 
 
+def request_pages_build() -> None:
+    """Ask GitHub to build Pages from the freshly pushed gh-pages branch.
+
+    Pushes made with the Actions ``GITHUB_TOKEN`` do not trigger the legacy
+    (deploy-from-branch) Pages build, so CI must request one explicitly after
+    ``properdocs gh-deploy``. Locally the push itself triggers the build and
+    ``GITHUB_TOKEN`` is normally absent, making this a no-op.
+    """
+    token = os.environ.get('GITHUB_TOKEN', '').strip()
+    slug = os.environ.get('GITHUB_REPOSITORY', '').strip()
+    if not (token and slug):
+        return
+    request = urllib.request.Request(
+        f'https://api.github.com/repos/{slug}/pages/builds',
+        data=b'',
+        method='POST',
+        headers={
+            'Accept': 'application/vnd.github+json',
+            'Authorization': f'Bearer {token}',
+            'X-GitHub-Api-Version': '2022-11-28',
+            'User-Agent': 'paleofuturistic-python-docs',
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
+            print(emojize_message(f'Requested GitHub Pages build (HTTP {response.status})'))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode('utf-8', errors='replace')[:500]
+        print(emojize_message(f'GitHub Pages build request returned {exc.code}: {detail}', success=False))
+        raise SystemExit(1) from exc
+    except OSError as exc:
+        print(emojize_message(f'GitHub Pages build request failed: {exc}', success=False))
+        raise SystemExit(1) from exc
+
+
 @task
 def deploy_github(context):
-    """Build the docs and push them to the gh-pages branch for GitHub Pages."""
+    """Build the docs, push them to the gh-pages branch, and request the Pages build."""
     run_properdocs(context, 'gh-deploy --force', 'Document gh-deploy')
+    request_pages_build()
 
 
 @task

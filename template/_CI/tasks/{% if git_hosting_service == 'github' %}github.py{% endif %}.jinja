@@ -137,6 +137,43 @@ def create_release_pr(context: Context, release_branch: str, new_version: str) -
     return data.get('html_url', '')
 
 
+def request_pages_build(context: Context) -> None:
+    """Ask GitHub to build Pages from the freshly pushed gh-pages branch.
+
+    Pushes made with the Actions ``GITHUB_TOKEN`` do not trigger the legacy
+    (deploy-from-branch) Pages build, so CI must request one explicitly after
+    ``properdocs gh-deploy``. Locally the push itself triggers the build and
+    ``GITHUB_TOKEN`` is normally absent, making this a no-op.
+    """
+    token = os.environ.get('GITHUB_TOKEN', '').strip()
+    if not token:
+        return
+    slug = origin_slug(context)
+    if not slug:
+        return
+    request = urllib.request.Request(
+        f'https://api.github.com/repos/{slug}/pages/builds',
+        data=b'',
+        method='POST',
+        headers={
+            'Accept': 'application/vnd.github+json',
+            'Authorization': f'Bearer {token}',
+            'X-GitHub-Api-Version': '2022-11-28',
+            'User-Agent': '{{ project_slug }}-docs',
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
+            print(f'Requested GitHub Pages build (HTTP {response.status}).')
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode('utf-8', errors='replace')[:500]
+        print(f'GitHub Pages build request returned {exc.code}: {detail}')
+        raise SystemExit(1) from exc
+    except OSError as exc:
+        print(f'GitHub Pages build request failed: {exc}')
+        raise SystemExit(1) from exc
+
+
 def iter_pipeline_components() -> Iterator[PipelineComponent]:
     """Yield CI pipeline components for inclusion in the SBOM.
 

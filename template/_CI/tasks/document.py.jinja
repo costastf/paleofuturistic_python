@@ -6,6 +6,9 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
+{% if integrate_pages and git_hosting_service == 'github' -%}
+from .github import request_pages_build
+{% endif -%}
 from .quality import update_pyscn_badge
 from .shared import execute, is_ci, logged, open_command, run, run_steps
 from .test import update_coverage_badge
@@ -82,9 +85,10 @@ def view(context: Context) -> None:
 
 @task
 @logged('document.deploy-github')
-@run('uv run properdocs gh-deploy --force')
 def deploy_github(context: Context) -> None:
-    """Build the docs and push them to the `gh-pages` branch for GitHub Pages."""
+    """Build the docs, push them to the `gh-pages` branch, and request the Pages build."""
+    execute(context, 'uv run properdocs gh-deploy --force')
+    request_pages_build(context)
 {%- endif %}
 
 
