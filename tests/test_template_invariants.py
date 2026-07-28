@@ -143,6 +143,16 @@ def test_dependency_track_doc_matches_choice(generated_project):
     assert ('upload-an-sbom-to-dependency-track' in nav_text) == expected
 
 
+def test_sidebar_nav_override_ships(generated_project):
+    """The sidebar site-nav theme override ships and is wired into properdocs.yml."""
+    project, _ = generated_project
+    override = project / 'docs-theme' / 'toc.html'
+    assert override.is_file()
+    assert 'site_nav_item' in override.read_text(encoding='utf-8')
+    config = yaml.safe_load((project / 'properdocs.yml').read_text(encoding='utf-8'))
+    assert config['theme']['custom_dir'] == 'docs-theme'
+
+
 def test_no_hidden_dirs_in_docs(generated_project):
     """No dotfile/dotdir junk ships under docs/ (guards against tool-state directories leaking in)."""
     project, _ = generated_project

@@ -1,0 +1,73 @@
+<div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="{% trans %}Table of Contents{% endtrans %}">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    {%- macro site_nav_item(item) %}
+        {%- if item.children %}
+            <li class="nav-item sitenav-section">
+                <details {% if item.active %}open{% endif %}>
+                    <summary class="nav-link">{{ item.title }}</summary>
+                    <ul class="nav flex-column">
+                        {%- for child in item.children %}
+                            {{- site_nav_item(child) }}
+                        {%- endfor %}
+                    </ul>
+                </details>
+            </li>
+        {%- else %}
+            <li class="nav-item">
+                <a href="{{ item.url | url }}" class="nav-link{% if item.active %} active fw-bold{% endif %}">{{ item.title }}</a>
+            </li>
+        {%- endif %}
+    {%- endmacro %}
+
+    {% macro toc_item(item) %}
+        {%- if item.level <= config.theme.navigation_depth %}
+            <li class="nav-item" data-bs-level="{{ item.level }}"><a href="{{ item.url }}" class="nav-link">{{ item.title }}</a>
+              <ul class="nav flex-column">
+                {%- for child in item.children %}
+                    {{- toc_item(child) }}
+                {%- endfor %}
+              </ul>
+            </li>
+        {%- endif %}
+    {%- endmacro %}
+
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <style>
+            /* The theme styles bare <details> as admonition boxes; undo that inside the sidebar. */
+            .bs-sidebar .sitenav-section details {
+                padding: 0; margin: 0; border: 0; border-radius: 0;
+                background: transparent; text-align: inherit;
+            }
+            .bs-sidebar #toc-collapse .nav-link { padding: 2px 10px; }
+            .sitenav-section > details > summary { cursor: pointer; list-style: none; }
+            .sitenav-section > details > summary::-webkit-details-marker { display: none; }
+            .sitenav-section > details > summary::before { content: "\25B8"; display: inline-block; width: 1em; }
+            .sitenav-section > details[open] > summary::before { content: "\25BE"; }
+            .bs-sidebar .sitenav-section ul { margin-left: 0.9em; }
+            .bs-sidebar .nav .nav .nav { margin-left: 0; }
+            .bs-sidebar .sitenav-title {
+                font-weight: 600; font-size: 0.85em; text-transform: uppercase;
+                letter-spacing: 0.05em; opacity: 0.6; padding: 0.5rem 10px 0.15rem;
+            }
+        </style>
+        <div class="sitenav-title">{% trans %}Navigation{% endtrans %}</div>
+        <ul class="nav flex-column">
+        {%- for item in nav %}
+            {{ site_nav_item(item) }}
+        {%- endfor %}
+        </ul>
+        {%- if page.toc %}
+        <div class="sitenav-title">{% trans %}On this page{% endtrans %}</div>
+        <ul class="nav flex-column">
+        {%- for item in page.toc %}
+            {{ toc_item(item) }}
+        {%- endfor %}
+        </ul>
+        {%- endif %}
+    </div>
+</div>
