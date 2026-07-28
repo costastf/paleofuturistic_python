@@ -257,7 +257,178 @@
     </div>
 
     
+
     <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <style>
+            /* The theme styles bare <details> as admonition boxes; undo that inside the sidebar. */
+            .bs-sidebar .sitenav-section details {
+                padding: 0; margin: 0; border: 0; border-radius: 0;
+                background: transparent; text-align: inherit;
+            }
+            .bs-sidebar #toc-collapse .nav-link { padding: 2px 10px; }
+            .sitenav-section > details > summary { cursor: pointer; list-style: none; }
+            .sitenav-section > details > summary::-webkit-details-marker { display: none; }
+            .sitenav-section > details > summary::before { content: "\25B8"; display: inline-block; width: 1em; }
+            .sitenav-section > details[open] > summary::before { content: "\25BE"; }
+            .bs-sidebar .sitenav-section ul { margin-left: 0.9em; }
+            .bs-sidebar .nav .nav .nav { margin-left: 0; }
+            .bs-sidebar .sitenav-title {
+                font-weight: 600; font-size: 0.85em; text-transform: uppercase;
+                letter-spacing: 0.05em; opacity: 0.6; padding: 0.5rem 10px 0.15rem;
+            }
+        </style>
+        <div class="sitenav-title">Navigation</div>
+        <ul class="nav flex-column">
+            
+            <li class="nav-item">
+                <a href="../../index.html" class="nav-link">Home</a>
+            </li>
+            
+            <li class="nav-item sitenav-section">
+                <details open>
+                    <summary class="nav-link">Using the template</summary>
+                    <ul class="nav flex-column">
+            <li class="nav-item sitenav-section">
+                <details >
+                    <summary class="nav-link">Tutorials</summary>
+                    <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="../tutorials/generate-your-first-project.html" class="nav-link">Generate your first project</a>
+            </li>
+            <li class="nav-item">
+                <a href="../tutorials/from-zero-to-published-package.html" class="nav-link">From zero to a published package</a>
+            </li>
+                    </ul>
+                </details>
+            </li>
+            <li class="nav-item sitenav-section">
+                <details >
+                    <summary class="nav-link">How-to</summary>
+                    <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="../how-to/update-existing-project-with-copier.html" class="nav-link">Update an existing project with copier</a>
+            </li>
+            <li class="nav-item">
+                <a href="../how-to/choose-a-git-host.html" class="nav-link">Choose a git host</a>
+            </li>
+            <li class="nav-item">
+                <a href="../how-to/enable-dependency-track.html" class="nav-link">Enable Dependency Track integration</a>
+            </li>
+            <li class="nav-item">
+                <a href="../how-to/harden-github-repository.html" class="nav-link">Harden the GitHub repository</a>
+            </li>
+            <li class="nav-item">
+                <a href="../how-to/convert-library-to-cli.html" class="nav-link">Convert the library into a CLI</a>
+            </li>
+            <li class="nav-item">
+                <a href="../how-to/choose-python-version-range.html" class="nav-link">Choose the Python version range</a>
+            </li>
+            <li class="nav-item">
+                <a href="../how-to/publish-docs-to-github-pages.html" class="nav-link">Publish docs to GitHub Pages</a>
+            </li>
+                    </ul>
+                </details>
+            </li>
+            <li class="nav-item sitenav-section">
+                <details open>
+                    <summary class="nav-link">Reference</summary>
+                    <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="copier-questions.html" class="nav-link active fw-bold">Copier questions</a>
+            </li>
+            <li class="nav-item">
+                <a href="generated-project-tree.html" class="nav-link">Generated project tree</a>
+            </li>
+            <li class="nav-item">
+                <a href="license-options.html" class="nav-link">License options</a>
+            </li>
+                    </ul>
+                </details>
+            </li>
+            <li class="nav-item sitenav-section">
+                <details >
+                    <summary class="nav-link">Explanation</summary>
+                    <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="../explanation/how-uv-is-used.html" class="nav-link">How uv is used</a>
+            </li>
+            <li class="nav-item">
+                <a href="../explanation/sbom-and-security-model.html" class="nav-link">SBOM and security model</a>
+            </li>
+            <li class="nav-item">
+                <a href="../explanation/testing-strategy.html" class="nav-link">Testing strategy</a>
+            </li>
+                    </ul>
+                </details>
+            </li>
+                    </ul>
+                </details>
+            </li>
+            
+            <li class="nav-item sitenav-section">
+                <details >
+                    <summary class="nav-link">Maintaining the template</summary>
+                    <ul class="nav flex-column">
+            <li class="nav-item sitenav-section">
+                <details >
+                    <summary class="nav-link">Tutorials</summary>
+                    <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="../../maintaining/tutorials/make-your-first-template-change.html" class="nav-link">Make your first template change</a>
+            </li>
+                    </ul>
+                </details>
+            </li>
+            <li class="nav-item sitenav-section">
+                <details >
+                    <summary class="nav-link">How-to</summary>
+                    <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="../../maintaining/how-to/test-the-template.html" class="nav-link">Test the template</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/how-to/extend-the-template-tasks.html" class="nav-link">Extend the template workflow tasks</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/how-to/sync-shipped-docs.html" class="nav-link">Keep shipped docs in sync</a>
+            </li>
+                    </ul>
+                </details>
+            </li>
+            <li class="nav-item sitenav-section">
+                <details >
+                    <summary class="nav-link">Reference</summary>
+                    <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="../../maintaining/reference/generation-internals.html" class="nav-link">Generation internals</a>
+            </li>
+                    </ul>
+                </details>
+            </li>
+            <li class="nav-item sitenav-section">
+                <details >
+                    <summary class="nav-link">Explanation</summary>
+                    <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="../../maintaining/explanation/design-principles.html" class="nav-link">Design principles</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/explanation/why-copier.html" class="nav-link">Why copier</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/explanation/the-ci-tasks-architecture.html" class="nav-link">The CI tasks architecture</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/explanation/history-and-lineage.html" class="nav-link">History and lineage</a>
+            </li>
+                    </ul>
+                </details>
+            </li>
+                    </ul>
+                </details>
+            </li>
+        </ul>
+        <div class="sitenav-title">On this page</div>
         <ul class="nav flex-column">
             
             <li class="nav-item" data-bs-level="1"><a href="#copier-questions" class="nav-link">Copier questions</a>
