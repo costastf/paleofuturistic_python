@@ -7,14 +7,14 @@
         
         <meta name="author" content="Carlo 'carlovo' van Overbeek">
         
-        <link rel="shortcut icon" href="../img/favicon.ico">
-        <title>Add a workflow task - Paleofuturistic Python</title>
-        <link href="../css/bootstrap.min.css" rel="stylesheet">
-        <link href="../css/fontawesome.min.css" rel="stylesheet">
-        <link href="../css/brands.min.css" rel="stylesheet">
-        <link href="../css/solid.min.css" rel="stylesheet">
-        <link href="../css/v4-font-face.min.css" rel="stylesheet">
-        <link href="../css/base.css" rel="stylesheet">
+        <link rel="shortcut icon" href="../../img/favicon.ico">
+        <title>Enable Dependency Track integration - Paleofuturistic Python</title>
+        <link href="../../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../../css/brands.min.css" rel="stylesheet">
+        <link href="../../css/solid.min.css" rel="stylesheet">
+        <link href="../../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../../css/base.css" rel="stylesheet">
         <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" disabled>
         <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
@@ -24,7 +24,7 @@
     <body>
         <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
             <div class="container">
-                <a class="navbar-brand" href="../index.html">Paleofuturistic Python</a>
+                <a class="navbar-brand" href="../../index.html">Paleofuturistic Python</a>
                 <!-- Expander button -->
                 <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
@@ -35,114 +35,160 @@
                         <!-- Main navigation -->
                         <ul class="nav navbar-nav">
                             <li class="nav-item">
-                                <a href="../index.html" class="nav-link">Home</a>
+                                <a href="../../index.html" class="nav-link">Home</a>
                             </li>
                             <li class="nav-item dropdown">
-                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Tutorials</a>
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Using the template</a>
                                 <ul class="dropdown-menu">
                                     
+  <li class="dropdown-submenu">
+    <a href="#" class="dropdown-item">Tutorials</a>
+    <ul class="dropdown-menu">
+            
 <li>
     <a href="../tutorials/generate-your-first-project.html" class="dropdown-item">Generate your first project</a>
 </li>
-                                    
+            
 <li>
     <a href="../tutorials/from-zero-to-published-package.html" class="dropdown-item">From zero to a published package</a>
 </li>
-                                </ul>
-                            </li>
-                            <li class="nav-item dropdown">
-                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">How-to</a>
-                                <ul class="dropdown-menu">
+    </ul>
+  </li>
                                     
+  <li class="dropdown-submenu">
+    <a href="#" class="dropdown-item">How-to</a>
+    <ul class="dropdown-menu">
+            
 <li>
     <a href="update-existing-project-with-copier.html" class="dropdown-item">Update an existing project with copier</a>
 </li>
-                                    
+            
 <li>
     <a href="choose-a-git-host.html" class="dropdown-item">Choose a git host</a>
 </li>
-                                    
+            
 <li>
-    <a href="enable-dependency-track.html" class="dropdown-item">Enable Dependency Track integration</a>
+    <a href="enable-dependency-track.html" class="dropdown-item active" aria-current="page">Enable Dependency Track integration</a>
 </li>
-                                    
+            
 <li>
     <a href="harden-github-repository.html" class="dropdown-item">Harden the GitHub repository</a>
 </li>
-                                    
+            
 <li>
     <a href="convert-library-to-cli.html" class="dropdown-item">Convert the library into a CLI</a>
 </li>
-                                    
+            
 <li>
     <a href="choose-python-version-range.html" class="dropdown-item">Choose the Python version range</a>
 </li>
-                                    
+            
 <li>
     <a href="publish-docs-to-github-pages.html" class="dropdown-item">Publish docs to GitHub Pages</a>
 </li>
+    </ul>
+  </li>
                                     
-<li>
-    <a href="add-a-workflow-task.html" class="dropdown-item active" aria-current="page">Add a workflow task</a>
-</li>
-                                    
-<li>
-    <a href="customize-the-bootstrap.html" class="dropdown-item">Customize the bootstrap</a>
-</li>
-                                </ul>
-                            </li>
-                            <li class="nav-item dropdown">
-                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Reference</a>
-                                <ul class="dropdown-menu">
-                                    
+  <li class="dropdown-submenu">
+    <a href="#" class="dropdown-item">Reference</a>
+    <ul class="dropdown-menu">
+            
 <li>
     <a href="../reference/copier-questions.html" class="dropdown-item">Copier questions</a>
 </li>
-                                    
-<li>
-    <a href="../reference/generation-internals.html" class="dropdown-item">Generation internals</a>
-</li>
-                                    
+            
 <li>
     <a href="../reference/generated-project-tree.html" class="dropdown-item">Generated project tree</a>
 </li>
-                                    
+            
 <li>
     <a href="../reference/license-options.html" class="dropdown-item">License options</a>
 </li>
-                                </ul>
-                            </li>
-                            <li class="nav-item dropdown">
-                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Explanation</a>
-                                <ul class="dropdown-menu">
+    </ul>
+  </li>
                                     
-<li>
-    <a href="../explanation/why-copier.html" class="dropdown-item">Why copier</a>
-</li>
-                                    
-<li>
-    <a href="../explanation/design-principles.html" class="dropdown-item">Design principles</a>
-</li>
-                                    
-<li>
-    <a href="../explanation/history-and-lineage.html" class="dropdown-item">History and lineage</a>
-</li>
-                                    
+  <li class="dropdown-submenu">
+    <a href="#" class="dropdown-item">Explanation</a>
+    <ul class="dropdown-menu">
+            
 <li>
     <a href="../explanation/how-uv-is-used.html" class="dropdown-item">How uv is used</a>
 </li>
-                                    
-<li>
-    <a href="../explanation/the-ci-tasks-architecture.html" class="dropdown-item">The CI tasks architecture</a>
-</li>
-                                    
+            
 <li>
     <a href="../explanation/sbom-and-security-model.html" class="dropdown-item">SBOM and security model</a>
 </li>
-                                    
+            
 <li>
     <a href="../explanation/testing-strategy.html" class="dropdown-item">Testing strategy</a>
 </li>
+    </ul>
+  </li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Maintaining the template</a>
+                                <ul class="dropdown-menu">
+                                    
+  <li class="dropdown-submenu">
+    <a href="#" class="dropdown-item">Tutorials</a>
+    <ul class="dropdown-menu">
+            
+<li>
+    <a href="../../maintaining/tutorials/make-your-first-template-change.html" class="dropdown-item">Make your first template change</a>
+</li>
+    </ul>
+  </li>
+                                    
+  <li class="dropdown-submenu">
+    <a href="#" class="dropdown-item">How-to</a>
+    <ul class="dropdown-menu">
+            
+<li>
+    <a href="../../maintaining/how-to/test-the-template.html" class="dropdown-item">Test the template</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/how-to/extend-the-template-tasks.html" class="dropdown-item">Extend the template workflow tasks</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/how-to/sync-shipped-docs.html" class="dropdown-item">Keep shipped docs in sync</a>
+</li>
+    </ul>
+  </li>
+                                    
+  <li class="dropdown-submenu">
+    <a href="#" class="dropdown-item">Reference</a>
+    <ul class="dropdown-menu">
+            
+<li>
+    <a href="../../maintaining/reference/generation-internals.html" class="dropdown-item">Generation internals</a>
+</li>
+    </ul>
+  </li>
+                                    
+  <li class="dropdown-submenu">
+    <a href="#" class="dropdown-item">Explanation</a>
+    <ul class="dropdown-menu">
+            
+<li>
+    <a href="../../maintaining/explanation/design-principles.html" class="dropdown-item">Design principles</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/explanation/why-copier.html" class="dropdown-item">Why copier</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/explanation/the-ci-tasks-architecture.html" class="dropdown-item">The CI tasks architecture</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/explanation/history-and-lineage.html" class="dropdown-item">History and lineage</a>
+</li>
+    </ul>
+  </li>
                                 </ul>
                             </li>
                         </ul>
@@ -154,17 +200,17 @@
                             </a>
                         </li>
                             <li class="nav-item">
-                                <a rel="prev" href="publish-docs-to-github-pages.html" class="nav-link">
+                                <a rel="prev" href="choose-a-git-host.html" class="nav-link">
                                     <i class="fa fa-arrow-left"></i> Previous
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a rel="next" href="customize-the-bootstrap.html" class="nav-link">
+                                <a rel="next" href="harden-github-repository.html" class="nav-link">
                                     Next <i class="fa fa-arrow-right"></i>
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a href="https://github.com/schubergphilis/paleofuturistic_python/blob/main/docs/how-to/add-a-workflow-task.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
+                                <a href="https://github.com/schubergphilis/paleofuturistic_python/blob/main/docs/using/how-to/enable-dependency-track.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
                             </li>
                             <li class="nav-item dropdown">
                               <button id="theme-menu" aria-expanded="false" data-bs-toggle="dropdown" data-bs-display="static" aria-label="Toggle theme" class="nav-link dropdown-toggle">
@@ -199,7 +245,7 @@
                 </div>
             </div>
         </div>
-        <script src="../js/darkmode.js"></script>
+        <script src="../../js/darkmode.js"></script>
 
         <div class="container">
             <div class="row">
@@ -214,25 +260,25 @@
     <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
         <ul class="nav flex-column">
             
-            <li class="nav-item" data-bs-level="1"><a href="#add-a-workflow-task" class="nav-link">Add a workflow task</a>
+            <li class="nav-item" data-bs-level="1"><a href="#enable-dependency-track-integration" class="nav-link">Enable Dependency Track integration</a>
               <ul class="nav flex-column">
-            <li class="nav-item" data-bs-level="2"><a href="#a-new-task-in-an-existing-module" class="nav-link">A new task in an existing module</a>
-              <ul class="nav flex-column">
-              </ul>
-            </li>
-            <li class="nav-item" data-bs-level="2"><a href="#a-new-module-entirely" class="nav-link">A new module entirely</a>
+            <li class="nav-item" data-bs-level="2"><a href="#when-to-use-this" class="nav-link">When to use this</a>
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-bs-level="2"><a href="#calling-from-another-task" class="nav-link">Calling from another task</a>
+            <li class="nav-item" data-bs-level="2"><a href="#at-generation-time" class="nav-link">At generation time</a>
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-bs-level="2"><a href="#conventions" class="nav-link">Conventions</a>
+            <li class="nav-item" data-bs-level="2"><a href="#after-generation" class="nav-link">After generation</a>
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-bs-level="2"><a href="#see-also" class="nav-link">See also</a>
+            <li class="nav-item" data-bs-level="2"><a href="#verify-it-works" class="nav-link">Verify it works</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#i-picked-the-wrong-answer-at-generation-time" class="nav-link">I picked the wrong answer at generation time</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -243,80 +289,50 @@
 </div></div>
                     <div class="col-md-9" role="main">
 
-<h1 id="add-a-workflow-task">Add a workflow task</h1>
-<p>The <code>./workflow.cmd &lt;namespace&gt;.&lt;task&gt;</code> interface is backed by Invoke. Adding a new task to a generated project is one of:</p>
-<ul>
-<li>A new task inside an existing module (e.g. another step in <code>lint</code>).</li>
-<li>A new module entirely (e.g. <code>_CI/tasks/benchmarks.py</code>).</li>
-</ul>
-<h2 id="a-new-task-in-an-existing-module">A new task in an existing module</h2>
-<p>Open the relevant module under <code>_CI/tasks/</code>. Each module ends with a <code>namespace = Collection(...)</code> and a series of <code>namespace.add_task(...)</code> calls. To add an Invoke task:</p>
-<pre><code class="language-python">from invoke import Context, task
-
-from .shared import execute, logged
-
-
-@task
-@logged('lint.spelling')
-def spelling(context: Context) -&gt; None:
-    &quot;&quot;&quot;Run codespell on src/ and tests/.&quot;&quot;&quot;
-    execute(context, 'uv run codespell src/ tests/')
+<h1 id="enable-dependency-track-integration">Enable Dependency Track integration</h1>
+<p>Wire a generated project to an OWASP <a href="https://dependencytrack.org/">Dependency Track</a> server so every release uploads a fresh CycloneDX SBOM.</p>
+<h2 id="when-to-use-this">When to use this</h2>
+<p>You already run a Dependency Track instance (self-hosted or managed) and want this project's releases to appear there automatically. If you don't have a server, see <a href="../explanation/sbom-and-security-model.html">SBOM and security model</a> (inner-project explanation) for what you're missing first.</p>
+<h2 id="at-generation-time">At generation time</h2>
+<p>When <code>copier copy</code> asks:</p>
+<pre><code>integrate_dependency_track [y]:
 </code></pre>
-<p>The <code>@logged</code> decorator emits the pass/fail status line. The <code>execute</code> helper raises <code>SystemExit(1)</code> on non-zero exit; nested stdout is indented under the parent banner (the <code>IndentingStream</code> wiring in <code>_CI/tasks/shared.py</code>).</p>
-<p>Then register the task at the bottom of the module:</p>
-<pre><code class="language-python">namespace.add_task(cast(Task, spelling))
+<p>answer <code>y</code>. This adds the Dependency Track upload step to the security workflow and the <code>OWASP_DTRACK_SETTINGS</code> block to <code>_CI/tasks/configuration.py</code>.</p>
+<h2 id="after-generation">After generation</h2>
+<p>The generated project expects three environment variables at release time:</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Example</th>
+<th>Where to find it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OWASP_DT_URL</code></td>
+<td><code>https://dt.example.com</code></td>
+<td>Your Dependency Track instance</td>
+</tr>
+<tr>
+<td><code>OWASP_DT_API_KEY</code></td>
+<td><code>odt_…</code></td>
+<td>DT → Administration → Access Management → Teams</td>
+</tr>
+<tr>
+<td><code>OWASP_DT_PROJECT_UUID</code></td>
+<td>UUID</td>
+<td>DT → Projects → your project</td>
+</tr>
+</tbody>
+</table>
+<p>Set them in your CI secret store (GitHub Actions secrets or GitLab CI variables). Locally, export them in your shell before running:</p>
+<pre><code class="language-bash">./workflow.cmd secure.sbom-upload
 </code></pre>
-<p>If the module aggregates several subtasks into a default (e.g. <code>lint</code> running everything), add it to the <code>run_steps()</code> call.</p>
-<h2 id="a-new-module-entirely">A new module entirely</h2>
-<ol>
-<li>Create <code>_CI/tasks/&lt;name&gt;.py</code> with at least:</li>
-</ol>
-<p>```python
-   from invoke import Collection, Context, Task, task</p>
-<p>from .shared import execute, logged</p>
-<p>@task
-   @logged('<name>.all')
-   def all_(context: Context) -&gt; None:
-       """Run everything in this namespace."""
-       ...</p>
-<p>namespace = Collection('<name>')
-   namespace.add_task(cast(Task, all_), default=True, name='all')
-   ```</p>
-<ol>
-<li>Register it in <code>_CI/tasks/__init__.py</code>:</li>
-</ol>
-<p>```python
-   from . import <name></p>
-<p>namespace.add_collection(<name>.namespace)
-   ```</p>
-<ol>
-<li>Add it to the bootstrap-pre-task loop so the first invocation triggers bootstrap:</li>
-</ol>
-<p><code>python
-   for module in (build, container, ..., &lt;name&gt;):
-       for task in module.namespace.tasks.values():
-           task.pre.insert(0, bootstrap_task)</code></p>
-<h2 id="calling-from-another-task">Calling from another task</h2>
-<p>Modules compose via direct function calls — they don't reach into each other's Invoke internals:</p>
-<pre><code class="language-python">from .build import build as build_task
-
-@task
-def my_thing(context):
-    build_task(context)   # plain call
-    ...
-</code></pre>
-<h2 id="conventions">Conventions</h2>
-<ul>
-<li>One module per concern. Lint covers all linters; security covers all security tools. Don't sprawl.</li>
-<li>Side effects via <code>execute(context, '...')</code> so failures abort the run cleanly.</li>
-<li>Don't catch <code>SystemExit</code> — let the <code>run_steps()</code> runner accumulate failures.</li>
-<li>Don't use leading underscores on module-level function names; the project's pylint config disallows it.</li>
-</ul>
-<h2 id="see-also">See also</h2>
-<ul>
-<li><a href="../reference/generated-project-tree.html">Generated project tree</a> — the full <code>_CI/tasks/</code> file listing.</li>
-<li><a href="../explanation/the-ci-tasks-architecture.html">The _CI tasks architecture</a> — design rationale for the <code>@logged</code> + <code>IndentingStream</code> plumbing.</li>
-</ul></div>
+<h2 id="verify-it-works">Verify it works</h2>
+<p>After running <code>secure.sbom-upload</code>, the task prints the upload response. In the DT UI, the project's "Components" tab should refresh within a few seconds.</p>
+<h2 id="i-picked-the-wrong-answer-at-generation-time">I picked the wrong answer at generation time</h2>
+<p>Re-run <code>uvx copier update --trust</code> and change <code>integrate_dependency_track</code> when prompted. See <a href="update-existing-project-with-copier.html">Update an existing project with copier</a> for the full flow.</p></div>
             </div>
         </div>
 
@@ -325,13 +341,13 @@ def my_thing(context):
                 <p>Copyright &copy; 2024 <a href="https://schubergphilis.com/">Schuberg Philis</a></p>
             <p>Documentation built with <a href="https://properdocs.org/">ProperDocs</a>.</p>
         </footer>
-        <script src="../js/bootstrap.bundle.min.js"></script>
+        <script src="../../js/bootstrap.bundle.min.js"></script>
         <script>
-            var base_url = "..",
+            var base_url = "../..",
                 shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
         </script>
-        <script src="../js/base.js"></script>
-        <script src="../search/main.js"></script>
+        <script src="../../js/base.js"></script>
+        <script src="../../search/main.js"></script>
 
         <div class="modal" id="properdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
