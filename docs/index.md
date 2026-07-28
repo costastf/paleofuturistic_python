@@ -10,7 +10,7 @@
 
 This is a [copier](https://copier.readthedocs.io/) template that generates a fully scaffolded, enterprise-ready Python package — uv-managed, ruff-formatted, pytest-tested, properdocs-documented, with vendored CI tooling, SBOM generation, and optional Dependency Track integration.
 
-The documentation is split by what you're here to do; each area is organized around the [Diátaxis](https://diataxis.fr/) framework, and the sidebar is the full map.
+The documentation is split by what you're here to do; each area is organized around the [Diátaxis](https://diataxis.fr/) framework. The **navigation bar at the top** is the full map — open an area's dropdown and click a quadrant to unfold its pages. (The panel on the left is just the current page's table of contents.)
 
 ## Using the template
 
