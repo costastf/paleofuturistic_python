@@ -1,6 +1,7 @@
 """Test task definitions."""
 
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -35,13 +36,18 @@ def coverage_color(pct: float) -> str:
 
 
 def read_coverage_pct() -> int | None:
-    """Return the rounded total coverage percentage from the latest pytest-cov JSON report."""
+    """Return the floored total coverage percentage from the latest pytest-cov JSON report.
+
+    Floored, not rounded: this value becomes the ratchet's `fail_under`, and rounding up
+    can write a bar the very run that produced it doesn't clear. The badge rounds for
+    display in `update_coverage_badge`; a gate must never exceed measured coverage.
+    """
     if not COVERAGE_REPORT.exists():
         return None
     try:
         report = json.loads(COVERAGE_REPORT.read_text(encoding='utf-8'))
-        return round(report['totals']['percent_covered'])
-    except (ValueError, KeyError):
+        return math.floor(report['totals']['percent_covered'])
+    except (TypeError, ValueError, KeyError):
         return None
 
 
