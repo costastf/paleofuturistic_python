@@ -7,7 +7,19 @@ requires-python = ">=3.12"
 [tool.uv]
 package = false
 required-version = "==0.11.30"
-exclude-newer = "1 week"
+# Fixed date, not a relative window. `exclude-newer = "1 week"` moved forward every day,
+# so a resolution could change — and a gate could go red — with no commit behind it. The
+# value below is exactly where that rolling window sat when it was frozen, so resolution
+# did not shift at the time of the change.
+#
+# Bumping it is a deliberate act: raise the date, re-resolve, and land the resulting
+# dependency-group bumps in the same commit so the quarantine boundary and the pins always
+# agree.
+#
+# This is the template repository's own boundary, maintained by hand. Generated projects
+# get theirs stamped with their generation date by tasks_render.py, so a project created
+# later does not inherit a boundary that has receded into the past.
+exclude-newer = "2026-07-27"
 
 [dependency-groups]
 # PyYAML parses copier.yml in _CI.tasks.configuration.base_context; the `dev` group is

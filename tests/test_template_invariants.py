@@ -14,6 +14,7 @@ import os
 import re
 import subprocess
 import tomllib
+from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -556,6 +557,89 @@ def test_no_task_still_depends_on_wslu(generated_project):
         source = (project / '_CI' / 'tasks' / name).read_text(encoding='utf-8')
         assert 'install the wslu' not in source, f'{name} still recommends the deprecated wslu package'
         assert 'open_command' not in source, f'{name} still uses the removed open_command()'
+
+
+def test_exclude_newer_is_a_fixed_date(generated_project):
+    """`exclude-newer` is an absolute date, not a rolling window.
+
+    A relative `"1 week"` moved forward daily, so a resolution — and a green gate — could
+    change with no commit behind it. That is how the toolchain drifted into a red lint run
+    with no code change.
+    """
+    project, _ = generated_project
+    for pyproject in (project / 'pyproject.toml', REPO_ROOT / 'pyproject.toml'):
+        value = tomllib.loads(pyproject.read_text(encoding='utf-8'))['tool']['uv']['exclude-newer']
+        assert re.fullmatch(r'\d{4}-\d{2}-\d{2}', value), f'{pyproject} has a relative window: {value!r}'
+
+
+def test_generated_quarantine_date_is_stamped_not_inherited(generated_project):
+    """A new project's `exclude-newer` is its generation date, not a literal from the template.
+
+    The template's own value recedes into the past between bumps; inheriting it would hand a
+    project created a year later a boundary pinned to year-old packages. `tasks_render.py`
+    overwrites it at generation, and this catches the stamp silently not running — in which
+    case the fallback literal shows through and is already days stale.
+    """
+    project, _ = generated_project
+    stamped = date.fromisoformat(
+        tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))['tool']['uv']['exclude-newer']
+    )
+    # A day of slack absorbs a suite running across midnight; a missed stamp is far staler.
+    assert abs((date.today() - stamped).days) <= 1, f'quarantine date {stamped} was not stamped at generation'
+
+
+def test_base_images_are_pinned_by_digest(generated_project):
+    """Both container images carry a digest, and the base image's tag matches its Python version."""
+    project, _ = generated_project
+    data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
+    images = data['tool']['docker-versions']
+    minimum = data['project']['requires-python'].removeprefix('>=')
+    base = images['base-image']
+    assert '@sha256:' in base, f'base image not pinned by digest: {base}'
+    assert f'python{minimum}-trixie-slim@' in base, f'tag does not match requires-python {minimum}: {base}'
+    assert '@sha256:' in images['alpine-image'], 'alpine image not pinned by digest'
+
+
+def test_generated_project_ships_a_lockfile(generated_project):
+    """A resolved `uv.lock` ships, and it is not ignored.
+
+    `Dockerfile.deps` runs `uv sync --frozen` and the deps-image tag hashes the lockfile;
+    both previously relied on a lock created as a side effect of the first `uv run`.
+    """
+    project, _ = generated_project
+    lock = project / 'uv.lock'
+    assert lock.is_file(), 'no uv.lock was resolved at generation time'
+    data = tomllib.loads(lock.read_text(encoding='utf-8'))
+    assert data['package'], 'lockfile resolved no packages'
+    ignore = (project / '.gitignore').read_text(encoding='utf-8')
+    assert not re.search(r'^\s*/?uv\.lock\s*$', ignore, re.MULTILINE), 'uv.lock is gitignored'
+
+
+def test_lockfile_agrees_with_the_pinned_uv(generated_project):
+    """The locked uv matches `[tool.uv] required-version`.
+
+    They are resolved from the same pyproject, so a mismatch would mean the lockfile was
+    generated against different pins than the ones that shipped.
+    """
+    project, _ = generated_project
+    data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
+    required = data['tool']['uv']['required-version'].removeprefix('==')
+    locked = {p['name']: p['version'] for p in tomllib.loads((project / 'uv.lock').read_text(encoding='utf-8'))['package']}
+    assert locked.get('uv') == required, f'lock pins uv {locked.get("uv")}, pyproject requires {required}'
+
+
+def test_lock_task_derives_the_uv_version_from_the_project():
+    """The copier lock task reads the uv version out of the rendered pyproject.
+
+    Hardcoding it in copier.yml would silently drift from `[tool.uv] required-version`, and
+    the generated project pins uv exactly — so a stale value there fails generation outright.
+    """
+    # Parsed, not grepped: the surrounding comments also mention `uvx uv@`.
+    tasks = yaml.safe_load((REPO_ROOT / 'copier.yml').read_text(encoding='utf-8'))['_tasks']
+    commands = [task['command'] if isinstance(task, dict) else task for task in tasks]
+    lock_task = next(command for command in commands if 'uvx uv@' in command)
+    assert 'required-version' in lock_task, 'lock task hardcodes a uv version instead of deriving it'
+    assert 'pyproject.toml' in lock_task, 'lock task does not read the version from the rendered project'
 
 
 def test_sidebar_nav_override_ships(generated_project):
