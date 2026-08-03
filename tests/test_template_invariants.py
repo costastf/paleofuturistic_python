@@ -745,6 +745,52 @@ def test_pre_push_gate_enforces_the_same_coverage_floor(generated_project):
     assert 'run_steps(pytest)' in aggregator, 'the aggregator no longer delegates to the same pytest task'
 
 
+def test_local_task_module_ships_with_a_namespace(generated_project):
+    """`_CI/tasks/local.py` ships and exposes a `local` collection ready to add tasks to."""
+    project, _ = generated_project
+    local = project / '_CI' / 'tasks' / 'local.py'
+    assert local.is_file(), 'no project-owned task module ships'
+    source = local.read_text(encoding='utf-8')
+    assert "Collection('local')" in source, 'local.py defines no namespace for __init__ to pick up'
+
+
+def test_local_task_module_is_protected_from_updates(generated_project):
+    """`local.py` is in `_skip_if_exists`, without which the seam is pointless.
+
+    The whole reason it exists is that template-owned modules are replaced on
+    `copier update`. If it were not skipped it would be overwritten or conflict on every
+    update — exactly the problem it is meant to remove.
+    """
+    config = yaml.safe_load((REPO_ROOT / 'copier.yml').read_text(encoding='utf-8'))
+    skipped = config.get('_skip_if_exists') or []
+    assert '_CI/tasks/local.py' in skipped, f'local.py is not protected from updates; skipped={skipped}'
+
+
+def test_local_tasks_need_no_registration(generated_project):
+    """`__init__.py` discovers `local.py` itself, so adding a task never edits template files.
+
+    Registration used to mean editing `__init__.py` and its bootstrap loop — both
+    template-owned, so every local task cost a merge conflict on every update.
+    """
+    project, _ = generated_project
+    init = (project / '_CI' / 'tasks' / '__init__.py').read_text(encoding='utf-8')
+    assert 'LOCAL_MODULE' in init and 'is_file()' in init, 'local.py is not conditionally discovered'
+    assert 'local.namespace' in init, 'the local namespace is never added'
+    assert 'modules.append(local)' in init, 'local tasks would not get the bootstrap pre-task'
+
+
+def test_add_a_workflow_task_directs_people_to_local(generated_project):
+    """The how-to points at `local.py` and no longer tells people to edit `__init__.py`.
+
+    The doc previously instructed readers to create a module *and* register it in
+    `_CI/tasks/__init__.py`, which guaranteed a conflict on the next update.
+    """
+    project, _ = generated_project
+    how_to = (project / 'docs' / 'developer' / 'how-to' / 'add-a-workflow-task.md').read_text(encoding='utf-8')
+    assert 'local.py' in how_to, 'the how-to never mentions the project-owned module'
+    assert 'Register it in `_CI/tasks/__init__.py`' not in how_to, 'the how-to still tells people to edit __init__.py'
+
+
 def test_sidebar_nav_override_ships(generated_project):
     """The sidebar site-nav theme override ships and is wired into properdocs.yml."""
     project, _ = generated_project

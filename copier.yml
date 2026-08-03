@@ -4,6 +4,13 @@ _answers_file: .copier-answers.yml
 # are copied verbatim (vendored _CI/lib/**, binaries, static configs), which removes
 # the need for a copy-without-render exclusion list.
 
+# Seeded once, then left alone forever. Everything else under `_CI/tasks/` is template-owned
+# and gets replaced on update, so a project's own tasks need somewhere that does not. Without
+# this entry `local.py` would be overwritten — or conflict — on every `copier update`, which
+# is the whole problem it exists to solve.
+_skip_if_exists:
+  - _CI/tasks/local.py
+
 _tasks:
   - command: >-
       {{ _copier_python }} {{ _copier_conf.src_path }}/tasks_render.py

@@ -24,6 +24,7 @@ Centralized constants shared across task modules:
 | `OWASP_DTRACK_SETTINGS` | Required environment variables for Dependency Track uploads |
 | `PROJECT_NAME` | Project name for SBOM uploads |
 {%- endif %}
+| `LOCAL_MODULE` | Path to `_CI/tasks/local.py`, the project-owned task module (in `__init__.py`) |
 | `IMAGE_NAME` | Container image name for the deps cache |
 | `DOCKERFILE_DEPS` | Dockerfile for the deps image (also a deps-image tag input) |
 | `DEPS_IMAGE_FILE` | Where `container.publish` records the resolved image reference |
@@ -129,10 +130,18 @@ _CI/
     secure.py          pip-audit, CycloneDX SBOM{% if integrate_dependency_track %}, Dependency Track upload{% endif %}
     test.py            pytest
     {{ git_hosting_service }}.py          Host-specific helpers (registry, release PR/MR)
+    local.py           YOUR tasks — never overwritten by `copier update`
   lib/
     vendor/            Vendored Invoke + dependencies (committed — don't hand-edit)
     vendor.txt         Pinned dependency list
 ```
+
+Everything in that tree is template-owned and replaced on `copier update` — **except
+`local.py`**. It is listed in the template's `_skip_if_exists`, so it is seeded once and then
+left alone. Put project-specific tasks there and updates stay conflict-free; put them in any
+other module and that hunk needs resolving on every update. `__init__.py` includes it
+automatically when present, with the same bootstrap pre-task the built-in namespaces get, so
+there is no registration step. See [Add a workflow task](../how-to/add-a-workflow-task.md).
 
 ## See also
 
