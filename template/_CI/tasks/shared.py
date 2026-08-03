@@ -36,8 +36,14 @@ OPEN_COMMAND = {
     'linux': 'xdg-open',
     'macos': 'open',
     'windows': 'start',
-    'wsl': 'wslview',  # from the wslu package; falls back to xdg-open if not installed
 }
+
+# WSL registers a binfmt handler to run Windows executables. Distros with interop
+# disabled have neither name, and there is then no way to reach a Windows browser.
+WSL_INTEROP_MARKERS = (
+    '/proc/sys/fs/binfmt_misc/WSLInterop',
+    '/proc/sys/fs/binfmt_misc/WSLInterop-late',
+)
 
 
 class IndentingStream:
@@ -133,18 +139,54 @@ def get_operating_system() -> str:
     raise SystemExit(1)
 
 
-def open_command() -> str:
-    """Return the shell command to open a file in the default application.
+def wsl_interop_available() -> bool:
+    """Return True when WSL can execute Windows binaries."""
+    return any(os.path.exists(marker) for marker in WSL_INTEROP_MARKERS)
 
-    Picks 'start' on Windows, 'open' on macOS, 'wslview' on WSL when
-    available (routes to the Windows default handler via interop), and
-    'xdg-open' on plain Linux.
+
+def open_on_wsl(context: Context, target: str) -> None:
+    """Open `target` with the Windows default application, best-effort.
+
+    There is no Linux browser to hand under WSL, so the file has to be handed to
+    Windows. Three details make this awkward:
+
+    * ``wslview`` (from ``wslu``) used to be the way to do this, but the package is
+      deprecated and often simply absent. It is still preferred when installed, since
+      an existing setup should keep working, and `cmd.exe` is used otherwise.
+    * Windows cannot resolve a Linux path, so ``wslpath -w`` translates it first.
+      Relative paths resolve against the current directory, which is what callers pass.
+    * ``cmd.exe`` and ``explorer.exe`` both exit non-zero even when they succeed, so the
+      exit status is deliberately not checked — failing on it would turn a working
+      ``./workflow.cmd document`` into a red task.
+    """
+    if shutil.which('wslview'):
+        context.run(f'wslview "{target}"', echo=True, warn=True)
+        return
+    if not wsl_interop_available():
+        print(f'WSL interop is disabled, so {target} cannot be handed to Windows. Open it manually.')
+        return
+    result = context.run(f'wslpath -w "{target}"', hide=True, warn=True)
+    windows_path = result.stdout.strip() if result is not None and not result.failed else ''
+    if not windows_path:
+        print(f'Could not translate {target} to a Windows path. Open it manually.')
+        return
+    # The empty "" is `start`'s window-title argument. Without it cmd.exe reads the
+    # quoted path as the title and opens nothing at all.
+    context.run(f'cmd.exe /c start "" "{windows_path}"', echo=True, warn=True)
+
+
+def open_target(context: Context, target: str) -> None:
+    """Open a file or URL in the host's default application.
+
+    A failure to open is fatal on Windows, macOS and Linux, as it was before. WSL is the
+    exception: the Windows helpers it has to delegate to report failure on success, so
+    there is no exit status worth trusting and problems are reported as messages instead.
     """
     system = get_operating_system()
-    if system == 'wsl' and not shutil.which('wslview'):
-        print('wslview not found; install the wslu package for `open` to work. Falling back to xdg-open.')
-        return OPEN_COMMAND['linux']
-    return OPEN_COMMAND[system]
+    if system == 'wsl':
+        open_on_wsl(context, target)
+        return
+    execute(context, f'{OPEN_COMMAND[system]} {target}')
 
 
 def container_engine() -> str:

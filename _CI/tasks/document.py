@@ -4,11 +4,10 @@ import os
 import tomllib
 import urllib.error
 import urllib.request
-import webbrowser
 
 from invoke import task
 
-from _CI import PROJECT_ROOT_DIRECTORY, emojize_message
+from _CI import PROJECT_ROOT_DIRECTORY, emojize_message, open_in_default_application
 
 SITE_INDEX = PROJECT_ROOT_DIRECTORY / 'site' / 'index.html'
 
@@ -58,7 +57,7 @@ def view(context):  # noqa: ARG001
     if not SITE_INDEX.exists():
         print(emojize_message(f'No site to view at {SITE_INDEX}; run build first.', success=False))
         raise SystemExit(1)
-    webbrowser.open(SITE_INDEX.as_uri())
+    open_in_default_application(SITE_INDEX)
 
 
 def request_pages_build() -> None:

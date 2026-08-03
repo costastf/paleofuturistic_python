@@ -15,6 +15,7 @@ import re
 import subprocess
 import tomllib
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -472,6 +473,89 @@ def test_gitlab_credentials_are_environment_scoped(generated_project):
     config = yaml.safe_load((project / '.gitlab-ci.yml').read_text(encoding='utf-8'))
     assert config['build-deps-image'].get('environment'), 'deps job has no environment to scope variables to'
     assert config['publish'].get('environment') == 'pypi'
+
+
+class RecordingContext:
+    """Minimal stand-in for an Invoke context that records commands instead of running them."""
+
+    def __init__(self, stdout_for=None):
+        self.commands = []
+        self.stdout_for = stdout_for or {}
+
+    def run(self, cmd, **_kwargs):
+        self.commands.append(cmd)
+        for prefix, stdout in self.stdout_for.items():
+            if cmd.startswith(prefix):
+                return SimpleNamespace(stdout=stdout, failed=False)
+        return SimpleNamespace(stdout='', failed=False)
+
+
+def opener(project, system, *, has_wslview=False, interop=False):
+    """Load the generated `shared.py` and drive `open_target` for one platform.
+
+    Returns (commands issued via context.run, commands routed through `execute`). The
+    split matters: `execute` fails the task on a non-zero exit, so which list a command
+    lands in *is* the failure-semantics contract.
+    """
+    shared = load_generated_shared(project)
+    executed = []
+    shared.get_operating_system = lambda: system
+    shared.shutil = SimpleNamespace(which=lambda n: '/wslview' if (n == 'wslview' and has_wslview) else None)
+    shared.wsl_interop_available = lambda: interop
+    shared.execute = lambda _ctx, cmd: executed.append(cmd)
+    context = RecordingContext({'wslpath': r'\\wsl.localhost\Ubuntu\home\me\site\index.html'})
+    shared.open_target(context, 'site/index.html')
+    return context.commands, executed
+
+
+@pytest.mark.parametrize(
+    ('system', 'expected'),
+    [('macos', 'open site/index.html'), ('linux', 'xdg-open site/index.html'), ('windows', 'start site/index.html')],
+)
+def test_open_target_keeps_strict_failure_off_wsl(generated_project, system, expected):
+    """macOS, Linux and Windows keep the pre-existing command and keep failing loudly."""
+    project, _ = generated_project
+    ran, executed = opener(project, system)
+    assert executed == [expected], f'{system} should go through execute() so a failure fails the task'
+    assert ran == []
+
+
+def test_open_target_uses_wslview_when_still_installed(generated_project):
+    """An existing `wslu` install keeps working, rather than being bypassed."""
+    project, _ = generated_project
+    ran, executed = opener(project, 'wsl', has_wslview=True, interop=True)
+    assert ran == ['wslview "site/index.html"']
+    assert executed == [], 'WSL must not use execute(): the Windows helpers exit non-zero on success'
+
+
+def test_open_target_hands_a_translated_path_to_windows(generated_project):
+    """Without `wslview`, the path is translated with `wslpath -w` and opened via cmd.exe.
+
+    Both details are load-bearing: Windows cannot resolve a Linux path, and `start`
+    needs its empty window-title argument or it treats the quoted path as a title and
+    opens nothing.
+    """
+    project, _ = generated_project
+    ran, executed = opener(project, 'wsl', interop=True)
+    assert ran[0] == 'wslpath -w "site/index.html"'
+    assert ran[1] == 'cmd.exe /c start "" "\\\\wsl.localhost\\Ubuntu\\home\\me\\site\\index.html"'
+    assert executed == []
+
+
+def test_open_target_degrades_when_wsl_interop_is_disabled(generated_project):
+    """A distro with interop off gets a message, not a traceback or a failed task."""
+    project, _ = generated_project
+    ran, executed = opener(project, 'wsl', interop=False)
+    assert ran == [] and executed == []
+
+
+def test_no_task_still_depends_on_wslu(generated_project):
+    """Nothing tells the user to install the deprecated `wslu` package, or shells out to it blindly."""
+    project, _ = generated_project
+    for name in ('shared.py', 'document.py', 'test.py', 'quality.py'):
+        source = (project / '_CI' / 'tasks' / name).read_text(encoding='utf-8')
+        assert 'install the wslu' not in source, f'{name} still recommends the deprecated wslu package'
+        assert 'open_command' not in source, f'{name} still uses the removed open_command()'
 
 
 def test_sidebar_nav_override_ships(generated_project):

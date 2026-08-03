@@ -10,7 +10,7 @@ from invoke import Collection, Context, Task, task
 from .github import request_pages_build
 {% endif -%}
 from .quality import update_pyscn_badge
-from .shared import execute, is_ci, logged, open_command, run, run_steps
+from .shared import execute, is_ci, logged, open_target, run, run_steps
 from .test import update_coverage_badge
 
 
@@ -79,7 +79,7 @@ def view(context: Context) -> None:
     """Open the built documentation in the default browser. Skipped in CI."""
     if is_ci():
         return
-    execute(context, f'{open_command()} site/index.html')
+    open_target(context, 'site/index.html')
 {%- if integrate_pages and git_hosting_service == 'github' %}
 
 
