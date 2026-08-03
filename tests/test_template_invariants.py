@@ -143,6 +143,57 @@ def test_dependency_track_doc_matches_choice(generated_project):
     assert ('upload-an-sbom-to-dependency-track' in nav_text) == expected
 
 
+DEVELOPER_NAV_START = '# developer-docs:start'
+DEVELOPER_NAV_END = '# developer-docs:end'
+
+
+def strip_developer_nav(config_text):
+    """Mirror ``properdocs_config_without_developer_docs()`` from the generated document task.
+
+    Kept in lockstep with ``template/_CI/tasks/document.py.jinja``: the sentinel slice is the
+    fragile part of the ``--no-developer-docs`` flag, so the invariants below exercise it here
+    rather than bootstrapping a generated project's virtualenv to import the real helper.
+    """
+    lines = config_text.splitlines(keepends=True)
+    start = next(i for i, line in enumerate(lines) if DEVELOPER_NAV_START in line)
+    end = next(i for i, line in enumerate(lines) if DEVELOPER_NAV_END in line)
+    return ''.join(lines[:start] + lines[end + 1 :]) + '\nexclude_docs: |\n  developer/*\n'
+
+
+def test_developer_nav_markers_bracket_the_developer_block(generated_project):
+    """The `developer-docs` sentinels ship in order and fence exactly the Developer nav section."""
+    project, _ = generated_project
+    lines = (project / 'properdocs.yml').read_text(encoding='utf-8').splitlines()
+    starts = [i for i, line in enumerate(lines) if DEVELOPER_NAV_START in line]
+    ends = [i for i, line in enumerate(lines) if DEVELOPER_NAV_END in line]
+    assert len(starts) == 1, f'expected exactly one {DEVELOPER_NAV_START} marker, found {len(starts)}'
+    assert len(ends) == 1, f'expected exactly one {DEVELOPER_NAV_END} marker, found {len(ends)}'
+    assert starts[0] < ends[0], 'developer-docs markers are out of order'
+    fenced = lines[starts[0] + 1 : ends[0]]
+    assert fenced[0].strip() == '- Developer:', 'start marker does not immediately precede the Developer nav entry'
+    outside = lines[: starts[0]] + lines[ends[0] + 1 :]
+    assert not [line for line in outside if 'developer/' in line], 'developer/ pages referenced outside the markers'
+
+
+def test_developer_docs_can_be_excluded_from_the_build(generated_project):
+    """Stripping the sentinel block yields a valid config with no Developer nav and every page resolving.
+
+    This is the config the `--no-developer-docs` flag pipes into `properdocs … -f -`.
+    """
+    project, _ = generated_project
+    original = (project / 'properdocs.yml').read_text(encoding='utf-8')
+    config = yaml.safe_load(strip_developer_nav(original))
+    pages = collect_nav_pages(config['nav'])
+    assert pages, 'stripped nav is empty'
+    assert not [page for page in pages if page.startswith('developer/')], 'Developer pages survived the strip'
+    assert 'Developer' not in {key for entry in config['nav'] if isinstance(entry, dict) for key in entry}
+    assert config['exclude_docs'].strip() == 'developer/*'
+    missing = [page for page in pages if not (project / 'docs' / page).is_file()]
+    assert not missing, f'nav entries without a file: {missing}'
+    # The default build must still see the Developer section, so the strip has to be opt-in only.
+    assert 'developer/index.md' in collect_nav_pages(yaml.safe_load(original)['nav'])
+
+
 def test_sidebar_nav_override_ships(generated_project):
     """The sidebar site-nav theme override ships and is wired into properdocs.yml."""
     project, _ = generated_project

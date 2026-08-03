@@ -1,6 +1,7 @@
 """Documentation task definitions."""
 
 import re
+from functools import partial
 from pathlib import Path
 from typing import cast
 
@@ -10,8 +11,37 @@ from invoke import Collection, Context, Task, task
 from .github import request_pages_build
 {% endif -%}
 from .quality import update_pyscn_badge
-from .shared import execute, is_ci, logged, open_command, run, run_steps
+from .shared import execute, execute_with_input, is_ci, logged, open_command, run, run_steps
 from .test import update_coverage_badge
+
+DEVELOPER_NAV_START = '# developer-docs:start'
+DEVELOPER_NAV_END = '# developer-docs:end'
+
+
+def properdocs_config_without_developer_docs() -> str:
+    """Return `properdocs.yml` with the Developer nav block and its pages excluded.
+
+    Strips the block between the ``developer-docs`` sentinel comments and appends
+    ``exclude_docs`` so the underlying pages are dropped from the build entirely,
+    not just unlinked from the nav.
+    """
+    lines = Path('properdocs.yml').read_text(encoding='utf-8').splitlines(keepends=True)
+    try:
+        start = next(i for i, line in enumerate(lines) if DEVELOPER_NAV_START in line)
+        end = next(i for i, line in enumerate(lines) if DEVELOPER_NAV_END in line)
+    except StopIteration:
+        print(f'properdocs.yml is missing the {DEVELOPER_NAV_START}/{DEVELOPER_NAV_END} markers.')
+        raise SystemExit(1) from None
+    config = ''.join(lines[:start] + lines[end + 1 :])
+    return f'{config}\nexclude_docs: |\n  developer/*\n'
+
+
+def run_properdocs(context: Context, args: str, *, developer_docs: bool) -> None:
+    """Run `properdocs <args>`, optionally with the Developer docs excluded."""
+    if developer_docs:
+        execute(context, f'uv run properdocs {args}')
+    else:
+        execute_with_input(context, f'uv run properdocs {args} -f -', properdocs_config_without_developer_docs())
 
 
 def update_package_version_badge() -> None:
@@ -61,9 +91,13 @@ def update_python_badge() -> None:
 
 @task
 @logged('document.build')
-@run('uv run properdocs build --strict')
-def build(context: Context) -> None:
-    """Build the documentation."""
+def build(context: Context, developer_docs: bool = True) -> None:
+    """Build the documentation.
+
+    Pass --no-developer-docs to exclude the Developer section (its pages and nav
+    entry) — for a release-facing build with no mention of the development workflow.
+    """
+    run_properdocs(context, 'build --strict', developer_docs=developer_docs)
 
 
 @task
@@ -85,22 +119,28 @@ def view(context: Context) -> None:
 
 @task
 @logged('document.deploy-github')
-def deploy_github(context: Context) -> None:
-    """Build the docs, push them to the `gh-pages` branch, and request the Pages build."""
-    execute(context, 'uv run properdocs gh-deploy --force')
+def deploy_github(context: Context, developer_docs: bool = True) -> None:
+    """Build the docs, push them to the `gh-pages` branch, and request the Pages build.
+
+    Pass --no-developer-docs to publish without the Developer section.
+    """
+    run_properdocs(context, 'gh-deploy --force', developer_docs=developer_docs)
     request_pages_build(context)
 {%- endif %}
 
 
 @task
 @logged('document')
-def document(context: Context) -> None:
-    """Build and open the documentation; reports all failures before exiting."""
+def document(context: Context, developer_docs: bool = True) -> None:
+    """Build and open the documentation; reports all failures before exiting.
+
+    Pass --no-developer-docs to exclude the Developer section from the build.
+    """
     update_package_version_badge()
     update_python_badge()
     update_coverage_badge()
     update_pyscn_badge()
-    run_steps(build, view)(context)
+    run_steps(partial(build, developer_docs=developer_docs), view)(context)
 
 
 namespace = Collection('document')

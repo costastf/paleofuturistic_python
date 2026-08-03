@@ -33,6 +33,26 @@ Starts a local server (default `http://127.0.0.1:8000`) and watches `src/` plus 
 2. Add it to the `nav:` block in `properdocs.yml`.
 3. Either rebuild (`./workflow.cmd document`) or rely on the live-reload server.
 
+## Building without this Developer section
+
+```bash
+./workflow.cmd document --no-developer-docs
+```
+
+Builds a site that omits the **Developer** section entirely — no nav entry, no pages, nothing in the
+search index. Use it for a release-facing site that should document only what your software does, with
+no trace of the development workflow.
+
+The flag changes nothing on disk: the task pipes a filtered copy of `properdocs.yml` to
+`properdocs … -f -`, dropping the block fenced by the `# developer-docs:start` / `# developer-docs:end`
+comments and appending `exclude_docs: developer/*`. Leave those two markers in place if you reorder the
+nav, or the flag has nothing to cut. Omit the flag and the full site builds as before.
+
+`document.build` and `document.deploy-github` take the same flag, so a published site can drop the
+section too. `document.serve` deliberately doesn't: the live-reload server re-reads its config on every
+rebuild, which a config piped through stdin can't satisfy. Preview the filtered site with
+`./workflow.cmd document.build --no-developer-docs` and open `site/index.html`.
+
 ## Docstring style
 
 mkdocstrings is configured for Google style (`docstring_style: google` in `properdocs.yml`). Sections it understands: `Args:`, `Returns:`, `Raises:`, `Yields:`, `Examples:`. Other formats render as plain text — useful, but you'll get less typed output and fewer cross-links.
