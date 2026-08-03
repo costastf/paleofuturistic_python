@@ -320,20 +320,29 @@ def test_documented_override_format_is_actually_accepted(generated_project):
     that `validate_override_entry` rejects outright, so following the docs broke the build.
     """
     project, _ = generated_project
-    doc = (project / 'docs' / 'developer' / 'how-to' / 'triage-a-security-finding.md').read_text(encoding='utf-8')
     pattern = load_generated_configuration(project).IGNORE_PATTERN
-    # Only ```text fences hold override-file content; sample command output lives in
-    # ```console fences and is deliberately not a valid entry.
-    examples = [
-        line.strip()
-        for block in re.findall(r'^```text\n(.*?)^```', doc, re.MULTILINE | re.DOTALL)
-        for line in block.splitlines()
-        # Skip comments and `<PLACEHOLDER>` format specs; everything else must be real.
-        if line.strip() and not line.strip().startswith('#') and '<' not in line
-    ]
-    assert examples, 'no override examples found in the how-to'
-    for example in examples:
-        assert pattern.fullmatch(example), f'documented example {example!r} would be rejected by the validator'
+    # Every doc, not just the how-to: the same wrong format was also sitting in the
+    # configuration-files reference, where a check scoped to one page could not see it.
+    examples = []
+    for doc_path in sorted((project / 'docs').rglob('*.md')):
+        doc = doc_path.read_text(encoding='utf-8')
+        # ```text fences hold override-file content; sample command output lives in
+        # ```console fences and is deliberately not a valid entry.
+        for block in re.findall(r'^```text\n(.*?)^```', doc, re.MULTILINE | re.DOTALL):
+            for line in block.splitlines():
+                entry = line.strip()
+                # Skip comments and `<PLACEHOLDER>` format specs; the rest must be real.
+                if not entry or entry.startswith('#') or '<' in entry:
+                    continue
+                examples.append((doc_path.relative_to(project), entry))
+    # Prose can also spell the format out inline; catch the space-separated shape directly.
+    for doc_path in sorted((project / 'docs').rglob('*.md')):
+        doc = doc_path.read_text(encoding='utf-8')
+        bad = re.search(r'`<[A-Za-z_-]*(VULN|vuln)[A-Za-z_-]*>\s+<YYYY-MM-DD>', doc)
+        assert not bad, f'{doc_path.relative_to(project)} documents a space-separated override format'
+    assert examples, 'no override examples found anywhere in the docs'
+    for source, example in examples:
+        assert pattern.fullmatch(example), f'{source}: documented example {example!r} would be rejected'
 
 
 def test_suppressions_are_validated_whole_not_scanned(generated_project):
@@ -640,6 +649,57 @@ def test_lock_task_derives_the_uv_version_from_the_project():
     lock_task = next(command for command in commands if 'uvx uv@' in command)
     assert 'required-version' in lock_task, 'lock task hardcodes a uv version instead of deriving it'
     assert 'pyproject.toml' in lock_task, 'lock task does not read the version from the rendered project'
+
+
+def pre_commit_hooks(project):
+    """Yield every hook defined in the generated `.pre-commit-config.yaml`."""
+    config = yaml.safe_load((project / '.pre-commit-config.yaml').read_text(encoding='utf-8'))
+    for repo in config['repos']:
+        yield from repo['hooks']
+
+
+def test_no_commit_stage_hook_rewrites_tracked_files(generated_project):
+    """No `pre-commit`-stage hook runs a task that writes README.md or pyproject.toml.
+
+    The `test` aggregator updates the coverage badge and ratchets `fail_under`. Run from a
+    commit hook, pre-commit aborted the commit with "files were modified by this hook" —
+    after the message was written, for files the author never staged. That is what teaches
+    people `--no-verify`, which then disables every hook here at once.
+    """
+    project, _ = generated_project
+    mutating = {'test', 'document', 'build', 'quality.pyscn-analyze', 'test.coverage'}
+    for hook in pre_commit_hooks(project):
+        if 'pre-commit' not in (hook.get('stages') or ['pre-commit']):
+            continue
+        invoked = hook['entry'].removeprefix('./workflow.cmd').strip()
+        assert invoked not in mutating, f'commit-stage hook {hook["id"]!r} runs {invoked!r}, which rewrites tracked files'
+
+
+def test_suite_runs_on_pre_push(generated_project):
+    """The test suite gates pushes, not commits, and uses the non-mutating task."""
+    project, _ = generated_project
+    hooks = {hook['id']: hook for hook in pre_commit_hooks(project)}
+    test_hook = hooks['test']
+    assert test_hook['stages'] == ['pre-push'], f'test hook stages are {test_hook["stages"]}'
+    assert test_hook['entry'].endswith('test.pytest'), f'test hook runs {test_hook["entry"]!r}'
+    installed = yaml.safe_load((project / '.pre-commit-config.yaml').read_text(encoding='utf-8'))
+    assert 'pre-push' in installed['default_install_hook_types'], 'pre-push hooks would never be installed'
+
+
+def test_pre_push_gate_enforces_the_same_coverage_floor(generated_project):
+    """`test.pytest` and the `test` aggregator share one pytest invocation, so the floor holds.
+
+    Coverage is enforced by pytest-cov from `[tool.coverage.report] fail_under`, driven by the
+    `--cov` flags in `addopts`. Moving the hook to `test.pytest` therefore drops the badge and
+    ratchet writes without weakening the gate.
+    """
+    project, _ = generated_project
+    data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
+    assert '--cov' in data['tool']['pytest']['ini_options']['addopts']
+    assert 'fail_under' in data['tool']['coverage']['report']
+    test_py = (project / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
+    aggregator = test_py.split("@logged('test')", 1)[1]
+    assert 'run_steps(pytest)' in aggregator, 'the aggregator no longer delegates to the same pytest task'
 
 
 def test_sidebar_nav_override_ships(generated_project):

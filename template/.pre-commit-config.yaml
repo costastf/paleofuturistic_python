@@ -1,4 +1,6 @@
-default_install_hook_types: [pre-commit, commit-msg]
+# `pre-commit install` installs every type listed here, so the pre-push hook below is
+# wired up by the same bootstrap step as the rest.
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
 repos:
   - repo: local
     hooks:
@@ -51,13 +53,25 @@ repos:
         pass_filenames: false
         files: ^(src/).*\.py$
         stages: [pre-commit]
+      # Pre-push, not pre-commit, and `test.pytest` rather than the `test` aggregator.
+      #
+      # The aggregator also updates the README coverage badge and ratchets `fail_under` in
+      # pyproject.toml. Doing that from a commit hook meant pre-commit aborted the commit
+      # with "files were modified by this hook" — after the commit message was already
+      # written — for files the author had not staged. Those writes belong to a deliberate
+      # `./workflow.cmd test`, where the bump can be reviewed and committed on purpose.
+      #
+      # Running the whole suite on every commit was the other half of the problem: slow
+      # enough to teach people `--no-verify`, which switches off every hook here. On
+      # pre-push it still blocks anything broken from reaching the remote, without
+      # standing between the author and each commit.
       - id: test
         name: Run tests
-        entry: ./workflow.cmd test
+        entry: ./workflow.cmd test.pytest
         language: system
         pass_filenames: false
         files: ^(src/|tests/).*\.py$
-        stages: [pre-commit]
+        stages: [pre-push]
       - id: security-overrides
         name: Validate .security-overrides
         entry: ./workflow.cmd secure.validate-overrides

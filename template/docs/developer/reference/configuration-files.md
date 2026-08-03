@@ -31,11 +31,29 @@ Empty placeholder. Tox config lives in `pyproject.toml`'s `[tool.tox]`. The file
 
 ## `.pre-commit-config.yaml`
 
-Pre-commit hook definitions. Adds: ruff format + check, pylint, commitizen. Edit to add hooks; don't remove the existing ones without thinking — they keep the main branch clean.
+Hook definitions, split across three git stages:
+
+| Stage | Hooks |
+|---|---|
+| `commit-msg` | commitizen (conventional-commit format) |
+| `pre-commit` | ruff format, ruff, pylint, ty, complexipy, pyscn, and `.security-overrides` validation |
+| `pre-push` | the test suite |
+
+The suite sits on **pre-push** on purpose. Running it on every commit was slow enough to
+push people towards `--no-verify`, which disables *all* of these at once; on pre-push it
+still stops anything broken reaching the remote. It also runs `test.pytest` rather than
+the `test` aggregator, so it gates without rewriting the README badge or ratcheting
+`fail_under` — writes that belong to a deliberate `./workflow.cmd test`, not to a hook
+firing mid-commit.
+
+Edit to add hooks; don't remove the existing ones without thinking — they keep the main
+branch clean.
 
 ## `.security-overrides`
 
-Allow-list for pip-audit findings. Each line is `<vuln-id> <YYYY-MM-DD> <justification>`. See [Triage a security finding](../how-to/triage-a-security-finding.md).
+Allow-list for pip-audit findings. Each entry is a single token, `<VULN_ID>[::YYYY-MM-DD]`,
+with the justification in a `#` comment — anything after the id on the same line is not
+part of the entry. See [Triage a security finding](../how-to/triage-a-security-finding.md).
 
 ## `.gitignore`
 
