@@ -1,5 +1,6 @@
 """Shared utilities for CI task definitions."""
 
+import io
 import os
 import platform
 import shutil
@@ -147,6 +148,15 @@ def execute(context: Context, cmd: str) -> None:
     shell = os.environ.get('INVOKE_SHELL')
     kwargs: dict[str, object] = {'shell': shell} if shell else {}
     result = context.run(cmd, echo=True, warn=True, **kwargs)
+    if result is None or result.failed:
+        raise SystemExit(1)
+
+
+def execute_with_input(context: Context, cmd: str, input_text: str) -> None:
+    """Execute a shell command with ``input_text`` piped to its stdin, raising SystemExit(1) on failure."""
+    shell = os.environ.get('INVOKE_SHELL')
+    kwargs: dict[str, object] = {'shell': shell} if shell else {}
+    result = context.run(cmd, echo=True, warn=True, in_stream=io.StringIO(input_text), **kwargs)
     if result is None or result.failed:
         raise SystemExit(1)
 

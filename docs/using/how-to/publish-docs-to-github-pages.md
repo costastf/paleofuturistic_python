@@ -39,6 +39,22 @@ That run is a GitHub-managed pipeline (`dynamic/pages/pages-build-deployment`) t
 
 The warning is expected and intentionally not addressed. Silencing it would require switching to the `actions/upload-pages-artifact` + `actions/deploy-pages` flow, which would violate both design principles above. We accept the warning as the cost of keeping deploy logic in `_CI/tasks/document.py` and outside the SBOM-tracked dependency surface. GitHub will update their internal pipeline on their own timeline.
 
+## Publishing without the Developer section
+
+The generated site carries a **Developer** section documenting the inherited scaffold — the daily
+workflow, task runner, testing, releasing. Once a project is properly released you may not want that
+shipped to its audience. Every `document` task takes `--no-developer-docs`, which drops the section's
+nav entry and pages from the build:
+
+```bash
+./workflow.cmd document.deploy-github --no-developer-docs
+```
+
+To make the published site do this permanently, add the flag to that step in
+`.github/workflows/pages.yaml`. Local builds keep the section unless you pass the flag too, so
+contributors still have the scaffold manual while the public site doesn't. Nothing is deleted from
+`docs/` — the flag filters `properdocs.yml` at build time and pipes it to `properdocs … -f -`.
+
 ## Concurrency
 
 The workflow uses `concurrency: { group: pages, cancel-in-progress: false }`. If you push twice in quick succession, the second deploy waits for the first to finish rather than racing it. Cancelling mid-deploy would leave the `gh-pages` branch in an indeterminate state.

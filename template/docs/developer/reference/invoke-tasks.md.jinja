@@ -73,13 +73,22 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 
 | Task | Args | What it does |
 | --- | --- | --- |
-| `document.build` | — | `properdocs build` — generate the static site under `site/`. |
+| `document.build` | `--no-developer-docs` | `properdocs build` — generate the static site under `site/`. |
 | `document.serve` | — | `properdocs serve` — serve the site locally with live reload (Ctrl-C to stop). |
 | `document.view` | — | Open the rendered site in the default browser (skipped in CI). |
-| `document` (aggregator) | — | Update badges, then `build` + `view`. |
+| `document` (aggregator) | `--no-developer-docs` | Update badges, then `build` + `view`. |
 {%- if integrate_pages and git_hosting_service == 'github' %}
-| `document.deploy-github` | — | `properdocs gh-deploy --force` — build and publish to the `gh-pages` branch (consumed by the shipped Pages workflow). Only present when `integrate_pages=true` and `git_hosting_service=github`. |
+| `document.deploy-github` | `--no-developer-docs` | `properdocs gh-deploy --force` — build and publish to the `gh-pages` branch (consumed by the shipped Pages workflow). Only present when `integrate_pages=true` and `git_hosting_service=github`. |
 {%- endif %}
+
+`--no-developer-docs` drops this **Developer** section — both its nav entry and its pages — from
+the build, for a release-facing site that carries no trace of the development workflow. It works by
+piping a filtered copy of `properdocs.yml` to `properdocs … -f -`: the block between the
+`# developer-docs:start` / `# developer-docs:end` markers is removed and `exclude_docs: developer/*`
+is appended. Nothing on disk changes, so the flag is a per-build decision — omit it and the full
+site builds as usual. Keep those markers intact if you reorder the nav. If you add your own
+`exclude_docs:` key to `properdocs.yml`, fold `developer/*` into it and drop the flag instead — the
+appended key would otherwise override yours.
 
 ## `container` — OCI deps image
 
