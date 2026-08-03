@@ -1,5 +1,6 @@
 """Shared utilities for CI task definitions."""
 
+import json
 import os
 import platform
 import shutil
@@ -157,6 +158,35 @@ def container_engine() -> str:
             return engine
     print('No container engine found. Install docker or podman.')
     raise SystemExit(1)
+
+
+def image_digest_reference(context: Context, engine: str, image: str) -> str:
+    """Return ``repository@sha256:…`` for a locally-present ``image``, else ``image`` unchanged.
+
+    Downstream CI jobs pin the deps image by digest, so a tag repointed between the
+    build job and a consumer job cannot change the container that consumer runs in.
+
+    The image must already be local (freshly built, or pulled) for a repo digest to
+    exist. The ``inspect`` JSON is parsed rather than shelling out with a Go template,
+    which keeps the command free of braces needing shell quoting and avoids docker and
+    podman disagreeing on which template field carries the repository digest.
+    """
+    repository = image.rsplit(':', 1)[0]
+    result = context.run(f'{engine} image inspect {image}', hide=True, warn=True)
+    if result is None or result.failed:
+        print(f'Could not inspect {image} for a digest; falling back to the tag.')
+        return image
+    try:
+        entries = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        print(f'Could not parse {engine} inspect output for {image}; falling back to the tag.')
+        return image
+    for entry in entries:
+        for reference in entry.get('RepoDigests') or []:
+            if reference.startswith(f'{repository}@sha256:'):
+                return reference
+    print(f'No repo digest recorded for {image}; falling back to the tag.')
+    return image
 
 
 def execute(context: Context, cmd: str) -> None:

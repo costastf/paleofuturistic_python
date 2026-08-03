@@ -25,6 +25,11 @@ VENDOR_TXT = Path('_CI') / 'lib' / 'vendor.txt'
 VENDOR_DIR = Path('_CI') / 'lib' / 'vendor'
 UV_LOCK = Path('uv.lock')
 
+# Inputs to the deps-image tag, plus where `container.publish` records the
+# resolved reference for downstream CI jobs to consume.
+DOCKERFILE_DEPS = Path('Dockerfile.deps')
+DEPS_IMAGE_FILE = Path('.deps-image')
+
 {%- if integrate_dependency_track %}
 OWASP_DTRACK_SETTINGS = ('OWASP_DTRACK_URL', 'OWASP_DTRACK_API_KEY')
 {%- endif %}

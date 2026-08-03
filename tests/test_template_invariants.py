@@ -8,6 +8,7 @@ runner pick it up automatically.
 """
 
 import importlib.util
+import inspect
 import json
 import os
 import subprocess
@@ -196,6 +197,61 @@ def test_sbom_and_slug_helpers_sanitize_the_remote(generated_project):
     assert 'strip_credentials' in sbom_py, 'sbom.py does not sanitize the origin URL'
     host_py = (project / '_CI' / 'tasks' / f'{cell["git_hosting_service"]}.py').read_text(encoding='utf-8')
     assert 'strip_credentials' in host_py, 'origin_slug() does not sanitize the origin URL'
+
+
+def test_deps_image_tag_covers_every_content_input(generated_project):
+    """The deps-image tag hashes the lockfile, the Dockerfile and the base image, not just the lock.
+
+    Keying on `uv.lock` alone let a `Dockerfile.deps` edit or a base-image bump reuse a
+    stale image, because the tag never changed.
+    """
+    project, _ = generated_project
+    container_py = (project / '_CI' / 'tasks' / 'container.py').read_text(encoding='utf-8')
+    assert 'def deps_image_tag' in container_py
+    tag_source = container_py.split('def deps_image_tag', 1)[1].split('\n@task', 1)[0]
+    for required in ('UV_LOCK', 'DOCKERFILE_DEPS', 'info.base-image'):
+        assert required in tag_source, f'deps_image_tag() does not hash {required}'
+    # Per-input digests are fixed-width, which is what stops ("AB","C") colliding
+    # with ("A","BC") and what makes the algorithm reproducible in shell.
+    assert 'hexdigest()' in tag_source, 'deps_image_tag() does not fold per-input digests'
+
+
+def test_gitlab_deps_job_matches_the_python_tag_algorithm(generated_project):
+    """GitLab's inlined deps job hashes the same three inputs and pins by digest.
+
+    Its deps job runs in kaniko with no Python, so it cannot call ``deps_image_tag()``
+    and reimplements it in shell. That duplicate is easy to leave behind — this pins it.
+    """
+    project, cell = generated_project
+    if cell['git_hosting_service'] != 'gitlab':
+        pytest.skip('GitLab-only pipeline')
+    pipeline = (project / '.gitlab-ci.yml').read_text(encoding='utf-8')
+    deps_job = pipeline.split('build-deps-image:', 1)[1].split('\nlint:', 1)[0]
+    for required in ('uv.lock', 'Dockerfile.deps', 'BASE_IMAGE'):
+        assert required in deps_job, f'GitLab deps job does not hash {required}'
+    assert 'sha256sum uv.lock' in deps_job and 'sha256sum Dockerfile.deps' in deps_job
+    assert 'cut -c1-16' not in deps_job, 'GitLab deps job still uses the old 64-bit lockfile-only tag'
+    assert '--digest-file' in deps_job, 'GitLab deps job does not capture the pushed digest'
+    assert 'DEPS_IMAGE=${CI_REGISTRY_IMAGE}@${DIGEST}' in deps_job, 'DEPS_IMAGE is not digest-pinned'
+
+
+def test_deps_image_reference_is_digest_pinned(generated_project):
+    """`container.publish` hands downstream jobs a digest, so a repointed tag can't swap the image."""
+    project, cell = generated_project
+    host = cell['git_hosting_service']
+    host_py = (project / '_CI' / 'tasks' / f'{host}.py').read_text(encoding='utf-8')
+    if host == 'github':
+        # Daemon-based build: resolve the repo digest of the local image.
+        assert 'image_digest_reference' in host_py
+        shared = load_generated_shared(project)
+        resolver = inspect.getsource(shared.image_digest_reference)
+        assert 'RepoDigests' in resolver
+        # Parsed as JSON rather than via a Go --format template, which docker and
+        # podman expose differently and which needs brace quoting in a shell command.
+        assert 'json.loads' in resolver
+    else:
+        # kaniko is daemonless, so there is no local image to inspect afterwards.
+        assert '--digest-file' in host_py
 
 
 def test_sidebar_nav_override_ships(generated_project):
