@@ -11,27 +11,42 @@ repos:
         language: system
         pass_filenames: true
         stages: [commit-msg]
+      # The per-file tools below receive only the staged files, so a one-line change costs a
+      # one-file check instead of a whole-project sweep. `sh -c … --` collapses the file list
+      # pre-commit appends into the single `--paths` value Invoke expects; Invoke would
+      # otherwise read the second filename as another task name and fail. (Filenames
+      # containing spaces are not supported by that marshalling — as with `lint-commit`.)
       - id: format
         name: Format code and sort imports
-        entry: ./workflow.cmd format
+        entry: sh -c './workflow.cmd format --paths="$*"' --
         language: system
-        pass_filenames: false
+        pass_filenames: true
         files: ^(_CI/tasks/|src/|tests/).*\.py$
         stages: [pre-commit]
       - id: ruff
         name: Lint with ruff
-        entry: ./workflow.cmd lint.ruff
+        entry: sh -c './workflow.cmd lint.ruff --paths="$*"' --
         language: system
-        pass_filenames: false
+        pass_filenames: true
         files: ^(_CI/tasks/|src/|tests/).*\.py$
         stages: [pre-commit]
       - id: pylint
         name: Lint with pylint
-        entry: ./workflow.cmd lint.pylint
+        entry: sh -c './workflow.cmd lint.pylint --paths="$*"' --
         language: system
-        pass_filenames: false
+        pass_filenames: true
         files: ^(_CI/tasks/|src/|tests/).*\.py$
         stages: [pre-commit]
+      - id: complexipy
+        name: Complexity check with complexipy
+        entry: sh -c './workflow.cmd lint.complexipy --paths="$*"' --
+        language: system
+        pass_filenames: true
+        files: ^(src/).*\.py$
+        stages: [pre-commit]
+      # ty stays whole-project. Type checking is whole-program: a signature change surfaces
+      # as an error in the *callers*, so handing it only the changed files would hide the
+      # errors that matter most. It is fast enough that scoping buys little anyway.
       - id: ty
         name: Type check with ty
         entry: ./workflow.cmd lint.ty
@@ -39,13 +54,9 @@ repos:
         pass_filenames: false
         files: ^(_CI/tasks/|src/|tests/).*\.py$
         stages: [pre-commit]
-      - id: complexipy
-        name: Complexity check with complexipy
-        entry: ./workflow.cmd lint.complexipy
-        language: system
-        pass_filenames: false
-        files: ^(src/).*\.py$
-        stages: [pre-commit]
+      # pyscn stays whole-project too: it reports dead code and duplicate blocks, both of
+      # which are relationships *between* files. A single-file view cannot see either — a
+      # function only looks dead once you know nothing else calls it.
       - id: pyscn
         name: Quality check with pyscn
         entry: ./workflow.cmd quality.pyscn-check

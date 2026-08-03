@@ -28,6 +28,11 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 
 ## `format`, `lint`, `test`, `quality`
 
+Every task in this group that takes paths accepts `--paths="<space-separated paths>"`, and
+defaults to the whole project when it is omitted. The pre-commit hooks use it to check only
+the staged files — see [`.pre-commit-config.yaml`](configuration-files.md#pre-commit-configyaml)
+for which hooks are scoped that way and which are deliberately not.
+
 | Task | What it does |
 | --- | --- |
 | `format.ruff` | `ruff check --select I --fix` + `ruff format`. |

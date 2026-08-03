@@ -675,6 +675,49 @@ def test_no_commit_stage_hook_rewrites_tracked_files(generated_project):
         assert invoked not in mutating, f'commit-stage hook {hook["id"]!r} runs {invoked!r}, which rewrites tracked files'
 
 
+def test_per_file_hooks_check_only_staged_files(generated_project):
+    """The per-file tools receive the staged files instead of sweeping the whole project.
+
+    Each wraps the task in `sh -c … --paths="$*"`: pre-commit appends filenames as separate
+    arguments, and Invoke would read the second one as another task name, so they have to be
+    collapsed into one option value.
+    """
+    project, _ = generated_project
+    hooks = {hook['id']: hook for hook in pre_commit_hooks(project)}
+    for hook_id in ('format', 'ruff', 'pylint', 'complexipy'):
+        hook = hooks[hook_id]
+        assert hook.get('pass_filenames') is True, f'{hook_id} does not receive the staged files'
+        assert '--paths="$*"' in hook['entry'], f'{hook_id} does not collapse filenames into --paths'
+
+
+def test_whole_program_checks_are_not_scoped_to_staged_files(generated_project):
+    """ty and pyscn keep seeing the whole project, because a per-file view answers wrongly.
+
+    ty: a changed signature fails in the *callers*, which a narrowed run never looks at.
+    pyscn: dead code and duplicate blocks are relationships between files.
+    """
+    project, _ = generated_project
+    hooks = {hook['id']: hook for hook in pre_commit_hooks(project)}
+    for hook_id in ('ty', 'pyscn'):
+        hook = hooks[hook_id]
+        assert hook.get('pass_filenames') is False, f'{hook_id} was narrowed to staged files'
+        assert '--paths' not in hook['entry'], f'{hook_id} was narrowed to staged files'
+
+
+def test_path_taking_tasks_accept_a_paths_argument(generated_project):
+    """The tasks the hooks scope actually take `--paths`, and fall back to the project paths."""
+    project, _ = generated_project
+    lint_py = (project / '_CI' / 'tasks' / 'lint.py').read_text(encoding='utf-8')
+    format_py = (project / '_CI' / 'tasks' / 'format_.py').read_text(encoding='utf-8')
+    for name, source in (('lint.py', lint_py), ('format_.py', format_py)):
+        # A hardcoded `@run(f'… {PATHS}')` cannot be narrowed: it is baked at import time.
+        assert '@run(' not in source, f'{name} still builds its command at import time'
+    for signature in ('def ruff_lint(context: Context, paths: str', 'def pylint(context: Context, paths: str'):
+        assert signature in lint_py, f'missing {signature!r}'
+    assert 'def format_(context: Context, paths: str' in format_py, 'the format aggregator cannot forward paths'
+    assert 'paths or PATHS' in lint_py, 'lint tasks do not fall back to the project-wide paths'
+
+
 def test_suite_runs_on_pre_push(generated_project):
     """The test suite gates pushes, not commits, and uses the non-mutating task."""
     project, _ = generated_project

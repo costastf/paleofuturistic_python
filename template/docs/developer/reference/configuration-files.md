@@ -33,13 +33,32 @@ Empty placeholder. Tox config lives in `pyproject.toml`'s `[tool.tox]`. The file
 
 Hook definitions, split across three git stages:
 
-| Stage | Hooks |
-|---|---|
-| `commit-msg` | commitizen (conventional-commit format) |
-| `pre-commit` | ruff format, ruff, pylint, ty, complexipy, pyscn, and `.security-overrides` validation |
-| `pre-push` | the test suite |
+| Stage | Hooks | Scope |
+|---|---|---|
+| `commit-msg` | commitizen (conventional-commit format) | the message |
+| `pre-commit` | ruff format, ruff, pylint, complexipy | **staged files only** |
+| `pre-commit` | ty, pyscn, `.security-overrides` validation | whole project |
+| `pre-push` | the test suite | whole project |
 
-The suite sits on **pre-push** on purpose. Running it on every commit was slow enough to
+**Per-file tools get only the staged files.** A one-line change costs a one-file check
+rather than a sweep of `src/ _CI/tasks/ tests/`. Each of those hooks wraps the task in
+`sh -c '… --paths="$*"' --`, which collapses the file list pre-commit appends into the
+single `--paths` value Invoke expects — passed bare, Invoke reads the second filename as
+another task name and fails. Filenames containing spaces are not supported by that
+marshalling.
+
+**Two checks stay whole-project deliberately**, because a per-file view gives a wrong
+answer rather than a partial one:
+
+- **ty** — type checking is whole-program. A changed signature surfaces as an error in the
+  *callers*, so narrowing the input hides exactly the errors worth catching.
+- **pyscn** — reports dead code and duplicate blocks, both relationships *between* files. A
+  function only looks dead once you know nothing else calls it.
+
+Any of these tasks also takes `--paths` directly, e.g.
+`./workflow.cmd lint.pylint --paths="src/thing.py"`.
+
+**The suite sits on pre-push** on purpose. Running it on every commit was slow enough to
 push people towards `--no-verify`, which disables *all* of these at once; on pre-push it
 still stops anything broken reaching the remote. It also runs `test.pytest` rather than
 the `test` aggregator, so it gates without rewriting the README badge or ratcheting
