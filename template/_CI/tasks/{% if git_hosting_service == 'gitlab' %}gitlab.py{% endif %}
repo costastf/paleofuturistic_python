@@ -12,7 +12,7 @@ from invoke import Context
 
 from _CI.info import read as read_info
 
-from .shared import PipelineComponent, execute
+from .shared import PipelineComponent, execute, strip_credentials
 
 CI_FILE = Path('.gitlab-ci.yml')
 # Matches inline `image: foo/bar:tag` and the `name: foo/bar:tag` line inside
@@ -69,7 +69,9 @@ def origin_slug(context: Context) -> str:
     remote = context.run('git remote get-url origin', hide=True, warn=True)
     if remote is None or remote.failed:
         return ''
-    url = remote.stdout.strip()
+    # In CI origin carries a token (https://gitlab-ci-token:<token>@gitlab.com/…),
+    # which the patterns below would otherwise fail to match.
+    url = strip_credentials(remote.stdout.strip())
     match = re.match(
         r'(?:git@gitlab\.com:|https://gitlab\.com/)(.+?)(?:\.git)?/?$',
         url,

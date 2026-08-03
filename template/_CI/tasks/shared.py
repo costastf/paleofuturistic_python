@@ -9,6 +9,7 @@ from contextlib import contextmanager, suppress
 from contextvars import ContextVar
 from functools import wraps
 from typing import IO, Any, NamedTuple
+from urllib.parse import urlsplit, urlunsplit
 
 from invoke import Context
 
@@ -83,6 +84,26 @@ def indented_streams(prefix: str) -> Iterator[None]:
 def is_ci() -> bool:
     """Detect CI environment (GitHub Actions, GitLab CI, etc.)."""
     return os.environ.get('CI', '').lower() == 'true'
+
+
+def strip_credentials(url: str) -> str:
+    """Return ``url`` with any ``user:password@`` userinfo removed from its netloc.
+
+    CI checkouts bake a token into the ``origin`` remote — for example
+    ``https://x-access-token:<token>@github.com/owner/repo.git``. Anything that
+    reads the remote back and publishes it must drop the credential first: the
+    SBOM's VCS reference ships inside the wheel, so a token written there would
+    become a permanent public artefact.
+
+    Only the netloc is inspected, so an ``@`` elsewhere in the URL (a path or
+    query) is left alone. URLs without userinfo are returned unchanged.
+    """
+    parts = urlsplit(url)
+    if '@' not in parts.netloc:
+        return url
+    host = parts.hostname or ''
+    netloc = f'{host}:{parts.port}' if parts.port else host
+    return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
 
 
 def get_operating_system() -> str:

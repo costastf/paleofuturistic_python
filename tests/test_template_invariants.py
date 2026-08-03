@@ -7,6 +7,7 @@ new ``test_*`` function; adding a new combo axis edits ``matrix_combos()`` in
 runner pick it up automatically.
 """
 
+import importlib.util
 import json
 import os
 import subprocess
@@ -141,6 +142,60 @@ def test_dependency_track_doc_matches_choice(generated_project):
     assert page.exists() == expected
     nav_text = (project / 'properdocs.yml').read_text(encoding='utf-8')
     assert ('upload-an-sbom-to-dependency-track' in nav_text) == expected
+
+
+CREDENTIALED_URLS = [
+    # (origin URL as CI leaves it, expected published form)
+    ('https://x-access-token:ghs_SECRETTOKEN@github.com/owner/repo.git', 'https://github.com/owner/repo.git'),
+    ('https://gitlab-ci-token:glcbt-SECRETTOKEN@gitlab.com/group/proj.git', 'https://gitlab.com/group/proj.git'),
+    ('https://user:pw@git.example.com:8443/o/r.git', 'https://git.example.com:8443/o/r.git'),
+    ('ssh://git@github.com/owner/repo.git', 'ssh://github.com/owner/repo.git'),
+    # No userinfo — must pass through byte-for-byte.
+    ('https://github.com/owner/repo.git', 'https://github.com/owner/repo.git'),
+    ('https://github.com/owner/repo', 'https://github.com/owner/repo'),
+    # An `@` outside the netloc is not a credential.
+    ('https://github.com/owner/repo@v1.2.3', 'https://github.com/owner/repo@v1.2.3'),
+]
+
+
+def load_generated_shared(project):
+    """Import the generated project's `_CI/tasks/shared.py` as a standalone module.
+
+    It imports only `invoke`, which ``conftest.py`` already puts on ``sys.path`` via the
+    vendored tree, so the module loads without the rest of the `_CI.tasks` package.
+    """
+    path = project / '_CI' / 'tasks' / 'shared.py'
+    spec = importlib.util.spec_from_file_location('generated_shared', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_strip_credentials_removes_userinfo(generated_project):
+    """`strip_credentials` drops userinfo and leaves credential-free URLs untouched."""
+    project, _ = generated_project
+    strip_credentials = load_generated_shared(project).strip_credentials
+    for url, expected in CREDENTIALED_URLS:
+        assert strip_credentials(url) == expected, f'{url!r} was not sanitized to {expected!r}'
+
+
+def test_no_token_survives_into_a_published_url(generated_project):
+    """No secret and no netloc `@` survives sanitizing — the invariant the SBOM's VCS ref relies on."""
+    project, _ = generated_project
+    strip_credentials = load_generated_shared(project).strip_credentials
+    for url, _expected in CREDENTIALED_URLS:
+        sanitized = strip_credentials(url)
+        assert 'SECRETTOKEN' not in sanitized, f'token survived sanitizing {url!r}'
+        assert '@' not in sanitized.split('//', 1)[-1].split('/', 1)[0], f'userinfo survived in {sanitized!r}'
+
+
+def test_sbom_and_slug_helpers_sanitize_the_remote(generated_project):
+    """Every consumer of `git remote get-url origin` routes through `strip_credentials`."""
+    project, cell = generated_project
+    sbom_py = (project / '_CI' / 'tasks' / 'sbom.py').read_text(encoding='utf-8')
+    assert 'strip_credentials' in sbom_py, 'sbom.py does not sanitize the origin URL'
+    host_py = (project / '_CI' / 'tasks' / f'{cell["git_hosting_service"]}.py').read_text(encoding='utf-8')
+    assert 'strip_credentials' in host_py, 'origin_slug() does not sanitize the origin URL'
 
 
 def test_sidebar_nav_override_ships(generated_project):
