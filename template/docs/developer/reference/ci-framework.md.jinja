@@ -32,6 +32,29 @@ Centralized constants shared across task modules:
 
 ## The deps image and its cache
 
+### It runs as a non-root user
+
+`Dockerfile.deps` ends with `USER 1001`, so nothing in CI runs as root. Two things have
+to line up for that to work, and both are in the Dockerfile:
+
+- **`/app` is chowned to 1001.** The image is built with `--no-install-project`, so
+  `uv run` installs the project into `UV_PROJECT_ENVIRONMENT` (`/app/.venv`) at job
+  time. Left root-owned, every task would fail on the first write.
+- **The user has a home directory.** uv caches under `$HOME`.
+
+**The uid is not arbitrary.** 1001 is the uid {% if git_hosting_service == 'github' %}GitHub's hosted runners{% else %}GitLab's runners commonly{% endif %} own the
+mounted workspace with. If your runner uses a different uid, the workspace arrives
+unwritable and jobs fail with permission errors on paths under the checkout — change the
+uid in `Dockerfile.deps` to match. That edit changes the deps-image tag automatically,
+because the Dockerfile is one of the tag's inputs, so you will not be served a stale
+image built for the old uid.
+{%- if git_hosting_service == 'gitlab' %}
+
+Worth checking on GitLab specifically: the clone is performed by a helper container, so
+depending on runner configuration the project directory can arrive owned by root. If the
+first job fails writing into the checkout, that mismatch is the likely cause.
+{%- endif %}
+
 CI jobs run inside a prebuilt image holding the project's dependencies, so each job
 starts with a warm environment instead of resolving from scratch. `container.publish`
 builds and publishes it; `.deps-image` records the reference downstream jobs consume.

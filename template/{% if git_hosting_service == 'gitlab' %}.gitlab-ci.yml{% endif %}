@@ -10,6 +10,9 @@ variables:
 
 build-deps-image:
   stage: deps
+  # Declared so the registry credentials below can be scoped to this environment
+  # instead of being readable by every job in the project.
+  environment: deps
   # kaniko:debug has no python/uv and its busybox binaries are static, which
   # uv's libc probe refuses. This is the one pipeline job that can't go
   # through ./workflow.cmd — the container.publish steps are inlined here so
@@ -41,6 +44,13 @@ build-deps-image:
     # write_registry). Create one at Settings → Repository → Deploy tokens,
     # then expose as protected/masked CI variables DEPS_IMAGE_USERNAME and
     # DEPS_IMAGE_PASSWORD.
+    #
+    # Mark both Protected and Masked, and set their Environment scope to `deps`
+    # (this job's environment) rather than leaving it at `*`. An unscoped variable
+    # is readable by every job in every pipeline, including one added by a
+    # merge request from a fork, so a registry write token would be reachable from
+    # code that has not been reviewed. The publish credentials are scoped the same
+    # way via the `pypi` environment on the publish job.
     - '[ -n "$DEPS_IMAGE_USERNAME" ] && echo "DEPS_IMAGE_USERNAME is set" || echo "DEPS_IMAGE_USERNAME EMPTY"'
     - '[ -n "$DEPS_IMAGE_PASSWORD" ] && echo "DEPS_IMAGE_PASSWORD is set" || echo "DEPS_IMAGE_PASSWORD EMPTY"'
     - printf '{"auths":{"%s":{"username":"%s","password":"%s"}}}' "$CI_REGISTRY" "$DEPS_IMAGE_USERNAME" "$DEPS_IMAGE_PASSWORD" > /kaniko/.docker/config.json

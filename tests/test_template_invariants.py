@@ -391,6 +391,89 @@ def test_parent_overrides_document_the_expiry_requirement():
         assert '::' in entry, f'{entry!r} has no expiry but is forwarded via the environment'
 
 
+def github_workflows(project):
+    """Yield (name, parsed) for every shipped GitHub workflow."""
+    directory = project / '.github' / 'workflows'
+    for path in sorted(directory.iterdir()):
+        yield path.name, yaml.safe_load(path.read_text(encoding='utf-8'))
+
+
+def test_no_workflow_writes_the_token_into_a_git_remote(generated_project):
+    """No workflow embeds the token in a remote URL.
+
+    `origin` carrying `x-access-token:<token>` is what leaked a credential into the
+    published SBOM; checkout now authenticates with a non-persisted header instead.
+    """
+    project, cell = generated_project
+    if cell['git_hosting_service'] != 'github':
+        pytest.skip('GitHub-only workflows')
+    for name, _ in github_workflows(project):
+        raw = (project / '.github' / 'workflows' / name).read_text(encoding='utf-8')
+        code = '\n'.join(line for line in raw.splitlines() if not line.strip().startswith('#'))
+        assert 'x-access-token' not in code, f'{name} still builds a credentialed remote URL'
+
+
+def test_checkouts_do_not_persist_credentials(generated_project):
+    """Every `actions/checkout` that precedes an SBOM-capable task refuses to persist auth.
+
+    The Pages deploy is the deliberate exception: `properdocs gh-deploy` pushes to the
+    `gh-pages` branch and needs the credential to survive the checkout.
+    """
+    project, cell = generated_project
+    if cell['git_hosting_service'] != 'github':
+        pytest.skip('GitHub-only workflows')
+    for name, config in github_workflows(project):
+        for job_name, job in config['jobs'].items():
+            for step in job.get('steps') or []:
+                if not str(step.get('uses', '')).startswith('actions/checkout@'):
+                    continue
+                persists = (step.get('with') or {}).get('persist-credentials')
+                if name == 'pages.yaml':
+                    continue
+                assert persists is False, f'{name}:{job_name} checkout persists credentials'
+
+
+def test_every_github_job_declares_least_privilege_permissions(generated_project):
+    """No job silently inherits the repository's default token scopes."""
+    project, cell = generated_project
+    if cell['git_hosting_service'] != 'github':
+        pytest.skip('GitHub-only workflows')
+    for name, config in github_workflows(project):
+        for job_name, job in config['jobs'].items():
+            declared = job.get('permissions') or config.get('permissions')
+            assert declared, f'{name}:{job_name} inherits default token permissions'
+            # Only the image build (pushes to ghcr) and the docs deploy (pushes gh-pages)
+            # may mutate anything. `id-token: write` is exempt everywhere: it mints an
+            # OIDC token for PyPI Trusted Publishing and grants no access to repo resources.
+            if job_name not in ('build-deps-image', 'deploy'):
+                writes = [
+                    scope for scope, level in declared.items() if level == 'write' and scope != 'id-token'
+                ]
+                assert not writes, f'{name}:{job_name} asks for write scopes {writes}'
+
+
+def test_deps_image_runs_as_non_root(generated_project):
+    """`Dockerfile.deps` drops root and makes the venv path writable to that user."""
+    project, _ = generated_project
+    dockerfile = (project / 'Dockerfile.deps').read_text(encoding='utf-8')
+    assert 'USER 1001' in dockerfile, 'deps image still runs as root'
+    assert 'chown -R 1001:1001 /app' in dockerfile, 'uv run could not write to UV_PROJECT_ENVIRONMENT'
+    assert '--create-home' in dockerfile, 'uv needs a writable HOME for its cache'
+    # The uid is part of the tag inputs, so changing it cannot serve a stale image.
+    container_py = (project / '_CI' / 'tasks' / 'container.py').read_text(encoding='utf-8')
+    assert 'DOCKERFILE_DEPS' in container_py
+
+
+def test_gitlab_credentials_are_environment_scoped(generated_project):
+    """The GitLab deps job declares an environment so its registry token can be scoped."""
+    project, cell = generated_project
+    if cell['git_hosting_service'] != 'gitlab':
+        pytest.skip('GitLab-only pipeline')
+    config = yaml.safe_load((project / '.gitlab-ci.yml').read_text(encoding='utf-8'))
+    assert config['build-deps-image'].get('environment'), 'deps job has no environment to scope variables to'
+    assert config['publish'].get('environment') == 'pypi'
+
+
 def test_sidebar_nav_override_ships(generated_project):
     """The sidebar site-nav theme override ships and is wired into properdocs.yml."""
     project, _ = generated_project
