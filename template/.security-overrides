@@ -17,6 +17,13 @@
 # so entries here travel with the repo but can be augmented per-run.
 # Invalid entries abort the task with a `file:line: <reason>` message.
 #
+# Those two other sources leave no trace in the repository, so they are held
+# to a stricter rule: an entry from `--ignore` or the environment variable
+# MUST carry an `::YYYY-MM-DD` expiry. Permanent suppressions are only
+# accepted from this file, where they are reviewed along with the code.
+# Whatever ends up applied is printed with its origin, so a suppression
+# injected through CI configuration alone still shows up in the build log.
+#
 # Examples (uncomment and edit — do not leave sample IDs active):
 #
 # CVE-2024-1234::2026-12-31

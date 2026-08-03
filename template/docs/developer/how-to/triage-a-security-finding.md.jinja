@@ -22,24 +22,45 @@ git commit -am "fix: bump <package> for <CVE-id>"
 
 The `.security-overrides` file at the project root lists allowed-for-now vulnerabilities with expiry dates. Each entry is a single token — the id and the optional expiry joined by `::`, with **no** justification field:
 
-```
+```text
 <VULN_ID>[::YYYY-MM-DD]
 ```
 
 The justification goes in a `#` comment, since anything after the id on the same line is not part of the entry:
 
-```
+```text
 # upstream fix pending in v2.3 — see https://github.com/pkg/issue/42
 PYSEC-2024-1234::2026-06-01
 ```
 
-Malformed entries abort the task with a `file:line: <reason>` message rather than being silently ignored, so a typo fails loudly instead of quietly un-suppressing (or over-suppressing) a finding.
+Malformed entries abort the task with a `file:line: <reason>` message rather than being silently ignored, so a typo fails loudly instead of quietly un-suppressing (or over-suppressing) a finding. Note the failure direction that matters: a mistyped expiry like `::2020-1-1` is rejected outright rather than being read as a *permanent* suppression.
 
 After the expiry date, `secure.audit` fails again, forcing a re-triage. Don't extend overrides without revisiting the underlying issue. Omitting the expiry suppresses the finding permanently — prefer a date, because a permanent entry is never resurfaced.
 
 ## 3. Accept and document (rare)
 
 For findings that don't apply to your usage — e.g. the vulnerable code path is gated on a feature you don't use — write an override with a thorough `#` justification and a far-future expiry. Keep this rare; the next maintainer needs to trust the override list.
+
+## Where suppressions can come from
+
+Three sources are merged, in this precedence order, and deduplicated by vulnerability id:
+
+| Source | Permanent entries | Leaves a record in the repo |
+|---|---|---|
+| `--ignore` on the command line | **rejected** | no |
+| `{{ project_slug | upper }}_SECURITY_OVERRIDE` env var | **rejected** | no |
+| `.security-overrides` | allowed | yes |
+
+The first two must carry an `::YYYY-MM-DD` expiry. They are convenient for unblocking a single run, but nothing in the repository records that they were used — so an expiry-less entry there could mute a finding forever with no code change to review. A permanent suppression has to go in `.security-overrides`, where it shows up in a diff and gets read by whoever touches it next.
+
+Whichever source they come from, the suppressions actually applied are printed with their origin before the audit runs:
+
+```console
+Applying 1 suppression(s):
+  PYSEC-2024-1234 (expires 2026-06-01) from .security-overrides:12
+```
+
+Expired entries are reported too, naming the source, and then ignored — so the finding comes back rather than lingering behind a stale override.
 
 ## Where the audit runs
 

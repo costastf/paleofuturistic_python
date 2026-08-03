@@ -320,14 +320,75 @@ def test_documented_override_format_is_actually_accepted(generated_project):
     project, _ = generated_project
     doc = (project / 'docs' / 'developer' / 'how-to' / 'triage-a-security-finding.md').read_text(encoding='utf-8')
     pattern = load_generated_configuration(project).IGNORE_PATTERN
+    # Only ```text fences hold override-file content; sample command output lives in
+    # ```console fences and is deliberately not a valid entry.
     examples = [
         line.strip()
-        for line in doc.splitlines()
-        if re.match(r'^(CVE|GHSA|PYSEC)-', line.strip())
+        for block in re.findall(r'^```text\n(.*?)^```', doc, re.MULTILINE | re.DOTALL)
+        for line in block.splitlines()
+        # Skip comments and `<PLACEHOLDER>` format specs; everything else must be real.
+        if line.strip() and not line.strip().startswith('#') and '<' not in line
     ]
     assert examples, 'no override examples found in the how-to'
     for example in examples:
         assert pattern.fullmatch(example), f'documented example {example!r} would be rejected by the validator'
+
+
+def test_suppressions_are_validated_whole_not_scanned(generated_project):
+    """Suppression entries are matched with `fullmatch`, never scanned out of a joined string.
+
+    `finditer` over the merged list failed open in the worst direction: a mistyped expiry
+    like `CVE-1::2020-1-1` does not match the optional expiry group, so the bare id
+    matched and the entry became a *permanent* suppression, with `2020`, `1`, `1` added
+    as extra ids.
+    """
+    project, _ = generated_project
+    secure_py = (project / '_CI' / 'tasks' / 'secure.py').read_text(encoding='utf-8')
+    audit_source = secure_py.split("@logged('secure.audit')", 1)[1].split('\n@task', 1)[0]
+    assert 'IGNORE_PATTERN.finditer' not in audit_source, 'audit still scans for id-shaped substrings'
+    assert 'parse_suppressions' in audit_source
+    assert 'IGNORE_PATTERN.fullmatch' in secure_py
+
+
+def test_untracked_suppression_sources_require_an_expiry(generated_project):
+    """`--ignore` and the env var must carry an expiry; `.security-overrides` need not.
+
+    Those two leave no trace in the repo, so a permanent entry there could mute a finding
+    with no code change to review.
+    """
+    project, _ = generated_project
+    secure_py = (project / '_CI' / 'tasks' / 'secure.py').read_text(encoding='utf-8')
+    audit_source = secure_py.split("@logged('secure.audit')", 1)[1].split('\n@task', 1)[0]
+    cli = next(line for line in audit_source.splitlines() if "'--ignore'" in line)
+    env = next(line for line in audit_source.splitlines() if 'SECURITY_OVERRIDE_ENV' in line and 'parse_' in line)
+    assert 'require_expiry=True' in cli, '--ignore does not require an expiry'
+    assert 'require_expiry=True' in env, 'the env var does not require an expiry'
+    # The file keeps permanent entries: load_overrides_file must not opt in.
+    file_loader = secure_py.split('def load_overrides_file', 1)[1].split('\n@task', 1)[0]
+    assert 'require_expiry=True' not in file_loader, '.security-overrides should still allow permanent entries'
+
+
+def test_applied_suppressions_are_logged_with_their_source(generated_project):
+    """Whatever is applied is printed with its origin, so an env-only mute leaves a footprint."""
+    project, _ = generated_project
+    secure_py = (project / '_CI' / 'tasks' / 'secure.py').read_text(encoding='utf-8')
+    audit_source = secure_py.split("@logged('secure.audit')", 1)[1].split('\n@task', 1)[0]
+    assert 'Applying' in audit_source, 'applied suppressions are not announced'
+    assert 'suppression.source' in audit_source, 'the origin of each suppression is not printed'
+    assert 'expired on' in audit_source, 'expired suppressions are not reported'
+
+
+def test_parent_overrides_document_the_expiry_requirement():
+    """The parent's `.security-overrides` warns that its entries travel by env and need expiries.
+
+    The matrix runner forwards them through `<PROJECT>_SECURITY_OVERRIDE`, which now rejects
+    permanent entries — so an expiry-less entry here would fail every matrix cell.
+    """
+    header = (REPO_ROOT / '.security-overrides').read_text(encoding='utf-8')
+    assert 'expiry' in header.lower()
+    entries = [line.strip() for line in header.splitlines() if line.strip() and not line.startswith('#')]
+    for entry in entries:
+        assert '::' in entry, f'{entry!r} has no expiry but is forwarded via the environment'
 
 
 def test_sidebar_nav_override_ships(generated_project):
