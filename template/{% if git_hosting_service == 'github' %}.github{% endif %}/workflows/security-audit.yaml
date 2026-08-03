@@ -1,0 +1,56 @@
+name: Security audit
+
+# A dependency can turn out to be vulnerable, and a `.security-overrides` entry can
+# expire, without anyone pushing a commit. Tied to `push` alone the audit only fires on
+# activity, so a quiet repository quietly stops being checked — and the expiry dates in
+# `.security-overrides` would never come due. This run is what makes them load-bearing.
+on:
+  schedule:
+    # Daily. The minute is deliberately not :00 — GitHub sheds on-the-hour scheduled
+    # jobs when the queue is busy. Adjust the cadence to taste.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-deps-image:
+    uses: ./.github/workflows/build-deps-image.yaml
+    permissions:
+      contents: read
+      packages: write
+
+  secure:
+    name: Security audit
+    needs: build-deps-image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ${{ needs.build-deps-image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Configure git
+        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+
+      - name: Checkout repository
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git init -b main
+          remote_url="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git remote get-url origin >/dev/null 2>&1; then
+            git remote set-url origin "${remote_url}"
+          else
+            git remote add origin "${remote_url}"
+          fi
+          git fetch --depth=1 origin "${GITHUB_SHA}"
+          git checkout --force FETCH_HEAD
+
+      - name: Audit dependencies
+        run: ./workflow.cmd secure.audit

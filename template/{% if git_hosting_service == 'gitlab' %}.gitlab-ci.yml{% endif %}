@@ -77,6 +77,17 @@ test:
   script:
     - ./workflow.cmd test.tox
 
+secure:
+  stage: ci
+  image: $DEPS_IMAGE
+  needs:
+    - job: build-deps-image
+      artifacts: true
+  before_script:
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+  script:
+    - ./workflow.cmd secure.audit
+
 build:
   stage: ci
   image: $DEPS_IMAGE

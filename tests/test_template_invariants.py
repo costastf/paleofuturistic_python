@@ -11,6 +11,7 @@ import importlib.util
 import inspect
 import json
 import os
+import re
 import subprocess
 import tomllib
 from pathlib import Path
@@ -159,6 +160,18 @@ CREDENTIALED_URLS = [
 ]
 
 
+def load_generated_configuration(project):
+    """Import the generated project's `_CI/tasks/configuration.py` as a standalone module.
+
+    Pure stdlib (`re`, `pathlib`), so it loads without the rest of the `_CI.tasks` package.
+    """
+    path = project / '_CI' / 'tasks' / 'configuration.py'
+    spec = importlib.util.spec_from_file_location('generated_configuration', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def load_generated_shared(project):
     """Import the generated project's `_CI/tasks/shared.py` as a standalone module.
 
@@ -252,6 +265,69 @@ def test_deps_image_reference_is_digest_pinned(generated_project):
     else:
         # kaniko is daemonless, so there is no local image to inspect afterwards.
         assert '--digest-file' in host_py
+
+
+def test_security_audit_runs_in_ci(generated_project):
+    """The chosen host's pipeline runs `secure.audit`.
+
+    Without this the `.security-overrides` expiry mechanism gates nothing: pip-audit was
+    reachable only as a local command, so a dependency with a known CVE shipped green.
+    """
+    project, cell = generated_project
+    if cell['git_hosting_service'] == 'github':
+        pipeline = (project / '.github' / 'workflows' / 'continuous-integration.yaml').read_text(encoding='utf-8')
+    else:
+        pipeline = (project / '.gitlab-ci.yml').read_text(encoding='utf-8')
+    assert 'secure.audit' in pipeline, 'no pipeline job runs secure.audit'
+
+
+def test_scheduled_security_audit_ships_for_github(generated_project):
+    """GitHub projects get a scheduled audit, so expiries come due without a push."""
+    project, cell = generated_project
+    workflow = project / '.github' / 'workflows' / 'security-audit.yaml'
+    if cell['git_hosting_service'] != 'github':
+        assert not workflow.exists()
+        return
+    content = workflow.read_text(encoding='utf-8')
+    assert 'schedule:' in content and 'cron:' in content
+    assert 'workflow_dispatch:' in content, 'no way to trigger the audit on demand'
+    assert 'secure.audit' in content
+    config = yaml.safe_load(content)
+    # Least privilege: the audit only reads the repo; only the image build may publish.
+    assert config['permissions'] == {'contents': 'read'}
+    assert config['jobs']['secure']['permissions'] == {'contents': 'read', 'packages': 'read'}
+
+
+def test_qa_steps_include_the_security_audit():
+    """`secure.audit` is in QA_STEPS, so every matrix cell audits its generated project.
+
+    The matrix runner already exports `<PROJECT>_SECURITY_OVERRIDE` for this step; until
+    it was listed here that plumbing fed nothing.
+    """
+    from _CI.tasks.configuration import QA_STEPS
+
+    assert 'secure.audit' in QA_STEPS
+    # Fail fast: audit before the slow tox matrix.
+    assert QA_STEPS.index('secure.audit') < QA_STEPS.index('test.tox')
+
+
+def test_documented_override_format_is_actually_accepted(generated_project):
+    """Every `.security-overrides` example in the docs parses as a real entry.
+
+    The how-to previously documented a space-separated `<ID> <DATE> <justification>` form
+    that `validate_override_entry` rejects outright, so following the docs broke the build.
+    """
+    project, _ = generated_project
+    doc = (project / 'docs' / 'developer' / 'how-to' / 'triage-a-security-finding.md').read_text(encoding='utf-8')
+    pattern = load_generated_configuration(project).IGNORE_PATTERN
+    examples = [
+        line.strip()
+        for line in doc.splitlines()
+        if re.match(r'^(CVE|GHSA|PYSEC)-', line.strip())
+    ]
+    assert examples, 'no override examples found in the how-to'
+    for example in examples:
+        assert pattern.fullmatch(example), f'documented example {example!r} would be rejected by the validator'
 
 
 def test_sidebar_nav_override_ships(generated_project):

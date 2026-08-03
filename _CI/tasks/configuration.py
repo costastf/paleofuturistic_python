@@ -8,7 +8,11 @@ from _CI import PROJECT_ROOT_DIRECTORY
 
 PROJECT_SLUG = 'paleofuturistic_python_project'
 IGNORE_PATTERNS = shutil.ignore_patterns('.git', '.venv', '__pycache__', '*.pyc', '.copier-answers.yml')
-QA_STEPS = ('format', 'lint', 'test.tox', 'build', 'document')
+# `secure.audit` runs right after the static checks and before the slow tox matrix, so a
+# vulnerable dependency fails fast. It is also the step the `<PROJECT>_SECURITY_OVERRIDE`
+# plumbing below exists to serve — until it was listed here, that env var was set for
+# nothing and the `.security-overrides` expiry mechanism gated no automated run at all.
+QA_STEPS = ('format', 'lint', 'secure.audit', 'test.tox', 'build', 'document')
 TEMPLATE_SECURITY_OVERRIDE_ENV = 'TEMPLATE_SECURITY_OVERRIDE'
 SECURITY_OVERRIDES_FILE = PROJECT_ROOT_DIRECTORY / '.security-overrides'
 

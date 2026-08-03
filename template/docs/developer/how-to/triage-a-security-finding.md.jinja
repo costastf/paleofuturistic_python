@@ -20,23 +20,38 @@ git commit -am "fix: bump <package> for <CVE-id>"
 
 ## 2. Override with an expiry (recommended for "can't upgrade yet")
 
-The `.security-overrides` file at the project root lists allowed-for-now vulnerabilities with expiry dates. Each line is:
+The `.security-overrides` file at the project root lists allowed-for-now vulnerabilities with expiry dates. Each entry is a single token — the id and the optional expiry joined by `::`, with **no** justification field:
 
 ```
-<VULN-ID> <YYYY-MM-DD> <justification>
+<VULN_ID>[::YYYY-MM-DD]
 ```
 
-For example:
+The justification goes in a `#` comment, since anything after the id on the same line is not part of the entry:
 
 ```
-PYSEC-2024-1234 2026-06-01 upstream fix pending in v2.3 — see https://github.com/pkg/issue/42
+# upstream fix pending in v2.3 — see https://github.com/pkg/issue/42
+PYSEC-2024-1234::2026-06-01
 ```
 
-After the expiry date, `secure.audit` fails again, forcing a re-triage. Don't extend overrides without revisiting the underlying issue.
+Malformed entries abort the task with a `file:line: <reason>` message rather than being silently ignored, so a typo fails loudly instead of quietly un-suppressing (or over-suppressing) a finding.
+
+After the expiry date, `secure.audit` fails again, forcing a re-triage. Don't extend overrides without revisiting the underlying issue. Omitting the expiry suppresses the finding permanently — prefer a date, because a permanent entry is never resurfaced.
 
 ## 3. Accept and document (rare)
 
-For findings that don't apply to your usage — e.g. the vulnerable code path is gated on a feature you don't use — write an override with an extra-long justification and a far-future expiry. Keep this rare; the next maintainer needs to trust the override list.
+For findings that don't apply to your usage — e.g. the vulnerable code path is gated on a feature you don't use — write an override with a thorough `#` justification and a far-future expiry. Keep this rare; the next maintainer needs to trust the override list.
+
+## Where the audit runs
+
+`secure.audit` is not only a local command — it gates automatically, which is what makes the expiry dates above meaningful:
+
+- **Every CI run** — the `secure` job in {% if git_hosting_service == 'github' %}`.github/workflows/continuous-integration.yaml`{% else %}`.gitlab-ci.yml`{% endif %} runs it alongside lint, test and build.
+{%- if git_hosting_service == 'github' %}
+- **Daily on a schedule** — `.github/workflows/security-audit.yaml`. A dependency can turn out to be vulnerable, and an override can expire, with nobody pushing a commit; without the scheduled run a quiet repository would stop being checked and expiry dates would never come due. Trigger it by hand from the Actions tab (`workflow_dispatch`) to re-check on demand.
+{%- else %}
+- **On a schedule** — the `secure` job carries no `rules:`, so it also runs in scheduled pipelines. Create one under **Build → Pipeline schedules**; without it a quiet repository stops being checked and the expiry dates never come due.
+{%- endif %}
+- **Pre-commit** — only `secure.validate-overrides`, and only when `.security-overrides` itself changes. That checks the file's syntax, not your dependencies.
 
 ## Re-running after a triage
 
