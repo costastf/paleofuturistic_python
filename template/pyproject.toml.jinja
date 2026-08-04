@@ -71,12 +71,16 @@ test = [
     # Pin uv to match [tool.uv] required-version — tox-uv depends on the uv
     # Python package, which installs a uv binary into .venv/bin that would
     # otherwise shadow the image's /usr/local/bin/uv and break the check.
+    # Bump with `./workflow.cmd develop.bump-uv`, never by hand: this is one of five
+    # places the uv version appears, and one of them carries an image digest that has
+    # to move with it.
     "uv==0.11.30",
     "tox==4.58.0",
     "tox-uv==1.36.0",
 ]
 
 [build-system]
+# The upper bound tracks the pinned uv. Bump with `./workflow.cmd develop.bump-uv`.
 requires = ["uv_build>=0.8.15,<=0.11.30"]
 build-backend = "uv_build"
 
@@ -300,6 +304,10 @@ mode = "auto-detect"
 
 
 [tool.uv]
+# This version was the newest release that had been public for a week when the project was
+# generated. It does not advance on its own — `./workflow.cmd develop.bump-uv` moves it, and
+# every other place it appears, together. Editing it here alone leaves the base image below
+# pinned to the old version's digest.
 required-version = "==0.11.30"
 # Fixed date, not a relative window. A rolling `"1 week"` moved forward every day, so a
 # resolution — and therefore a green pipeline — could change with no commit behind it.
@@ -334,6 +342,9 @@ dependency_groups = ["test"]
 set_env = { COVERAGE_FILE = ".coverage.{envname}" }
 commands = [["pytest", { replace = "posargs", default = [], extend = true }]]
 
+{#- Template-maintainer note (never rendered): one digest per supported Python, because only
+    one of them ships into any given project. `./workflow.cmd maintain.bump-uv` re-resolves all
+    of them alongside the version literals — they are meaningless if they disagree. -#}
 {%- set base_image_digests = {
   '3.10': 'sha256:1e0e81799d404a74d028f7970b7fb30303a6ebc49674aae5262ab483986df3b9',
   '3.11': 'sha256:a884ade93f08f56138d3c5a5a126da5bbc6b9ab9bae1a58c1db3aa83c8660941',
@@ -353,6 +364,7 @@ commands = [["pytest", { replace = "posargs", default = [], extend = true }]]
 # an input to the deps-image tag, so changing it rebuilds rather than serving a cached image
 # built from the old base.
 #
-# When bumping uv, update the version in the tag and the digest together — a reference carrying
-# both resolves to the digest, so a bumped tag with a stale digest silently keeps the old image.
+# Use `./workflow.cmd develop.bump-uv` rather than editing this line: it moves the tag and
+# re-resolves the digest in one step. A reference carrying both resolves to the *digest*, so a
+# hand-bumped tag left beside the old digest silently keeps building the previous image.
 base-image = "ghcr.io/astral-sh/uv:0.11.30-python{{ min_python_version }}-trixie-slim@{{ base_image_digests[min_python_version] }}"

@@ -1,10 +1,20 @@
 """Centralized constants for CI task definitions."""
 
+import re
 import shutil
 
 import yaml
 
 from _CI import PROJECT_ROOT_DIRECTORY
+
+TEMPLATE_PYPROJECT = PROJECT_ROOT_DIRECTORY / 'template' / 'pyproject.toml.jinja'
+
+# Generation normally stamps the newest uv release that has cleared its cool-down, so a new
+# project starts current. That would break the template's own tests: CI installs the uv the
+# template pins, then generates projects and runs `uv sync` with it, and a freshly stamped
+# `required-version` the ambient uv cannot satisfy fails every matrix cell. Setting this to the
+# committed pin makes generation deterministic and keeps it matching the installed uv.
+UV_VERSION_ENV = 'TEMPLATE_UV_VERSION'
 
 PROJECT_SLUG = 'paleofuturistic_python_project'
 IGNORE_PATTERNS = shutil.ignore_patterns('.git', '.venv', '__pycache__', '*.pyc', '.copier-answers.yml')
@@ -32,6 +42,29 @@ def read_template_overrides():
         if entry:
             entries.append(entry)
     return ','.join(entries)
+
+
+def template_uv_version() -> str:
+    """Return the uv version the template currently pins.
+
+    Read from the template source rather than hardcoded, so it follows `maintain.bump-uv`
+    automatically. Used to pin what generation stamps during the template's own tests.
+
+    Raises:
+        RuntimeError: If the template has no exact `required-version` to read.
+    """
+    match = re.search(
+        r'^required-version = "==([^"]+)"$', TEMPLATE_PYPROJECT.read_text(encoding='utf-8'), re.MULTILINE
+    )
+    if not match:
+        msg = f'no exact [tool.uv] required-version found in {TEMPLATE_PYPROJECT}'
+        raise RuntimeError(msg)
+    return match.group(1)
+
+
+def generation_env() -> dict:
+    """Environment for invoking copier in tests: pins the uv version generation stamps."""
+    return {UV_VERSION_ENV: template_uv_version()}
 
 
 def version_sort_key(version: str) -> tuple[int, ...]:

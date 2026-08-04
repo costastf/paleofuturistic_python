@@ -8,6 +8,7 @@ from _CI.tasks.document import build as document_build
 from _CI.tasks.document import deploy_github as document_deploy_github
 from _CI.tasks.document import document
 from _CI.tasks.document import view as document_view
+from _CI.tasks.maintain import bump_uv
 from _CI.tasks.test import combo, invariants, list_combos, matrix, test
 
 LOGGER = logging.getLogger(__file__)
@@ -26,6 +27,10 @@ document_collection.add_task(document_build, name='build')
 document_collection.add_task(document_view, name='view')
 document_collection.add_task(document_deploy_github, name='deploy-github')
 
+maintain_collection = Collection('maintain')
+maintain_collection.add_task(bump_uv, name='bump-uv')
+
 namespace = Collection()
 namespace.add_collection(test_collection)
 namespace.add_collection(document_collection)
+namespace.add_collection(maintain_collection)

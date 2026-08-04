@@ -6,6 +6,10 @@ requires-python = ">=3.12"
 
 [tool.uv]
 package = false
+# Bump with `./workflow.cmd maintain.bump-uv`, which moves this, the template's four version
+# literals and all five per-Python image digests in one step. This value does double duty: it
+# is the uv CI installs before generating anything, and the floor a generated project falls
+# back to when it cannot reach PyPI.
 required-version = "==0.11.30"
 # Fixed date, not a relative window. `exclude-newer = "1 week"` moved forward every day,
 # so a resolution could change — and a gate could go red — with no commit behind it. The

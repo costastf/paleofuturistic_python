@@ -1,6 +1,7 @@
 """Shared fixtures for the template invariants suite."""
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -25,7 +26,7 @@ sys.path.insert(0, str(REPO_ROOT / '_CI' / 'lib' / 'vendor'))
 sys.path.insert(0, str(REPO_ROOT / '_CI'))
 sys.path.insert(0, str(REPO_ROOT))
 
-from _CI.tasks.configuration import IGNORE_PATTERNS, PROJECT_SLUG, combo_context, matrix_combos
+from _CI.tasks.configuration import IGNORE_PATTERNS, PROJECT_SLUG, combo_context, generation_env, matrix_combos
 
 
 @pytest.fixture(scope='session')
@@ -67,5 +68,8 @@ def generated_project(request, template_snapshot, tmp_path_factory):
         ],
         check=True,
         capture_output=True,
+        # Pin what generation stamps, so assertions compare against a known version rather
+        # than whatever uv released this week.
+        env={**os.environ, **generation_env()},
     )
     return project, cell

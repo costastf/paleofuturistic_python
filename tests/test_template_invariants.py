@@ -25,7 +25,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # conftest.py wires sys.path so _CI.tasks.* is importable; pytest loads it
 # before this module, which is why no path setup is needed here.
-from _CI.tasks.configuration import PROJECT_SLUG
+from _CI.tasks.configuration import PROJECT_SLUG, UV_VERSION_ENV, generation_env, template_uv_version
 
 
 def test_host_scaffolding_present(generated_project):
@@ -160,6 +160,19 @@ CREDENTIALED_URLS = [
     # An `@` outside the netloc is not a credential.
     ('https://github.com/owner/repo@v1.2.3', 'https://github.com/owner/repo@v1.2.3'),
 ]
+
+
+def load_uv_release_module():
+    """Import `template/_CI/uv_release.py` from source.
+
+    The same file both this repo and generated projects use, so there is one implementation to
+    test rather than two that could drift.
+    """
+    path = REPO_ROOT / 'template' / '_CI' / 'uv_release.py'
+    spec = importlib.util.spec_from_file_location('uv_release_under_test', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def load_generated_configuration(project):
@@ -629,6 +642,117 @@ def test_generated_project_ships_a_lockfile(generated_project):
     assert not re.search(r'^\s*/?uv\.lock\s*$', ignore, re.MULTILINE), 'uv.lock is gitignored'
 
 
+def uv_pins(project):
+    """Return every uv version a generated project pins, keyed by where it came from.
+
+    Five places have to agree. They are collected together because the failure that matters is
+    *disagreement* — most of all a base-image tag that has moved while its digest has not,
+    since a reference carrying both resolves to the digest and silently keeps the old image.
+    """
+    data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
+    base = data['tool']['docker-versions']['base-image']
+    locked = {p['name']: p['version'] for p in tomllib.loads((project / 'uv.lock').read_text(encoding='utf-8'))['package']}
+    return {
+        'required-version': data['tool']['uv']['required-version'].removeprefix('=='),
+        'test group': next(d for d in data['dependency-groups']['test'] if d.startswith('uv==')).removeprefix('uv=='),
+        'uv_build bound': data['build-system']['requires'][0].split('<=')[1],
+        'base-image tag': base.split('@')[0].split(':')[-1].split('-python')[0],
+        'uv.lock': locked['uv'],
+    }
+
+
+def test_every_uv_pin_agrees(generated_project):
+    """All five uv pins in a generated project carry the same version."""
+    project, _ = generated_project
+    pins = uv_pins(project)
+    assert len(set(pins.values())) == 1, f'uv pins disagree: {pins}'
+
+
+def test_generation_honours_the_uv_version_override(generated_project):
+    """Generation stamps exactly the version `TEMPLATE_UV_VERSION` asks for.
+
+    The template's own CI depends on this: it installs the uv the template pins, then generates
+    projects and runs `uv sync` with it. A freshly resolved `required-version` the ambient uv
+    cannot satisfy would fail every matrix cell, so the fixture pins generation via this
+    variable — and this asserts the pin actually took effect.
+    """
+    project, _ = generated_project
+    assert set(uv_pins(project).values()) == {template_uv_version()}
+
+
+def test_base_image_tag_matches_the_pinned_version(generated_project):
+    """The base image's tag names the same uv version and Python as the project pins.
+
+    Network-free on purpose: this is the drift a hand-edit causes, and it should be caught
+    whether or not a registry is reachable.
+    """
+    project, _ = generated_project
+    data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
+    base = data['tool']['docker-versions']['base-image']
+    version = data['tool']['uv']['required-version'].removeprefix('==')
+    python_version = data['project']['requires-python'].removeprefix('>=')
+    tag_reference, _, digest = base.partition('@')
+    assert f'{version}-python{python_version}-trixie-slim' in tag_reference, f'tag disagrees with the pin: {base}'
+    assert digest.startswith('sha256:'), f'no digest pinned: {base}'
+
+
+def test_committed_digests_resolve_to_their_tags():
+    """Every digest in the template is the one its tag actually resolves to.
+
+    The failure `maintain.bump-uv` exists to prevent: move the tag, leave a digest behind, and
+    the reference still resolves to the *digest* — so projects keep building the old image while
+    the file claims otherwise. Checks all five Pythons at once rather than once per matrix cell.
+
+    Skipped when the registry cannot be reached: an unreachable ghcr is not a defect in this
+    repository, and failing here would make the suite depend on network weather.
+    """
+    uv_release = load_uv_release_module()
+    template = (REPO_ROOT / 'template' / 'pyproject.toml.jinja').read_text(encoding='utf-8')
+    version = uv_release.current_pin(template)
+    committed = dict(re.findall(r"^\s*'(\d+\.\d+)': '(sha256:[0-9a-f]+)',$", template, re.MULTILINE))
+    assert committed, 'no per-Python digests found in the template'
+    for python_version, digest in sorted(committed.items()):
+        try:
+            live = uv_release.image_digest(version, python_version)
+        except uv_release.UvReleaseError as exc:
+            pytest.skip(f'registry unreachable: {exc}')
+        assert live == digest, f'uv {version} python{python_version}: committed {digest}, registry has {live}'
+
+
+def test_every_uv_site_points_at_the_bump_command(generated_project):
+    """Each uv pin carries a comment naming the command that moves them all.
+
+    Five places hold the same version; editing one by hand is how they drift apart.
+    """
+    project, _ = generated_project
+    content = (project / 'pyproject.toml').read_text(encoding='utf-8')
+    for anchor in ('"uv==', 'requires = ["uv_build', 'required-version = "==', 'base-image = "'):
+        index = content.index(anchor)
+        # The pointer should be in the comment block immediately above the pin.
+        preceding = content[:index].rsplit('\n\n', 1)[-1]
+        assert 'develop.bump-uv' in preceding, f'no bump-uv pointer above {anchor!r}'
+
+
+def test_override_variable_name_matches_the_generation_hook():
+    """The harness and `tasks_render.py` agree on the override variable's name.
+
+    They are two separate constants. If they drift the override silently stops working: every
+    generated project resolves a fresh uv, the ambient uv no longer satisfies it, and all eight
+    matrix cells fail on a version mismatch — a long way from the renamed string.
+    """
+    render = (REPO_ROOT / 'tasks_render.py').read_text(encoding='utf-8')
+    assert f"UV_VERSION_ENV = '{UV_VERSION_ENV}'" in render, (
+        f'tasks_render.py does not read {UV_VERSION_ENV}; the harness override would be ignored'
+    )
+
+
+def test_repo_uv_pin_points_at_its_own_command():
+    """This repo's pin names `maintain.bump-uv`, which also refreshes the template's digests."""
+    content = (REPO_ROOT / 'pyproject.toml').read_text(encoding='utf-8')
+    index = content.index('required-version = "==')
+    assert 'maintain.bump-uv' in content[:index].rsplit('\n\n', 1)[-1]
+
+
 def test_lockfile_agrees_with_the_pinned_uv(generated_project):
     """The locked uv matches `[tool.uv] required-version`.
 
@@ -939,6 +1063,9 @@ def test_license_file_matches_choice(template_snapshot, tmp_path_factory, licens
         ],
         check=True,
         capture_output=True,
+        # Pin the stamped uv version: this test only cares about LICENSE, so there is no
+        # reason for it to resolve a release over the network.
+        env={**os.environ, **generation_env()},
     )
     if license_choice == 'None':
         assert not (project / 'LICENSE').exists()
