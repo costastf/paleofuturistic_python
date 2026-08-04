@@ -20,6 +20,7 @@ from _CI.tasks.configuration import (IGNORE_PATTERNS,
                                      TEMPLATE_SECURITY_OVERRIDE_ENV,
                                      combo_context,
                                      combo_label,
+                                     generation_env,
                                      matrix_combos,
                                      read_template_overrides)
 
@@ -70,7 +71,9 @@ def run_combo(template_repo, output_root, extra_context, label, log_file=None):
         f'uvx copier copy --defaults --trust '
         f'--data-file {data_file} {template_repo} {project_dir}'
     )
-    if not run_command(copier_cmd, log_file=log_file):
+    # Pin what generation stamps, so the generated `required-version` matches the uv this run
+    # is using — otherwise every `uv sync` below fails on a version mismatch.
+    if not run_command(copier_cmd, env=generation_env(), log_file=log_file):
         return False
 
     make_file_executable(project_dir / 'workflow.cmd')

@@ -30,7 +30,7 @@ from packageurl import PackageURL
 
 from .configuration import PROJECT_NAME, SBOM_FILE, UV_LOCK, VENDOR_DIR, VENDOR_TXT
 from .{{ git_hosting_service }} import iter_pipeline_components
-from .shared import PipelineComponent
+from .shared import PipelineComponent, strip_credentials
 
 REQUIREMENT_PATTERN = re.compile(r'^([A-Za-z0-9._\-]+)==([A-Za-z0-9._\-+]+)')
 
@@ -139,6 +139,8 @@ def origin_repo_url() -> str | None:
     url = result.stdout.strip()
     if url.startswith('git@'):
         url = url.replace(':', '/', 1).replace('git@', 'https://', 1)
+    # CI rewrites origin to embed a token; this reference ships inside the wheel.
+    url = strip_credentials(url)
     return url.removesuffix('.git') or None
 
 

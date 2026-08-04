@@ -9,3 +9,8 @@
 # expiry).
 #
 # One entry per line. Blank lines and `#` comments are ignored.
+#
+# Entries here reach the generated projects through an environment variable, not
+# as a file, so each one MUST carry an `::YYYY-MM-DD` expiry — the inner template
+# rejects permanent suppressions from that source, on the grounds that they would
+# mute a finding with no reviewable record. Use `CVE-2024-1234::2026-12-31`.

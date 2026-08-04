@@ -3,17 +3,29 @@ name: Continuous Integration
 on:
   push:
 
+# Workflow-level floor. Without it every job would inherit the repository default,
+# which for many repositories is the full read/write token — far more than a lint or
+# test run needs. Jobs below narrow further; none of them writes anything.
+permissions:
+  contents: read
+
 jobs:
   build-deps-image:
     uses: ./.github/workflows/build-deps-image.yaml
     permissions:
       contents: read
+      # The only job that publishes: it pushes the deps image to ghcr.
       packages: write
 
   lint:
     name: Lint
     needs: build-deps-image
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Pulling the deps image from ghcr goes through GITHUB_TOKEN; without
+      # `packages: read` the manifest request comes back 403.
+      packages: read
     container:
       image: ${{ needs.build-deps-image.outputs.image }}
       credentials:
@@ -21,22 +33,14 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
-      - name: Configure git
-        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
-
       - name: Checkout repository
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git init -b main
-          remote_url="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          if git remote get-url origin >/dev/null 2>&1; then
-            git remote set-url origin "${remote_url}"
-          else
-            git remote add origin "${remote_url}"
-          fi
-          git fetch --depth=1 origin "${GITHUB_SHA}"
-          git checkout --force FETCH_HEAD
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          # Auth goes in an `http.extraheader` that is removed once the fetch is done,
+          # so no credential is left behind in `.git/config` and `origin` stays a clean
+          # URL. That matters because the SBOM reads `origin` for its VCS reference and
+          # ships inside the wheel — a token there becomes public and permanent.
+          persist-credentials: false
 
       - name: Lint code
         run: ./workflow.cmd lint
@@ -45,6 +49,11 @@ jobs:
     name: Test (tox matrix)
     needs: build-deps-image
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Pulling the deps image from ghcr goes through GITHUB_TOKEN; without
+      # `packages: read` the manifest request comes back 403.
+      packages: read
     container:
       image: ${{ needs.build-deps-image.outputs.image }}
       credentials:
@@ -52,30 +61,55 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
-      - name: Configure git
-        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
-
       - name: Checkout repository
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git init -b main
-          remote_url="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          if git remote get-url origin >/dev/null 2>&1; then
-            git remote set-url origin "${remote_url}"
-          else
-            git remote add origin "${remote_url}"
-          fi
-          git fetch --depth=1 origin "${GITHUB_SHA}"
-          git checkout --force FETCH_HEAD
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          # Auth goes in an `http.extraheader` that is removed once the fetch is done,
+          # so no credential is left behind in `.git/config` and `origin` stays a clean
+          # URL. That matters because the SBOM reads `origin` for its VCS reference and
+          # ships inside the wheel — a token there becomes public and permanent.
+          persist-credentials: false
 
       - name: Run tests
         run: ./workflow.cmd test.tox
+
+  secure:
+    name: Security audit
+    needs: build-deps-image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Pulling the deps image from ghcr goes through GITHUB_TOKEN; without
+      # `packages: read` the manifest request comes back 403.
+      packages: read
+    container:
+      image: ${{ needs.build-deps-image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          # Auth goes in an `http.extraheader` that is removed once the fetch is done,
+          # so no credential is left behind in `.git/config` and `origin` stays a clean
+          # URL. That matters because the SBOM reads `origin` for its VCS reference and
+          # ships inside the wheel — a token there becomes public and permanent.
+          persist-credentials: false
+
+      - name: Audit dependencies
+        run: ./workflow.cmd secure.audit
 
   build:
     name: Build
     needs: build-deps-image
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Pulling the deps image from ghcr goes through GITHUB_TOKEN; without
+      # `packages: read` the manifest request comes back 403.
+      packages: read
     container:
       image: ${{ needs.build-deps-image.outputs.image }}
       credentials:
@@ -83,22 +117,14 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
-      - name: Configure git
-        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
-
       - name: Checkout repository
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git init -b main
-          remote_url="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          if git remote get-url origin >/dev/null 2>&1; then
-            git remote set-url origin "${remote_url}"
-          else
-            git remote add origin "${remote_url}"
-          fi
-          git fetch --depth=1 origin "${GITHUB_SHA}"
-          git checkout --force FETCH_HEAD
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          # Auth goes in an `http.extraheader` that is removed once the fetch is done,
+          # so no credential is left behind in `.git/config` and `origin` stays a clean
+          # URL. That matters because the SBOM reads `origin` for its VCS reference and
+          # ships inside the wheel — a token there becomes public and permanent.
+          persist-credentials: false
 
       - name: Build package
         run: ./workflow.cmd build

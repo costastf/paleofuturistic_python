@@ -12,7 +12,7 @@ from invoke import Context
 
 from _CI.info import read as read_info
 
-from .shared import PipelineComponent, execute
+from .shared import PipelineComponent, execute, strip_credentials
 
 CI_FILE = Path('.gitlab-ci.yml')
 # Matches inline `image: foo/bar:tag` and the `name: foo/bar:tag` line inside
@@ -41,11 +41,16 @@ def registry_settings() -> RegistrySettings:
 
 
 def publish_deps_image(context: Context, tag: str) -> str:
-    """Build and push the deps image via kaniko. Return the full image reference.
+    """Build and push the deps image via kaniko. Return a digest-pinned reference.
 
     kaniko is a daemonless builder that runs entirely in userspace — required
     on GitLab runners that don't allow privileged docker-in-docker or user
     namespaces (which rule out docker, buildah, and podman).
+
+    Every run builds from the repository — there is no reuse-an-existing-tag path
+    here — so the image can only ever be what this pipeline just produced.
+    ``--digest-file`` reports the digest kaniko pushed, which is what downstream jobs
+    pin to; being daemonless, there is no local image to inspect for it afterwards.
     """
     settings = registry_settings()
     image = f'{settings.image_prefix}-deps:{tag}'
@@ -56,12 +61,17 @@ def publish_deps_image(context: Context, tag: str) -> str:
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(json.dumps(config), encoding='utf-8')
     base_image = read_info('info.base-image')
+    digest_file = Path('.deps-image-digest')
     execute(
         context,
         f'/kaniko/executor --dockerfile=Dockerfile.deps --context=. '
-        f'--destination={image} --build-arg=BASE_IMAGE={base_image}',
+        f'--destination={image} --build-arg=BASE_IMAGE={base_image} --digest-file={digest_file}',
     )
-    return image
+    digest = digest_file.read_text(encoding='utf-8').strip() if digest_file.exists() else ''
+    if not digest.startswith('sha256:'):
+        print(f'kaniko reported no digest for {image}; falling back to the tag.')
+        return image
+    return f'{image.rsplit(":", 1)[0]}@{digest}'
 
 
 def origin_slug(context: Context) -> str:
@@ -69,7 +79,9 @@ def origin_slug(context: Context) -> str:
     remote = context.run('git remote get-url origin', hide=True, warn=True)
     if remote is None or remote.failed:
         return ''
-    url = remote.stdout.strip()
+    # In CI origin carries a token (https://gitlab-ci-token:<token>@gitlab.com/…),
+    # which the patterns below would otherwise fail to match.
+    url = strip_credentials(remote.stdout.strip())
     match = re.match(
         r'(?:git@gitlab\.com:|https://gitlab\.com/)(.+?)(?:\.git)?/?$',
         url,

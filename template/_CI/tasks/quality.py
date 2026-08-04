@@ -8,7 +8,7 @@ from typing import cast
 from invoke import Collection, Context, Task, task
 
 from .configuration import PYSCN_REPORTS_DIR
-from .shared import execute, is_ci, logged, open_command, run, run_steps
+from .shared import execute, is_ci, logged, open_target, run, run_steps
 
 GRADE_COLORS = {'A': 'brightgreen', 'B': 'green', 'C': 'yellow', 'D': 'orange', 'F': 'red'}
 BADGE_PATTERN = re.compile(r'(!\[pyscn quality\]\(https://img\.shields\.io/badge/pyscn-)[^)]+(\)\[)')
@@ -54,7 +54,7 @@ def pyscn_analyze(context: Context) -> None:
     execute(context, 'uv run pyscn analyze --json src/')
     update_pyscn_badge()
     if not is_ci():
-        execute(context, f'{open_command()} {latest_pyscn_report()}')
+        open_target(context, str(latest_pyscn_report()))
 
 
 @task

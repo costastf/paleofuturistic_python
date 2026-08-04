@@ -16,15 +16,26 @@ The deciding factor was vendoring: a fresh clone runs `./workflow.cmd …` immed
 
 ## The polyglot launcher
 
-`workflow.cmd` is a script that's simultaneously valid sh and Windows cmd:
+`workflow.cmd` is a single script that both sh and Windows cmd read as valid — three lines,
+each doing different work depending on who is reading:
 
-```
-@echo off & rem (Windows cmd interprets the rest; sh ignores the @ + rem prefix)
-@uv run python -m _CI.invoke -- %*
-:; uv run python -m _CI.invoke -- "$@"
+```sh
+#!/bin/sh
+: ; exec uv run python _CI/lib/vendor/bin/invoke --search-root _CI "$@"
+@uv run python _CI\lib\vendor\bin\invoke --search-root _CI %*
 ```
 
-Both shells route through `uv run python -m _CI.invoke -- <args>` — uv handles venv creation, invoke handles task dispatch. No global installs required; no shell-specific copy.
+The trick is line 2, and it hinges on `:` meaning two different things:
+
+- **sh** treats `:` as the do-nothing builtin, runs the rest of the line, and `exec` replaces
+  the shell process — so line 3 is never reached. The Windows line is dead code to sh.
+- **cmd** treats a line starting with `:` as a *label*, so it skips line 2 entirely and falls
+  through to line 3, which carries the backslash paths and `%*` that cmd needs.
+
+Both routes end up running the same vendored Invoke, with `--search-root _CI` pointing it at
+the task package. uv creates and syncs the virtualenv on the way through; the vendored Invoke
+means there is nothing to install first. No global installs, and no second copy of the
+launcher to keep in step.
 
 ## Module structure
 
@@ -35,9 +46,13 @@ _CI/tasks/
 ├── configuration.py     # Shared constants (paths, env vars, registry settings)
 ├── shared.py            # @logged, @run, execute, run_steps, IndentingStream
 ├── github.py / gitlab.py  # Host-specific helpers (only one is present)
+├── local.py             # Yours. Never overwritten by `copier update`
 └── <feature>.py         # build, container, develop, document, format_, lint,
                          #   quality, release, secure, test
 ```
+
+Everything there except `local.py` is template-owned and replaced on update, which is why
+project-specific tasks belong in `local.py` — `__init__.py` picks it up automatically.
 
 Each feature module:
 

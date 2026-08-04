@@ -14,7 +14,7 @@ else:
 
 from invoke import Collection, Context, Task, task
 
-from .shared import execute, logged, open_command, run_steps
+from .shared import execute, logged, open_target, run_steps
 
 COVERAGE_REPORT = Path('reports/coverage.json')
 PYPROJECT = Path('pyproject.toml')
@@ -159,8 +159,8 @@ def coverage(context: Context) -> None:
 def view(context: Context) -> None:
     """Run tests and open HTML test and coverage reports in browser."""
     test(context)
-    execute(context, f'{open_command()} reports/tests.html')
-    execute(context, f'{open_command()} reports/coverage/index.html')
+    open_target(context, 'reports/tests.html')
+    open_target(context, 'reports/coverage/index.html')
 
 
 @task

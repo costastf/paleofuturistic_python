@@ -5,10 +5,17 @@ on:
     branches:
       - main
 
+# Floor for the workflow; the publish job widens it to what Trusted Publishing needs.
+# Without this the tag-detection job would inherit the repository default token.
+permissions:
+  contents: read
+
 jobs:
   detect:
     name: Detect release tag
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       {#- Escape curly braces for Copier. -#}
       {%- raw %}
@@ -17,7 +24,9 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
+          # Full history: the step below walks the pushed commits looking for a tag.
           fetch-depth: 0
+          persist-credentials: false
 
       - id: find
         env:
@@ -73,10 +82,9 @@ jobs:
       # `release.publish` falls back to legacy UV_PUBLISH_* credentials.
       id-token: write
       # Declaring any `permissions:` entry flips every other scope to `none`
-      # for this job. The checkout step needs read access to clone the
-      # release tag via x-access-token:${GITHUB_TOKEN} — without this it 403s.
-      # Kept at `read` (not write) so a compromised build step cannot push
-      # back to the repo.
+      # for this job. The checkout step needs read access to fetch the release
+      # tag — without this it 403s. Kept at `read` (not write) so a compromised
+      # build step cannot push back to the repo.
       contents: read
       # The job runs inside the deps image from ghcr.io. Pulling that image
       # uses GITHUB_TOKEN via the `container.credentials` block; without
@@ -94,26 +102,17 @@ jobs:
     environment: pypi
 
     steps:
-      - name: Configure git
-        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
-
       - name: Checkout release tag
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         {#- Escape curly braces for Copier. -#}
         {%- raw %}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ needs.detect.outputs.tag }}
+        with:
+          ref: ${{ needs.detect.outputs.tag }}
+          # Critical in this job specifically: it builds the SBOM, whose VCS reference is
+          # read from `origin` and ships inside the wheel to PyPI. A credential left in
+          # the git config is the one that becomes permanent and public.
+          persist-credentials: false
         {%- endraw %}
-        run: |
-          git init -b main
-          remote_url="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          if git remote get-url origin >/dev/null 2>&1; then
-            git remote set-url origin "${remote_url}"
-          else
-            git remote add origin "${remote_url}"
-          fi
-          git fetch --depth=1 origin "+refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
-          git checkout --force "refs/tags/${RELEASE_TAG}"
 
       - name: Publish package and upload SBOM
         env:

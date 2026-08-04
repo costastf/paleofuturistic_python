@@ -10,6 +10,9 @@ variables:
 
 build-deps-image:
   stage: deps
+  # Declared so the registry credentials below can be scoped to this environment
+  # instead of being readable by every job in the project.
+  environment: deps
   # kaniko:debug has no python/uv and its busybox binaries are static, which
   # uv's libc probe refuses. This is the one pipeline job that can't go
   # through ./workflow.cmd — the container.publish steps are inlined here so
@@ -19,23 +22,45 @@ build-deps-image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [""]
   script:
-    - TAG=$(sha256sum uv.lock | cut -c1-16)
+    - BASE_IMAGE=$(sed -n 's/^base-image = "\(.*\)"$/\1/p' pyproject.toml)
+    # Mirrors deps_image_tag() in _CI/tasks/container.py: fold each input's own
+    # hex digest into an outer hash. Fixed-width digests make the concatenation
+    # unambiguous, and hashing the Dockerfile and base image — not just the
+    # lockfile — means a change to either produces a new tag instead of silently
+    # reusing a stale image. Keep both implementations in step.
+    - |
+      TAG=$(printf '%s%s%s' \
+        "$(sha256sum uv.lock | cut -d' ' -f1)" \
+        "$(sha256sum Dockerfile.deps | cut -d' ' -f1)" \
+        "$(printf '%s' "$BASE_IMAGE" | sha256sum | cut -d' ' -f1)" \
+        | sha256sum | cut -c1-32)
     # Push to $CI_REGISTRY_IMAGE (the project's registry root) with a
     # deps-prefixed tag. SBP's registry restricts deploy tokens to the
     # root path only — /deps and -deps subpaths both return DENIED.
     - IMAGE="${CI_REGISTRY_IMAGE}:deps-${TAG}"
-    - BASE_IMAGE=$(sed -n 's/^base-image = "\(.*\)"$/\1/p' pyproject.toml)
     - mkdir -p /kaniko/.docker
     # SBP's registry rejects the default CI_JOB_TOKEN for pushes, so this job
     # authenticates with a project Deploy Token (scopes: read_registry +
     # write_registry). Create one at Settings → Repository → Deploy tokens,
     # then expose as protected/masked CI variables DEPS_IMAGE_USERNAME and
     # DEPS_IMAGE_PASSWORD.
+    #
+    # Mark both Protected and Masked, and set their Environment scope to `deps`
+    # (this job's environment) rather than leaving it at `*`. An unscoped variable
+    # is readable by every job in every pipeline, including one added by a
+    # merge request from a fork, so a registry write token would be reachable from
+    # code that has not been reviewed. The publish credentials are scoped the same
+    # way via the `pypi` environment on the publish job.
     - '[ -n "$DEPS_IMAGE_USERNAME" ] && echo "DEPS_IMAGE_USERNAME is set" || echo "DEPS_IMAGE_USERNAME EMPTY"'
     - '[ -n "$DEPS_IMAGE_PASSWORD" ] && echo "DEPS_IMAGE_PASSWORD is set" || echo "DEPS_IMAGE_PASSWORD EMPTY"'
     - printf '{"auths":{"%s":{"username":"%s","password":"%s"}}}' "$CI_REGISTRY" "$DEPS_IMAGE_USERNAME" "$DEPS_IMAGE_PASSWORD" > /kaniko/.docker/config.json
-    - /kaniko/executor --dockerfile=Dockerfile.deps --context=. --destination="$IMAGE" --build-arg=BASE_IMAGE="$BASE_IMAGE"
-    - echo "DEPS_IMAGE=$IMAGE" > .deps-image.env
+    - /kaniko/executor --dockerfile=Dockerfile.deps --context=. --destination="$IMAGE" --build-arg=BASE_IMAGE="$BASE_IMAGE" --digest-file=/tmp/deps-digest
+    # Hand downstream jobs a digest rather than the tag, so a tag repointed after
+    # this job cannot change the image those jobs run in. kaniko is daemonless, so
+    # --digest-file is the only way to learn what it pushed.
+    - DIGEST=$(cat /tmp/deps-digest)
+    - echo "DEPS_IMAGE=${CI_REGISTRY_IMAGE}@${DIGEST}" > .deps-image.env
+    - cat .deps-image.env
   artifacts:
     reports:
       dotenv: .deps-image.env
@@ -61,6 +86,17 @@ test:
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
   script:
     - ./workflow.cmd test.tox
+
+secure:
+  stage: ci
+  image: $DEPS_IMAGE
+  needs:
+    - job: build-deps-image
+      artifacts: true
+  before_script:
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+  script:
+    - ./workflow.cmd secure.audit
 
 build:
   stage: ci

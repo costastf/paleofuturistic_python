@@ -4,11 +4,35 @@ _answers_file: .copier-answers.yml
 # are copied verbatim (vendored _CI/lib/**, binaries, static configs), which removes
 # the need for a copy-without-render exclusion list.
 
+# Seeded once, then left alone forever. Everything else under `_CI/tasks/` is template-owned
+# and gets replaced on update, so a project's own tasks need somewhere that does not. Without
+# this entry `local.py` would be overwritten — or conflict — on every `copier update`, which
+# is the whole problem it exists to solve.
+_skip_if_exists:
+  - _CI/tasks/local.py
+
 _tasks:
   - command: >-
       {{ _copier_python }} {{ _copier_conf.src_path }}/tasks_render.py
       --license "{{ license }}"
       --author "{{ full_name }}"
+    when: "{{ _copier_operation == 'copy' }}"
+
+  # Resolve a lockfile so the new project starts reproducible. Without one,
+  # `Dockerfile.deps` (`COPY … uv.lock` + `uv sync --frozen`) and the deps-image tag
+  # both depended on a lock that happened to be created as a side effect of the first
+  # `uv run`, and every environment re-resolved from scratch.
+  #
+  # The uv version is read back out of the rendered pyproject.toml rather than repeated
+  # here, so it cannot drift from `[tool.uv] required-version`. It is also why this runs
+  # through `uvx uv@<version>` instead of the ambient `uv`: the generated project pins an
+  # exact uv, so any other version refuses to run at all — which would make generation
+  # fail for everyone whose local uv differs.
+  #
+  # `copy` only. On update the project already has a lock, and refreshing it is the
+  # owner's call to make deliberately.
+  - command: >-
+      uvx uv@$(sed -n 's/^required-version = "==\(.*\)"$/\1/p' pyproject.toml) lock
     when: "{{ _copier_operation == 'copy' }}"
 
 project_name:

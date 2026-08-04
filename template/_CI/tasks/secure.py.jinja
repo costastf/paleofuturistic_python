@@ -4,14 +4,16 @@
 import base64
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 from datetime import date
-from typing import cast
+from typing import NamedTuple, cast
 {%- else -%}
 import os
+import re
 from datetime import date
-from typing import cast
+from typing import NamedTuple, cast
 {%- endif %}
 
 from invoke import Collection, Context, Task, task
@@ -32,13 +34,25 @@ from .sbom import render_sbom, validate_sbom, write_sbom
 from .shared import execute, logged
 
 
-def validate_override_entry(entry: str, source: str) -> None:
+class Suppression(NamedTuple):
+    """A validated suppression: which vulnerability, until when, and where it came from."""
+
+    vulnerability_id: str
+    expires: date | None
+    source: str
+
+
+def validate_override_entry(entry: str, source: str, *, require_expiry: bool = False) -> None:
     """Abort with a clear message if `entry` is not a valid suppression.
 
     Format: ``<VULN_ID>[::YYYY-MM-DD]`` — the vulnerability id must match the
     project-wide ``IGNORE_PATTERN``, and the expiry, when present, must be a
     real calendar date. ``source`` is prepended to the error for context
     (e.g. ``.security-overrides:7``).
+
+    With ``require_expiry``, a missing expiry is also an error. That is applied to
+    suppressions arriving from outside the repository, where a permanent entry would
+    leave no reviewable trace.
 
     Raises:
         SystemExit: with exit code 1 if the entry is malformed.
@@ -55,6 +69,14 @@ def validate_override_entry(entry: str, source: str) -> None:
         raise SystemExit(1)
     expiry = match.group('expiration_date')
     if not expiry:
+        if require_expiry:
+            print(
+                f'{source}: {entry!r} has no expiry. Suppressions from this source must expire '
+                f'(<VULN_ID>::YYYY-MM-DD) — a permanent one here would mute a finding with no '
+                f'record in the repository. Put permanent suppressions in {SECURITY_OVERRIDES_FILE}, '
+                f'where they are reviewed with the code.'
+            )
+            raise SystemExit(1)
         return
     try:
         date.fromisoformat(expiry)
@@ -63,18 +85,41 @@ def validate_override_entry(entry: str, source: str) -> None:
         raise SystemExit(1) from None
 
 
-def load_overrides_file() -> str:
-    """Return comma-joined entries from `.security-overrides`, stripping `#` comments and blanks."""
+def parse_suppressions(raw: str, source: str, *, require_expiry: bool = False) -> list[Suppression]:
+    """Validate every entry in a comma/whitespace-separated list and return them parsed.
+
+    Each entry is matched whole. Scanning the joined list for id-shaped substrings
+    instead would let malformed input through in the most dangerous direction: a
+    mistyped expiry such as ``CVE-1::2020-1-1`` does not match the optional expiry
+    group, so the id alone would match and the entry would silently become a
+    *permanent* suppression, with the date fragments tacked on as extra ids.
+    """
+    suppressions: list[Suppression] = []
+    for entry in (part for part in re.split(r'[,\s]+', raw.strip()) if part):
+        validate_override_entry(entry, source, require_expiry=require_expiry)
+        match = cast(re.Match[str], IGNORE_PATTERN.fullmatch(entry))
+        expiry = match.group('expiration_date')
+        suppressions.append(
+            Suppression(
+                vulnerability_id=match.group('vulnerability_id'),
+                expires=date.fromisoformat(expiry) if expiry else None,
+                source=source,
+            )
+        )
+    return suppressions
+
+
+def load_overrides_file() -> list[Suppression]:
+    """Return validated suppressions from `.security-overrides`, stripping `#` comments and blanks."""
     if not SECURITY_OVERRIDES_FILE.exists():
-        return ''
-    entries: list[str] = []
+        return []
+    suppressions: list[Suppression] = []
     for lineno, raw in enumerate(SECURITY_OVERRIDES_FILE.read_text(encoding='utf-8').splitlines(), start=1):
         entry = raw.split('#', 1)[0].strip()
         if not entry:
             continue
-        validate_override_entry(entry, f'{SECURITY_OVERRIDES_FILE}:{lineno}')
-        entries.append(entry)
-    return ','.join(entries)
+        suppressions.extend(parse_suppressions(entry, f'{SECURITY_OVERRIDES_FILE}:{lineno}'))
+    return suppressions
 
 
 @task
@@ -89,20 +134,41 @@ def audit(context: Context, ignore: str | None = None) -> None:
     optional expiry (``CVE-2024-1234::2026-12-31``); entries whose expiry has
     passed are dropped so the audit fails until the suppression is reviewed.
 
+    Every entry is validated whatever its source, and the two sources that leave no
+    trace in the repository — ``--ignore`` and the environment variable — must carry an
+    expiry, so they cannot mute a finding indefinitely. Whatever ends up applied is
+    printed with its origin, so a suppression injected through CI configuration alone
+    still shows up in the build log.
+
     Args:
         context: Invoke context.
         ignore: Comma-separated vulnerability IDs to ignore.
     """
     today = date.today()  # noqa: DTZ011
-    env_override = os.environ.get(SECURITY_OVERRIDE_ENV, '')
-    file_override = load_overrides_file()
-    combined = ','.join(filter(None, [ignore, env_override, file_override]))
-    ignore_args = [
-        f'--ignore-vuln {m.group("vulnerability_id")}'
-        for m in IGNORE_PATTERN.finditer(combined)
-        if not m.group('expiration_date') or date.fromisoformat(m.group('expiration_date')) > today
+    suppressions = [
+        *parse_suppressions(ignore or '', '--ignore', require_expiry=True),
+        *parse_suppressions(
+            os.environ.get(SECURITY_OVERRIDE_ENV, ''), f'${SECURITY_OVERRIDE_ENV}', require_expiry=True
+        ),
+        *load_overrides_file(),
     ]
-    ignore_opts = (' ' + ' '.join(ignore_args)) if ignore_args else ''
+    active: dict[str, Suppression] = {}
+    for suppression in suppressions:
+        if suppression.expires is not None and suppression.expires <= today:
+            print(
+                f'{suppression.source}: suppression for {suppression.vulnerability_id} expired on '
+                f'{suppression.expires}; it will be reported again until re-reviewed.'
+            )
+            continue
+        # First wins, which is the documented precedence: --ignore, then env, then file.
+        active.setdefault(suppression.vulnerability_id, suppression)
+    if active:
+        print(f'Applying {len(active)} suppression(s):')
+        for suppression in active.values():
+            expiry = f'expires {suppression.expires}' if suppression.expires else 'permanent'
+            print(f'  {suppression.vulnerability_id} ({expiry}) from {suppression.source}')
+    ignore_args = ' '.join(f'--ignore-vuln {vulnerability_id}' for vulnerability_id in active)
+    ignore_opts = f' {ignore_args}' if ignore_args else ''
     execute(context, f'uv run pip-audit{ignore_opts}')
 
 

@@ -10,6 +10,8 @@ The project's documentation is a [properdocs](https://properdocs.org/) site with
 
 Runs `properdocs build` and opens the rendered `site/index.html` in your default browser. Good for a quick check.
 
+Under **WSL** the file is handed to Windows instead, since there is no Linux browser to open it with: the path is translated with `wslpath -w` and passed to `cmd.exe`. If you still have `wslview` from the deprecated `wslu` package installed it is used first, but it is no longer required. Opening is best-effort on WSL only — `cmd.exe` reports failure even when it worked, so the task prints a message rather than failing if the browser can't be reached. If your distro has Windows interop disabled, `./workflow.cmd document.build` still builds the site and you can open `site/index.html` yourself.
+
 ## Live reload
 
 ```bash

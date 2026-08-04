@@ -48,6 +48,10 @@ pip-log.txt
 pip-delete-this-directory.txt
 
 # Unit test / coverage reports
+# `reports/` holds per-combo logs written by `test.matrix`, plus any local write-ups. All of it
+# is generated or working material, never repository content — the template's own .gitignore
+# excludes the same path in generated projects.
+reports/
 htmlcov/
 .tox/
 .nox/

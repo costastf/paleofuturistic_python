@@ -19,18 +19,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git init -b main
-          remote_url="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          if git remote get-url origin >/dev/null 2>&1; then
-            git remote set-url origin "${remote_url}"
-          else
-            git remote add origin "${remote_url}"
-          fi
-          git fetch --depth=1 origin "${GITHUB_SHA}"
-          git checkout --force FETCH_HEAD
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          # No credential left in `.git/config` after the fetch; `origin` stays clean.
+          persist-credentials: false
 
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0

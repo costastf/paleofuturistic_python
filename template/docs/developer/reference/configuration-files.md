@@ -19,7 +19,7 @@ The single source of truth for project metadata and tool configuration. Sections
 | `[tool.test-ratchet]` | Template (knob), you (mode) | `mode = "auto-detect"` (default) keeps the coverage ratchet dormant while the scaffolded `test_sanity` is in place; `mode = "strict"` engages it on run #1. See [Testing strategy](../explanation/testing-strategy.md#dormant-during-scaffold). |
 | `[tool.tox]` | Template | Generated from `min_python_version` / `max_python_version`. |
 | `[tool.commitizen]` | Template | Conventional-Commits parser config used by `cz changelog` and the lint hook. The template does **not** use commitizen's autorelease — the bump is chosen explicitly via `./workflow.cmd release -i <type>`. |
-| `[tool.docker-versions]` | Template | Image tags consumed by `Dockerfile.deps` and CI. |
+| `[tool.docker-versions]` | Template | The one image `Dockerfile.deps` builds on, pinned by tag *and* digest. |
 
 ## `uv.lock`
 
@@ -31,11 +31,48 @@ Empty placeholder. Tox config lives in `pyproject.toml`'s `[tool.tox]`. The file
 
 ## `.pre-commit-config.yaml`
 
-Pre-commit hook definitions. Adds: ruff format + check, pylint, commitizen. Edit to add hooks; don't remove the existing ones without thinking — they keep the main branch clean.
+Hook definitions, split across three git stages:
+
+| Stage | Hooks | Scope |
+|---|---|---|
+| `commit-msg` | commitizen (conventional-commit format) | the message |
+| `pre-commit` | ruff format, ruff, pylint, complexipy | **staged files only** |
+| `pre-commit` | ty, pyscn, `.security-overrides` validation | whole project |
+| `pre-push` | the test suite | whole project |
+
+**Per-file tools get only the staged files.** A one-line change costs a one-file check
+rather than a sweep of `src/ _CI/tasks/ tests/`. Each of those hooks wraps the task in
+`sh -c '… --paths="$*"' --`, which collapses the file list pre-commit appends into the
+single `--paths` value Invoke expects — passed bare, Invoke reads the second filename as
+another task name and fails. Filenames containing spaces are not supported by that
+marshalling.
+
+**Two checks stay whole-project deliberately**, because a per-file view gives a wrong
+answer rather than a partial one:
+
+- **ty** — type checking is whole-program. A changed signature surfaces as an error in the
+  *callers*, so narrowing the input hides exactly the errors worth catching.
+- **pyscn** — reports dead code and duplicate blocks, both relationships *between* files. A
+  function only looks dead once you know nothing else calls it.
+
+Any of these tasks also takes `--paths` directly, e.g.
+`./workflow.cmd lint.pylint --paths="src/thing.py"`.
+
+**The suite sits on pre-push** on purpose. Running it on every commit was slow enough to
+push people towards `--no-verify`, which disables *all* of these at once; on pre-push it
+still stops anything broken reaching the remote. It also runs `test.pytest` rather than
+the `test` aggregator, so it gates without rewriting the README badge or ratcheting
+`fail_under` — writes that belong to a deliberate `./workflow.cmd test`, not to a hook
+firing mid-commit.
+
+Edit to add hooks; don't remove the existing ones without thinking — they keep the main
+branch clean.
 
 ## `.security-overrides`
 
-Allow-list for pip-audit findings. Each line is `<vuln-id> <YYYY-MM-DD> <justification>`. See [Triage a security finding](../how-to/triage-a-security-finding.md).
+Allow-list for pip-audit findings. Each entry is a single token, `<VULN_ID>[::YYYY-MM-DD]`,
+with the justification in a `#` comment — anything after the id on the same line is not
+part of the entry. See [Triage a security finding](../how-to/triage-a-security-finding.md).
 
 ## `.gitignore`
 

@@ -1,0 +1,44 @@
+name: Security audit
+
+# A dependency can turn out to be vulnerable, and a `.security-overrides` entry can
+# expire, without anyone pushing a commit. Tied to `push` alone the audit only fires on
+# activity, so a quiet repository quietly stops being checked — and the expiry dates in
+# `.security-overrides` would never come due. This run is what makes them load-bearing.
+on:
+  schedule:
+    # Daily. The minute is deliberately not :00 — GitHub sheds on-the-hour scheduled
+    # jobs when the queue is busy. Adjust the cadence to taste.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-deps-image:
+    uses: ./.github/workflows/build-deps-image.yaml
+    permissions:
+      contents: read
+      packages: write
+
+  secure:
+    name: Security audit
+    needs: build-deps-image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ${{ needs.build-deps-image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Audit dependencies
+        run: ./workflow.cmd secure.audit

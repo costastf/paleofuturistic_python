@@ -13,7 +13,7 @@ from invoke import Context
 
 from _CI.info import read as read_info
 
-from .shared import PipelineComponent, container_engine, execute
+from .shared import PipelineComponent, container_engine, execute, image_digest_reference, strip_credentials
 
 WORKFLOWS_DIR = Path('.github/workflows')
 USES_PATTERN = re.compile(r'^\s*-?\s*uses:\s*([A-Za-z0-9._\-]+/[A-Za-z0-9._\-]+)@([A-Za-z0-9._\-]+)')
@@ -41,10 +41,17 @@ def registry_settings() -> RegistrySettings:
 
 
 def publish_deps_image(context: Context, tag: str) -> str:
-    """Build and push the deps image to ghcr.io. Return the full image reference.
+    """Build and push the deps image to ghcr.io. Return a digest-pinned reference.
 
-    Logs into the registry with the detected engine and builds+pushes only
-    when the image is not already present.
+    Logs into the registry with the detected engine and builds+pushes only when the
+    image is not already present. The tag is content-addressed on the lockfile, the
+    Dockerfile and the base image, so a hit means those inputs match.
+
+    Reusing a pre-existing tag is a deliberate trade-off: it keeps CI fast, but it
+    trusts whoever pushed that tag first. Restrict registry write access to this
+    pipeline accordingly — see the deps-image section of the CI framework reference.
+    The returned reference is digest-pinned either way, so the tag cannot be
+    repointed between this job and the jobs that run inside the image.
     """
     settings = registry_settings()
     image = f'{settings.image_prefix}-deps:{tag}'
@@ -56,11 +63,14 @@ def publish_deps_image(context: Context, tag: str) -> str:
     result = context.run(f'{engine} manifest inspect {image}', hide=True, warn=True)
     if result and not result.failed:
         print(f'Image already exists: {image}')
+        # Pull so a repo digest exists locally to pin against, and so a corrupt or
+        # unpullable image fails here rather than in every consumer job.
+        execute(context, f'{engine} pull {image}')
     else:
         base_image = read_info('info.base-image')
         execute(context, f'{engine} build --build-arg BASE_IMAGE={base_image} -f Dockerfile.deps -t {image} .')
         execute(context, f'{engine} push {image}')
-    return image
+    return image_digest_reference(context, engine, image)
 
 
 def origin_slug(context: Context) -> str:
@@ -68,7 +78,9 @@ def origin_slug(context: Context) -> str:
     remote = context.run('git remote get-url origin', hide=True, warn=True)
     if remote is None or remote.failed:
         return ''
-    url = remote.stdout.strip()
+    # In CI origin carries a token (https://x-access-token:<token>@github.com/…),
+    # which the patterns below would otherwise fail to match.
+    url = strip_credentials(remote.stdout.strip())
     match = re.match(
         r'(?:git@github\.com:|https://github\.com/)([^/]+/[^/]+?)(?:\.git)?/?$',
         url,

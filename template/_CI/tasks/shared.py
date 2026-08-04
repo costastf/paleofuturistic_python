@@ -1,5 +1,6 @@
 """Shared utilities for CI task definitions."""
 
+import json
 import os
 import platform
 import shutil
@@ -9,6 +10,7 @@ from contextlib import contextmanager, suppress
 from contextvars import ContextVar
 from functools import wraps
 from typing import IO, Any, NamedTuple
+from urllib.parse import urlsplit, urlunsplit
 
 from invoke import Context
 
@@ -34,8 +36,22 @@ OPEN_COMMAND = {
     'linux': 'xdg-open',
     'macos': 'open',
     'windows': 'start',
-    'wsl': 'wslview',  # from the wslu package; falls back to xdg-open if not installed
 }
+
+# git's own summary line when it cannot create the commit object, which is how a signing
+# failure surfaces whatever `gpg.format` is set to. The cause line above it is format-specific
+# — openpgp prints "gpg: signing failed: No secret key", ssh prints "error: Couldn't load
+# public key" — so neither is safe to match on. Verified against both formats on git 2.x.
+# A failing pre-commit hook does not print this, which is what stops the unsigned retry below
+# from turning an ordinary hook failure into a bogus report about signing.
+SIGNING_FAILURE_MARKER = 'failed to write commit object'
+
+# WSL registers a binfmt handler to run Windows executables. Distros with interop
+# disabled have neither name, and there is then no way to reach a Windows browser.
+WSL_INTEROP_MARKERS = (
+    '/proc/sys/fs/binfmt_misc/WSLInterop',
+    '/proc/sys/fs/binfmt_misc/WSLInterop-late',
+)
 
 
 class IndentingStream:
@@ -85,6 +101,26 @@ def is_ci() -> bool:
     return os.environ.get('CI', '').lower() == 'true'
 
 
+def strip_credentials(url: str) -> str:
+    """Return ``url`` with any ``user:password@`` userinfo removed from its netloc.
+
+    CI checkouts bake a token into the ``origin`` remote — for example
+    ``https://x-access-token:<token>@github.com/owner/repo.git``. Anything that
+    reads the remote back and publishes it must drop the credential first: the
+    SBOM's VCS reference ships inside the wheel, so a token written there would
+    become a permanent public artefact.
+
+    Only the netloc is inspected, so an ``@`` elsewhere in the URL (a path or
+    query) is left alone. URLs without userinfo are returned unchanged.
+    """
+    parts = urlsplit(url)
+    if '@' not in parts.netloc:
+        return url
+    host = parts.hostname or ''
+    netloc = f'{host}:{parts.port}' if parts.port else host
+    return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
+
+
 def get_operating_system() -> str:
     """Return the current operating system ('windows', 'macos', 'linux', or 'wsl').
 
@@ -111,18 +147,54 @@ def get_operating_system() -> str:
     raise SystemExit(1)
 
 
-def open_command() -> str:
-    """Return the shell command to open a file in the default application.
+def wsl_interop_available() -> bool:
+    """Return True when WSL can execute Windows binaries."""
+    return any(os.path.exists(marker) for marker in WSL_INTEROP_MARKERS)
 
-    Picks 'start' on Windows, 'open' on macOS, 'wslview' on WSL when
-    available (routes to the Windows default handler via interop), and
-    'xdg-open' on plain Linux.
+
+def open_on_wsl(context: Context, target: str) -> None:
+    """Open `target` with the Windows default application, best-effort.
+
+    There is no Linux browser to hand under WSL, so the file has to be handed to
+    Windows. Three details make this awkward:
+
+    * ``wslview`` (from ``wslu``) used to be the way to do this, but the package is
+      deprecated and often simply absent. It is still preferred when installed, since
+      an existing setup should keep working, and `cmd.exe` is used otherwise.
+    * Windows cannot resolve a Linux path, so ``wslpath -w`` translates it first.
+      Relative paths resolve against the current directory, which is what callers pass.
+    * ``cmd.exe`` and ``explorer.exe`` both exit non-zero even when they succeed, so the
+      exit status is deliberately not checked — failing on it would turn a working
+      ``./workflow.cmd document`` into a red task.
+    """
+    if shutil.which('wslview'):
+        context.run(f'wslview "{target}"', echo=True, warn=True)
+        return
+    if not wsl_interop_available():
+        print(f'WSL interop is disabled, so {target} cannot be handed to Windows. Open it manually.')
+        return
+    result = context.run(f'wslpath -w "{target}"', hide=True, warn=True)
+    windows_path = result.stdout.strip() if result is not None and not result.failed else ''
+    if not windows_path:
+        print(f'Could not translate {target} to a Windows path. Open it manually.')
+        return
+    # The empty "" is `start`'s window-title argument. Without it cmd.exe reads the
+    # quoted path as the title and opens nothing at all.
+    context.run(f'cmd.exe /c start "" "{windows_path}"', echo=True, warn=True)
+
+
+def open_target(context: Context, target: str) -> None:
+    """Open a file or URL in the host's default application.
+
+    A failure to open is fatal on Windows, macOS and Linux, as it was before. WSL is the
+    exception: the Windows helpers it has to delegate to report failure on success, so
+    there is no exit status worth trusting and problems are reported as messages instead.
     """
     system = get_operating_system()
-    if system == 'wsl' and not shutil.which('wslview'):
-        print('wslview not found; install the wslu package for `open` to work. Falling back to xdg-open.')
-        return OPEN_COMMAND['linux']
-    return OPEN_COMMAND[system]
+    if system == 'wsl':
+        open_on_wsl(context, target)
+        return
+    execute(context, f'{OPEN_COMMAND[system]} {target}')
 
 
 def container_engine() -> str:
@@ -138,6 +210,35 @@ def container_engine() -> str:
     raise SystemExit(1)
 
 
+def image_digest_reference(context: Context, engine: str, image: str) -> str:
+    """Return ``repository@sha256:…`` for a locally-present ``image``, else ``image`` unchanged.
+
+    Downstream CI jobs pin the deps image by digest, so a tag repointed between the
+    build job and a consumer job cannot change the container that consumer runs in.
+
+    The image must already be local (freshly built, or pulled) for a repo digest to
+    exist. The ``inspect`` JSON is parsed rather than shelling out with a Go template,
+    which keeps the command free of braces needing shell quoting and avoids docker and
+    podman disagreeing on which template field carries the repository digest.
+    """
+    repository = image.rsplit(':', 1)[0]
+    result = context.run(f'{engine} image inspect {image}', hide=True, warn=True)
+    if result is None or result.failed:
+        print(f'Could not inspect {image} for a digest; falling back to the tag.')
+        return image
+    try:
+        entries = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        print(f'Could not parse {engine} inspect output for {image}; falling back to the tag.')
+        return image
+    for entry in entries:
+        for reference in entry.get('RepoDigests') or []:
+            if reference.startswith(f'{repository}@sha256:'):
+                return reference
+    print(f'No repo digest recorded for {image}; falling back to the tag.')
+    return image
+
+
 def execute(context: Context, cmd: str) -> None:
     """Execute a shell command, raising SystemExit(1) on failure.
 
@@ -149,6 +250,47 @@ def execute(context: Context, cmd: str) -> None:
     result = context.run(cmd, echo=True, warn=True, **kwargs)
     if result is None or result.failed:
         raise SystemExit(1)
+
+
+def signing_requested(context: Context) -> bool:
+    """Return whether git is configured to sign commits in this repository.
+
+    ``--type=bool`` normalizes every spelling git accepts (``1``, ``yes``, ``on``) to
+    ``true``, so this does not have to guess at the value.
+    """
+    result = context.run('git config --type=bool --get commit.gpgsign', hide=True, warn=True)
+    return result is not None and result.ok and result.stdout.strip() == 'true'
+
+
+def commit(context: Context, message: str) -> None:
+    """Commit the staged changes, letting git decide whether to sign.
+
+    Signing is deliberately not forced in either direction. ``commit.gpgsign`` is what the
+    developer or the repository has asked for, and a branch protected by a required-signatures
+    rule rejects an unsigned commit at push time — so hardcoding ``--no-gpg-sign`` would break
+    exactly the repositories that care most about provenance. CI, on the other hand, usually
+    has no signing key at all, and a release must not stop on a documentation commit.
+
+    So a signed commit is attempted first, and retried unsigned only when both guards hold:
+    signing is what git was asked to do, and signing is what failed. Without the second guard
+    a pre-commit hook failure would be retried too, reporting a signing problem that does not
+    exist. The retry says plainly that the commit is unsigned and what that costs.
+
+    Raises:
+        SystemExit: with exit code 1 if the commit fails for any reason other than an
+            unavailable signing key, or if the unsigned retry also fails.
+    """
+    result = context.run(f'git commit -m "{message}"', echo=True, warn=True)
+    if result is not None and result.ok:
+        return
+    stderr = (result.stderr if result is not None else '') or ''
+    if SIGNING_FAILURE_MARKER not in stderr or not signing_requested(context):
+        raise SystemExit(1)
+    print(
+        'Signing failed and no usable signing key was found, so the commit was made unsigned. '
+        'A branch that requires signed commits will reject it on push.'
+    )
+    execute(context, f'git commit --no-gpg-sign -m "{message}"')
 
 
 def run(cmd: str) -> Callable[[Callable[[Context], None]], Callable[[Context], None]]:

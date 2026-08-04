@@ -5,42 +5,72 @@ from typing import cast
 from invoke import Collection, Context, Task, task
 
 from .configuration import PATHS
-from .shared import execute, logged, run, run_steps
+from .shared import execute, logged, run_steps
 
 
 @task
 @logged('lint.ruff')
-@run(f'uv run ruff check {PATHS}')
-def ruff_lint(context: Context) -> None:
-    """Run ruff linter."""
+def ruff_lint(context: Context, paths: str = '') -> None:
+    """Run ruff linter.
+
+    Args:
+        context: Invoke context.
+        paths: Space-separated paths to check. Defaults to the project's standard paths.
+    """
+    execute(context, f'uv run ruff check {paths or PATHS}')
 
 
 @task
 @logged('lint.format')
-@run(f'uv run ruff format --check {PATHS}')
-def format_check(context: Context) -> None:
-    """Report code that is not correctly formatted, without modifying any files."""
+def format_check(context: Context, paths: str = '') -> None:
+    """Report code that is not correctly formatted, without modifying any files.
+
+    Args:
+        context: Invoke context.
+        paths: Space-separated paths to check. Defaults to the project's standard paths.
+    """
+    execute(context, f'uv run ruff format --check {paths or PATHS}')
 
 
 @task
 @logged('lint.pylint')
-@run(f'uv run pylint {PATHS}')
-def pylint(context: Context) -> None:
-    """Run pylint."""
+def pylint(context: Context, paths: str = '') -> None:
+    """Run pylint.
+
+    Args:
+        context: Invoke context.
+        paths: Space-separated paths to check. Defaults to the project's standard paths.
+    """
+    execute(context, f'uv run pylint {paths or PATHS}')
 
 
 @task
 @logged('lint.ty')
-@run(f'uv run ty check {PATHS}')
-def ty(context: Context) -> None:
-    """Run ty type checker."""
+def ty(context: Context, paths: str = '') -> None:
+    """Run ty type checker.
+
+    Type checking is whole-program: a signature change in one module surfaces as an error in
+    its callers, so narrowing the input hides exactly the errors that matter most. The
+    pre-commit hook deliberately does not pass changed files here — pass ``paths`` yourself
+    only when you want a narrower answer on purpose.
+
+    Args:
+        context: Invoke context.
+        paths: Space-separated paths to check. Defaults to the project's standard paths.
+    """
+    execute(context, f'uv run ty check {paths or PATHS}')
 
 
 @task
 @logged('lint.complexipy')
-@run('uv run complexipy src/')
-def complexipy(context: Context) -> None:
-    """Run complexipy cognitive complexity checker."""
+def complexipy(context: Context, paths: str = '') -> None:
+    """Run complexipy cognitive complexity checker.
+
+    Args:
+        context: Invoke context.
+        paths: Space-separated paths to check. Defaults to ``src/``.
+    """
+    execute(context, f'uv run complexipy {paths or "src/"}')
 
 
 @task
@@ -64,7 +94,7 @@ def commitizen(context: Context, commit_msg_file: str | None = None) -> None:
 @task
 @logged('lint')
 def lint(context: Context) -> None:
-    """Run all linting steps; reports all failures before exiting."""
+    """Run every linting step over the whole project; reports all failures before exiting."""
     run_steps(ruff_lint, format_check, pylint, ty, complexipy, commitizen)(context)
 
 

@@ -18,7 +18,7 @@ from .{{ git_hosting_service }} import create_release_pr, pr_create_url
 {%- if integrate_dependency_track %}
 from .secure import sbom_upload
 {%- endif %}
-from .shared import execute, logged
+from .shared import commit, execute, logged
 
 
 @task
@@ -103,6 +103,10 @@ def changelog(context: Context, write: bool = False) -> None:
     By default prints the changelog to stdout. With --write, writes to
     docs/changelog.md and commits the result.
 
+    The commit is signed when ``commit.gpgsign`` is set and a signing key is available, and
+    made unsigned with a warning when signing is configured but no key can be reached — which
+    is the usual situation in CI. See ``shared.commit``.
+
     Args:
         context: Invoke context.
         write: Write changelog to file and commit instead of printing to stdout.
@@ -110,7 +114,14 @@ def changelog(context: Context, write: bool = False) -> None:
     if write:
         execute(context, 'uv run cz changelog')
         execute(context, 'git add docs/changelog.md')
-        execute(context, 'git commit --no-gpg-sign -m "docs: update changelog"')
+        # `git diff --cached --quiet` exits 0 when nothing is staged. Regenerating an
+        # already-current changelog is a no-op, not a failure, so this returns rather than
+        # letting `git commit` fail on an empty index.
+        staged = context.run('git diff --cached --quiet', hide=True, warn=True)
+        if staged is not None and staged.ok:
+            print('Changelog is already up to date; nothing to commit.')
+            return
+        commit(context, 'docs: update changelog')
     else:
         execute(context, 'uv run cz changelog --dry-run')
 

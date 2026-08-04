@@ -42,7 +42,7 @@ The `release` task is the orchestrator. In order, it:
 3. **Checks for collisions** — fails if the target tag or `release/<version>` branch already exists locally or on origin.
 4. **Branches** — `git checkout -b release/<version>`.
 5. **Bumps** — `cz bump` writes the new version into `pyproject.toml` and creates the tag.
-6. **Updates the changelog** — `cz changelog` regenerates `docs/changelog.md` and commits it.
+6. **Updates the changelog** — `cz changelog` regenerates `docs/changelog.md` and commits it. Signing follows your `commit.gpgsign` setting; if signing is configured but no key can be reached — the usual case in CI — the commit is made unsigned and says so. Nothing is committed when the changelog is already current.
 7. **Pushes** — branch and tag both go to origin.
 8. **Opens the PR/MR** — GitHub: via API if `GITHUB_TOKEN` is set, otherwise prints a manual URL. GitLab: prints a manual URL.
 

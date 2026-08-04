@@ -25,8 +25,14 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 | --- | --- | --- |
 | `develop.bootstrap` | `--force` | Run all bootstrap steps. Idempotent. |
 | `develop.pre-commit` | `--install` / `--uninstall` / `--update` | Manage pre-commit hooks. |
+| `develop.bump-uv` | `--version=<v>` | Move every uv pin to the newest release at least 7 days old: the four version literals, the base image's tag *and* its re-resolved digest, and `uv.lock`. Warns when the bump crosses a minor version. `--version` takes a specific release, ignoring the cool-down. See [Dependency groups](dependency-groups.md#the-uv-pin-and-the-one-command-that-moves-it). |
 
 ## `format`, `lint`, `test`, `quality`
+
+Every task in this group that takes paths accepts `--paths="<space-separated paths>"`, and
+defaults to the whole project when it is omitted. The pre-commit hooks use it to check only
+the staged files — see [`.pre-commit-config.yaml`](configuration-files.md#pre-commit-configyaml)
+for which hooks are scoped that way and which are deliberately not.
 
 | Task | What it does |
 | --- | --- |
@@ -50,7 +56,7 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 | `release` | `-i <type>`, `--no-push` | Full release flow: validate, branch, bump, changelog, push, open PR/MR. |
 | `release.validate` | — | Working-tree-clean and in-sync-with-origin checks. |
 | `release.bump` | `-i <type>` | `cz bump` with the given increment (major/minor/patch/alpha/beta/rc). |
-| `release.changelog` | `--write` | Generate changelog. `--write` persists and commits. |
+| `release.changelog` | `--write` | Generate changelog. `--write` persists and commits, signing per `commit.gpgsign`. |
 | `release.push` | — | `git push` + `git push --tags`. |
 | `release.publish` | — | Build + `uv publish` + SBOM upload (if DT enabled). Invoked from CI on release-tag merge. |
 | `release.clean` | — | Remove `dist/` and `sbom.json`. |

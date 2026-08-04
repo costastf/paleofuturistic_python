@@ -1,5 +1,5 @@
 [project]
-name = 'backbone-template'
+name = 'workflow-tooling'
 version = '0.1.0'
 description = 'A vendored version of invoke that can be used to construct portable development workflows with no dependencies other than a recent version of python.'
 requires-python = ">=3.12"
@@ -41,7 +41,10 @@ drop = [
 ]
 
 [tool.ruff]
-line-length = 121
+# Kept at 120 to match the template's `_CI/pyproject.toml`, the root ruff `line-length` and the
+# root pylint `max-line-length`. A higher value here only creates lines that ruff accepts and
+# the real lint gate rejects.
+line-length = 120
 
 [tool.ruff.format]
 quote-style = "single"

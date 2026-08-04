@@ -19,15 +19,15 @@ click==8.1.8
     #   pip-tools
     #   vendoring
 coloredlogs==15.0.1
-    # via backbone-template (pyproject.toml)
+    # via workflow-tooling (pyproject.toml)
 emoji==2.14.1
-    # via backbone-template (pyproject.toml)
+    # via workflow-tooling (pyproject.toml)
 humanfriendly==10.0
     # via coloredlogs
 idna==3.10
     # via requests
 invoke==2.2.0
-    # via backbone-template (pyproject.toml)
+    # via workflow-tooling (pyproject.toml)
 jsonschema==4.23.0
     # via vendoring
 jsonschema-specifications==2025.4.1
@@ -41,7 +41,7 @@ packaging==25.0
     #   build
     #   vendoring
 pip-tools==7.4.1
-    # via backbone-template (pyproject.toml)
+    # via workflow-tooling (pyproject.toml)
 pygments==2.19.1
     # via rich
 pyproject-hooks==1.2.0
@@ -67,7 +67,7 @@ typing-extensions==4.13.2
 urllib3==2.4.0
     # via requests
 vendoring==1.2.0
-    # via backbone-template (pyproject.toml)
+    # via workflow-tooling (pyproject.toml)
 wheel==0.45.1
     # via pip-tools
 

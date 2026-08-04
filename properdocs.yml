@@ -43,6 +43,7 @@ nav:
       - Test the template: maintaining/how-to/test-the-template.md
       - Extend the template workflow tasks: maintaining/how-to/extend-the-template-tasks.md
       - Keep shipped docs in sync: maintaining/how-to/sync-shipped-docs.md
+      - Bump the uv pin: maintaining/how-to/bump-the-uv-pin.md
     - Reference:
       - Generation internals: maintaining/reference/generation-internals.md
     - Explanation:

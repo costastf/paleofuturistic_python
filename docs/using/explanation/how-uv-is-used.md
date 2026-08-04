@@ -35,6 +35,34 @@ uv replaces all of them with a single Rust binary that:
 
 **Familiarity.** Some contributors will arrive expecting `pip install -r requirements.txt`. The generated README points them to `./workflow.cmd bootstrap` and the [tutorial that walks through generating a first project](../tutorials/generate-your-first-project.md).
 
+## Which uv version a new project gets
+
+Because `[tool.uv] required-version` is an **exact** pin, a stale uv version does not merely
+lag — it refuses to run. A literal carried in the template would age between bumps, so a
+project generated months after the last one would start life on an obstructive pin.
+
+Generation therefore resolves it: a new project is pinned to the **newest uv release that has
+been public for at least a week**. The cool-down means a same-day release withdrawn hours later
+never reaches anyone, and it is why the pin is always resolvable under the `exclude-newer`
+boundary stamped at the same moment.
+
+That single version is written to five places at once — the constraint, the `test` group's `uv`
+entry, the `uv_build` upper bound, the base image's tag with a freshly resolved digest, and
+`uv.lock`. They are never written separately: a tag carrying both a version and a digest
+resolves to the **digest**, so a bumped tag beside a stale digest would silently keep building
+the old image.
+
+From then on the version is frozen and maintaining it belongs to the project, not the template.
+Nothing chases it, and no bot opens pull requests; `./workflow.cmd develop.bump-uv` inside the
+project moves all five together whenever its developers choose to.
+
+Two escape hatches:
+
+- **Pin it explicitly.** Set `TEMPLATE_UV_VERSION` before generating to get exactly that
+  version — which is also how the template's own test suite stays deterministic.
+- **Generate offline.** If PyPI cannot be reached, generation keeps the version the template
+  committed and says so. It never fails for want of a network, and never falls back silently.
+
 ## When this decision could be revisited
 
 If two of these became true together:

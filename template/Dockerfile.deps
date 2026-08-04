@@ -11,3 +11,12 @@ RUN uv sync --frozen --all-extras --dev --no-install-project
 
 ENV UV_PROJECT_ENVIRONMENT=/app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
+
+# Drop root. uid 1001 is not arbitrary: it is the uid GitHub's hosted runners own the
+# mounted workspace with, and a mismatch would leave that workspace unwritable to the
+# job. `/app` has to change hands too — the image is built with `--no-install-project`,
+# so `uv run` installs the project into UV_PROJECT_ENVIRONMENT at job time — and uv
+# needs a writable HOME for its cache.
+RUN useradd --uid 1001 --create-home --shell /bin/bash ci && chown -R 1001:1001 /app
+USER 1001
+ENV HOME=/home/ci
