@@ -597,8 +597,13 @@ def test_generated_quarantine_date_is_stamped_not_inherited(generated_project):
     assert abs((date.today() - stamped).days) <= 1, f'quarantine date {stamped} was not stamped at generation'
 
 
-def test_base_images_are_pinned_by_digest(generated_project):
-    """Both container images carry a digest, and the base image's tag matches its Python version."""
+def test_base_image_is_pinned_by_digest(generated_project):
+    """The base image carries a digest and its tag matches the project's minimum Python.
+
+    `[tool.docker-versions]` holds exactly one image. It used to also carry an `alpine-image`
+    that nothing read — dead since the copier migration — which still had to be kept
+    version-consistent with uv on every bump.
+    """
     project, _ = generated_project
     data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
     images = data['tool']['docker-versions']
@@ -606,7 +611,7 @@ def test_base_images_are_pinned_by_digest(generated_project):
     base = images['base-image']
     assert '@sha256:' in base, f'base image not pinned by digest: {base}'
     assert f'python{minimum}-trixie-slim@' in base, f'tag does not match requires-python {minimum}: {base}'
-    assert '@sha256:' in images['alpine-image'], 'alpine image not pinned by digest'
+    assert set(images) == {'base-image'}, f'unused image references reintroduced: {sorted(set(images) - {"base-image"})}'
 
 
 def test_generated_project_ships_a_lockfile(generated_project):

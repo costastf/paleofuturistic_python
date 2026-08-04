@@ -19,7 +19,7 @@ The single source of truth for project metadata and tool configuration. Sections
 | `[tool.test-ratchet]` | Template (knob), you (mode) | `mode = "auto-detect"` (default) keeps the coverage ratchet dormant while the scaffolded `test_sanity` is in place; `mode = "strict"` engages it on run #1. See [Testing strategy](../explanation/testing-strategy.md#dormant-during-scaffold). |
 | `[tool.tox]` | Template | Generated from `min_python_version` / `max_python_version`. |
 | `[tool.commitizen]` | Template | Conventional-Commits parser config used by `cz changelog` and the lint hook. The template does **not** use commitizen's autorelease — the bump is chosen explicitly via `./workflow.cmd release -i <type>`. |
-| `[tool.docker-versions]` | Template | Image tags consumed by `Dockerfile.deps` and CI. |
+| `[tool.docker-versions]` | Template | The one image `Dockerfile.deps` builds on, pinned by tag *and* digest. |
 
 ## `uv.lock`
 
