@@ -1,5 +1,5 @@
 [project]
-name = 'backbone-template'
+name = 'workflow-tooling'
 version = '0.1.0'
 description = 'A vendored version of invoke that can be used to construct portable development workflows with no dependencies other than a recent version of python.'
 requires-python = ">=3.12"

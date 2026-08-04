@@ -791,6 +791,73 @@ def test_add_a_workflow_task_directs_people_to_local(generated_project):
     assert 'Register it in `_CI/tasks/__init__.py`' not in how_to, 'the how-to still tells people to edit __init__.py'
 
 
+def test_documented_launcher_matches_the_real_one(generated_project):
+    """The architecture doc quotes the launcher that actually ships.
+
+    It previously described `uv run python -m _CI.invoke -- <args>` — a module that has never
+    existed — alongside an `@echo off` first line the file does not have. Anyone debugging the
+    launcher from that description would be looking for code that isn't there.
+    """
+    project, _ = generated_project
+    launcher = (project / 'workflow.cmd').read_text(encoding='utf-8')
+    doc = (project / 'docs' / 'developer' / 'explanation' / 'the-ci-tasks-architecture.md').read_text(
+        encoding='utf-8'
+    )
+    assert '_CI.invoke' not in doc, 'the doc still cites a nonexistent _CI.invoke module'
+    # Every non-shebang line of the real launcher must appear verbatim in the doc.
+    for line in (line.strip() for line in launcher.splitlines()):
+        if not line or line.startswith('#!'):
+            continue
+        assert line in doc, f'launcher line not documented: {line!r}'
+    # And the dispatch mechanism the two interpreters rely on is explained, not just shown.
+    assert 'exec' in doc and 'label' in doc, 'the doc shows the launcher without explaining how it dispatches'
+
+
+def test_launcher_dispatch_is_intact(generated_project):
+    """The launcher execs on the sh line so the cmd line is unreachable from a POSIX shell.
+
+    Without `exec`, sh would fall through and try to run the Windows line as a command.
+    """
+    project, _ = generated_project
+    lines = [line.strip() for line in (project / 'workflow.cmd').read_text(encoding='utf-8').splitlines()]
+    posix = next(line for line in lines if line.startswith(': ;'))
+    assert 'exec ' in posix, 'sh would fall through to the Windows line'
+    assert posix.startswith(': ;'), 'cmd relies on this line reading as a label'
+    assert '--search-root _CI' in posix
+
+
+def test_no_predecessor_template_name_survives(generated_project):
+    """Nothing still calls the CI tooling package by the template's former name.
+
+    `_CI/pyproject.toml` named it `backbone-template`, which pip-compile then stamped into
+    every `# via …` comment in `vendor.txt` — so the stale name was reproduced on each
+    re-vendor.
+    """
+    project, _ = generated_project
+    for relative in ('_CI/pyproject.toml', '_CI/lib/vendor.txt'):
+        for root in (project, REPO_ROOT):
+            content = (root / relative).read_text(encoding='utf-8')
+            assert 'backbone' not in content.lower(), f'{root / relative} still names backbone-template'
+
+
+def test_vendor_comments_agree_with_the_package_name(generated_project):
+    """`vendor.txt`'s `# via <name>` comments match `_CI/pyproject.toml`'s project name.
+
+    pip-compile derives them from that name, so a mismatch means the two would diverge again
+    the next time the vendored tree is regenerated.
+    """
+    project, _ = generated_project
+    for root in (project, REPO_ROOT):
+        name = re.search(
+            r"^name = ['\"]([^'\"]+)['\"]", (root / '_CI' / 'pyproject.toml').read_text(encoding='utf-8'), re.MULTILINE
+        ).group(1)
+        vendor = (root / '_CI' / 'lib' / 'vendor.txt').read_text(encoding='utf-8')
+        # pip-compile indents the `# via …` comment under the requirement it belongs to.
+        cited = set(re.findall(r'^\s*#\s+via ([a-z0-9-]+) \(pyproject\.toml\)\s*$', vendor, re.MULTILINE))
+        assert cited, f'{root}: no self-referential via comments found in vendor.txt'
+        assert cited == {name}, f'{root}: vendor.txt cites {cited}, pyproject declares {name!r}'
+
+
 def test_sidebar_nav_override_ships(generated_project):
     """The sidebar site-nav theme override ships and is wired into properdocs.yml."""
     project, _ = generated_project
