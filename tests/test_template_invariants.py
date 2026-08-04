@@ -228,6 +228,120 @@ def test_sbom_and_slug_helpers_sanitize_the_remote(generated_project):
     assert 'strip_credentials' in host_py, 'origin_slug() does not sanitize the origin URL'
 
 
+def stub_result(*, ok=True, stdout='', stderr=''):
+    """A stand-in for invoke's `Result`, carrying only what the code under test reads."""
+    return SimpleNamespace(ok=ok, failed=not ok, stdout=stdout, stderr=stderr)
+
+
+class StubContext:
+    """Minimal invoke-`Context` stand-in returning canned results and recording every command.
+
+    `responses` is an ordered list of `(fragment, result)` pairs and the first fragment
+    contained in the command wins, so more specific commands must come first —
+    `git commit --no-gpg-sign` contains `git commit`.
+    """
+
+    def __init__(self, responses):
+        self.responses = responses
+        self.commands = []
+
+    def run(self, cmd, **_kwargs):
+        self.commands.append(cmd)
+        for fragment, result in self.responses:
+            if fragment in cmd:
+                return result
+        raise AssertionError(f'unexpected command: {cmd!r}')
+
+
+# Real `git commit` stderr, captured from git 2.x. The ssh case is used deliberately: it
+# contains none of the plausible-looking "signing failed"/"failed to sign" phrasings, so a
+# marker matched against those instead of git's summary line fails this test.
+SIGNING_FAILED = (
+    "error: Couldn't load public key /nonexistent/key.pub: No such file or directory?\n"
+    'fatal: failed to write commit object\n'
+)
+HOOK_FAILED = 'hook says no\n'
+
+
+def test_commit_leaves_signing_to_git_when_it_succeeds(generated_project):
+    """A successful commit carries no signing flag at all — git honours `commit.gpgsign`."""
+    project, _ = generated_project
+    context = StubContext([('git commit', stub_result())])
+    load_generated_shared(project).commit(context, 'docs: update changelog')
+    assert context.commands == ['git commit -m "docs: update changelog"']
+
+
+def test_commit_retries_unsigned_when_no_signing_key_is_available(generated_project):
+    """Signing configured but unusable — the CI case — falls back so the release continues."""
+    project, _ = generated_project
+    context = StubContext(
+        [
+            ('--no-gpg-sign', stub_result()),
+            ('git commit', stub_result(ok=False, stderr=SIGNING_FAILED)),
+            ('commit.gpgsign', stub_result(stdout='true\n')),
+        ]
+    )
+    load_generated_shared(project).commit(context, 'docs: update changelog')
+    assert context.commands[-1] == 'git commit --no-gpg-sign -m "docs: update changelog"'
+
+
+def test_commit_does_not_retry_when_a_hook_failed(generated_project):
+    """A failing pre-commit hook must not be reported or retried as a signing problem."""
+    project, _ = generated_project
+    context = StubContext(
+        [
+            ('git commit', stub_result(ok=False, stderr=HOOK_FAILED)),
+            ('commit.gpgsign', stub_result(stdout='true\n')),
+        ]
+    )
+    with pytest.raises(SystemExit):
+        load_generated_shared(project).commit(context, 'docs: update changelog')
+    assert not any('--no-gpg-sign' in cmd for cmd in context.commands), 'retried a non-signing failure'
+
+
+def test_commit_does_not_retry_when_signing_was_not_requested(generated_project):
+    """Both guards are required: without `commit.gpgsign` the fallback must not engage."""
+    project, _ = generated_project
+    context = StubContext(
+        [
+            ('git commit', stub_result(ok=False, stderr=SIGNING_FAILED)),
+            ('commit.gpgsign', stub_result(stdout='false\n')),
+        ]
+    )
+    with pytest.raises(SystemExit):
+        load_generated_shared(project).commit(context, 'docs: update changelog')
+    assert not any('--no-gpg-sign' in cmd for cmd in context.commands), 'retried without signing configured'
+
+
+def test_signing_requested_reads_the_normalized_boolean(generated_project):
+    """`--type=bool` is what makes `yes`/`on`/`1` safe to compare against `true`."""
+    project, _ = generated_project
+    shared = load_generated_shared(project)
+    context = StubContext([('commit.gpgsign', stub_result(stdout='true\n'))])
+    assert shared.signing_requested(context) is True
+    assert '--type=bool' in context.commands[0], 'the config read does not normalize the value'
+    unset = StubContext([('commit.gpgsign', stub_result(ok=False))])
+    assert shared.signing_requested(unset) is False
+
+
+def test_changelog_never_forces_an_unsigned_commit(generated_project):
+    """`release.changelog --write` must not hardcode `--no-gpg-sign`; only the fallback may."""
+    project, _ = generated_project
+    release_py = (project / '_CI' / 'tasks' / 'release.py').read_text(encoding='utf-8')
+    assert '--no-gpg-sign' not in release_py, 'release.py forces an unsigned commit'
+    assert 'commit(context,' in release_py, 'the changelog commit does not route through shared.commit'
+
+
+def test_changelog_skips_the_commit_when_nothing_is_staged(generated_project):
+    """Regenerating an unchanged changelog is a no-op, not a failed commit on an empty index."""
+    project, _ = generated_project
+    release_py = (project / '_CI' / 'tasks' / 'release.py').read_text(encoding='utf-8')
+    tree = ast.parse(release_py)
+    func = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == 'changelog')
+    body = ast.unparse(func)
+    assert 'git diff --cached --quiet' in body, 'the changelog commit is not guarded by a staged-changes check'
+
+
 def test_deps_image_tag_covers_every_content_input(generated_project):
     """The deps-image tag hashes the lockfile, the Dockerfile and the base image, not just the lock.
 

@@ -38,6 +38,14 @@ OPEN_COMMAND = {
     'windows': 'start',
 }
 
+# git's own summary line when it cannot create the commit object, which is how a signing
+# failure surfaces whatever `gpg.format` is set to. The cause line above it is format-specific
+# — openpgp prints "gpg: signing failed: No secret key", ssh prints "error: Couldn't load
+# public key" — so neither is safe to match on. Verified against both formats on git 2.x.
+# A failing pre-commit hook does not print this, which is what stops the unsigned retry below
+# from turning an ordinary hook failure into a bogus report about signing.
+SIGNING_FAILURE_MARKER = 'failed to write commit object'
+
 # WSL registers a binfmt handler to run Windows executables. Distros with interop
 # disabled have neither name, and there is then no way to reach a Windows browser.
 WSL_INTEROP_MARKERS = (
@@ -242,6 +250,47 @@ def execute(context: Context, cmd: str) -> None:
     result = context.run(cmd, echo=True, warn=True, **kwargs)
     if result is None or result.failed:
         raise SystemExit(1)
+
+
+def signing_requested(context: Context) -> bool:
+    """Return whether git is configured to sign commits in this repository.
+
+    ``--type=bool`` normalizes every spelling git accepts (``1``, ``yes``, ``on``) to
+    ``true``, so this does not have to guess at the value.
+    """
+    result = context.run('git config --type=bool --get commit.gpgsign', hide=True, warn=True)
+    return result is not None and result.ok and result.stdout.strip() == 'true'
+
+
+def commit(context: Context, message: str) -> None:
+    """Commit the staged changes, letting git decide whether to sign.
+
+    Signing is deliberately not forced in either direction. ``commit.gpgsign`` is what the
+    developer or the repository has asked for, and a branch protected by a required-signatures
+    rule rejects an unsigned commit at push time — so hardcoding ``--no-gpg-sign`` would break
+    exactly the repositories that care most about provenance. CI, on the other hand, usually
+    has no signing key at all, and a release must not stop on a documentation commit.
+
+    So a signed commit is attempted first, and retried unsigned only when both guards hold:
+    signing is what git was asked to do, and signing is what failed. Without the second guard
+    a pre-commit hook failure would be retried too, reporting a signing problem that does not
+    exist. The retry says plainly that the commit is unsigned and what that costs.
+
+    Raises:
+        SystemExit: with exit code 1 if the commit fails for any reason other than an
+            unavailable signing key, or if the unsigned retry also fails.
+    """
+    result = context.run(f'git commit -m "{message}"', echo=True, warn=True)
+    if result is not None and result.ok:
+        return
+    stderr = (result.stderr if result is not None else '') or ''
+    if SIGNING_FAILURE_MARKER not in stderr or not signing_requested(context):
+        raise SystemExit(1)
+    print(
+        'Signing failed and no usable signing key was found, so the commit was made unsigned. '
+        'A branch that requires signed commits will reject it on push.'
+    )
+    execute(context, f'git commit --no-gpg-sign -m "{message}"')
 
 
 def run(cmd: str) -> Callable[[Callable[[Context], None]], Callable[[Context], None]]:

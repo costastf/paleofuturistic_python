@@ -56,7 +56,7 @@ for which hooks are scoped that way and which are deliberately not.
 | `release` | `-i <type>`, `--no-push` | Full release flow: validate, branch, bump, changelog, push, open PR/MR. |
 | `release.validate` | — | Working-tree-clean and in-sync-with-origin checks. |
 | `release.bump` | `-i <type>` | `cz bump` with the given increment (major/minor/patch/alpha/beta/rc). |
-| `release.changelog` | `--write` | Generate changelog. `--write` persists and commits. |
+| `release.changelog` | `--write` | Generate changelog. `--write` persists and commits, signing per `commit.gpgsign`. |
 | `release.push` | — | `git push` + `git push --tags`. |
 | `release.publish` | — | Build + `uv publish` + SBOM upload (if DT enabled). Invoked from CI on release-tag merge. |
 | `release.clean` | — | Remove `dist/` and `sbom.json`. |
