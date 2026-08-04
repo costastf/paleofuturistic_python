@@ -10,7 +10,11 @@ from invoke import Collection, Context, Task, task
 from .github import request_pages_build
 {% endif -%}
 from .quality import update_pyscn_badge
+{% if integrate_pages and git_hosting_service == 'github' -%}
 from .shared import execute, is_ci, logged, open_target, run, run_steps
+{%- else -%}
+from .shared import is_ci, logged, open_target, run, run_steps
+{%- endif %}
 from .test import update_coverage_badge
 
 

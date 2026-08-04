@@ -147,7 +147,9 @@ def audit(context: Context, ignore: str | None = None) -> None:
     today = date.today()  # noqa: DTZ011
     suppressions = [
         *parse_suppressions(ignore or '', '--ignore', require_expiry=True),
-        *parse_suppressions(os.environ.get(SECURITY_OVERRIDE_ENV, ''), f'${SECURITY_OVERRIDE_ENV}', require_expiry=True),
+        *parse_suppressions(
+            os.environ.get(SECURITY_OVERRIDE_ENV, ''), f'${SECURITY_OVERRIDE_ENV}', require_expiry=True
+        ),
         *load_overrides_file(),
     ]
     active: dict[str, Suppression] = {}

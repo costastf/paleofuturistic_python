@@ -41,7 +41,10 @@ drop = [
 ]
 
 [tool.ruff]
-line-length = 121
+# Kept at 120 to match the template's `_CI/pyproject.toml`, the root ruff `line-length` and the
+# root pylint `max-line-length`. A higher value here only creates lines that ruff accepts and
+# the real lint gate rejects.
+line-length = 120
 
 [tool.ruff.format]
 quote-style = "single"

@@ -7,6 +7,7 @@ new ``test_*`` function; adding a new combo axis edits ``matrix_combos()`` in
 runner pick it up automatically.
 """
 
+import ast
 import importlib.util
 import inspect
 import json
@@ -374,6 +375,24 @@ def test_suppressions_are_validated_whole_not_scanned(generated_project):
     assert 'IGNORE_PATTERN.fullmatch' in secure_py
 
 
+def suppression_calls(secure_py, function_name='audit'):
+    """Return `{source label: {keyword: value}}` for each `parse_suppressions()` call in `audit`.
+
+    Parsed with `ast`, not matched textually. Line-based matching broke the moment a call was
+    wrapped across lines, and a regex stops at the wrong parenthesis because one call nests
+    `os.environ.get(...)` inside it. The AST is indifferent to both.
+    """
+    tree = ast.parse(secure_py)
+    func = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == function_name)
+    calls = {}
+    for node in ast.walk(func):
+        if not (isinstance(node, ast.Call) and getattr(node.func, 'id', '') == 'parse_suppressions'):
+            continue
+        label = ast.unparse(node.args[1]) if len(node.args) > 1 else ''
+        calls[label] = {kw.arg: ast.unparse(kw.value) for kw in node.keywords}
+    return calls
+
+
 def test_untracked_suppression_sources_require_an_expiry(generated_project):
     """`--ignore` and the env var must carry an expiry; `.security-overrides` need not.
 
@@ -382,11 +401,11 @@ def test_untracked_suppression_sources_require_an_expiry(generated_project):
     """
     project, _ = generated_project
     secure_py = (project / '_CI' / 'tasks' / 'secure.py').read_text(encoding='utf-8')
-    audit_source = secure_py.split("@logged('secure.audit')", 1)[1].split('\n@task', 1)[0]
-    cli = next(line for line in audit_source.splitlines() if "'--ignore'" in line)
-    env = next(line for line in audit_source.splitlines() if 'SECURITY_OVERRIDE_ENV' in line and 'parse_' in line)
-    assert 'require_expiry=True' in cli, '--ignore does not require an expiry'
-    assert 'require_expiry=True' in env, 'the env var does not require an expiry'
+    calls = suppression_calls(secure_py)
+    cli = next(kwargs for label, kwargs in calls.items() if '--ignore' in label)
+    env = next(kwargs for label, kwargs in calls.items() if 'SECURITY_OVERRIDE_ENV' in label)
+    assert cli.get('require_expiry') == 'True', '--ignore does not require an expiry'
+    assert env.get('require_expiry') == 'True', 'the env var does not require an expiry'
     # The file keeps permanent entries: load_overrides_file must not opt in.
     file_loader = secure_py.split('def load_overrides_file', 1)[1].split('\n@task', 1)[0]
     assert 'require_expiry=True' not in file_loader, '.security-overrides should still allow permanent entries'

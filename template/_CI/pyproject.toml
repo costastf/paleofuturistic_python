@@ -41,7 +41,12 @@ drop = [
 ]
 
 [tool.ruff]
-line-length = 121
+# Must match the root pyproject's ruff `line-length` and pylint `max-line-length`, both 120.
+# Ruff resolves *this* file for anything under `_CI/`, while pylint is invoked from the project
+# root and uses the root config — so a higher value here creates a band of line lengths that
+# ruff accepts and `./workflow.cmd lint` then rejects on `line-too-long`. It was 121, and a
+# 121-character line duly passed every ruff run and failed the real gate.
+line-length = 120
 
 [tool.ruff.format]
 quote-style = "single"
