@@ -155,6 +155,10 @@
 <li>
     <a href="../../maintaining/how-to/sync-shipped-docs.html" class="dropdown-item">Keep shipped docs in sync</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/how-to/bump-the-uv-pin.html" class="dropdown-item">Bump the uv pin</a>
+</li>
     </ul>
   </li>
                                     
@@ -392,6 +396,9 @@
             <li class="nav-item">
                 <a href="../../maintaining/how-to/sync-shipped-docs.html" class="nav-link">Keep shipped docs in sync</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/how-to/bump-the-uv-pin.html" class="nav-link">Bump the uv pin</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -445,6 +452,10 @@
               <ul class="nav flex-column">
               </ul>
             </li>
+            <li class="nav-item" data-bs-level="2"><a href="#which-uv-version-a-new-project-gets" class="nav-link">Which uv version a new project gets</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
             <li class="nav-item" data-bs-level="2"><a href="#when-this-decision-could-be-revisited" class="nav-link">When this decision could be revisited</a>
               <ul class="nav flex-column">
               </ul>
@@ -485,6 +496,29 @@
 </ul>
 <p><strong>Older Python support.</strong> uv itself supports far older interpreters than the template targets, so the project's chosen <code>min_python_version</code> (as low as 3.10) isn't a constraint uv adds — if a generated project wanted to support 3.8, uv wouldn't stop it; that configuration just isn't one the template tests.</p>
 <p><strong>Familiarity.</strong> Some contributors will arrive expecting <code>pip install -r requirements.txt</code>. The generated README points them to <code>./workflow.cmd bootstrap</code> and the <a href="../tutorials/generate-your-first-project.html">tutorial that walks through generating a first project</a>.</p>
+<h2 id="which-uv-version-a-new-project-gets">Which uv version a new project gets</h2>
+<p>Because <code>[tool.uv] required-version</code> is an <strong>exact</strong> pin, a stale uv version does not merely
+lag — it refuses to run. A literal carried in the template would age between bumps, so a
+project generated months after the last one would start life on an obstructive pin.</p>
+<p>Generation therefore resolves it: a new project is pinned to the <strong>newest uv release that has
+been public for at least a week</strong>. The cool-down means a same-day release withdrawn hours later
+never reaches anyone, and it is why the pin is always resolvable under the <code>exclude-newer</code>
+boundary stamped at the same moment.</p>
+<p>That single version is written to five places at once — the constraint, the <code>test</code> group's <code>uv</code>
+entry, the <code>uv_build</code> upper bound, the base image's tag with a freshly resolved digest, and
+<code>uv.lock</code>. They are never written separately: a tag carrying both a version and a digest
+resolves to the <strong>digest</strong>, so a bumped tag beside a stale digest would silently keep building
+the old image.</p>
+<p>From then on the version is frozen and maintaining it belongs to the project, not the template.
+Nothing chases it, and no bot opens pull requests; <code>./workflow.cmd develop.bump-uv</code> inside the
+project moves all five together whenever its developers choose to.</p>
+<p>Two escape hatches:</p>
+<ul>
+<li><strong>Pin it explicitly.</strong> Set <code>TEMPLATE_UV_VERSION</code> before generating to get exactly that
+  version — which is also how the template's own test suite stays deterministic.</li>
+<li><strong>Generate offline.</strong> If PyPI cannot be reached, generation keeps the version the template
+  committed and says so. It never fails for want of a network, and never falls back silently.</li>
+</ul>
 <h2 id="when-this-decision-could-be-revisited">When this decision could be revisited</h2>
 <p>If two of these became true together:</p>
 <ol>
