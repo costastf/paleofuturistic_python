@@ -2,6 +2,12 @@
 
 import importlib.util
 import re
+import shutil
+import tarfile
+import tempfile
+import tomllib
+import urllib.request
+from pathlib import Path
 
 from invoke import task
 
@@ -147,3 +153,105 @@ def bump_uv(context, version=''):  # noqa: ARG001
         print('        changelog before merging — minor releases are allowed to break behaviour.')
     print('  run `./workflow.cmd test.matrix` before committing: it is the only thing that')
     print('  proves generated projects still work on the new version.')
+
+
+VENDOR_DESTINATIONS = (
+    PROJECT_ROOT_DIRECTORY / '_CI' / 'lib',
+    PROJECT_ROOT_DIRECTORY / 'template' / '_CI' / 'lib',
+)
+# Copied verbatim out of the upstream archive. `vendor.txt` records what was resolved and
+# `path_inject.patch` is what makes the launcher importable, so a tree without them cannot be
+# rebuilt or explained.
+VENDOR_ARTEFACTS = ('vendor', 'vendor.txt', 'patches/path_inject.patch')
+
+
+def vendored_invoke_pin() -> dict:
+    """Return the `[tool.vendored-invoke]` table, or abort if it is missing or incomplete."""
+    data = tomllib.loads(REPO_PYPROJECT.read_text(encoding='utf-8'))
+    pin = data.get('tool', {}).get('vendored-invoke', {})
+    missing = [key for key in ('repository', 'version', 'commit') if not pin.get(key)]
+    if missing:
+        print(emojize_message(f'[tool.vendored-invoke] is missing {", ".join(missing)}.', success=False))
+        raise SystemExit(1)
+    return pin
+
+
+def extract_vendor_tree(archive: Path, destination: Path) -> int:
+    """Replace `destination`'s vendored artefacts with the ones inside `archive`. Return file count."""
+    with tarfile.open(archive) as tar:
+        # GitHub archives nest everything under a single `<repo>-<sha>/` directory.
+        root = tar.getnames()[0].split('/')[0]
+        with tempfile.TemporaryDirectory() as unpacked:
+            # `filter='data'` refuses absolute paths, `..` traversal and device nodes. It is the
+            # default from 3.14, but this repo also runs on 3.12.
+            tar.extractall(unpacked, filter='data')
+            source = Path(unpacked) / root / '_CI' / 'lib'
+            for artefact in VENDOR_ARTEFACTS:
+                target = destination / artefact
+                if target.is_dir():
+                    shutil.rmtree(target)
+                elif target.exists():
+                    target.unlink()
+                target.parent.mkdir(parents=True, exist_ok=True)
+                origin = source / artefact
+                if origin.is_dir():
+                    # `copytree` keeps the mode bits, which matters: bin/invoke must stay
+                    # executable or every `./workflow.cmd` invocation exits 126.
+                    shutil.copytree(origin, target)
+                else:
+                    shutil.copy2(origin, target)
+            retarget_manifest(destination, upstream_name=project_name(Path(unpacked) / root / '_CI'))
+    return sum(1 for path in (destination / 'vendor').rglob('*') if path.is_file())
+
+
+def project_name(ci_directory: Path) -> str:
+    """Return the `[project] name` of a `_CI/pyproject.toml`."""
+    return tomllib.loads((ci_directory / 'pyproject.toml').read_text(encoding='utf-8'))['project']['name']
+
+
+def retarget_manifest(destination: Path, upstream_name: str) -> None:
+    """Rewrite vendor.txt's `# via <package>` attribution to name the local CI package.
+
+    `uv pip compile` stamps the resolving project's name into every `# via` comment, so a
+    manifest copied verbatim credits upstream's package — reintroducing a name this repository
+    deliberately retired, and which an invariant still guards. Only the attribution is
+    rewritten: re-resolving locally could pick different versions from the tree that was
+    actually copied, and then the manifest would no longer describe it.
+    """
+    manifest = destination / 'vendor.txt'
+    local_name = project_name(destination.parent)
+    text = manifest.read_text(encoding='utf-8')
+    if upstream_name != local_name:
+        manifest.write_text(text.replace(upstream_name, local_name), encoding='utf-8')
+
+
+@task(name='sync-vendor')
+def sync_vendor(context):
+    """Refresh both vendored invoke trees from the pinned upstream commit.
+
+    The tree is built by schubergphilis/vendored_invoke and copied in verbatim — editing it
+    here would silently detach it from the source it is supposed to mirror. Both copies move
+    together so a generated project never gets a different tree from this repository.
+
+    Refuses to run on a dirty working tree: the whole point is being able to read the resulting
+    diff and see that nothing but the vendored files changed.
+    """
+    pin = vendored_invoke_pin()
+    status = context.run('git status --porcelain', hide=True, warn=True)
+    if status is None or status.stdout.strip():
+        print(emojize_message('Working tree is dirty; commit or stash first.', success=False))
+        raise SystemExit(1)
+    url = f'https://codeload.github.com/{pin["repository"]}/tar.gz/{pin["commit"]}'
+    print(f'Fetching {pin["repository"]} {pin["version"]} ({pin["commit"][:12]})')
+    with tempfile.TemporaryDirectory() as workspace:
+        archive = Path(workspace) / 'vendored_invoke.tar.gz'
+        try:
+            with urllib.request.urlopen(url, timeout=60) as response:  # noqa: S310
+                archive.write_bytes(response.read())
+        except OSError as exc:
+            print(emojize_message(f'Could not fetch {url}: {exc}', success=False))
+            raise SystemExit(1) from exc
+        for destination in VENDOR_DESTINATIONS:
+            count = extract_vendor_tree(archive, destination)
+            print(f'  {destination.relative_to(PROJECT_ROOT_DIRECTORY)}/vendor -> {count} files')
+    print(emojize_message(f'Vendored invoke synced to {pin["version"]}.'))

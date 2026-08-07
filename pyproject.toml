@@ -88,6 +88,18 @@ convention = "google"
 [tool.ruff.format]
 quote-style = "single"
 
+# The vendored invoke under `_CI/lib/vendor/` and `template/_CI/lib/vendor/` is not maintained
+# here — it is built by schubergphilis/vendored_invoke and copied in verbatim. Move it with
+# `./workflow.cmd maintain.sync-vendor`, never by hand: an edited tree silently stops matching
+# its source, which is exactly the state this pin exists to prevent.
+#
+# `commit` is the tag dereferenced to a commit. Tags move; commits do not, which is the same
+# reason every GitHub Action here is pinned by SHA rather than by version.
+[tool.vendored-invoke]
+repository = "schubergphilis/vendored_invoke"
+version = "v1.0.0"
+commit = "ffbd48d334d80a79cca65a0f31cc86f25d489e96"
+
 [tool.properdocs]
 version = "1.6.7"
 theme-mkdocs-version = "1.6.7"

@@ -1544,3 +1544,87 @@ def test_license_file_matches_choice(template_snapshot, tmp_path_factory, licens
         assert not (project / 'LICENSE').exists()
     else:
         assert (project / 'LICENSE').exists()
+
+
+VENDOR_TREES = ('_CI/lib', 'template/_CI/lib')
+# Distribution names in vendor.txt do not always match the importable directory.
+VENDOR_DIRECTORY_ALIASES = {'pip-tools': 'piptools', 'rpds-py': 'rpds', 'typing-extensions': 'typing_extensions'}
+
+
+def vendored_packages(lib_directory):
+    """Return the importable top-level package directories in a vendored tree."""
+    vendor = lib_directory / 'vendor'
+    return {path.name for path in vendor.iterdir() if path.is_dir() and path.name != 'bin'}
+
+
+def manifest_packages(lib_directory):
+    """Return the distribution names pinned in a tree's vendor.txt, mapped to directory names."""
+    text = (lib_directory / 'vendor.txt').read_text(encoding='utf-8')
+    names = {line.split('==')[0].strip() for line in text.splitlines() if re.match(r'^[A-Za-z]', line)}
+    return {VENDOR_DIRECTORY_ALIASES.get(name, name.replace('-', '_')) for name in names}
+
+
+@pytest.mark.parametrize('tree', VENDOR_TREES)
+def test_vendored_tree_matches_its_manifest(tree):
+    """Every vendored package is pinned in vendor.txt, and every pin is present in the tree.
+
+    The tree is an output of `vendoring sync`, not a place to add or delete files. A package
+    present without a pin means someone edited the tree by hand; a pin without a package means
+    the tree is stale. Either way it no longer reproduces from its declared input.
+    """
+    lib = REPO_ROOT / tree
+    on_disk, pinned = vendored_packages(lib), manifest_packages(lib)
+    assert on_disk == pinned, f'{tree}: unpinned {sorted(on_disk - pinned)}, missing {sorted(pinned - on_disk)}'
+
+
+@pytest.mark.parametrize('tree', VENDOR_TREES)
+def test_vendored_tree_is_pure_python(tree):
+    """No compiled extensions in a tree whose entire purpose is running anywhere.
+
+    Vendoring `tomli` produced a `__mypyc.cpython-314-darwin.so`: 427 KiB usable on exactly one
+    operating system, architecture and Python version, shipped to every generated project.
+    A binary here is portability quietly lost, and nothing else would report it.
+    """
+    vendor = REPO_ROOT / tree / 'vendor'
+    binaries = [str(p.relative_to(vendor)) for p in vendor.rglob('*') if p.suffix in {'.so', '.pyd', '.dylib'}]
+    assert not binaries, f'{tree}: platform-specific binaries vendored: {binaries}'
+
+
+def test_both_vendored_trees_are_identical():
+    """This repository and the template ship the same vendored invoke, byte for byte.
+
+    They are two copies of one upstream artefact. Letting them drift means a generated project
+    runs different code from the repository that produced it, and the difference would only
+    surface as a bug somewhere downstream.
+    """
+    parent, template = (REPO_ROOT / tree / 'vendor' for tree in VENDOR_TREES)
+    parent_files = {p.relative_to(parent): p.read_bytes() for p in parent.rglob('*') if p.is_file()}
+    template_files = {p.relative_to(template): p.read_bytes() for p in template.rglob('*') if p.is_file()}
+    assert parent_files.keys() == template_files.keys(), (
+        f'only in _CI: {sorted(map(str, parent_files.keys() - template_files.keys()))}; '
+        f'only in template: {sorted(map(str, template_files.keys() - parent_files.keys()))}'
+    )
+    differing = sorted(str(name) for name, data in parent_files.items() if template_files[name] != data)
+    assert not differing, f'vendored files differ between the two trees: {differing}'
+
+
+def test_vendored_invoke_records_an_immutable_pin():
+    """The vendored tree names the exact upstream commit it came from.
+
+    A tag can be moved; a commit cannot. This is the same reason every action in these
+    workflows is pinned by SHA, and it is what lets `maintain.sync-vendor` be re-run to prove
+    the committed tree still matches its source.
+    """
+    pin = tomllib.loads((REPO_ROOT / 'pyproject.toml').read_text(encoding='utf-8'))['tool']['vendored-invoke']
+    assert pin['repository'] == 'schubergphilis/vendored_invoke'
+    assert re.fullmatch(r'v\d+\.\d+\.\d+', pin['version']), f'version {pin["version"]!r} is not a release tag'
+    assert re.fullmatch(r'[0-9a-f]{40}', pin['commit']), f'commit {pin["commit"]!r} is not a full SHA'
+
+
+def test_generated_projects_get_the_slim_vendor_tree(generated_project):
+    """A generated project carries the same slim tree, not a stale copy of the old one."""
+    project, _ = generated_project
+    vendor = project / '_CI' / 'lib' / 'vendor'
+    packages = {p.name for p in vendor.iterdir() if p.is_dir() and p.name != 'bin'}
+    assert packages == {'invoke', 'coloredlogs', 'humanfriendly'}, f'unexpected vendored packages: {packages}'
+    assert not [p for p in vendor.rglob('*') if p.suffix in {'.so', '.pyd', '.dylib'}]
