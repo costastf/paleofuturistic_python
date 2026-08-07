@@ -94,6 +94,20 @@ Without DT, only what `pip-audit` reported at the moment it ran is visible. With
 
 See [Enable Dependency Track integration](../how-to/enable-dependency-track.md) for setup.
 
+## Layer 4 — build provenance
+
+The SBOM says what is *inside* an artifact. Provenance says where the artifact *came from* — and unlike the SBOM, it is not self-reported. `actions/attest-build-provenance` signs a statement binding the exact file digests to the workflow, commit and runner that produced them, and that signature chains to GitHub's Sigstore instance rather than to anything the project controls. A forged SBOM is a text edit; a forged attestation is not.
+
+A consumer verifies a downloaded artifact with:
+
+```bash
+gh attestation verify <package>-<version>-py3-none-any.whl --repo <owner>/<repo>
+```
+
+Order matters in the publish job: `release.dist` builds into `dist/`, the attestation is taken over those files, and `release.publish --prebuilt` uploads them *without* rebuilding. Rebuilding in between would publish files that no attestation refers to, and verification would then fail — reading as tampering rather than as a fresh build.
+
+**GitHub only.** GitLab has no equivalent that works without extra infrastructure, so GitLab projects ship the SBOM without provenance. Nothing else about the release differs.
+
 ## What about overrides?
 
 `.security-overrides` is a project-local allow-list with mandatory expiry dates. It applies to `pip-audit`. It does **not** suppress findings in the SBOM or in Dependency Track — those continue to show the world the full truth. Override = "we accept this locally for now," not "make this invisible."

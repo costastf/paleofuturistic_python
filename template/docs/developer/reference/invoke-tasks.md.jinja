@@ -58,7 +58,8 @@ for which hooks are scoped that way and which are deliberately not.
 | `release.bump` | `-i <type>` | `cz bump` with the given increment (major/minor/patch/alpha/beta/rc). |
 | `release.changelog` | `--write` | Generate changelog. `--write` persists and commits, signing per `commit.gpgsign`. |
 | `release.push` | — | `git push` + `git push --tags`. |
-| `release.publish` | — | Build + `uv publish` + SBOM upload (if DT enabled). Invoked from CI on release-tag merge. |
+| `release.dist` | — | Clean and build into `dist/`, leaving the artifacts for inspection{% if git_hosting_service == 'github' %} or attestation{% endif %}. |
+| `release.publish` | `--prebuilt` | Build + `uv publish` + SBOM upload (if DT enabled). Invoked from CI on release-tag merge. `--prebuilt` publishes what `release.dist` already built instead of rebuilding. |
 | `release.clean` | — | Remove `dist/` and `sbom.json`. |
 {%- if integrate_dependency_track %}
 | `release.sbom-upload` | — | Extract and upload SBOM to Dependency Track. |

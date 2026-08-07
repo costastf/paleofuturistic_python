@@ -732,13 +732,89 @@ def test_every_github_job_declares_least_privilege_permissions(generated_project
             declared = job.get('permissions') or config.get('permissions')
             assert declared, f'{name}:{job_name} inherits default token permissions'
             # Only the image build (pushes to ghcr) and the docs deploy (pushes gh-pages)
-            # may mutate anything. `id-token: write` is exempt everywhere: it mints an
-            # OIDC token for PyPI Trusted Publishing and grants no access to repo resources.
+            # may mutate anything. Two write scopes are exempt everywhere because neither
+            # grants access to repository contents: `id-token` mints an OIDC token for PyPI
+            # Trusted Publishing, and `attestations` records a signed build-provenance
+            # statement. Both produce a signature; neither can change what is in the repo.
+            signing_scopes = ('id-token', 'attestations')
             if job_name not in ('build-deps-image', 'deploy'):
                 writes = [
-                    scope for scope, level in declared.items() if level == 'write' and scope != 'id-token'
+                    scope
+                    for scope, level in declared.items()
+                    if level == 'write' and scope not in signing_scopes
                 ]
                 assert not writes, f'{name}:{job_name} asks for write scopes {writes}'
+
+
+def publish_steps(project):
+    """Return the `publish` job's steps from the generated publish workflow."""
+    config = yaml.safe_load((project / '.github' / 'workflows' / 'publish.yaml').read_text(encoding='utf-8'))
+    return config['jobs']['publish']['steps']
+
+
+def step_index(steps, needle):
+    """Return the index of the first step whose `run` or `uses` contains `needle`."""
+    for index, step in enumerate(steps):
+        if needle in (step.get('run') or '') or needle in (step.get('uses') or ''):
+            return index
+    return -1
+
+
+def test_publish_attests_the_artifacts_it_uploads(generated_project):
+    """Provenance is taken between building and uploading, over the files actually published.
+
+    The ordering is the whole guarantee. Attesting one build and uploading a different one
+    yields an attestation that fails verification, which reads to a consumer as tampering —
+    strictly worse than shipping no attestation at all. So this pins both the order and the
+    `--prebuilt` flag that stops the publish step rebuilding.
+    """
+    project, cell = generated_project
+    if cell['git_hosting_service'] != 'github':
+        pytest.skip('GitHub-only workflow')
+    steps = publish_steps(project)
+    built = step_index(steps, 'release.dist')
+    attested = step_index(steps, 'attest-build-provenance')
+    published = step_index(steps, 'release.publish')
+    assert built >= 0, 'nothing builds the distribution before publishing'
+    assert attested >= 0, 'no build-provenance attestation step'
+    assert built < attested < published, f'wrong order: build={built}, attest={attested}, publish={published}'
+    assert '--prebuilt' in steps[published]['run'], 'the publish step rebuilds, orphaning the attestation'
+
+
+def test_attestation_action_is_pinned_by_sha(generated_project):
+    """The attestation action is SHA-pinned like every other action in the generated workflows."""
+    project, cell = generated_project
+    if cell['git_hosting_service'] != 'github':
+        pytest.skip('GitHub-only workflow')
+    uses = next(s['uses'] for s in publish_steps(project) if 'attest-build-provenance' in (s.get('uses') or ''))
+    ref = uses.split('@', 1)[1]
+    assert re.fullmatch(r'[0-9a-f]{40}', ref), f'attestation action is pinned to {ref!r}, not a commit SHA'
+
+
+def test_publish_job_may_write_attestations(generated_project):
+    """Without `attestations: write` the attest step 403s at the end of a release."""
+    project, cell = generated_project
+    if cell['git_hosting_service'] != 'github':
+        pytest.skip('GitHub-only workflow')
+    config = yaml.safe_load((project / '.github' / 'workflows' / 'publish.yaml').read_text(encoding='utf-8'))
+    permissions = config['jobs']['publish']['permissions']
+    assert permissions.get('attestations') == 'write', 'publish job cannot record an attestation'
+    assert permissions.get('id-token') == 'write', 'attestation signing also needs the OIDC token'
+
+
+def test_prebuilt_publish_never_rebuilds(generated_project):
+    """`publish --prebuilt` must not call `dist()`, or CI would publish unattested files."""
+    project, _ = generated_project
+    release_py = (project / '_CI' / 'tasks' / 'release.py').read_text(encoding='utf-8')
+    tree = ast.parse(release_py)
+    func = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == 'publish')
+    guarded = [
+        node
+        for node in ast.walk(func)
+        if isinstance(node, ast.If) and any('dist(context)' in ast.unparse(child) for child in node.body)
+    ]
+    assert guarded, 'publish() calls dist() unconditionally; --prebuilt would still rebuild'
+    assert 'prebuilt' in ast.unparse(guarded[0].test), 'the rebuild is not guarded by the prebuilt flag'
 
 
 def test_deps_image_runs_as_non_root(generated_project):
