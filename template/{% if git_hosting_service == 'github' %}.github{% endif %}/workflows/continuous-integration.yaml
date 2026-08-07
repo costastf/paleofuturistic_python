@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 
+# Why every checkout below sets `persist-credentials: false`, stated once rather than in
+# each job: auth goes into an `http.extraheader` that is removed once the fetch is done, so
+# no credential is left in `.git/config` and `origin` stays a clean URL. That matters
+# because the SBOM reads `origin` for its VCS reference and ships inside the wheel — a token
+# there becomes public and permanent. An invariant asserts none of these copies drifts.
+
 jobs:
   build-deps-image:
     uses: ./.github/workflows/build-deps-image.yaml
@@ -36,10 +42,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
-          # Auth goes in an `http.extraheader` that is removed once the fetch is done,
-          # so no credential is left behind in `.git/config` and `origin` stays a clean
-          # URL. That matters because the SBOM reads `origin` for its VCS reference and
-          # ships inside the wheel — a token there becomes public and permanent.
+          # See the note above the jobs for why.
           persist-credentials: false
 
       - name: Lint code
@@ -64,10 +67,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
-          # Auth goes in an `http.extraheader` that is removed once the fetch is done,
-          # so no credential is left behind in `.git/config` and `origin` stays a clean
-          # URL. That matters because the SBOM reads `origin` for its VCS reference and
-          # ships inside the wheel — a token there becomes public and permanent.
+          # See the note above the jobs for why.
           persist-credentials: false
 
       - name: Run tests
@@ -92,10 +92,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
-          # Auth goes in an `http.extraheader` that is removed once the fetch is done,
-          # so no credential is left behind in `.git/config` and `origin` stays a clean
-          # URL. That matters because the SBOM reads `origin` for its VCS reference and
-          # ships inside the wheel — a token there becomes public and permanent.
+          # See the note above the jobs for why.
           persist-credentials: false
 
       - name: Audit dependencies
@@ -120,10 +117,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
-          # Auth goes in an `http.extraheader` that is removed once the fetch is done,
-          # so no credential is left behind in `.git/config` and `origin` stays a clean
-          # URL. That matters because the SBOM reads `origin` for its VCS reference and
-          # ships inside the wheel — a token there becomes public and permanent.
+          # See the note above the jobs for why.
           persist-credentials: false
 
       - name: Build package

@@ -850,6 +850,67 @@ def test_attestation_action_is_pinned_by_sha(generated_project):
     assert re.fullmatch(r'[0-9a-f]{40}', ref), f'attestation action is pinned to {ref!r}, not a commit SHA'
 
 
+TEMPLATE_WORKFLOWS = REPO_ROOT / 'template' / "{% if git_hosting_service == 'github' %}.github{% endif %}" / 'workflows'
+# `uses: owner/repo@ref  # vX.Y.Z`. Local refs (`uses: ./.github/...`) carry no `@` and are
+# skipped by the pattern, which is correct: they are versioned by the commit being built.
+ACTION_USE = re.compile(r'^\s*-?\s*uses:\s*(?P<action>[^@\s]+)@(?P<ref>\S+)(?:\s+#\s*(?P<comment>.+?))?\s*$')
+
+
+def action_pins(directory):
+    """Return {action: {ref: [where, ...]}} for every third-party `uses:` under `directory`."""
+    pins = {}
+    for path in sorted(directory.glob('*')):
+        if not path.is_file():
+            continue
+        for lineno, line in enumerate(path.read_text(encoding='utf-8').splitlines(), start=1):
+            match = ACTION_USE.match(line)
+            if match:
+                where = f'{path.name}:{lineno}'
+                pins.setdefault(match.group('action'), {}).setdefault(match.group('ref'), []).append(where)
+    return pins
+
+
+def test_generated_actions_are_pinned_to_a_sha_with_a_version_comment(generated_project):
+    """Every third-party action is pinned to a full commit SHA, annotated with its tag.
+
+    A tag is a moving target: `@v6` silently becomes whatever the owner pushes next, inside a
+    job holding the publish credentials. The trailing `# vX.Y.Z` is what makes a 40-character
+    hex string reviewable, so it is required too.
+    """
+    project, cell = generated_project
+    if cell['git_hosting_service'] != 'github':
+        pytest.skip('GitHub-only workflows')
+    for action, refs in action_pins(project / '.github' / 'workflows').items():
+        for ref, places in refs.items():
+            assert re.fullmatch(r'[0-9a-f]{40}', ref), f'{action} pinned to {ref!r} at {places[0]}, not a SHA'
+    for path in sorted((project / '.github' / 'workflows').glob('*')):
+        for lineno, line in enumerate(path.read_text(encoding='utf-8').splitlines(), start=1):
+            match = ACTION_USE.match(line)
+            if match:
+                assert match.group('comment'), f'{path.name}:{lineno} pins {match.group("action")} with no # vX.Y.Z'
+
+
+def test_action_pins_never_drift_apart():
+    """One action, one SHA — across this repository and the template it ships.
+
+    `actions/checkout` alone appears fourteen times. Bumping the copies you happen to grep for
+    and missing the rest is the failure this catches: the result still runs, so nothing else
+    reports it, and the workflows quietly disagree about which version they trust. It also
+    catches the parent moving ahead of the template, which would leave generated projects on
+    an older action indefinitely.
+    """
+    combined = {}
+    for directory in (REPO_ROOT / '.github' / 'workflows', TEMPLATE_WORKFLOWS):
+        for action, refs in action_pins(directory).items():
+            for ref, places in refs.items():
+                combined.setdefault(action, {}).setdefault(ref, []).extend(places)
+    assert combined, 'no pinned actions found; the workflow paths are wrong'
+    for action, refs in combined.items():
+        assert len(refs) == 1, f'{action} is pinned to {len(refs)} different SHAs: ' + '; '.join(
+            f'{ref} at {", ".join(places)}' for ref, places in sorted(refs.items())
+        )
+
+
 def test_publish_job_may_write_attestations(generated_project):
     """Without `attestations: write` the attest step 403s at the end of a release."""
     project, cell = generated_project
