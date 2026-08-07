@@ -1551,10 +1551,26 @@ VENDOR_TREES = ('_CI/lib', 'template/_CI/lib')
 VENDOR_DIRECTORY_ALIASES = {'pip-tools': 'piptools', 'rpds-py': 'rpds', 'typing-extensions': 'typing_extensions'}
 
 
+def source_files(vendor):
+    """Yield the committed files of a vendored tree, skipping bytecode caches.
+
+    Only one of the two trees is ever executed — this repository runs `_CI/lib/vendor`, while
+    the template's copy is only ever copied — so `__pycache__` appears in one and not the
+    other. Comparing them would make the result depend on whether anything had run yet, which
+    is how this passed locally and failed in CI.
+    """
+    return [
+        path
+        for path in vendor.rglob('*')
+        if path.is_file() and '__pycache__' not in path.parts and path.suffix != '.pyc'
+    ]
+
+
 def vendored_packages(lib_directory):
     """Return the importable top-level package directories in a vendored tree."""
     vendor = lib_directory / 'vendor'
-    return {path.name for path in vendor.iterdir() if path.is_dir() and path.name != 'bin'}
+    ignored = {'bin', '__pycache__'}
+    return {path.name for path in vendor.iterdir() if path.is_dir() and path.name not in ignored}
 
 
 def manifest_packages(lib_directory):
@@ -1598,8 +1614,8 @@ def test_both_vendored_trees_are_identical():
     surface as a bug somewhere downstream.
     """
     parent, template = (REPO_ROOT / tree / 'vendor' for tree in VENDOR_TREES)
-    parent_files = {p.relative_to(parent): p.read_bytes() for p in parent.rglob('*') if p.is_file()}
-    template_files = {p.relative_to(template): p.read_bytes() for p in template.rglob('*') if p.is_file()}
+    parent_files = {p.relative_to(parent): p.read_bytes() for p in source_files(parent)}
+    template_files = {p.relative_to(template): p.read_bytes() for p in source_files(template)}
     assert parent_files.keys() == template_files.keys(), (
         f'only in _CI: {sorted(map(str, parent_files.keys() - template_files.keys()))}; '
         f'only in template: {sorted(map(str, template_files.keys() - parent_files.keys()))}'
