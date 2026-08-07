@@ -2,7 +2,14 @@
 name = 'workflow-tooling'
 version = '0.1.0'
 description = 'A vendored version of invoke that can be used to construct portable development workflows with no dependencies other than a recent version of python.'
-requires-python = ">=3.12"
+# The floor of every `min_python_version` choice, not this file's own needs. Ruff resolves
+# *this* config for anything under `_CI/` and infers its Python target from here, but the
+# code in `_CI/tasks/` runs on the project's interpreter, which may be 3.10. Claiming 3.12
+# made ruff offer fixes that break those projects: dropping the `sys.version_info >= (3, 11)`
+# tomli fallback as dead code (UP036), and rewriting `timezone.utc` to the 3.11-only
+# `datetime.UTC` (UP017). Stating the floor means a suggestion is never newer than the
+# oldest interpreter the generated tooling can run on.
+requires-python = ">=3.10"
 
 [build-system]
 requires = ['setuptools', 'wheel']

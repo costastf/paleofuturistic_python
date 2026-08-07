@@ -20,6 +20,7 @@ import re
 import stat
 from datetime import date
 from pathlib import Path
+from types import ModuleType
 
 LICENSES_DIR = Path('licenses')
 WORKFLOW_CMD = Path('workflow.cmd')
@@ -74,7 +75,7 @@ def stamp_dependency_quarantine_date() -> None:
         PYPROJECT.write_text(updated, encoding='utf-8')
 
 
-def load_uv_release():
+def load_uv_release() -> ModuleType | None:
     """Import the template's `_CI/uv_release.py` by path, or return None if unavailable.
 
     Stdlib-only by design, so importing it here — before the project has an environment — is
@@ -148,14 +149,17 @@ def stamp_uv_version() -> None:
         print(f'  this crosses a minor version ({pinned} → {target}); uv is pre-1.0, so behaviour may differ.')
 
 
-def make_workflow_cmd_executable():
+def make_workflow_cmd_executable() -> None:
     """Set the executable bit on workflow.cmd so the Unix launcher works."""
     if WORKFLOW_CMD.exists():
-        mode = os.stat(WORKFLOW_CMD).st_mode
-        os.chmod(WORKFLOW_CMD, mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+        mode = WORKFLOW_CMD.stat().st_mode
+        # Execute bits only, added to whatever the file already had: `./workflow.cmd` is the
+        # entry point every user and CI job runs, so it has to be runnable by all of them.
+        WORKFLOW_CMD.chmod(mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
 
 
-def main():
+def main() -> None:
+    """Run the copier post-generation tasks in the order the lock step depends on."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--license', required=True)
     parser.add_argument('--author', required=True)
