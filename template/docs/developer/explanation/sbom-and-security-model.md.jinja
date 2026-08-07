@@ -95,6 +95,19 @@ Without DT, only what `pip-audit` reported at the moment it ran is visible. With
 
 See [Upload an SBOM to Dependency Track](../how-to/upload-an-sbom-to-dependency-track.md) for the wiring.
 {% endif %}
+{% if git_hosting_service == 'github' %}
+## Layer 4 — build provenance
+
+The SBOM says what is *inside* your artifact. Provenance says where it *came from* — and unlike the SBOM, it is not self-reported. `actions/attest-build-provenance` signs a statement binding the exact file digests to the workflow, commit and runner that produced them, and that signature chains to GitHub's Sigstore instance rather than to anything this project controls. A forged SBOM is a text edit; a forged attestation is not.
+
+Anyone who downloads a release can verify it:
+
+```bash
+gh attestation verify {{ project_slug }}-<version>-py3-none-any.whl --repo <owner>/<repo>
+```
+
+Order matters in the publish job: `release.dist` builds into `dist/`, the attestation is taken over those files, and `release.publish --prebuilt` uploads them *without* rebuilding. If you change that sequence so the artifacts are rebuilt after being attested, you will publish files no attestation refers to, and verification will fail — reading as tampering rather than as a fresh build.
+{% endif %}
 ## What about overrides?
 
 `.security-overrides` is a project-local allow-list with mandatory expiry dates. It applies to `pip-audit`. It does **not** suppress findings in the SBOM{% if integrate_dependency_track %} or in Dependency Track{% endif %} — those continue to show the world the full truth. Override = "we accept this locally for now," not "make this invisible."

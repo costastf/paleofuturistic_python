@@ -135,9 +135,30 @@ def push(context: Context) -> None:
 
 
 @task
+@logged('release.dist')
+def dist(context: Context) -> None:
+    """Clean and build the distribution artifacts, leaving them in ``dist/``.
+
+    Split out of ``publish`` so a caller can do something with the artifacts *between*
+    building and uploading them — CI attests their provenance there. Anything that inspects
+    ``dist/`` must run against the exact files that get published, which is why ``publish
+    --prebuilt`` exists rather than simply building a second time.
+    """
+    clean(context)
+    build(context)
+
+
+@task
 @logged('release.publish')
-def publish(context: Context) -> None:
-    """Build, publish, and upload SBOM — the full post-release publishing pipeline."""
+def publish(context: Context, prebuilt: bool = False) -> None:
+    """Build, publish, and upload SBOM — the full post-release publishing pipeline.
+
+    Args:
+        context: Invoke context.
+        prebuilt: Publish what is already in ``dist/`` instead of rebuilding. Set this when an
+            earlier step ran ``release.dist`` and acted on those artifacts — rebuilding would
+            upload files that no attestation, checksum or signature refers to.
+    """
     if all(os.environ.get(var) for var in OIDC_ENV_VARS):
         print('PyPI trusted publishing (OIDC) detected — skipping legacy credential check.')
         # GH Actions injects `secrets.UV_PUBLISH_*` as empty strings when the
@@ -162,8 +183,11 @@ def publish(context: Context) -> None:
         print(f'Missing Dependency Track environment variables: {", ".join(missing_dtrack)}.')
         raise SystemExit(1)
 {%- endif %}
-    clean(context)
-    build(context)
+    if not prebuilt:
+        dist(context)
+    elif not any(Path('dist').glob('*')):
+        print('--prebuilt was given but dist/ is empty; run `./workflow.cmd release.dist` first.')
+        raise SystemExit(1)
     execute(context, 'uv publish')
 {%- if integrate_dependency_track %}
     sbom_upload(context)
@@ -335,5 +359,6 @@ namespace.add_task(cast(Task, validate))
 namespace.add_task(cast(Task, bump))
 namespace.add_task(cast(Task, changelog))
 namespace.add_task(cast(Task, push))
+namespace.add_task(cast(Task, dist))
 namespace.add_task(cast(Task, publish))
 namespace.add_task(cast(Task, clean))

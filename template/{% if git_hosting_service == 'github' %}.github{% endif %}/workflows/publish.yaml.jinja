@@ -91,6 +91,10 @@ jobs:
       # `packages: read` ghcr returns 403 on the manifest HEAD request.
       # `read` only — `build-deps-image` is the job that publishes.
       packages: read
+      # Lets `attest-build-provenance` record the attestation against this repository.
+      # It also needs `id-token: write` above to sign, which Trusted Publishing already
+      # requires — so provenance costs exactly this one extra scope.
+      attestations: write
     container:
       {#- Escape curly braces for Copier. -#}
       {%- raw %}
@@ -114,6 +118,20 @@ jobs:
           persist-credentials: false
         {%- endraw %}
 
+      - name: Build distribution
+        run: ./workflow.cmd release.dist
+
+      # Signs a provenance statement binding these exact files to this workflow, commit and
+      # runner, so a consumer can verify where the wheel on PyPI came from:
+      #   gh attestation verify <file> --repo <owner>/<repo>
+      # It must sit between building and publishing, and `release.publish --prebuilt` below
+      # must not rebuild — attesting one set of files and uploading another would produce an
+      # attestation that verifies nothing.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-path: dist/*
+
       - name: Publish package and upload SBOM
         env:
           {#- Escape curly braces for Copier. -#}
@@ -128,4 +146,4 @@ jobs:
           OWASP_DTRACK_API_KEY: ${{ secrets.OWASP_DTRACK_API_KEY }}
           {%- endraw %}
           {%- endif %}
-        run: ./workflow.cmd release.publish
+        run: ./workflow.cmd release.publish --prebuilt
