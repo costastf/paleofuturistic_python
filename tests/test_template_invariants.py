@@ -441,6 +441,43 @@ def test_qa_steps_include_the_security_audit():
     assert QA_STEPS.index('secure.audit') < QA_STEPS.index('test.tox')
 
 
+def workflow_run_scripts(workflow):
+    """Yield every `run:` script in a parsed GitHub workflow, with a `job/step` label."""
+    for job_name, job in (workflow.get('jobs') or {}).items():
+        for index, step in enumerate(job.get('steps') or []):
+            script = step.get('run')
+            if script:
+                yield f'{job_name}/step{index}', script
+
+
+def test_this_repo_runs_tasks_only_through_the_launcher():
+    """No pipeline step assembles its own invoke call; every task goes through `./workflow.cmd`.
+
+    A hand-built `uvx --from invoke --with … invoke --search-root _CI` runs a *different*
+    invoke from the one developers use: unpinned, and without the vendored copy's
+    search-root patch, which is the only reason such a step needs `PYTHONPATH`. Its `--with`
+    list is maintained by hand too, and once left `main` red because `configuration.py`
+    imports yaml and the list had no pyyaml.
+    """
+    for path in sorted((REPO_ROOT / '.github' / 'workflows').glob('*.yaml')):
+        workflow = yaml.safe_load(path.read_text(encoding='utf-8'))
+        for label, script in workflow_run_scripts(workflow):
+            assert '--from invoke' not in script, f'{path.name}:{label} installs invoke itself'
+            assert '--search-root' not in script, f'{path.name}:{label} calls invoke directly'
+
+
+def test_the_launcher_stays_executable():
+    """`./workflow.cmd` is committed with its executable bit, or every pipeline step 126s."""
+    mode = subprocess.run(
+        ['git', 'ls-files', '--stage', 'workflow.cmd'],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split()[0]
+    assert mode == '100755', f'workflow.cmd is committed as {mode}, not executable'
+
+
 def test_documented_override_format_is_actually_accepted(generated_project):
     """Every `.security-overrides` example in the docs parses as a real entry.
 

@@ -26,10 +26,13 @@ jobs:
         with:
           version: ${{ steps.uv-pin.outputs.version }}
       - id: gen
-        env:
-          PYTHONPATH: .
+        # Tasks run through `./workflow.cmd`, never a hand-assembled invoke invocation. The
+        # launcher uses the vendored invoke, which is patched to put the search root on
+        # `sys.path` — so no `PYTHONPATH` is needed — and `uv run` supplies the task
+        # dependencies (pyyaml lives in the `dev` group) instead of a `--with` list that has
+        # to be kept in step by hand. It also means CI runs the same invoke developers do.
         run: |
-          matrix=$(uvx --from invoke --with coloredlogs --with pyyaml invoke --search-root _CI test.list-combos --as-json)
+          matrix=$(./workflow.cmd test.list-combos --as-json)
           echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
 
   invariants:
@@ -40,9 +43,7 @@ jobs:
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
         with:
           version: ${{ needs.plan.outputs.uv-version }}
-      - env:
-          PYTHONPATH: .
-        run: uvx --from invoke --with coloredlogs --with pyyaml invoke --search-root _CI test.invariants
+      - run: ./workflow.cmd test.invariants
 
   run:
     needs: plan
@@ -57,10 +58,8 @@ jobs:
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
         with:
           version: ${{ needs.plan.outputs.uv-version }}
-      - env:
-          PYTHONPATH: .
-        run: |
-          uvx --from invoke --with coloredlogs --with pyyaml invoke --search-root _CI test.combo \
+      - run: |
+          ./workflow.cmd test.combo \
             --git-hosting-service ${{ matrix.combo.git_hosting_service }} \
             ${{ matrix.combo.integrate_dependency_track && '' || '--no-integrate-dependency-track' }} \
             ${{ matrix.combo.integrate_pages && '' || '--no-integrate-pages' }}
