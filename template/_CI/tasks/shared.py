@@ -3,6 +3,7 @@
 import json
 import os
 import platform
+import re
 import shutil
 import sys
 from collections.abc import Callable, Iterator
@@ -23,6 +24,13 @@ class PipelineComponent(NamedTuple):
     purl: str
 
 
+class RemoteRef(NamedTuple):
+    """The host and project path parsed out of a git remote, with credentials removed."""
+
+    host: str
+    path: str
+
+
 for _stream in (sys.stdout, sys.stderr):
     reconfigure = getattr(_stream, 'reconfigure', None)
     if reconfigure is not None:
@@ -31,6 +39,15 @@ for _stream in (sys.stdout, sys.stderr):
 
 INDENT = '    '
 DEPTH: ContextVar[int] = ContextVar('logged_depth', default=0)
+
+# The two shapes git writes into `origin`. Tried in order; the scp form has no scheme, so it
+# must be matched before the URL form or `git@host:group/proj` reads as scheme-less nonsense.
+REMOTE_PATTERNS = (
+    re.compile(r'^[^@/]+@(?P<host>[^:/]+):(?P<path>.+?)(?:\.git)?/?$'),
+    re.compile(
+        r'^(?P<scheme>https?|ssh|git)://(?:[^@/]+@)?(?P<host>[^/:]+)(?::(?P<port>\d+))?/(?P<path>.+?)(?:\.git)?/?$'
+    ),
+)
 
 OPEN_COMMAND = {
     'linux': 'xdg-open',
@@ -119,6 +136,32 @@ def strip_credentials(url: str) -> str:
     host = parts.hostname or ''
     netloc = f'{host}:{parts.port}' if parts.port else host
     return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
+
+
+def parse_remote_url(url: str) -> RemoteRef:
+    """Split a git remote into its host and project path, credentials removed.
+
+    Handles the two forms git writes: the scp-style ``git@host:group/project.git`` and the
+    URL style ``https://host[:port]/group/project.git`` (also ``ssh://`` and ``git://``). The
+    trailing ``.git`` and any trailing slash are dropped, and the path keeps every segment, so
+    a nested GitLab group survives intact.
+
+    Returns empty strings when the remote cannot be parsed, which callers treat as "no host
+    known" rather than falling back to a guess.
+    """
+    text = strip_credentials(url.strip())
+    for pattern in REMOTE_PATTERNS:
+        match = pattern.match(text)
+        if not match:
+            continue
+        groups = match.groupdict()
+        host = groups['host']
+        # An explicit port is kept only for http(s). An ssh port (``ssh://host:2222/…``) means
+        # nothing to a browser, and carrying it into a web URL would produce a dead link.
+        if groups.get('scheme') in {'http', 'https'} and groups.get('port'):
+            host = f'{host}:{groups["port"]}'
+        return RemoteRef(host=host, path=groups['path'])
+    return RemoteRef(host='', path='')
 
 
 def get_operating_system() -> str:
