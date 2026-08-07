@@ -32,7 +32,7 @@ dev = [
     {include-group = "test"},
 ]
 develop = [
-    "pre-commit==4.6.0",
+    "pre-commit==4.6.1",
     # TOML parsing for the _CI tooling on Python < 3.11, which has no stdlib
     # `tomllib`. Imported via a version-guarded fallback in _CI/info.py,
     # _CI/tasks/sbom.py and _CI/tasks/test.py.
@@ -45,20 +45,24 @@ document = [
     "mkdocstrings[python]==1.0.6",
 ]
 lint = [
-    "commitizen==4.16.5",
-    "complexipy==6.1.0",
+    "commitizen==4.17.0",
+    "complexipy==6.2.0",
     "pylint==4.0.6",
-    # Newest version clearing the [tool.uv] exclude-newer boundary.
+    # Held below the exclude-newer boundary, unlike every other pin here. ruff 0.16 reports
+    # 18 findings on a freshly generated project where 0.15.22 reports none, because it lints
+    # `_CI/` against `_CI/pyproject.toml`, which declares `requires-python = ">=3.12"` while
+    # the project itself may target 3.10. Two of those findings (UP036 on the tomli fallback,
+    # UP017 on `datetime.UTC`) would break generated projects on 3.10 if applied. Fixing the
+    # python-target mismatch is a separate change; see the ruff-0.16 migration issue.
     "ruff==0.15.22",
-    # ty 0.0.60+ can no longer see through cyclonedx-python-lib's serializable
-    # decorator and reports ~150 false positives in _CI/tasks/sbom.py.
-    "ty==0.0.59",
+    # Newest version clearing the [tool.uv] exclude-newer boundary.
+    "ty==0.0.69",
 ]
 quality = [
-    "pyscn==1.26.4",
+    "pyscn==1.29.0",
 ]
 security = [
-    "cyclonedx-bom==7.3.0",
+    "cyclonedx-bom==7.3.1",
     "cyclonedx-python-lib[json-validation]==11.11.0",
     "pip-audit==2.10.1",
 ]
@@ -220,6 +224,30 @@ docstring-quotes = "double"
 [tool.ty.environment]
 extra-paths = ["_CI/lib/vendor"]
 
+# py-serializable annotates its class decorator as returning
+# `Intersection[Type[_T], Type[_JsonSerializable], Type[_XmlSerializable]]`, but PEP
+# intersection types do not exist, so it does `from typing import Union as Intersection`
+# — its own documented stopgap. The annotation therefore declares a *union*, and calling a
+# union whose members include two argument-less mixins is genuinely unsound. ty reports
+# exactly what is written; the annotation is what is wrong, not the checker.
+#
+# Older ty resolved those mixins as `@Todo` and checked nothing here, which is why this
+# surfaced as a "regression" when ty gained the ability to model them. Silencing the four
+# affected rules costs less than the alternative of freezing ty, which left every
+# cyclonedx constructor call in this module unchecked instead.
+#
+# Scoped to the one module that touches those classes. Every other rule still applies
+# there — an `invalid-assignment` in this file is still an error.
+# Revisit when py-serializable can express an intersection or ships stubs.
+[[tool.ty.overrides]]
+include = ["_CI/tasks/sbom.py"]
+
+[tool.ty.overrides.rules]
+unknown-argument = "ignore"
+unresolved-attribute = "ignore"
+too-many-positional-arguments = "ignore"
+invalid-argument-type = "ignore"
+
 [tool.pylint.MASTER]
 init-hook = "import sys; sys.path.append('src/'); sys.path.append('_CI/lib/vendor/')"
 
@@ -319,7 +347,7 @@ required-version = "==0.11.30"
 # disagree. See docs/developer/reference/dependency-groups.md for the flow.
 #
 # (The literal below is only a fallback; `tasks_render.py` overwrites it at generation.)
-exclude-newer = "2026-07-27"
+exclude-newer = "2026-08-07"
 
 [tool.tox]
 requires = ["tox>=4.21", "tox-uv>=1.16"]

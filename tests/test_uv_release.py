@@ -6,14 +6,14 @@ projects and is imported here from the same file — one implementation, one set
 """
 
 import importlib.util
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-NOW = datetime(2026, 8, 4, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 8, 4, 12, 0, tzinfo=UTC)
 
 
 def load_module():
@@ -27,6 +27,7 @@ def load_module():
 
 @pytest.fixture
 def uv_release():
+    """Load the stdlib-only uv-release resolver once per test."""
     return load_module()
 
 
@@ -46,6 +47,7 @@ def with_releases(uv_release, monkeypatch, releases):
 
 
 def test_picks_the_newest_release_past_the_cooldown(uv_release, monkeypatch):
+    """The newest release old enough to have soaked wins, not simply the newest."""
     with_releases(
         uv_release,
         monkeypatch,
@@ -131,6 +133,7 @@ def test_earliest_upload_dates_a_release(uv_release, monkeypatch):
 
 
 def test_nothing_eligible_raises(uv_release, monkeypatch):
+    """With every release inside the cooldown there is no safe answer, so it raises."""
     with_releases(uv_release, monkeypatch, {'0.12.0': NOW - timedelta(days=1)})
     with pytest.raises(uv_release.UvReleaseError, match='older than 7 days'):
         uv_release.latest_eligible(now=NOW)
@@ -158,11 +161,12 @@ def test_unusable_payloads_raise(uv_release, monkeypatch, releases):
     ],
 )
 def test_crosses_minor(uv_release, current, candidate, expected):
-    """uv is pre-1.0, so a minor bump is the one that warrants a warning."""
+    """Uv is pre-1.0, so a minor bump is the one that warrants a warning."""
     assert uv_release.crosses_minor(current, candidate) is expected
 
 
 def test_current_pin_requires_an_exact_pin(uv_release):
+    """A range pin is rejected: bumping only makes sense against an exact current value."""
     assert uv_release.current_pin('required-version = "==0.11.30"\n') == '0.11.30'
     with pytest.raises(uv_release.UvReleaseError, match='exact'):
         uv_release.current_pin('required-version = ">=0.11.30"\n')

@@ -23,7 +23,7 @@ required-version = "==0.11.30"
 # This is the template repository's own boundary, maintained by hand. Generated projects
 # get theirs stamped with their generation date by tasks_render.py, so a project created
 # later does not inherit a boundary that has receded into the past.
-exclude-newer = "2026-07-27"
+exclude-newer = "2026-08-07"
 
 [dependency-groups]
 # PyYAML parses copier.yml in _CI.tasks.configuration.base_context; the `dev` group is
@@ -34,6 +34,59 @@ dev = [
 test = [
     "pytest",
 ]
+# Pinned to the same ruff the template pins, so this repository and the projects it
+# generates are judged by one version. Bump both together.
+lint = [
+    "ruff==0.15.22",
+]
+
+# Mirrors the rule set generated projects get, so the repository that defines the standard is
+# held to it. `_CI/tasks/` keeps its own lighter config in `_CI/pyproject.toml`, exactly as a
+# generated project's does — ruff resolves the nearest config, so this block governs
+# `tasks_render.py` and `tests/` only.
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+exclude = ["_CI/lib"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "D203",    # one-blank-line-before-class (conflicts with D211)
+    "D213",    # multi-line-summary-second-line (conflicts with D212)
+    "CPY001",  # missing-copyright-notice
+    "COM812",  # missing-trailing-comma (conflicts with formatter)
+    "Q000",    # bad-quotes-inline-string (conflicts with format.quote-style)
+    "Q003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The first four match the template's own `tests/*.py` exemptions.
+"tests/*.py" = [
+    "S101",
+    "S311",
+    "RUF012",
+    "PLR2004",
+    # Deliberate divergence from generated projects, whose tests are annotated: these are
+    # pytest functions taking fixtures and returning None. Annotating ~265 of them adds
+    # churn without catching anything, and the fixture types are the least interesting
+    # signatures in the repository.
+    "ANN001",
+    "ANN201",
+    "ANN202",
+    # The suite drives `git`, `uvx` and `./workflow.cmd` by name on purpose; resolving
+    # absolute paths for them would test something other than what users run.
+    "S603",
+    "S607",
+]
+# A copier task: its stdout is the user-facing output of generation, not stray debugging.
+"tasks_render.py" = ["T201"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+quote-style = "single"
 
 [tool.properdocs]
 version = "1.6.7"

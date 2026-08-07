@@ -8,6 +8,9 @@ from _CI.tasks.document import build as document_build
 from _CI.tasks.document import deploy_github as document_deploy_github
 from _CI.tasks.document import document
 from _CI.tasks.document import view as document_view
+from _CI.tasks.lint import format_ as lint_format
+from _CI.tasks.lint import lint
+from _CI.tasks.lint import ruff as lint_ruff
 from _CI.tasks.maintain import bump_uv
 from _CI.tasks.test import combo, invariants, list_combos, matrix, test
 
@@ -30,7 +33,13 @@ document_collection.add_task(document_deploy_github, name='deploy-github')
 maintain_collection = Collection('maintain')
 maintain_collection.add_task(bump_uv, name='bump-uv')
 
+lint_collection = Collection('lint')
+lint_collection.add_task(lint, default=True, name='all')
+lint_collection.add_task(lint_ruff, name='ruff')
+lint_collection.add_task(lint_format, name='format')
+
 namespace = Collection()
 namespace.add_collection(test_collection)
 namespace.add_collection(document_collection)
 namespace.add_collection(maintain_collection)
+namespace.add_collection(lint_collection)

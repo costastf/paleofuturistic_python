@@ -35,6 +35,18 @@ jobs:
           matrix=$(./workflow.cmd test.list-combos --as-json)
           echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
 
+  # The repository that defines the standard is held to it too. Nothing linted this repo
+  # until this job existed, while every project it generates shipped a full lint gate.
+  lint:
+    needs: plan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+        with:
+          version: ${{ needs.plan.outputs.uv-version }}
+      - run: ./workflow.cmd lint
+
   invariants:
     needs: plan
     runs-on: ubuntu-latest

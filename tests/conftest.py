@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+
 # Mirror the sys.path layout the workflow.cmd launcher sets up so the test
 # suite can import _CI.tasks.* (which pulls vendored libs at module load).
 # The vendored libs cross-reference each other via ``lib.vendor.<x>``, so we
@@ -18,7 +19,8 @@ def find_repo_root() -> Path:
     for candidate in Path(__file__).resolve().parents:
         if (candidate / '_CI').is_dir():
             return candidate
-    raise RuntimeError("Could not locate repo root: no '_CI/' found above conftest.py")
+    message = "Could not locate repo root: no '_CI/' found above conftest.py"
+    raise RuntimeError(message)
 
 
 REPO_ROOT = find_repo_root()
@@ -26,7 +28,14 @@ sys.path.insert(0, str(REPO_ROOT / '_CI' / 'lib' / 'vendor'))
 sys.path.insert(0, str(REPO_ROOT / '_CI'))
 sys.path.insert(0, str(REPO_ROOT))
 
-from _CI.tasks.configuration import IGNORE_PATTERNS, PROJECT_SLUG, combo_context, generation_env, matrix_combos
+# E402: the sys.path wiring above has to run first — this import is what it exists for.
+from _CI.tasks.configuration import (  # noqa: E402
+    IGNORE_PATTERNS,
+    PROJECT_SLUG,
+    combo_context,
+    generation_env,
+    matrix_combos,
+)
 
 
 @pytest.fixture(scope='session')

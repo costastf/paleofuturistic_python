@@ -26,7 +26,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # conftest.py wires sys.path so _CI.tasks.* is importable; pytest loads it
 # before this module, which is why no path setup is needed here.
-from _CI.tasks.configuration import PROJECT_SLUG, UV_VERSION_ENV, generation_env, template_uv_version
+from _CI.tasks.configuration import (  # noqa: E402
+    PROJECT_SLUG,
+    UV_VERSION_ENV,
+    generation_env,
+    template_uv_version,
+)
 
 
 def test_host_scaffolding_present(generated_project):
@@ -77,6 +82,56 @@ def test_pyproject_is_valid_toml(generated_project):
     data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
     assert data['project']['name']
     assert 'dependency-groups' in data
+
+
+# Rules switched off for `_CI/tasks/sbom.py` because py-serializable annotates an
+# intersection as a union. They are the rules most likely to catch a real bug, so the
+# scoping is the whole point — see the comment beside the override in the template.
+UNION_WORKAROUND_RULES = {
+    'unknown-argument',
+    'unresolved-attribute',
+    'too-many-positional-arguments',
+    'invalid-argument-type',
+}
+
+
+def test_ty_suppressions_stay_scoped_to_one_module(generated_project):
+    """The py-serializable workaround must never become a project-wide rule change.
+
+    Moving these four rules to `[tool.ty.rules]` would silence them everywhere and look
+    like a tidy-up in review, while quietly removing the checks most likely to catch a real
+    call-signature bug across the whole project.
+    """
+    project, _ = generated_project
+    ty_config = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))['tool']['ty']
+    disabled_globally = UNION_WORKAROUND_RULES & set(ty_config.get('rules', {}))
+    assert not disabled_globally, f'ty rules disabled project-wide: {sorted(disabled_globally)}'
+    overrides = ty_config.get('overrides', [])
+    assert overrides, 'no scoped ty override; the sbom.py workaround has gone missing'
+    for override in overrides:
+        assert override.get('include'), 'a ty override applies to every file, defeating the scoping'
+
+
+def python_floor(pyproject):
+    """Return the `requires-python` lower bound of a pyproject as a (major, minor) tuple."""
+    spec = tomllib.loads(pyproject.read_text(encoding='utf-8'))['project']['requires-python']
+    match = re.search(r'>=\s*(\d+)\.(\d+)', spec)
+    assert match, f'{pyproject} has no >= lower bound: {spec!r}'
+    return int(match.group(1)), int(match.group(2))
+
+
+def test_ci_tooling_never_claims_a_newer_python_than_the_project(generated_project):
+    """`_CI/pyproject.toml` must not require a newer Python than the project itself.
+
+    Ruff resolves that file for everything under `_CI/` and infers its Python target from
+    it, but `_CI/tasks/*` runs on the *project's* interpreter. When it claimed 3.12 against a
+    3.10 project, ruff offered fixes that would break the generated project at runtime —
+    deleting the tomli fallback (UP036) and using the 3.11-only `datetime.UTC` (UP017).
+    """
+    project, _ = generated_project
+    assert python_floor(project / '_CI' / 'pyproject.toml') <= python_floor(project / 'pyproject.toml'), (
+        '_CI tooling is linted against a newer Python than the project supports'
+    )
 
 
 def test_workflow_cmd_is_executable(generated_project):
@@ -318,7 +373,8 @@ def test_gitlab_release_mr_is_implemented(generated_project):
     func = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == 'create_release_pr')
     body = ast.unparse(func)
     assert 'not yet implemented' not in body, 'create_release_pr is still a stub'
-    assert '/api/v4/projects/' in body and 'merge_requests' in body, 'no call to the merge-requests API'
+    assert '/api/v4/projects/' in body, 'no call to the projects API'
+    assert 'merge_requests' in body, 'no call to the merge-requests endpoint'
     assert 'GITLAB_TOKEN' in body, 'no documented token is read'
     assert "quote(origin.path, safe='')" in body, 'the project path is not URL-encoded'
 
@@ -336,16 +392,19 @@ class StubContext:
     `git commit --no-gpg-sign` contains `git commit`.
     """
 
-    def __init__(self, responses):
+    def __init__(self, responses) -> None:
+        """Store the ordered `(fragment, result)` pairs this context will answer with."""
         self.responses = responses
         self.commands = []
 
-    def run(self, cmd, **_kwargs):
+    def run(self, cmd, **_kwargs: object):
+        """Record `cmd` and return the canned result for the first matching fragment."""
         self.commands.append(cmd)
         for fragment, result in self.responses:
             if fragment in cmd:
                 return result
-        raise AssertionError(f'unexpected command: {cmd!r}')
+        message = f'unexpected command: {cmd!r}'
+        raise AssertionError(message)
 
 
 # Real `git commit` stderr, captured from git 2.x. The ssh case is used deliberately: it
@@ -467,7 +526,8 @@ def test_gitlab_deps_job_matches_the_python_tag_algorithm(generated_project):
     deps_job = pipeline.split('build-deps-image:', 1)[1].split('\nlint:', 1)[0]
     for required in ('uv.lock', 'Dockerfile.deps', 'BASE_IMAGE'):
         assert required in deps_job, f'GitLab deps job does not hash {required}'
-    assert 'sha256sum uv.lock' in deps_job and 'sha256sum Dockerfile.deps' in deps_job
+    assert 'sha256sum uv.lock' in deps_job, 'the deps tag does not hash the lockfile'
+    assert 'sha256sum Dockerfile.deps' in deps_job, 'the deps tag does not hash the Dockerfile'
     assert 'cut -c1-16' not in deps_job, 'GitLab deps job still uses the old 64-bit lockfile-only tag'
     assert '--digest-file' in deps_job, 'GitLab deps job does not capture the pushed digest'
     assert 'DEPS_IMAGE=${CI_REGISTRY_IMAGE}@${DIGEST}' in deps_job, 'DEPS_IMAGE is not digest-pinned'
@@ -514,7 +574,8 @@ def test_scheduled_security_audit_ships_for_github(generated_project):
         assert not workflow.exists()
         return
     content = workflow.read_text(encoding='utf-8')
-    assert 'schedule:' in content and 'cron:' in content
+    assert 'schedule:' in content, 'the audit is not scheduled'
+    assert 'cron:' in content, 'the schedule has no cron expression'
     assert 'workflow_dispatch:' in content, 'no way to trigger the audit on demand'
     assert 'secure.audit' in content
     config = yaml.safe_load(content)
@@ -529,7 +590,7 @@ def test_qa_steps_include_the_security_audit():
     The matrix runner already exports `<PROJECT>_SECURITY_OVERRIDE` for this step; until
     it was listed here that plumbing fed nothing.
     """
-    from _CI.tasks.configuration import QA_STEPS
+    from _CI.tasks.configuration import QA_STEPS  # noqa: PLC0415
 
     assert 'secure.audit' in QA_STEPS
     # Fail fast: audit before the slow tox matrix.
@@ -739,9 +800,7 @@ def test_every_github_job_declares_least_privilege_permissions(generated_project
             signing_scopes = ('id-token', 'attestations')
             if job_name not in ('build-deps-image', 'deploy'):
                 writes = [
-                    scope
-                    for scope, level in declared.items()
-                    if level == 'write' and scope not in signing_scopes
+                    scope for scope, level in declared.items() if level == 'write' and scope not in signing_scopes
                 ]
                 assert not writes, f'{name}:{job_name} asks for write scopes {writes}'
 
@@ -842,11 +901,13 @@ def test_gitlab_credentials_are_environment_scoped(generated_project):
 class RecordingContext:
     """Minimal stand-in for an Invoke context that records commands instead of running them."""
 
-    def __init__(self, stdout_for=None):
+    def __init__(self, stdout_for=None) -> None:
+        """Optionally map command prefixes to the stdout each should return."""
         self.commands = []
         self.stdout_for = stdout_for or {}
 
-    def run(self, cmd, **_kwargs):
+    def run(self, cmd, **_kwargs: object):
+        """Record `cmd` and return canned stdout when a prefix matches."""
         self.commands.append(cmd)
         for prefix, stdout in self.stdout_for.items():
             if cmd.startswith(prefix):
@@ -910,7 +971,8 @@ def test_open_target_degrades_when_wsl_interop_is_disabled(generated_project):
     """A distro with interop off gets a message, not a traceback or a failed task."""
     project, _ = generated_project
     ran, executed = opener(project, 'wsl', interop=False)
-    assert ran == [] and executed == []
+    assert ran == [], f'unexpected run() calls: {ran}'
+    assert executed == [], f'unexpected execute() calls: {executed}'
 
 
 def test_no_task_still_depends_on_wslu(generated_project):
@@ -948,7 +1010,8 @@ def test_generated_quarantine_date_is_stamped_not_inherited(generated_project):
         tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))['tool']['uv']['exclude-newer']
     )
     # A day of slack absorbs a suite running across midnight; a missed stamp is far staler.
-    assert abs((date.today() - stamped).days) <= 1, f'quarantine date {stamped} was not stamped at generation'
+    today = date.today()  # noqa: DTZ011 - compared against a stamped calendar date
+    assert abs((today - stamped).days) <= 1, f'quarantine date {stamped} was not stamped at generation'
 
 
 def test_base_image_is_pinned_by_digest(generated_project):
@@ -965,7 +1028,8 @@ def test_base_image_is_pinned_by_digest(generated_project):
     base = images['base-image']
     assert '@sha256:' in base, f'base image not pinned by digest: {base}'
     assert f'python{minimum}-trixie-slim@' in base, f'tag does not match requires-python {minimum}: {base}'
-    assert set(images) == {'base-image'}, f'unused image references reintroduced: {sorted(set(images) - {"base-image"})}'
+    extra = sorted(set(images) - {'base-image'})
+    assert set(images) == {'base-image'}, f'unused image references reintroduced: {extra}'
 
 
 def test_generated_project_ships_a_lockfile(generated_project):
@@ -992,7 +1056,8 @@ def uv_pins(project):
     """
     data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
     base = data['tool']['docker-versions']['base-image']
-    locked = {p['name']: p['version'] for p in tomllib.loads((project / 'uv.lock').read_text(encoding='utf-8'))['package']}
+    lock_data = tomllib.loads((project / 'uv.lock').read_text(encoding='utf-8'))
+    locked = {p['name']: p['version'] for p in lock_data['package']}
     return {
         'required-version': data['tool']['uv']['required-version'].removeprefix('=='),
         'test group': next(d for d in data['dependency-groups']['test'] if d.startswith('uv==')).removeprefix('uv=='),
@@ -1103,7 +1168,8 @@ def test_lockfile_agrees_with_the_pinned_uv(generated_project):
     project, _ = generated_project
     data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
     required = data['tool']['uv']['required-version'].removeprefix('==')
-    locked = {p['name']: p['version'] for p in tomllib.loads((project / 'uv.lock').read_text(encoding='utf-8'))['package']}
+    lock_data = tomllib.loads((project / 'uv.lock').read_text(encoding='utf-8'))
+    locked = {p['name']: p['version'] for p in lock_data['package']}
     assert locked.get('uv') == required, f'lock pins uv {locked.get("uv")}, pyproject requires {required}'
 
 
@@ -1142,7 +1208,8 @@ def test_no_commit_stage_hook_rewrites_tracked_files(generated_project):
         if 'pre-commit' not in (hook.get('stages') or ['pre-commit']):
             continue
         invoked = hook['entry'].removeprefix('./workflow.cmd').strip()
-        assert invoked not in mutating, f'commit-stage hook {hook["id"]!r} runs {invoked!r}, which rewrites tracked files'
+        hook_id = hook['id']
+        assert invoked not in mutating, f'commit-stage hook {hook_id!r} runs {invoked!r}, which rewrites files'
 
 
 def test_per_file_hooks_check_only_staged_files(generated_project):
@@ -1161,7 +1228,7 @@ def test_per_file_hooks_check_only_staged_files(generated_project):
 
 
 def test_whole_program_checks_are_not_scoped_to_staged_files(generated_project):
-    """ty and pyscn keep seeing the whole project, because a per-file view answers wrongly.
+    """Ty and pyscn keep seeing the whole project, because a per-file view answers wrongly.
 
     ty: a changed signature fails in the *callers*, which a narrowed run never looks at.
     pyscn: dead code and duplicate blocks are relationships between files.
@@ -1224,7 +1291,7 @@ def test_local_task_module_ships_with_a_namespace(generated_project):
     assert "Collection('local')" in source, 'local.py defines no namespace for __init__ to pick up'
 
 
-def test_local_task_module_is_protected_from_updates(generated_project):
+def test_local_task_module_is_protected_from_updates():
     """`local.py` is in `_skip_if_exists`, without which the seam is pointless.
 
     The whole reason it exists is that template-owned modules are replaced on
@@ -1244,7 +1311,8 @@ def test_local_tasks_need_no_registration(generated_project):
     """
     project, _ = generated_project
     init = (project / '_CI' / 'tasks' / '__init__.py').read_text(encoding='utf-8')
-    assert 'LOCAL_MODULE' in init and 'is_file()' in init, 'local.py is not conditionally discovered'
+    assert 'LOCAL_MODULE' in init, 'local.py is not referenced by __init__'
+    assert 'is_file()' in init, 'local.py is imported unconditionally, so its absence would break'
     assert 'local.namespace' in init, 'the local namespace is never added'
     assert 'modules.append(local)' in init, 'local tasks would not get the bootstrap pre-task'
 
@@ -1270,9 +1338,7 @@ def test_documented_launcher_matches_the_real_one(generated_project):
     """
     project, _ = generated_project
     launcher = (project / 'workflow.cmd').read_text(encoding='utf-8')
-    doc = (project / 'docs' / 'developer' / 'explanation' / 'the-ci-tasks-architecture.md').read_text(
-        encoding='utf-8'
-    )
+    doc = (project / 'docs' / 'developer' / 'explanation' / 'the-ci-tasks-architecture.md').read_text(encoding='utf-8')
     assert '_CI.invoke' not in doc, 'the doc still cites a nonexistent _CI.invoke module'
     # Every non-shebang line of the real launcher must appear verbatim in the doc.
     for line in (line.strip() for line in launcher.splitlines()):
@@ -1280,7 +1346,8 @@ def test_documented_launcher_matches_the_real_one(generated_project):
             continue
         assert line in doc, f'launcher line not documented: {line!r}'
     # And the dispatch mechanism the two interpreters rely on is explained, not just shown.
-    assert 'exec' in doc and 'label' in doc, 'the doc shows the launcher without explaining how it dispatches'
+    assert 'exec' in doc, 'the doc omits the sh side of the dispatch'
+    assert 'label' in doc, 'the doc omits the cmd label trick that makes the dispatch work'
 
 
 def test_launcher_dispatch_is_intact(generated_project):
@@ -1349,12 +1416,15 @@ def test_no_hidden_dirs_in_docs(generated_project):
     assert not hidden, f'hidden paths shipped under docs/: {hidden}'
 
 
+SHIPPED_EXPLANATION_DIR = 'template/docs/developer/explanation'
 SHIPPED_RATIONALE_PAGES = {
-    'docs/maintaining/explanation/design-principles.md': 'template/docs/developer/explanation/design-principles.md',
-    'docs/maintaining/explanation/the-ci-tasks-architecture.md': 'template/docs/developer/explanation/the-ci-tasks-architecture.md',
-    'docs/using/explanation/how-uv-is-used.md': 'template/docs/developer/explanation/how-uv-is-used.md',
-    'docs/using/explanation/sbom-and-security-model.md': 'template/docs/developer/explanation/sbom-and-security-model.md.jinja',
-    'docs/using/explanation/testing-strategy.md': 'template/docs/developer/explanation/testing-strategy.md',
+    'docs/maintaining/explanation/design-principles.md': f'{SHIPPED_EXPLANATION_DIR}/design-principles.md',
+    'docs/maintaining/explanation/the-ci-tasks-architecture.md': (
+        f'{SHIPPED_EXPLANATION_DIR}/the-ci-tasks-architecture.md'
+    ),
+    'docs/using/explanation/how-uv-is-used.md': f'{SHIPPED_EXPLANATION_DIR}/how-uv-is-used.md',
+    'docs/using/explanation/sbom-and-security-model.md': f'{SHIPPED_EXPLANATION_DIR}/sbom-and-security-model.md.jinja',
+    'docs/using/explanation/testing-strategy.md': f'{SHIPPED_EXPLANATION_DIR}/testing-strategy.md',
 }
 
 
@@ -1377,7 +1447,8 @@ def test_shipped_rationale_pages_match_canonical(canonical_path):
     """
     canonical = (REPO_ROOT / canonical_path).read_text(encoding='utf-8')
     shipped = (REPO_ROOT / SHIPPED_RATIONALE_PAGES[canonical_path]).read_text(encoding='utf-8')
-    assert shipped.startswith('<!-- canonical:'), f'{SHIPPED_RATIONALE_PAGES[canonical_path]} lacks the canonical marker'
+    shipped_path = SHIPPED_RATIONALE_PAGES[canonical_path]
+    assert shipped.startswith('<!-- canonical:'), f'{shipped_path} lacks the canonical marker'
     assert canonical_path in shipped.splitlines()[0], 'canonical marker does not name its source page'
     extra = extract_h2_headings(shipped) - extract_h2_headings(canonical)
     assert not extra, f'shipped copy has headings the canonical page lacks: {extra}'
