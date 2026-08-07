@@ -26,6 +26,8 @@ from cyclonedx.model.license import DisjunctiveLicense, LicenseExpression, Licen
 from cyclonedx.model.lifecycle import LifecyclePhase, LifecycleRepository, PredefinedLifecycle
 from cyclonedx.model.tool import ToolRepository
 from cyclonedx.output.json import JsonV1Dot7
+from cyclonedx.schema import SchemaVersion
+from cyclonedx.validation.json import JsonStrictValidator
 from packageurl import PackageURL
 
 from .configuration import PROJECT_NAME, SBOM_FILE, UV_LOCK, VENDOR_DIR, VENDOR_TXT
@@ -538,33 +540,18 @@ def write_sbom(target: Path = SBOM_FILE) -> None:
     target.write_text(render_sbom() + '\n', encoding='utf-8')
 
 
-VALIDATE_SCRIPT = (
-    'import sys\n'
-    'from pathlib import Path\n'
-    'from cyclonedx.validation.json import JsonStrictValidator\n'
-    'from cyclonedx.schema import SchemaVersion\n'
-    'validator = JsonStrictValidator(SchemaVersion.V1_7)\n'
-    'error = validator.validate_str(Path(sys.argv[1]).read_text(encoding="utf-8"))\n'
-    'if error is not None:\n'
-    '    print(str(error), file=sys.stderr)\n'
-    '    sys.exit(1)\n'
-)
-
-
 def validate_sbom(target: Path = SBOM_FILE) -> list[str]:
     """Validate the SBOM at `target` against the CycloneDX 1.7 JSON schema.
 
-    Runs in a `uv run python` subprocess so the venv-installed
-    cyclonedx-python-lib + jsonschema win over the vendored CI libs that the
-    workflow.cmd launcher places earlier on sys.path. Returns a list of
-    error messages (empty when the SBOM is valid).
+    Returns a list of error messages, empty when the SBOM is valid.
+
+    This used to run in a `uv run python` subprocess. The launcher puts the vendored CI
+    libraries earlier on `sys.path` than the venv, and the vendored tree carried its own
+    `jsonschema` — so an in-process import resolved to that copy instead of the one
+    cyclonedx-python-lib validates against. `jsonschema` was never wanted there; it arrived
+    as a transitive dependency of the vendoring toolchain, which is no longer vendored. With
+    it gone the import resolves to the venv and the subprocess has nothing left to isolate.
     """
-    result = subprocess.run(
-        ['uv', 'run', 'python', '-c', VALIDATE_SCRIPT, str(target)],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode == 0:
-        return []
-    return [(result.stderr or result.stdout).strip()]
+    validator = JsonStrictValidator(SchemaVersion.V1_7)
+    error = validator.validate_str(target.read_text(encoding='utf-8'))
+    return [str(error)] if error is not None else []

@@ -1,4 +1,4 @@
-#!/Users/ctyfoxylos/Library/Caches/uv/archive-v0/ulc6qXsaptnAmTo41dYbx/bin/python
+#!/usr/bin/env python
 import sys
 from pathlib import Path
 CI_DIRECTORY_NAME = '_CI'

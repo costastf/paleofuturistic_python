@@ -16,7 +16,15 @@ requires = ['setuptools', 'wheel']
 build-backend = "setuptools.build_meta"
 
 [project.optional-dependencies]
-vendor = ['vendoring', 'invoke', 'pip-tools', 'emoji', 'coloredlogs', 'lexicon']
+# Content: what ends up in lib/vendor/ and, for the template copy, ships to every generated
+# project. Nothing belongs here that the shipped `_CI/` code does not import.
+vendor = ['invoke', 'coloredlogs']
+
+# Tooling: performs the vendoring, never gets vendored. Run on demand with `uvx`; see
+# `./workflow.cmd maintain.sync-vendor` and the upstream README. This used to sit in `vendor`
+# above, which made re-vendoring self-hosting at the cost of shipping ~5.8 MB of maintainer
+# tooling to every consumer. pip-tools is gone entirely: `uv pip compile` replaces it.
+maintenance = ['vendoring==1.2.0']
 
 [tool.vendoring]
 destination = './lib/vendor/'
@@ -30,21 +38,25 @@ patches-dir = './lib/patches'
 py-modules = []  # https://github.com/jazzband/pip-tools/issues/1711 :facepalm:
 
 [tool.vendoring.transformations]
-substitute = [
-    { match = 'import pygments.', replace = 'import lib.vendor.pygments.' },
-    { match = 'import jsonschema.validators', replace = 'import lib.vendor.jsonschema.validators' },
-    { match = 'import urllib3.', replace = 'import lib.vendor.urllib3.' },
-    { match = 'import rich.traceback', replace = 'import lib.vendor.rich.traceback; from lib.vendor import rich' },
-    { match = 'import wheel.cli', replace = 'import lib.vendor.wheel.cli' },
-    { match = 'import build.env', replace = 'import lib.vendor.build.env' },
-    { match = ' packaging.', replace = ' lib.vendor.packaging.' },
-    { match = 'import referencing.', replace = 'import lib.vendor.referencing.jsonschema' },
-]
+# Every rule this list used to hold rewrote imports for pygments, jsonschema, urllib3, rich,
+# wheel, build, packaging or referencing — all transitive dependencies of the vendoring
+# toolchain vendoring itself, and none of them vendored any more. Add one only if
+# `vendoring sync` leaves a module importing a bare top-level name.
+substitute = []
+
 drop = [
-    'pygments/styles/[!_]*.py',
-    '^pygments/lexers/(?!python|__init__|_mapping).*\.py$',
-    'jsonschema/tests',
-    'coloredlogs/tests.py'
+    # Test suites: never imported, and they pull fixtures the tree does not carry.
+    'coloredlogs/tests.py',
+    # humanfriendly ships modules that cannot run on the Pythons this template supports:
+    # cli.py and testing.py `import pipes`, removed in 3.13, and sphinx.py needs docutils,
+    # which is not vendored. coloredlogs imports none of them.
+    'humanfriendly/cli.py',
+    'humanfriendly/testing.py',
+    'humanfriendly/sphinx.py',
+    # Console entry points for libraries we import but never run as commands. Only the invoke
+    # ones are launched, and each surviving script needs a hunk in path_inject.patch.
+    'bin/coloredlogs',
+    'bin/humanfriendly',
 ]
 
 [tool.ruff]

@@ -27,6 +27,11 @@ lib64/
 # works on a fresh clone without a global Invoke install.
 !**/_CI/lib/
 !**/_CI/lib/**
+# ...but not the bytecode running it produces. The re-include above is broad enough to
+# override the `__pycache__` rule, so without these the caches written the first time
+# `./workflow.cmd` runs become committable — and CI, which does run it, would offer them up.
+**/_CI/lib/**/__pycache__/
+**/_CI/lib/**/*.pyc
 parts/
 sdist/
 var/
