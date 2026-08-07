@@ -4,15 +4,18 @@ import base64
 import json
 import os
 import re
+import urllib.error
+import urllib.request
 from collections.abc import Iterator
 from pathlib import Path
 from typing import NamedTuple
+from urllib.parse import quote
 
 from invoke import Context
 
 from _CI.info import read as read_info
 
-from .shared import PipelineComponent, execute, strip_credentials
+from .shared import PipelineComponent, RemoteRef, execute, parse_remote_url
 
 CI_FILE = Path('.gitlab-ci.yml')
 # Matches inline `image: foo/bar:tag` and the `name: foo/bar:tag` line inside
@@ -74,37 +77,89 @@ def publish_deps_image(context: Context, tag: str) -> str:
     return f'{image.rsplit(":", 1)[0]}@{digest}'
 
 
-def origin_slug(context: Context) -> str:
-    """Return the project path (group/.../project) of the origin remote, or '' if not GitLab."""
+def origin_ref(context: Context) -> RemoteRef:
+    """Return the GitLab instance host and project path from `origin`, or empty strings.
+
+    The host comes from the remote instead of being assumed to be gitlab.com. This module
+    only ships when GitLab was the chosen host, so whatever instance `origin` points at *is*
+    the GitLab instance — including a self-hosted one. Matching gitlab.com literally, as this
+    did, returned an empty path off gitlab.com and silently disabled both the manual MR URL
+    and the API call, with nothing printed to say why.
+
+    `parse_remote_url` strips the token CI bakes into origin
+    (`https://gitlab-ci-token:<token>@host/…`) before parsing.
+    """
     remote = context.run('git remote get-url origin', hide=True, warn=True)
     if remote is None or remote.failed:
-        return ''
-    # In CI origin carries a token (https://gitlab-ci-token:<token>@gitlab.com/…),
-    # which the patterns below would otherwise fail to match.
-    url = strip_credentials(remote.stdout.strip())
-    match = re.match(
-        r'(?:git@gitlab\.com:|https://gitlab\.com/)(.+?)(?:\.git)?/?$',
-        url,
-    )
-    return match.group(1) if match else ''
+        return RemoteRef(host='', path='')
+    return parse_remote_url(remote.stdout)
+
+
+def origin_slug(context: Context) -> str:
+    """Return the project path (group/.../project) of the origin remote, or '' if unparseable."""
+    return origin_ref(context).path
 
 
 def pr_create_url(context: Context, release_branch: str) -> str:
-    """Compose the GitLab MR-create URL for a release branch, or '' if origin isn't GitLab."""
-    slug = origin_slug(context)
-    if not slug:
+    """Compose the GitLab MR-create URL for a release branch, or '' if origin is unparseable."""
+    origin = origin_ref(context)
+    if not origin.host or not origin.path:
         return ''
-    return f'https://gitlab.com/{slug}/-/merge_requests/new?merge_request[source_branch]={release_branch}'
+    source = quote(release_branch, safe='')
+    return f'https://{origin.host}/{origin.path}/-/merge_requests/new?merge_request[source_branch]={source}'
 
 
 def create_release_pr(context: Context, release_branch: str, new_version: str) -> str:
-    """Open a release MR via the GitLab API. Currently a stub — returns ''.
+    """Open the release merge request via the GitLab API. Return its URL, or '' on failure.
 
-    Implement against the GitLab Merge Requests API
-    (https://docs.gitlab.com/ee/api/merge_requests.html#create-mr) when needed.
+    Requires ``GITLAB_TOKEN`` in the environment — a personal, project, or group access token
+    with the ``api`` scope. Uses only the standard library, like the rest of the CI tooling.
+
+    Every failure returns '' rather than raising, so ``release`` falls back to printing the
+    manual URL from ``pr_create_url`` and the release still completes.
     """
-    print('Auto-creation of GitLab merge requests is not yet implemented. See pr_create_url() for the manual URL.')
-    return ''
+    token = os.environ.get('GITLAB_TOKEN', '').strip()
+    if not token:
+        print(
+            'GITLAB_TOKEN not set — release MR will not be opened automatically. '
+            'Export a token with the `api` scope to have it created for you.'
+        )
+        return ''
+    origin = origin_ref(context)
+    if not origin.host or not origin.path:
+        print('Could not read a host and project path from the origin remote; cannot open the MR via the API.')
+        return ''
+    payload = json.dumps(
+        {
+            'source_branch': release_branch,
+            'target_branch': 'main',
+            'title': f'chore(release): v{new_version}',
+            'description': (
+                f'Release v{new_version} prepared by `./workflow.cmd release`. '
+                'Merge this MR so the tag lands on main and publish fires in CI.'
+            ),
+        }
+    ).encode('utf-8')
+    # The API addresses a project by its URL-encoded path, so every `/` in a (possibly
+    # nested) group path has to become %2F — an unencoded path 404s.
+    project = quote(origin.path, safe='')
+    request = urllib.request.Request(
+        f'https://{origin.host}/api/v4/projects/{project}/merge_requests',
+        data=payload,
+        method='POST',
+        headers={'Content-Type': 'application/json', 'PRIVATE-TOKEN': token},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
+            data = json.loads(response.read().decode('utf-8'))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode('utf-8', errors='replace')[:500]
+        print(f'GitLab API returned {exc.code}: {detail}')
+        return ''
+    except OSError as exc:
+        print(f'GitLab API request failed: {exc}')
+        return ''
+    return data.get('web_url', '')
 
 
 def iter_pipeline_components() -> Iterator[PipelineComponent]:

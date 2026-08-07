@@ -220,12 +220,107 @@ def test_no_token_survives_into_a_published_url(generated_project):
 
 
 def test_sbom_and_slug_helpers_sanitize_the_remote(generated_project):
-    """Every consumer of `git remote get-url origin` routes through `strip_credentials`."""
+    """Every consumer of `git remote get-url origin` sanitizes it before use.
+
+    `parse_remote_url` counts as sanitizing: it calls `strip_credentials` itself, which
+    `test_parse_remote_url_strips_credentials` pins down.
+    """
     project, cell = generated_project
     sbom_py = (project / '_CI' / 'tasks' / 'sbom.py').read_text(encoding='utf-8')
     assert 'strip_credentials' in sbom_py, 'sbom.py does not sanitize the origin URL'
     host_py = (project / '_CI' / 'tasks' / f'{cell["git_hosting_service"]}.py').read_text(encoding='utf-8')
-    assert 'strip_credentials' in host_py, 'origin_slug() does not sanitize the origin URL'
+    sanitizers = ('strip_credentials', 'parse_remote_url')
+    assert any(name in host_py for name in sanitizers), 'origin_slug() does not sanitize the origin URL'
+
+
+def strip_prose(source):
+    """Return `source` as code only — no comments, no docstrings.
+
+    Both routinely mention the very literals a "don't hardcode this" assertion looks for, so
+    matching raw text would fail on an explanation of the fix. `ast.unparse` drops comments;
+    the docstrings have to be removed by hand.
+    """
+    tree = ast.parse(source)
+    scopes = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+    for node in ast.walk(tree):
+        if not isinstance(node, scopes) or len(node.body) < 2:
+            continue
+        first = node.body[0]
+        if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant) and isinstance(first.value.value, str):
+            node.body.pop(0)
+    return ast.unparse(tree)
+
+
+REMOTE_URLS = [
+    ('https://gitlab.com/group/project.git', 'gitlab.com', 'group/project'),
+    ('git@gitlab.com:group/project.git', 'gitlab.com', 'group/project'),
+    # The case the hardcoded gitlab.com match silently dropped.
+    ('https://gitlab.example.com/group/project.git', 'gitlab.example.com', 'group/project'),
+    ('git@gitlab.example.com:group/project.git', 'gitlab.example.com', 'group/project'),
+    # Nested groups: every path segment has to survive.
+    ('https://gitlab.example.com/group/sub/deeper/project.git', 'gitlab.example.com', 'group/sub/deeper/project'),
+    # No .git suffix, and a trailing slash.
+    ('https://gitlab.example.com/group/project/', 'gitlab.example.com', 'group/project'),
+    # An https port belongs in the web URL...
+    ('https://gitlab.example.com:8443/group/project.git', 'gitlab.example.com:8443', 'group/project'),
+    # ...but an ssh port does not.
+    ('ssh://git@gitlab.example.com:2222/group/project.git', 'gitlab.example.com', 'group/project'),
+]
+
+
+@pytest.mark.parametrize(('url', 'host', 'path'), REMOTE_URLS)
+def test_parse_remote_url_reads_host_and_path(generated_project, url, host, path):
+    """The host comes from the remote, so a self-hosted instance is not mistaken for gitlab.com."""
+    project, _ = generated_project
+    assert load_generated_shared(project).parse_remote_url(url) == (host, path)
+
+
+def test_parse_remote_url_strips_credentials(generated_project):
+    """The token CI bakes into origin never reaches a parsed host or path."""
+    project, _ = generated_project
+    parse_remote_url = load_generated_shared(project).parse_remote_url
+    ref = parse_remote_url('https://gitlab-ci-token:SECRETTOKEN@gitlab.example.com/group/project.git')
+    assert ref == ('gitlab.example.com', 'group/project')
+    assert 'SECRETTOKEN' not in ref.host + ref.path
+
+
+def test_parse_remote_url_reports_failure_rather_than_guessing(generated_project):
+    """An unparseable remote yields empty strings; callers must not invent a host."""
+    project, _ = generated_project
+    parse_remote_url = load_generated_shared(project).parse_remote_url
+    for url in ('', 'not a url', '/local/path/repo'):
+        assert parse_remote_url(url) == ('', ''), f'{url!r} was parsed into something'
+
+
+def test_gitlab_helpers_never_hardcode_the_instance_host(generated_project):
+    """No gitlab.com literal survives in the GitLab module — the host comes from `origin`.
+
+    Hardcoding it made `origin_slug()` return '' on every self-hosted instance, which
+    disabled the manual MR URL and the API call without printing anything.
+    """
+    project, cell = generated_project
+    if cell['git_hosting_service'] != 'gitlab':
+        pytest.skip('github combo')
+    gitlab_py = (project / '_CI' / 'tasks' / 'gitlab.py').read_text(encoding='utf-8')
+    assert 'gitlab.com' not in strip_prose(gitlab_py), 'the GitLab instance host is still hardcoded'
+
+
+def test_gitlab_release_mr_is_implemented(generated_project):
+    """`create_release_pr` calls the MR API and URL-encodes the project path.
+
+    An unencoded (nested) group path 404s, so the encoding is the part worth pinning.
+    """
+    project, cell = generated_project
+    if cell['git_hosting_service'] != 'gitlab':
+        pytest.skip('github combo')
+    gitlab_py = (project / '_CI' / 'tasks' / 'gitlab.py').read_text(encoding='utf-8')
+    tree = ast.parse(gitlab_py)
+    func = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == 'create_release_pr')
+    body = ast.unparse(func)
+    assert 'not yet implemented' not in body, 'create_release_pr is still a stub'
+    assert '/api/v4/projects/' in body and 'merge_requests' in body, 'no call to the merge-requests API'
+    assert 'GITLAB_TOKEN' in body, 'no documented token is read'
+    assert "quote(origin.path, safe='')" in body, 'the project path is not URL-encoded'
 
 
 def stub_result(*, ok=True, stdout='', stderr=''):
