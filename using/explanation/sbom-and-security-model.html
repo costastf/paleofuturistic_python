@@ -456,6 +456,10 @@
               <ul class="nav flex-column">
               </ul>
             </li>
+            <li class="nav-item" data-bs-level="2"><a href="#layer-4-build-provenance" class="nav-link">Layer 4 — build provenance</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
             <li class="nav-item" data-bs-level="2"><a href="#what-about-overrides" class="nav-link">What about overrides?</a>
               <ul class="nav flex-column">
               </ul>
@@ -577,6 +581,13 @@
 </ul>
 <p>Without DT, only what <code>pip-audit</code> reported at the moment it ran is visible. With DT, every release is <em>continuously</em> re-assessed against the world.</p>
 <p>See <a href="../how-to/enable-dependency-track.html">Enable Dependency Track integration</a> for setup.</p>
+<h2 id="layer-4-build-provenance">Layer 4 — build provenance</h2>
+<p>The SBOM says what is <em>inside</em> an artifact. Provenance says where the artifact <em>came from</em> — and unlike the SBOM, it is not self-reported. <code>actions/attest-build-provenance</code> signs a statement binding the exact file digests to the workflow, commit and runner that produced them, and that signature chains to GitHub's Sigstore instance rather than to anything the project controls. A forged SBOM is a text edit; a forged attestation is not.</p>
+<p>A consumer verifies a downloaded artifact with:</p>
+<pre><code class="language-bash">gh attestation verify &lt;package&gt;-&lt;version&gt;-py3-none-any.whl --repo &lt;owner&gt;/&lt;repo&gt;
+</code></pre>
+<p>Order matters in the publish job: <code>release.dist</code> builds into <code>dist/</code>, the attestation is taken over those files, and <code>release.publish --prebuilt</code> uploads them <em>without</em> rebuilding. Rebuilding in between would publish files that no attestation refers to, and verification would then fail — reading as tampering rather than as a fresh build.</p>
+<p><strong>GitHub only.</strong> GitLab has no equivalent that works without extra infrastructure, so GitLab projects ship the SBOM without provenance. Nothing else about the release differs.</p>
 <h2 id="what-about-overrides">What about overrides?</h2>
 <p><code>.security-overrides</code> is a project-local allow-list with mandatory expiry dates. It applies to <code>pip-audit</code>. It does <strong>not</strong> suppress findings in the SBOM or in Dependency Track — those continue to show the world the full truth. Override = "we accept this locally for now," not "make this invisible."</p>
 <p>The expiry dates are load-bearing: a stale override is a security regression hidden in plain sight. The template's lint config doesn't enforce this; treat it as a code-review convention.</p>
