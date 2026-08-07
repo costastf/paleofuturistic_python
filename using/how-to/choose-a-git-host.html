@@ -448,7 +448,7 @@
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-bs-level="2"><a href="#gitlab-limitations-to-be-aware-of" class="nav-link">GitLab limitations to be aware of</a>
+            <li class="nav-item" data-bs-level="2"><a href="#gitlab-specifics-to-be-aware-of" class="nav-link">GitLab specifics to be aware of</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -491,7 +491,7 @@
 <td>absent</td>
 </tr>
 <tr>
-<td><code>_CI/tasks/gitlab.py</code> (registry creds, kaniko publish, manual MR URL)</td>
+<td><code>_CI/tasks/gitlab.py</code> (registry creds, kaniko publish, release-MR API)</td>
 <td>absent</td>
 <td>shipped</td>
 </tr>
@@ -508,7 +508,7 @@
 <tr>
 <td>Release PR/MR</td>
 <td>auto-opened via GitHub API when <code>GITHUB_TOKEN</code> is set</td>
-<td>manual URL printed; API stub waiting to be implemented</td>
+<td>auto-opened via GitLab API when <code>GITLAB_TOKEN</code> is set</td>
 </tr>
 </tbody>
 </table>
@@ -524,13 +524,12 @@
 <li>Flips the import line in <code>_CI/tasks/container.py</code> (and <code>release.py</code>) from <code>.github</code> to <code>.gitlab</code> (or back).</li>
 </ul>
 <p>Review the result carefully — if you've already customised the host-specific CI files, your changes will need manual reconciliation.</p>
-<h2 id="gitlab-limitations-to-be-aware-of">GitLab limitations to be aware of</h2>
-<p>The GitLab path currently has two stubs:</p>
+<h2 id="gitlab-specifics-to-be-aware-of">GitLab specifics to be aware of</h2>
 <ul>
-<li><strong><code>create_release_pr</code></strong> in <code>_CI/tasks/gitlab.py</code> prints a message and returns <code>''</code> — auto-opening MRs via the GitLab API is not implemented. The <code>release</code> task falls back to printing the manual <code>pr_create_url</code>.</li>
+<li><strong>Releasing needs <code>GITLAB_TOKEN</code>.</strong> <code>create_release_pr</code> opens the MR through the GitLab API using a personal, project, or group access token with the <code>api</code> scope. Without one it says so and <code>release</code> falls back to printing the manual <code>pr_create_url</code>, which is also what happens if the API call fails — a release never stops because the MR could not be opened.</li>
+<li><strong>Self-hosted instances work.</strong> The instance host is read from your <code>origin</code> remote rather than assumed to be gitlab.com, for both the API call and the manual URL. Nested groups are handled too; the project path is URL-encoded as the API requires.</li>
 <li>The shipped <code>.gitlab-ci.yml</code> covers lint/test/build/publish for <code>gitlab.com</code> runners; self-hosted runners with kaniko may need adjustments.</li>
 </ul>
-<p>PRs implementing the GitLab MR auto-creation are welcome — the seam exists exactly so contributors don't have to touch <code>release.py</code>.</p>
 <h2 id="see-also">See also</h2>
 <ul>
 <li><a href="../reference/copier-questions.html#git_hosting_service">Copier questions</a> — the prompt's full reference entry.</li>
