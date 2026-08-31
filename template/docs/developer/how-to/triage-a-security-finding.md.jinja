@@ -2,7 +2,7 @@
 
 `./workflow.cmd secure` runs [pip-audit](https://github.com/pypa/pip-audit) against the lockfile. When it reports a vulnerability, you have three responses: upgrade, override with an expiry, or accept and document.
 
-## 1. Upgrade if possible
+## Option 1. Upgrade if possible
 
 The vast majority of findings have a fixed version available. Check the report:
 
@@ -18,7 +18,7 @@ uv lock --upgrade-package <vulnerable-package>
 git commit -am "fix: bump <package> for <CVE-id>"
 ```
 
-## 2. Override with an expiry (recommended for "can't upgrade yet")
+## Option 2. Override with an expiry (recommended for "can't upgrade yet")
 
 The `.security-overrides` file at the project root lists allowed-for-now vulnerabilities with expiry dates. Each entry is a single token — the id and the optional expiry joined by `::`, with **no** justification field:
 
@@ -37,7 +37,7 @@ Malformed entries abort the task with a `file:line: <reason>` message rather tha
 
 After the expiry date, `secure.audit` fails again, forcing a re-triage. Don't extend overrides without revisiting the underlying issue. Omitting the expiry suppresses the finding permanently — prefer a date, because a permanent entry is never resurfaced.
 
-## 3. Accept and document (rare)
+## Option 3. Accept and document (rare)
 
 For findings that don't apply to your usage — e.g. the vulnerable code path is gated on a feature you don't use — write an override with a thorough `#` justification and a far-future expiry. Keep this rare; the next maintainer needs to trust the override list.
 
