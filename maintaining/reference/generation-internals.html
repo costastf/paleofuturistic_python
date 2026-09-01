@@ -440,15 +440,15 @@
             
             <li class="nav-item" data-bs-level="1"><a href="#generation-internals" class="nav-link">Generation internals</a>
               <ul class="nav flex-column">
-            <li class="nav-item" data-bs-level="2"><a href="#1-python-version-validation-copier-validator" class="nav-link">1. Python-version validation (copier validator)</a>
+            <li class="nav-item" data-bs-level="2"><a href="#stage-1-python-version-validation-copier-validator" class="nav-link">Stage 1. Python-version validation (copier validator)</a>
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-bs-level="2"><a href="#2-conditional-filenames-copier-rendering" class="nav-link">2. Conditional filenames (copier rendering)</a>
+            <li class="nav-item" data-bs-level="2"><a href="#stage-2-conditional-filenames-copier-rendering" class="nav-link">Stage 2. Conditional filenames (copier rendering)</a>
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-bs-level="2"><a href="#3-copy-time-script-tasks_renderpy" class="nav-link">3. Copy-time script (tasks_render.py)</a>
+            <li class="nav-item" data-bs-level="2"><a href="#stage-3-copy-time-script-tasks_renderpy" class="nav-link">Stage 3. Copy-time script (tasks_render.py)</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -469,7 +469,7 @@
 
 <h1 id="generation-internals">Generation internals</h1>
 <p>What happens between answering the questionnaire and receiving a finished project directory. The work that was previously a single <code>hooks/post_gen_project.py</code> script is now split three ways across copier's own mechanisms and a dedicated copy-time script.</p>
-<h2 id="1-python-version-validation-copier-validator">1. Python-version validation (copier validator)</h2>
+<h2 id="stage-1-python-version-validation-copier-validator">Stage 1. Python-version validation (copier validator)</h2>
 <p>A <code>validator</code> expression on the <code>max_python_version</code> question in <code>copier.yml</code> runs before any files are written. It checks:</p>
 <ul>
 <li><code>max_python_version &gt;= min_python_version</code></li>
@@ -477,7 +477,7 @@
 <li>Both values appear in the choices list (currently <code>["3.13", "3.14"]</code>).</li>
 </ul>
 <p>Any failure aborts generation immediately with a clear error message. Because this runs before file output begins, there is no partial directory left on disk to clean up.</p>
-<h2 id="2-conditional-filenames-copier-rendering">2. Conditional filenames (copier rendering)</h2>
+<h2 id="stage-2-conditional-filenames-copier-rendering">Stage 2. Conditional filenames (copier rendering)</h2>
 <p>Copier skips any file or directory whose rendered name is an empty string. The template uses this mechanism to omit unchosen scaffolding at generation time — no post-generation deletion step needed.</p>
 <p>Examples currently used:</p>
 <table>
@@ -517,7 +517,7 @@
 </tbody>
 </table>
 <p>The <code>from .{{ git_hosting_service }} import …</code> line in <code>_CI/tasks/container.py</code> and <code>_CI/tasks/release.py</code> is Jinja-substituted at copy time to name the surviving module — exactly one code path remains, no runtime branching.</p>
-<h2 id="3-copy-time-script-tasks_renderpy">3. Copy-time script (<code>tasks_render.py</code>)</h2>
+<h2 id="stage-3-copy-time-script-tasks_renderpy">Stage 3. Copy-time script (<code>tasks_render.py</code>)</h2>
 <p><code>tasks_render.py</code> at the repo root is run via copier's <code>_tasks</code> configuration. It is <strong>gated to the copy operation only</strong> — <code>copier update</code> does not re-run it, so re-generation side-effects (like stamping the copyright year) don't fire on every update.</p>
 <p>It performs two actions, in order:</p>
 <h3 id="install-the-chosen-license">Install the chosen license</h3>

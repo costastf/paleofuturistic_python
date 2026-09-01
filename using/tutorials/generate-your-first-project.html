@@ -452,11 +452,15 @@
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-bs-level="2"><a href="#step-3-run-the-dev-cycle" class="nav-link">Step 3 — Run the dev cycle</a>
+            <li class="nav-item" data-bs-level="2"><a href="#step-3-run-the-qa-checks" class="nav-link">Step 3 — Run the QA checks</a>
               <ul class="nav flex-column">
               </ul>
             </li>
             <li class="nav-item" data-bs-level="2"><a href="#step-4-see-the-docs" class="nav-link">Step 4 — See the docs</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#step-5-commit-using-conventional-commits" class="nav-link">Step 5 — Commit using Conventional Commits</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -479,9 +483,13 @@
 </code></pre>
 <h2 id="step-1-generate-the-project">Step 1 — Generate the project</h2>
 <p>Pick an empty directory and run:</p>
-<pre><code class="language-bash">uvx copier copy --trust https://github.com/schubergphilis/paleofuturistic_python &lt;destination-dir&gt;
+<pre><code class="language-bash">uvx copier copy --vcs-ref latest --trust https://github.com/schubergphilis/paleofuturistic_python &lt;destination-dir&gt;
 </code></pre>
-<p><code>--trust</code> is required because the template runs a post-copy task. You will be asked a series of questions. Press Enter to accept the defaults for every one — they're documented in <a href="../reference/copier-questions.html">Copier questions</a>. Three answers worth thinking about:</p>
+<p><code>--trust</code> is required because the template runs a post-copy task.
+<code>--vcs-ref</code> is optional, but for stability we recommend only using actual tagged and released versions of this template.</p>
+<p>You will be asked a series of questions.
+Press Enter to accept the defaults for every one — they're documented in <a href="../reference/copier-questions.html">Copier questions</a>.
+Three answers worth thinking about:</p>
 <ul>
 <li><code>project_name</code> — pick something memorable; everything else is derived.</li>
 <li><code>git_hosting_service</code> — <code>github</code> (default) or <code>gitlab</code>; see <a href="../how-to/choose-a-git-host.html">Choose a git host</a>.</li>
@@ -493,21 +501,35 @@
 ./workflow.cmd bootstrap
 </code></pre>
 <p>This installs uv-managed virtualenvs for every dependency group and registers pre-commit hooks. It's idempotent — running it again is a no-op until you pass <code>--force</code>.</p>
-<h2 id="step-3-run-the-dev-cycle">Step 3 — Run the dev cycle</h2>
-<p>These four commands are the heartbeat of every project this template generates:</p>
+<h2 id="step-3-run-the-qa-checks">Step 3 — Run the QA checks</h2>
+<p>These commands are the heartbeat of every project this template generates:</p>
 <pre><code class="language-bash">./workflow.cmd format    # Ruff format + import sort
 ./workflow.cmd lint      # Ruff check, pylint, ty (type checker), complexipy, commitizen
 ./workflow.cmd test      # pytest with coverage and parallel execution
-./workflow.cmd build     # Produce a wheel + sdist in dist/
+./workflow.cmd quality   # pyscn code quality check
+./workflow.cmd build     # Produce a wheel + sdist in dist/ (also runs pip-audit and exports SBOM)
 </code></pre>
-<p>You should see a passing test for the example <code>hello()</code> function and a wheel appear under <code>dist/</code>.</p>
+<p>You should see a passing test for the example <code>hello()</code> function and a wheel appear under <code>dist/</code>.
+Some of the other QA tools also produce output you can look into later.</p>
 <h2 id="step-4-see-the-docs">Step 4 — See the docs</h2>
 <pre><code class="language-bash">./workflow.cmd document
 </code></pre>
 <p>A browser tab opens with the generated project's documentation — its own Diátaxis-structured site, ready to extend.</p>
+<h2 id="step-5-commit-using-conventional-commits">Step 5 — Commit using Conventional Commits</h2>
+<p>Commit messages must follow <a href="https://www.conventionalcommits.org/">Conventional Commits</a> — the lint step rejects anything that doesn't parse.
+Start each message with a type prefix:</p>
+<pre><code class="language-bash">git add -A
+git commit -m &quot;chore: bootstrap project&quot;
+</code></pre>
+<p>The prefixes drive the <strong>release notes</strong>: commitizen reads the commit history when generating the changelog and groups your commits by prefix (<code>feat:</code> under "Features", <code>fix:</code> under "Bug Fixes", etc.).
+(The prefix does <strong>not</strong> drive the version bump — you'll choose that explicitly in a later step.)</p>
+<p>Now that you have git properly setup in your project you can execute the following command to perform all QA checks from step 3:</p>
+<pre><code class="language-bash">./workflow.cmd develop.pre-commit
+</code></pre>
+<p>This command also runs before any commit is made.</p>
 <h2 id="youre-done">You're done</h2>
 <p>You have a fully scaffolded Python project with tests, linting, packaging, and docs all wired up.</p>
-<p><strong>Next:</strong> <a href="from-zero-to-published-package.html">From zero to a published package</a> — write a function, cut a release, push to PyPI.</p></div>
+<p><strong>Next:</strong> <a href="from-zero-to-published-package.html">From zero to a published package</a>.</p></div>
             </div>
         </div>
 

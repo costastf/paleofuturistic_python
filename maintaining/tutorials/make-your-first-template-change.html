@@ -440,23 +440,23 @@
             
             <li class="nav-item" data-bs-level="1"><a href="#make-your-first-template-change" class="nav-link">Make your first template change</a>
               <ul class="nav flex-column">
-            <li class="nav-item" data-bs-level="2"><a href="#1-clone-and-orient-yourself" class="nav-link">1. Clone and orient yourself</a>
+            <li class="nav-item" data-bs-level="2"><a href="#step-1-clone-and-orient-yourself" class="nav-link">Step 1. Clone and orient yourself</a>
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-bs-level="2"><a href="#2-make-a-change" class="nav-link">2. Make a change</a>
+            <li class="nav-item" data-bs-level="2"><a href="#step-2-make-a-change" class="nav-link">Step 2. Make a change</a>
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-bs-level="2"><a href="#3-run-the-fast-check" class="nav-link">3. Run the fast check</a>
+            <li class="nav-item" data-bs-level="2"><a href="#step-3-run-the-fast-check" class="nav-link">Step 3. Run the fast check</a>
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-bs-level="2"><a href="#4-run-one-full-cell" class="nav-link">4. Run one full cell</a>
+            <li class="nav-item" data-bs-level="2"><a href="#step-4-run-one-full-cell" class="nav-link">Step 4. Run one full cell</a>
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-bs-level="2"><a href="#5-commit-and-open-a-pull-request" class="nav-link">5. Commit and open a pull request</a>
+            <li class="nav-item" data-bs-level="2"><a href="#step-5-commit-and-open-a-pull-request" class="nav-link">Step 5. Commit and open a pull request</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -474,25 +474,25 @@
 <h1 id="make-your-first-template-change">Make your first template change</h1>
 <p>In this tutorial you clone the template repo, make a small change to what it generates, prove the change is correct at every level of the test pyramid, and open a pull request. At the end you'll know the edit-test loop every template change goes through.</p>
 <p>Prerequisite: <a href="https://docs.astral.sh/uv/">uv</a>.</p>
-<h2 id="1-clone-and-orient-yourself">1. Clone and orient yourself</h2>
+<h2 id="step-1-clone-and-orient-yourself">Step 1. Clone and orient yourself</h2>
 <pre><code class="language-bash">git clone https://github.com/schubergphilis/paleofuturistic_python
 cd paleofuturistic_python
 </code></pre>
 <p>Everything under <code>template/</code> is what copier copies into a generated project; files ending in <code>.jinja</code> are rendered with the answers from <code>copier.yml</code>, everything else is copied verbatim. Everything <em>outside</em> <code>template/</code> — this repo's own <code>_CI/</code>, <code>docs/</code>, <code>tests/</code> — exists to develop and verify the template itself.</p>
-<h2 id="2-make-a-change">2. Make a change</h2>
+<h2 id="step-2-make-a-change">Step 2. Make a change</h2>
 <p>Pick something harmless: open <code>template/README.md.jinja</code> and adjust a sentence, or tweak a page under <code>template/docs/</code>. If the file you edit ends in <code>.jinja</code>, remember that <code>{{ ... }}</code> and <code>{% ... %}</code> are rendered at generation time — plain text edits are safe.</p>
-<h2 id="3-run-the-fast-check">3. Run the fast check</h2>
+<h2 id="step-3-run-the-fast-check">Step 3. Run the fast check</h2>
 <pre><code class="language-bash">./workflow.cmd test.invariants
 </code></pre>
 <p>This generates a project for each matrix cell (git host × Dependency Track × Pages) once and asserts structural invariants over the results — the right files exist, conditional content matches the chosen knobs, nothing forbidden ships. It's the best signal-per-second check and should be your default while iterating.</p>
-<h2 id="4-run-one-full-cell">4. Run one full cell</h2>
+<h2 id="step-4-run-one-full-cell">Step 4. Run one full cell</h2>
 <pre><code class="language-bash">./workflow.cmd test
 </code></pre>
 <p>This generates a project with the default answers and runs the generated project's <em>own</em> full QA cycle inside it — <code>format</code>, <code>lint</code>, <code>test.tox</code>, <code>build</code>, <code>document</code>. If your change breaks the generated project's linters or docs build, this is where it surfaces.</p>
 <p>To reproduce a specific CI matrix cell instead, use <code>test.combo</code>:</p>
 <pre><code class="language-bash">./workflow.cmd test.combo --git-hosting-service gitlab --no-integrate-pages
 </code></pre>
-<h2 id="5-commit-and-open-a-pull-request">5. Commit and open a pull request</h2>
+<h2 id="step-5-commit-and-open-a-pull-request">Step 5. Commit and open a pull request</h2>
 <p>Commit messages must follow <a href="https://www.conventionalcommits.org/">Conventional Commits</a> — <code>feat(template): …</code>, <code>fix(ci): …</code> — the lint step rejects anything else.</p>
 <pre><code class="language-bash">git checkout -b feat/my-first-change
 git commit -am &quot;feat(template): clarify the generated README wording&quot;
