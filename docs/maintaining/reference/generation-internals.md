@@ -2,7 +2,7 @@
 
 What happens between answering the questionnaire and receiving a finished project directory. The work that was previously a single `hooks/post_gen_project.py` script is now split three ways across copier's own mechanisms and a dedicated copy-time script.
 
-## 1. Python-version validation (copier validator)
+## Stage 1. Python-version validation (copier validator)
 
 A `validator` expression on the `max_python_version` question in `copier.yml` runs before any files are written. It checks:
 
@@ -12,7 +12,7 @@ A `validator` expression on the `max_python_version` question in `copier.yml` ru
 
 Any failure aborts generation immediately with a clear error message. Because this runs before file output begins, there is no partial directory left on disk to clean up.
 
-## 2. Conditional filenames (copier rendering)
+## Stage 2. Conditional filenames (copier rendering)
 
 Copier skips any file or directory whose rendered name is an empty string. The template uses this mechanism to omit unchosen scaffolding at generation time — no post-generation deletion step needed.
 
@@ -28,7 +28,7 @@ Examples currently used:
 
 The `from .{{ git_hosting_service }} import …` line in `_CI/tasks/container.py` and `_CI/tasks/release.py` is Jinja-substituted at copy time to name the surviving module — exactly one code path remains, no runtime branching.
 
-## 3. Copy-time script (`tasks_render.py`)
+## Stage 3. Copy-time script (`tasks_render.py`)
 
 `tasks_render.py` at the repo root is run via copier's `_tasks` configuration. It is **gated to the copy operation only** — `copier update` does not re-run it, so re-generation side-effects (like stamping the copyright year) don't fire on every update.
 
