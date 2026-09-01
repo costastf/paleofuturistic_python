@@ -151,7 +151,7 @@ exclude = [
     "scratch",
     "_CI/lib",
 ]
-# Same as Black.
+# Black's default of 88 quickly feels overly restricted.
 line-length = 120
 indent-width = 4
 
@@ -162,7 +162,9 @@ ignore = [
     "D203",    # one-blank-line-before-class (conflicts with D211)
     "D213",    # multi-line-summary-second-line (conflicts with D212)
     # Copyright headers are intentionally not added to source files
+    # This will change when automated tools start doing something with them
     "CPY001",  # missing-copyright-notice
+    # A list of common ignores, uncomment or remove at your discretion
     # "D105",    # undocumented-magic-method
     # "D107",    # undocumented-public-init
     # "TRY003",  # raise-vanilla-args
@@ -203,7 +205,7 @@ convention = "google"
 "src/*.py" = ["UP038"]
 
 [tool.ruff.format]
-# Like Black, use double quotes for strings.
+# Use single quotes for strings, because that is more readable.
 quote-style = "single"
 
 # Like Black, indent with spaces, rather than tabs.
