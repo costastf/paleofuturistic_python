@@ -1024,7 +1024,7 @@ def test_open_target_hands_a_translated_path_to_windows(generated_project):
     project, _ = generated_project
     ran, executed = opener(project, 'wsl', interop=True)
     assert ran[0] == 'wslpath -w "site/index.html"'
-    assert ran[1] == 'cmd.exe /c start "" "\\\\wsl.localhost\\Ubuntu\\home\\me\\site\\index.html"'
+    assert ran[1] == "cmd.exe /c start '' '\\\\wsl.localhost\\Ubuntu\\home\\me\\site\\index.html'"
     assert executed == []
 
 
