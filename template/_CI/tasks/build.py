@@ -41,20 +41,28 @@ def package(context: Context) -> None:
 
 @task
 @logged('build')
-def build(context: Context) -> None:
+def build(context: Context, *, badge: bool = True) -> None:
     """Compose the SBOM and build the package; reports all failures before exiting.
 
     Deterministic from the tree: the SBOM comes from the lockfile, and `uv build` ships it
     inside the wheel. There is no dependency audit here on purpose — see `secure.sbom` — so a
     wheel can still be built when a fresh advisory lands. `release.dist` audits before it
     builds, which is where refusing to proceed actually protects someone.
+
+    Args:
+        context: Invoke context.
+        badge: Record the outcome in the README's build badge. ``preflight`` passes False:
+            README.md is a tracked file, and `preflight --check` must leave every one of them
+            alone. It runs this for the wheel, not for the badge.
     """
     try:
         run_steps(sbom, package)(context)
     except SystemExit:
-        update_build_badge('failing')
+        if badge:
+            update_build_badge('failing')
         raise
-    update_build_badge('passing')
+    if badge:
+        update_build_badge('passing')
 
 
 namespace = Collection('build')

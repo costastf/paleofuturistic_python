@@ -6,7 +6,7 @@ The questionnaire asks for `min_python_version` and `max_python_version`. They d
 
 - **`requires-python`** in `pyproject.toml` is set to `>=<min>,<<next-major>`.
 - **`tool.tox` envs** are generated for each minor version from `<min>` to `<max>` inclusive.
-- **CI matrix** in `.github/workflows/` or `.gitlab-ci.yml` runs lint/test/build across the same range.
+- **CI** in `.github/workflows/` or `.gitlab-ci.yml` runs `preflight --check`, whose tox step covers the same range. Trimming `env_list` shortens it locally and in CI together.
 - **PyPI classifiers** (`Programming Language :: Python :: 3.X`) match the range.
 
 ## Constraints enforced at generation time

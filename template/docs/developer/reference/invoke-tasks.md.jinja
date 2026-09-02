@@ -24,7 +24,7 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 
 | Task | Args | What it does |
 | --- | --- | --- |
-| `preflight` | `--check`, `--audit-dependencies` | Format, lint, type-check, pyscn, test, then write the four README badges and ratchet `fail_under`. `--check` verifies instead of writing and fails on anything stale. `--audit-dependencies` adds the pip-audit run, which is off by default because it needs the network. |
+| `preflight` | `--check`, `--audit-dependencies` | Format, lint, type-check, pyscn, the full tox matrix, the wheel, then write the four README badges and ratchet `fail_under`. `--check` verifies instead of writing and fails on anything stale. `--audit-dependencies` adds the pip-audit run, which is off by default because its answer depends on the advisory database rather than on your tree. |
 | `preflight.staged` | `--paths="<paths>"` | Only the checks that can be judged from the given files alone. What the pre-commit hook runs. |
 
 Both read one registry — `STEPS` in `_CI/tasks/preflight.py` — which declares every check
@@ -38,8 +38,10 @@ implementation for the verifying side is how a gate drifts from the generator it
 derived value — the badges, `fail_under` — is written through a single function that takes
 `write`, so what check mode compares is exactly what write mode would have produced.
 
-`preflight --check` is what the pre-push hook and CI both run, which is the property that keeps
-local and remote from disagreeing. Note that check mode still refreshes `reports/` — pytest's
+`preflight --check` is what the pre-push hook and the entire CI pipeline run — one job, since
+the separate lint, test and build jobs folded into it — which is the property that keeps local
+and remote from disagreeing. There is deliberately no flag that trims it: shortening the matrix
+is `env_list`'s job, and that shortens CI too. Note that check mode still refreshes `reports/` — pytest's
 coverage JSON and pyscn's analysis are the *inputs* the comparison reads, and both are
 gitignored. What it never touches is a tracked file.
 

@@ -34,13 +34,14 @@ from typing import NamedTuple, cast
 
 from invoke import Collection, Context, Task, task
 
+from .build import build
 from .document import update_package_version_badge, update_python_badge
 from .format_ import ruff_format
 from .lint import complexipy, format_check, pylint, ruff_lint, ty
 from .quality import pyscn_analyze_only, pyscn_check, update_pyscn_badge
 from .secure import audit
 from .shared import logged, run_steps
-from .test import pytest, ratchet_fail_under, update_coverage_badge
+from .test import ratchet_fail_under, tox, update_coverage_badge
 
 PER_FILE = 'per-file'
 WHOLE_PROGRAM = 'whole-program'
@@ -132,8 +133,19 @@ STEPS = (
     Step('complexipy', PER_FILE, check=complexipy, files=SRC_FILES),
     Step('ty', WHOLE_PROGRAM, check=ty),
     Step('pyscn', WHOLE_PROGRAM, check=pyscn),
-    Step('pytest', WHOLE_PROGRAM, check=pytest),
-    # After pyscn and pytest, which produce the reports it reads.
+    # The whole matrix, not one interpreter. A single-interpreter gate would leave the one
+    # thing CI could tell you that you could not have known locally, and the project promises
+    # every version in `env_list`. It costs about one extra suite-length, because the envs run
+    # in parallel. `test.pytest` remains the fast inner-loop task; this is the gate.
+    Step('tox', WHOLE_PROGRAM, check=tox),
+    # The build badge is the one derived value that records an *event* — what happened when
+    # the package was last built — rather than a value recomputable from a report. So write
+    # mode records it, and check mode passes `badge=False` and leaves it alone: README.md is
+    # tracked, and check mode touches no tracked file. That does mean a stale build badge is
+    # the one thing `--check` cannot catch. It is also the one badge CI could never fix, since
+    # its checkout has no credentials and its token is read-only.
+    Step('build', WHOLE_PROGRAM, check=partial(build, badge=False), write=partial(build, badge=True)),
+    # After pyscn and tox, which produce the reports it reads.
     Step(
         'artifacts',
         WHOLE_PROGRAM,
@@ -228,19 +240,29 @@ def staged(context: Context, paths: str = '') -> None:
 def preflight(context: Context, check: bool = False, audit_dependencies: bool = False) -> None:
     """Run every check this project has, and bring the derived files up to date.
 
-    The command to run before you open a pull request, and — as `--check` — what the pre-push
-    hook and the CI preflight job run. Write mode formats, checks, tests and then writes the
-    badges and the coverage ratchet. Check mode runs the identical steps, writes no tracked
-    file, and fails listing everything that is out of date.
+    The command to run before you open a pull request, and — as `--check` — the whole of the
+    CI pipeline as well as the pre-push hook. Write mode formats, lints, type-checks, runs
+    pyscn, runs the test matrix, builds the wheel, then writes the badges and the coverage
+    ratchet. Check mode runs the identical steps, writes no tracked file, and fails listing
+    everything that is out of date.
+
+    There is deliberately no flag for running a lighter version. The pipeline runs this exact
+    command, so any switch that trimmed it would be a documented way to make the two disagree
+    — and the obvious thing to reach for when in a hurry. The knob that shortens the matrix is
+    `env_list` in pyproject.toml, which shortens it for CI too and so cannot open a gap. For
+    fast feedback while writing code, the individual tasks are still there: `test.pytest`,
+    `lint.pylint --paths=…`.
 
     Args:
         context: Invoke context.
         check: Verify instead of write. Nothing tracked is modified; a stale badge or an
             unratcheted `fail_under` fails the run.
-        audit_dependencies: Also run the dependency audit. Off by default because it needs
-            the network, which would fail an offline push for reasons unrelated to the change.
-            CI covers it in its own job; `--audit-dependencies` is how you get everything
-            locally in one command.
+        audit_dependencies: Also run the dependency audit. Off by default, and not because of
+            the network alone: an audit's answer depends on the advisory database on the day it
+            runs rather than on this tree, so it can never have the property that makes the
+            rest of this worth gating a push on. It has its own homes — a daily schedule, the
+            dependency-change job, and `release.dist` before publishing. This flag is for
+            running it here too, when you want everything in one command.
     """
     run_scope(context, None, write=not check, network=audit_dependencies)
 

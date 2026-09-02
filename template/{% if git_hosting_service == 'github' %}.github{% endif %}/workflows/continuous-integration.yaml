@@ -3,9 +3,20 @@ name: Continuous Integration
 on:
   push:
 
-# Workflow-level floor. Without it every job would inherit the repository default,
-# which for many repositories is the full read/write token — far more than a lint or
-# test run needs. Jobs below narrow further; none of them writes anything.
+# One job runs the checks, because it runs the same command the pre-push hook does:
+# `preflight --check`. Separate lint, test and build jobs used to re-run, in a different
+# shape, the work that command already covers — so a green push could still meet a red
+# pipeline over which of the two had been kept in step. Absorbing them costs the wall-clock
+# those jobs bought by running in parallel; `run_steps` still reports every failure in one
+# pass, so it costs time, not diagnosis.
+#
+# What is deliberately *not* here: the dependency audit, which runs on a schedule and on
+# pushes that touch the dependency surface (see security-audit.yaml), because an advisory
+# published overnight is not something this branch's author introduced or can fix.
+#
+# Workflow-level permissions floor. Without it every job would inherit the repository
+# default, which for many repositories is the full read/write token — far more than a check
+# run needs. Jobs below narrow further; none of them writes anything.
 permissions:
   contents: read
 
@@ -22,56 +33,6 @@ jobs:
       contents: read
       # The only job that publishes: it pushes the deps image to ghcr.
       packages: write
-
-  lint:
-    name: Lint
-    needs: build-deps-image
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      # Pulling the deps image from ghcr goes through GITHUB_TOKEN; without
-      # `packages: read` the manifest request comes back 403.
-      packages: read
-    container:
-      image: ${{ needs.build-deps-image.outputs.image }}
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-        with:
-          # See the note above the jobs for why.
-          persist-credentials: false
-
-      - name: Lint code
-        run: ./workflow.cmd lint
-
-  test:
-    name: Test (tox matrix)
-    needs: build-deps-image
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      # Pulling the deps image from ghcr goes through GITHUB_TOKEN; without
-      # `packages: read` the manifest request comes back 403.
-      packages: read
-    container:
-      image: ${{ needs.build-deps-image.outputs.image }}
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-        with:
-          # See the note above the jobs for why.
-          persist-credentials: false
-
-      - name: Run tests
-        run: ./workflow.cmd test.tox
 
   preflight:
     name: Preflight
@@ -95,10 +56,10 @@ jobs:
           # See the note above the jobs for why.
           persist-credentials: false
 
-      # The same command the pre-push hook runs, which is the point: a derived file that is
-      # stale here would have failed the push too, so this job is a backstop rather than a
-      # surprise. It covers what no other job does — that the README badges and the coverage
-      # ratchet's `fail_under` match what the tools now measure.
+      # The same command the pre-push hook runs, which is the point: anything that fails here
+      # would have failed the push too, so the pipeline is a backstop rather than the place
+      # you first hear about it. Format, lint, ty, pyscn, the tox matrix, the wheel, and the
+      # README badges and coverage ratchet matching what the tools measure.
       #
       # `--check` is not optional here. `permissions: contents: read` and the
       # `persist-credentials: false` checkout above mean this job could not commit a
@@ -106,28 +67,3 @@ jobs:
       # command that fixes it.
       - name: Verify checks and derived files
         run: ./workflow.cmd preflight --check
-
-  build:
-    name: Build
-    needs: build-deps-image
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      # Pulling the deps image from ghcr goes through GITHUB_TOKEN; without
-      # `packages: read` the manifest request comes back 403.
-      packages: read
-    container:
-      image: ${{ needs.build-deps-image.outputs.image }}
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-        with:
-          # See the note above the jobs for why.
-          persist-credentials: false
-
-      - name: Build package
-        run: ./workflow.cmd build

@@ -42,10 +42,11 @@ repos:
         files: ^(_CI/tasks/|src/|tests/).*\.py$
         stages: [pre-commit]
       # Everything whole-program runs here instead of on every commit: ty needs the callers of
-      # a changed signature, pyscn needs every file to know what is dead or duplicated, pytest
-      # needs the suite. Their cost scales with the size of the *project*, not of the change,
-      # so on pre-commit they were the one thing that would make commits slower as the project
-      # grew. On pre-push they run once per push and keep commit latency flat.
+      # a changed signature, pyscn needs every file to know what is dead or duplicated, the
+      # matrix needs the suite on every interpreter, and a wheel builds from the whole tree or
+      # not at all. Their cost scales with the size of the *project*, not of the change, so on
+      # pre-commit they were the one thing that would make commits slower as the project grew.
+      # On pre-push they run once per push and keep commit latency flat (~19s on a scaffold).
       #
       # `--check` is what makes this safe to run from a hook at all. `preflight` on its own
       # writes the four README badges and ratchets `fail_under` in pyproject.toml; run from a
@@ -55,11 +56,14 @@ repos:
       # the identical steps, writes nothing tracked, and fails with the command to fix it.
       # Those writes belong to a deliberate `./workflow.cmd preflight`.
       #
-      # It also means the hook and the CI preflight job run the same command, so a stale badge
-      # cannot pass locally and fail in the pipeline. `SKIP=preflight git push` is the escape
-      # hatch when you need one; unlike `--no-verify` it leaves the other hooks in place.
+      # It also means this hook and the CI pipeline run the same command — the whole pipeline,
+      # since the separate lint, test and build jobs folded into it — so nothing in CI can
+      # reject what this accepted. There is deliberately no flag to make it run less: the knob
+      # that shortens the matrix is `env_list` in pyproject.toml, which shortens CI too and so
+      # cannot open a gap. `SKIP=preflight git push` is the escape hatch when you need one;
+      # unlike `--no-verify` it leaves the other hooks in place.
       - id: preflight
-        name: Preflight checks (ty, pyscn, tests, derived files)
+        name: Preflight checks (ty, pyscn, test matrix, wheel, derived files)
         entry: ./workflow.cmd preflight --check
         language: system
         pass_filenames: false

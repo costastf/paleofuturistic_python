@@ -65,32 +65,14 @@ build-deps-image:
     reports:
       dotenv: .deps-image.env
 
-lint:
-  stage: ci
-  image: $DEPS_IMAGE
-  needs:
-    - job: build-deps-image
-      artifacts: true
-  before_script:
-    - git config --global --add safe.directory "$CI_PROJECT_DIR"
-  script:
-    - ./workflow.cmd lint
-
-test:
-  stage: ci
-  image: $DEPS_IMAGE
-  needs:
-    - job: build-deps-image
-      artifacts: true
-  before_script:
-    - git config --global --add safe.directory "$CI_PROJECT_DIR"
-  script:
-    - ./workflow.cmd test.tox
-
-# The same command the pre-push hook runs, which is the point: a derived file that is stale
-# here would have failed the push too, so this job is a backstop rather than a surprise. It
-# covers what no other job does — that the README badges and the coverage ratchet's
-# `fail_under` match what the tools now measure.
+# One job runs the checks, because it runs the same command the pre-push hook does. Separate
+# lint, test and build jobs used to re-run, in a different shape, the work this command already
+# covers — so a green push could still meet a red pipeline over which of the two had been kept
+# in step. Absorbing them costs the wall-clock those jobs bought by running in parallel;
+# `run_steps` still reports every failure in one pass, so it costs time, not diagnosis.
+#
+# Anything that fails here would have failed the push: format, lint, ty, pyscn, the tox matrix,
+# the wheel, and the README badges and coverage ratchet matching what the tools measure.
 #
 # `--check` is not optional here. The job has no write access to the repository, so it could
 # not commit a refreshed badge even if it wanted to; its only useful move is to fail and name
@@ -133,17 +115,6 @@ secure:
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
   script:
     - ./workflow.cmd secure.audit
-
-build:
-  stage: ci
-  image: $DEPS_IMAGE
-  needs:
-    - job: build-deps-image
-      artifacts: true
-  before_script:
-    - git config --global --add safe.directory "$CI_PROJECT_DIR"
-  script:
-    - ./workflow.cmd build
 
 publish:
   stage: publish

@@ -634,17 +634,24 @@ def test_publishing_audits_before_it_builds(generated_project):
     assert dist.index('audit(context)') < dist.index('build(context)'), 'the audit runs after the build'
 
 
-def test_qa_steps_include_the_security_audit():
-    """`secure.audit` is in QA_STEPS, so every matrix cell audits its generated project.
+def test_qa_steps_cover_what_preflight_does_not():
+    """QA_STEPS runs the generated project's own gate, plus the two things it leaves out.
 
-    The matrix runner already exports `<PROJECT>_SECURITY_OVERRIDE` for this step; until
-    it was listed here that plumbing fed nothing.
+    `preflight` covers format, lint, ty, pyscn, the tox matrix, the wheel and the derived
+    files, so naming those separately would re-run them in a different shape and leave the
+    matrix with two lists of checks to keep in step — the same duplication the generated
+    project's pipeline shed. What has to be listed is what `preflight` deliberately omits:
+    the dependency audit, and the docs build.
+
+    `secure.audit` in particular has to be here explicitly. The matrix runner exports
+    `<PROJECT>_SECURITY_OVERRIDE` for it, and that plumbing feeds nothing unless it runs.
     """
     from _CI.tasks.configuration import QA_STEPS  # noqa: PLC0415
 
     assert 'secure.audit' in QA_STEPS
-    # Fail fast: audit before the slow tox matrix.
-    assert QA_STEPS.index('secure.audit') < QA_STEPS.index('test.tox')
+    assert 'preflight' in QA_STEPS, 'the matrix no longer exercises the generated gate'
+    # Fail fast: the cheapest failure first, before a five-interpreter matrix.
+    assert QA_STEPS.index('secure.audit') < QA_STEPS.index('preflight')
 
 
 def workflow_run_scripts(workflow):
@@ -1397,14 +1404,15 @@ def test_whole_program_steps_are_never_scoped_to_a_diff(generated_project):
 
     ty: a changed signature fails in the *callers*, which a narrowed run never looks at.
     pyscn: dead code and duplicate blocks are relationships between files.
-    pytest: a passing changed test says nothing about the ones it broke.
+    tox: a passing changed test says nothing about the ones it broke, on any interpreter.
+    build: a wheel is built from the whole tree or not at all.
 
     Their cost also scales with the size of the project rather than of the change, which is
     what would have made commits slower and slower as the project grew.
     """
     project, _ = generated_project
     steps = registry_steps(project)
-    for name in ('ty', 'pyscn', 'pytest', 'artifacts'):
+    for name in ('ty', 'pyscn', 'tox', 'build', 'artifacts'):
         assert steps.get(name) == 'WHOLE_PROGRAM', f'{name} is declared {steps.get(name)!r}, not whole-program'
     commit_stage = {invoked_task(hook) for hook in pre_commit_hooks(project) if 'pre-commit' in hook_stages(hook)}
     assert 'preflight' not in commit_stage, 'the whole-program bundle runs on every commit'
@@ -1457,7 +1465,51 @@ def test_pre_push_gate_enforces_the_same_coverage_floor(generated_project):
     aggregator = test_py.split("@logged('test')", 1)[1]
     assert 'run_steps(pytest)' in aggregator, 'the aggregator no longer delegates to the same pytest task'
     preflight_py = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
-    assert 'from .test import pytest' in preflight_py, 'the registry no longer runs the shared pytest task'
+    assert 'tox' in registry_steps(project), 'the registry no longer runs the matrix'
+    imported_from_test = preflight_py.split('from .test import', 1)[1].split('\n', 1)[0]
+    assert 'tox' in imported_from_test, (
+        'the registry no longer runs the shared tox task, so the floor it enforces can drift'
+    )
+
+
+def test_the_gate_offers_no_way_to_run_less_than_ci(generated_project):
+    """`preflight` takes no flag that trims what it runs, because CI runs this same command.
+
+    A `--quick` that dropped the matrix would be a documented way to make local and CI
+    disagree, and the obvious thing to reach for in a hurry. The knob that shortens the matrix
+    is `env_list`, which shortens it for CI too and so cannot open a gap. `--audit-dependencies`
+    is the one flag that adds a step, and it adds one no gate runs anywhere.
+    """
+    project, _ = generated_project
+    preflight_py = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
+    signature = preflight_py.split('def preflight(', 1)[1].split(')', 1)[0]
+    parameters = {part.split(':')[0].strip() for part in signature.split(',')}
+    assert parameters == {'context', 'check', 'audit_dependencies'}, (
+        f'preflight grew a parameter that can change what it runs: {parameters}'
+    )
+
+
+def test_no_ci_job_reruns_what_the_gate_already_covers(generated_project):
+    """CI has one job for the checks, and it is the gate.
+
+    Separate lint, test and build jobs re-ran, in a different shape, work `preflight --check`
+    already covers — which is how a green push comes to meet a red pipeline: two lists of
+    checks, one of them out of step. The cost of folding them in is the wall-clock their
+    parallelism bought, not diagnosis; `run_steps` still reports every failure in one pass.
+    """
+    project, cell = generated_project
+    duplicated = ('./workflow.cmd lint', './workflow.cmd test', './workflow.cmd build')
+    if cell['git_hosting_service'] == 'github':
+        pipeline = (project / '.github' / 'workflows' / 'continuous-integration.yaml').read_text(encoding='utf-8')
+        jobs = set(yaml.safe_load(pipeline)['jobs'])
+        assert jobs == {'build-deps-image', 'preflight'}, f'the pipeline runs {jobs}'
+    else:
+        pipeline = (project / '.gitlab-ci.yml').read_text(encoding='utf-8')
+        jobs = {name for name in yaml.safe_load(pipeline) if not name.startswith(('stages', 'variables'))}
+        assert jobs == {'build-deps-image', 'preflight', 'secure', 'publish'}, f'the pipeline runs {jobs}'
+    commands = [line.strip().lstrip('- ') for line in pipeline.splitlines() if './workflow.cmd' in line]
+    for command in commands:
+        assert not command.startswith(duplicated), f'{command!r} re-runs what preflight --check covers'
 
 
 def test_ci_runs_the_same_gate_as_the_pre_push_hook(generated_project):

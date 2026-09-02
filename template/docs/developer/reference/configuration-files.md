@@ -17,7 +17,7 @@ The single source of truth for project metadata and tool configuration. Sections
 | `[tool.pytest.ini_options]` | Template (framework), you (markers) | Don't disable coverage; add markers as needed. |
 | `[tool.coverage]` | Template | `fail_under` is ratcheted upward automatically once the ratchet engages. Don't lower it. |
 | `[tool.test-ratchet]` | Template (knob), you (mode) | `mode = "auto-detect"` (default) keeps the coverage ratchet dormant while the scaffolded `test_sanity` is in place; `mode = "strict"` engages it on run #1. See [Testing strategy](../explanation/testing-strategy.md#dormant-during-scaffold). |
-| `[tool.tox]` | Template | Generated from `min_python_version` / `max_python_version`. |
+| `[tool.tox]` | Template (framework), you (`env_list`) | Generated from `min_python_version` / `max_python_version`. Each env writes its own reports and coverage data, which `test.tox` then combines — see [Testing strategy](../explanation/testing-strategy.md#layer-3--tox). Trimming `env_list` shortens the gate locally *and* in CI, which is why it is the only supported way to make the matrix cheaper. |
 | `[tool.commitizen]` | Template | Conventional-Commits parser config used by `cz changelog` and the lint hook. The template does **not** use commitizen's autorelease — the bump is chosen explicitly via `./workflow.cmd release -i <type>`. |
 | `[tool.docker-versions]` | Template | The one image `Dockerfile.deps` builds on, pinned by tag *and* digest. |
 
@@ -38,7 +38,7 @@ Hook definitions, split across three git stages:
 | `commit-msg` | commitizen (conventional-commit format) | the message | ~2s |
 | `pre-commit` | `preflight.staged` — ruff format, ruff, pylint, complexipy | **staged files only** | ~2.9s |
 | `pre-commit` | `.security-overrides` validation | that file, when staged | ~1.5s |
-| `pre-push` | `preflight --check` — ty, pyscn, tests, derived files | whole project | ~10s |
+| `pre-push` | `preflight --check` — ty, pyscn, the tox matrix, the wheel, derived files | whole project | ~19s |
 
 **The commit stage is one hook, one invocation.** It used to be six, and that was the
 expensive part: `./workflow.cmd` spends about 1.3s on interpreter and imports before any tool
@@ -57,9 +57,10 @@ the second filename as another task name and fails. Filenames containing spaces 
 supported by that marshalling.
 
 **What runs on pre-commit is what can be judged from the staged files alone.** That is a rule
-about correctness, not speed. ty, pyscn and the test suite are whole-program: a changed
-signature surfaces as an error in its *callers*, a function only looks dead once you know
-nothing else calls it, and a passing changed test says nothing about the ones it broke.
+about correctness, not speed. ty, pyscn, the test matrix and the wheel are whole-program: a
+changed signature surfaces as an error in its *callers*, a function only looks dead once you
+know nothing else calls it, a passing changed test says nothing about the ones it broke, and a
+package builds from the whole tree or not at all.
 Narrowing any of them to a diff does not make it faster, it makes it answer wrongly — and
 their cost scales with the size of the *project* rather than of the change, which is what
 would have made commits slower and slower as the project grew. They moved to pre-push, where
@@ -70,8 +71,11 @@ they run once per push and leave commit latency flat.
 that meant aborting with "files were modified by this hook" for files the author never staged,
 which is what teaches people `--no-verify` and so disables every hook here at once. `--check`
 runs the identical registry, writes nothing tracked, and fails naming the command that fixes
-it. It is also the exact command the CI preflight job runs, so a stale badge cannot pass
-locally and then fail in the pipeline.
+it. It is also the exact command the CI pipeline runs — the whole of it, since the separate lint,
+test and build jobs folded into this one — so nothing in the pipeline can reject what your
+push accepted. That parity is also why there is no flag to make it run less: a `--quick` that
+dropped the matrix would be a documented way to reopen the gap. The knob that shortens the
+matrix is `env_list` in `pyproject.toml`, which shortens it for CI too.
 
 Every underlying task remains callable on its own, which is the escape hatch when you want one
 tool: `./workflow.cmd lint.pylint --paths="src/thing.py"`. Need to push past the gate once?
@@ -109,7 +113,7 @@ Polyglot launcher: a shell script on Unix, a batch file on Windows. Resolves to 
 
 ## `.github/` or `.gitlab-ci.yml`
 
-The chosen host's CI config (only one of these exists per project, per the `git_hosting_service` answer). Edit to add jobs; preserve the existing lint/test/build flow if you want `copier update` to keep working.
+The chosen host's CI config (only one of these exists per project, per the `git_hosting_service` answer). The checks live in a single `preflight` job running `./workflow.cmd preflight --check` — the same command the pre-push hook runs — so there is nothing to keep in step with a second list. Edit to add jobs; leave that one alone if you want `copier update` to keep working.
 
 ## `.copier-answers.yml`
 

@@ -36,7 +36,7 @@ Review the result carefully — if you've already customised the host-specific C
 
 - **Releasing needs `GITLAB_TOKEN`.** `create_release_pr` opens the MR through the GitLab API using a personal, project, or group access token with the `api` scope. Without one it says so and `release` falls back to printing the manual `pr_create_url`, which is also what happens if the API call fails — a release never stops because the MR could not be opened.
 - **Self-hosted instances work.** The instance host is read from your `origin` remote rather than assumed to be gitlab.com, for both the API call and the manual URL. Nested groups are handled too; the project path is URL-encoded as the API requires.
-- The shipped `.gitlab-ci.yml` covers lint/test/build/publish for `gitlab.com` runners; self-hosted runners with kaniko may need adjustments.
+- The shipped `.gitlab-ci.yml` covers the `preflight` gate, the dependency audit and publish for `gitlab.com` runners; self-hosted runners with kaniko may need adjustments.
 
 ## See also
 

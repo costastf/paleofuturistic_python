@@ -66,13 +66,24 @@ Expired entries are reported too, naming the source, and then ignored — so the
 
 `secure.audit` is not only a local command — it gates automatically, which is what makes the expiry dates above meaningful:
 
-- **Every CI run** — the `secure` job in {% if git_hosting_service == 'github' %}`.github/workflows/continuous-integration.yaml`{% else %}`.gitlab-ci.yml`{% endif %} runs it alongside lint, test and build.
 {%- if git_hosting_service == 'github' %}
 - **Daily on a schedule** — `.github/workflows/security-audit.yaml`. A dependency can turn out to be vulnerable, and an override can expire, with nobody pushing a commit; without the scheduled run a quiet repository would stop being checked and expiry dates would never come due. Trigger it by hand from the Actions tab (`workflow_dispatch`) to re-check on demand.
+- **On pushes that change what you depend on** — the same workflow, triggered by `on.push.paths` for `uv.lock`, `pyproject.toml` and `.security-overrides`.
 {%- else %}
-- **On a schedule** — the `secure` job carries no `rules:`, so it also runs in scheduled pipelines. Create one under **Build → Pipeline schedules**; without it a quiet repository stops being checked and the expiry dates never come due.
+- **On a schedule** — the `secure` job's `rules:` include `$CI_PIPELINE_SOURCE == "schedule"`. Create a schedule under **Build → Pipeline schedules**; without it a quiet repository stops being checked and the expiry dates never come due.
+- **On pushes that change what you depend on** — the same job's `changes:` rule covers `uv.lock`, `pyproject.toml` and `.security-overrides`.
 {%- endif %}
+- **Before publishing** — `release.dist` audits before it builds. This is the gate that matters: publishing is when the outside world is exposed to these dependencies.
 - **Pre-commit** — only `secure.validate-overrides`, and only when `.security-overrides` itself changes. That checks the file's syntax, not your dependencies.
+
+Deliberately *not* on every push, and not from `build`. An audit's answer depends on the
+advisory database on the day it runs rather than on your branch, so a pull request that touches
+a docstring would go red for a CVE published overnight that its author neither introduced nor
+can fix — and a pipeline that fails for reasons outside the author's control is one people
+learn to ignore. Bundling it into `build` had a sharper edge: a fresh advisory made it
+impossible to build a wheel from code that built yesterday, blocking a hotfix on an unrelated
+finding. Run it locally whenever you like with `./workflow.cmd secure.audit`, or alongside
+everything else with `./workflow.cmd preflight --audit-dependencies`.
 
 ## Re-running after a triage
 
