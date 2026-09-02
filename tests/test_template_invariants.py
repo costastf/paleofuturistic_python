@@ -552,18 +552,38 @@ def test_deps_image_reference_is_digest_pinned(generated_project):
         assert '--digest-file' in host_py
 
 
-def test_security_audit_runs_in_ci(generated_project):
-    """The chosen host's pipeline runs `secure.audit`.
+def test_security_audit_is_automated_without_failing_unrelated_changes(generated_project):
+    """The audit runs automatically, but never on a push that cannot have caused it.
 
-    Without this the `.security-overrides` expiry mechanism gates nothing: pip-audit was
-    reachable only as a local command, so a dependency with a known CVE shipped green.
+    Two failure modes, and the fix for one is the cause of the other. Reachable only as a
+    local command, the `.security-overrides` expiry mechanism gates nothing and a dependency
+    with a known CVE ships green. Wired to every push, it fails pull requests for advisories
+    published overnight that the author did not introduce and cannot fix in their branch —
+    and a pipeline that goes red for reasons outside the author's control is one people learn
+    to ignore.
+
+    So it is automated on the axis it actually varies along: time (a schedule) and the
+    dependency surface (the files that can introduce a vulnerable package). Publishing is
+    gated separately by `release.dist`.
     """
     project, cell = generated_project
+    dependency_surface = {'uv.lock', 'pyproject.toml'}
     if cell['git_hosting_service'] == 'github':
         pipeline = (project / '.github' / 'workflows' / 'continuous-integration.yaml').read_text(encoding='utf-8')
+        assert 'secure.audit' not in pipeline, 'the per-push pipeline audits every change'
+        audit_workflow = yaml.safe_load(
+            (project / '.github' / 'workflows' / 'security-audit.yaml').read_text(encoding='utf-8')
+        )
+        # yaml parses a bare `on:` key as the boolean True, hence the lookup.
+        triggers = audit_workflow.get('on') or audit_workflow[True]
+        paths = set(triggers['push']['paths'])
+        assert dependency_surface <= paths, f'the audit is not triggered by {dependency_surface - paths}'
     else:
-        pipeline = (project / '.gitlab-ci.yml').read_text(encoding='utf-8')
-    assert 'secure.audit' in pipeline, 'no pipeline job runs secure.audit'
+        jobs = yaml.safe_load((project / '.gitlab-ci.yml').read_text(encoding='utf-8'))
+        rules = jobs['secure']['rules']
+        assert any('schedule' in str(rule.get('if', '')) for rule in rules), 'no scheduled audit'
+        changes = {path for rule in rules for path in rule.get('changes') or []}
+        assert dependency_surface <= changes, f'the audit is not triggered by {dependency_surface - changes}'
 
 
 def test_scheduled_security_audit_ships_for_github(generated_project):
@@ -582,6 +602,36 @@ def test_scheduled_security_audit_ships_for_github(generated_project):
     # Least privilege: the audit only reads the repo; only the image build may publish.
     assert config['permissions'] == {'contents': 'read'}
     assert config['jobs']['secure']['permissions'] == {'contents': 'read', 'packages': 'read'}
+
+
+def test_building_a_wheel_does_not_depend_on_the_advisory_database(generated_project):
+    """`build` composes the SBOM and builds; it does not audit.
+
+    The SBOM belongs to the build — `uv build` ships it inside the wheel, and it is derived
+    from the lockfile and the tree. The audit does not: its answer depends on the advisory
+    database on the day it runs, so bundling them meant a newly published CVE made it
+    impossible to produce a wheel from code that built yesterday, blocking a hotfix on an
+    advisory it had nothing to do with.
+    """
+    project, _ = generated_project
+    build_py = (project / '_CI' / 'tasks' / 'build.py').read_text(encoding='utf-8')
+    assert 'run_steps(sbom, package)' in build_py, 'build no longer composes the SBOM before building'
+    assert 'from .secure import sbom' in build_py, 'build imports more of secure than the SBOM half'
+    # The word appears in the docstring explaining its absence; what must not appear is a call.
+    assert 'audit(' not in build_py, 'build audits dependencies again, so a fresh CVE blocks every wheel'
+
+
+def test_publishing_audits_before_it_builds(generated_project):
+    """`release.dist` audits, so the decoupling above does not leave publishing unguarded.
+
+    Publishing is the moment the outside world is exposed to what these dependencies
+    contain, and the one place where refusing to proceed protects somebody.
+    """
+    project, _ = generated_project
+    release_py = (project / '_CI' / 'tasks' / 'release.py').read_text(encoding='utf-8')
+    dist = release_py.split("@logged('release.dist')", 1)[1].split('@task', 1)[0]
+    assert 'audit(context)' in dist, 'release.dist publishes without auditing'
+    assert dist.index('audit(context)') < dist.index('build(context)'), 'the audit runs after the build'
 
 
 def test_qa_steps_include_the_security_audit():

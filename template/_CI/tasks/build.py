@@ -5,7 +5,7 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .secure import secure
+from .secure import sbom
 from .shared import apply_badge, logged, note, run, run_steps
 
 STATUS_COLORS = {'passing': 'brightgreen', 'failing': 'red'}
@@ -42,9 +42,15 @@ def package(context: Context) -> None:
 @task
 @logged('build')
 def build(context: Context) -> None:
-    """Run security checks and build the package; reports all failures before exiting."""
+    """Compose the SBOM and build the package; reports all failures before exiting.
+
+    Deterministic from the tree: the SBOM comes from the lockfile, and `uv build` ships it
+    inside the wheel. There is no dependency audit here on purpose — see `secure.sbom` — so a
+    wheel can still be built when a fresh advisory lands. `release.dist` audits before it
+    builds, which is where refusing to proceed actually protects someone.
+    """
     try:
-        run_steps(secure, package)(context)
+        run_steps(sbom, package)(context)
     except SystemExit:
         update_build_badge('failing')
         raise

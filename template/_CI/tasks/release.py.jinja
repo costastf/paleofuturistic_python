@@ -16,7 +16,9 @@ from .configuration import OIDC_ENV_VARS, SBOM_FILE, UV_PUBLISH_SETTINGS
 {%- endif %}
 from .{{ git_hosting_service }} import create_release_pr, pr_create_url
 {%- if integrate_dependency_track %}
-from .secure import sbom_upload
+from .secure import audit, sbom_upload
+{%- else %}
+from .secure import audit
 {%- endif %}
 from .shared import commit, execute, logged
 
@@ -143,8 +145,14 @@ def dist(context: Context) -> None:
     building and uploading them — CI attests their provenance there. Anything that inspects
     ``dist/`` must run against the exact files that get published, which is why ``publish
     --prebuilt`` exists rather than simply building a second time.
+
+    The dependency audit runs here rather than inside ``build``. Publishing is the moment the
+    outside world is exposed to what these dependencies contain, so it is the moment worth
+    blocking on a live advisory; merely building a wheel locally is not, and coupling the two
+    meant a new CVE could stop a hotfix from being built at all.
     """
     clean(context)
+    audit(context)
     build(context)
 
 

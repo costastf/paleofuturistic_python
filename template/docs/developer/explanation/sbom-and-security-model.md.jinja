@@ -26,7 +26,26 @@ What it doesn't catch:
 - Vulnerabilities in the project's *own* code.
 - Misuse of a safe dependency.
 
-Runs on every CI pipeline.
+**When it runs, and why not on every push.** The audit's answer depends on the advisory
+database at the moment it runs, not on your branch — so a pull request that touches a docstring
+can go red because a CVE was published overnight, for something its author neither introduced
+nor can fix. A pipeline that fails for reasons outside the author's control is one people learn
+to ignore, so it is triggered on the axes it actually varies along:
+
+- **On a schedule** (daily), which is what makes the expiry dates in `.security-overrides`
+  load-bearing — a dependency can turn out to be vulnerable, and an override can come due,
+  without anyone pushing anything.
+- **On pushes that change the dependency surface** — `uv.lock`, `pyproject.toml`,
+  `.security-overrides`. Change what you depend on and you own the result.
+- **Before publishing.** `release.dist` audits before it builds. That is the moment the outside
+  world is exposed to these dependencies, and the one place where refusing to proceed protects
+  somebody.
+
+It is deliberately *not* part of `build`. The SBOM is (see Layer 2 — `uv build` ships it inside
+the wheel), but the audit is not: coupling them meant a newly published CVE made it impossible
+to produce a wheel from code that built yesterday, blocking a hotfix on an advisory that had
+nothing to do with it. `./workflow.cmd preflight --audit-dependencies` is how you run it
+locally alongside everything else.
 
 ## Layer 2 — CycloneDX SBOM
 

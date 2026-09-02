@@ -106,12 +106,29 @@ preflight:
   script:
     - ./workflow.cmd preflight --check
 
+# Not on every pipeline. An audit's answer depends on the advisory database on the day it
+# runs, not on the branch, so running it everywhere fails merge requests for something the
+# author did not introduce and cannot fix in their branch — and a pipeline that goes red for
+# reasons outside the author's control is one people learn to ignore. The `changes:` rule
+# narrows it to the files that can actually introduce a vulnerable dependency.
+#
+# What that leaves uncovered — a dependency that turns vulnerable while nobody is touching
+# it, and `.security-overrides` entries coming due — belongs to a scheduled pipeline. Add one
+# under CI/CD → Schedules; `$CI_PIPELINE_SOURCE == "schedule"` below is what makes it run the
+# audit regardless of what changed. Publishing is gated separately: `release.dist` audits
+# before it builds.
 secure:
   stage: ci
   image: $DEPS_IMAGE
   needs:
     - job: build-deps-image
       artifacts: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - changes:
+        - uv.lock
+        - pyproject.toml
+        - .security-overrides
   before_script:
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
   script:

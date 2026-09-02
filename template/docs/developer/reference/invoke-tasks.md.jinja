@@ -13,10 +13,10 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 | `format` | `format.ruff` | Ruff format + import sort. |
 | `lint` | `lint.all` | Runs ruff, pylint, ty, complexipy, commitizen. |
 | `test` | `test.all` | pytest with coverage and xdist. |
-| `build` | `build.package` | Security checks + `uv build`. |
+| `build` | `build.package` | SBOM compose + validate, then `uv build`. No dependency audit — see `secure`. |
 | `release` | `release` | Validate, branch, bump, changelog, push, open PR/MR. |
 | `quality` | `quality.pyscn-analyze` | pyscn static analysis with HTML report. |
-| `secure` | `secure.all` | pip-audit + SBOM generate + (optional) DT upload. |
+| `secure` | `secure.all` | Every security task at once: pip-audit + SBOM compose/validate. Nothing automated calls it; the pieces have their own homes. |
 | `document` | `document` | properdocs build + view in browser. |
 | `container` | `container.publish` | Build deps image; in CI pushes to the registry. |
 
@@ -87,7 +87,7 @@ what the collapsed hook no longer does for you: `./workflow.cmd lint.pylint --pa
 | `release.bump` | `-i <type>` | `cz bump` with the given increment (major/minor/patch/alpha/beta/rc). |
 | `release.changelog` | `--write` | Generate changelog. `--write` persists and commits, signing per `commit.gpgsign`. |
 | `release.push` | — | `git push` + `git push --tags`. |
-| `release.dist` | — | Clean and build into `dist/`, leaving the artifacts for inspection{% if git_hosting_service == 'github' %} or attestation{% endif %}. |
+| `release.dist` | — | Audit dependencies, then clean and build into `dist/`, leaving the artifacts for inspection{% if git_hosting_service == 'github' %} or attestation{% endif %}. The audit is here rather than in `build`: publishing is where a live advisory should stop you. |
 | `release.publish` | `--prebuilt` | Build + `uv publish` + SBOM upload (if DT enabled). Invoked from CI on release-tag merge. `--prebuilt` publishes what `release.dist` already built instead of rebuilding. |
 | `release.clean` | — | Remove `dist/` and `sbom.json`. |
 {%- if integrate_dependency_track %}
@@ -98,7 +98,8 @@ what the collapsed hook no longer does for you: `./workflow.cmd lint.pylint --pa
 
 | Task | Args | What it does |
 | --- | --- | --- |
-| `secure.audit` | — | pip-audit honoring `.security-overrides`. |
+| `secure.audit` | — | pip-audit honoring `.security-overrides`. Runs on a schedule, on pushes that change the dependency surface, and before publishing — deliberately not on every push, and not from `build`. |
+| `secure.sbom` | — | The half `build` depends on: `sbom-extract --write` + `sbom-validate`. |
 | `secure.sbom-extract` | `--write` | Compose a CycloneDX 1.7 SBOM with metadata header (lifecycles, tools, supplier, authors), a two-level dependency graph (project → runtime + dev + build-environment; build-environment → vendored + pipeline), and per-component licence + hash + external-reference enrichment. Prints to stdout; with `--write` lands at `src/<slug>/sbom.cdx.json` so `uv build` ships it inside the wheel. |
 | `secure.sbom-validate` | — | Validate the SBOM against the CycloneDX 1.7 JSON schema (runs the validator in a clean `uv run python` subprocess so the venv-installed `jsonschema` wins over the older vendored one). Re-runs sbom-extract first if the file is missing. |
 {%- if integrate_dependency_track %}

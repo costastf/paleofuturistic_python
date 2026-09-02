@@ -107,31 +107,6 @@ jobs:
       - name: Verify checks and derived files
         run: ./workflow.cmd preflight --check
 
-  secure:
-    name: Security audit
-    needs: build-deps-image
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      # Pulling the deps image from ghcr goes through GITHUB_TOKEN; without
-      # `packages: read` the manifest request comes back 403.
-      packages: read
-    container:
-      image: ${{ needs.build-deps-image.outputs.image }}
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-        with:
-          # See the note above the jobs for why.
-          persist-credentials: false
-
-      - name: Audit dependencies
-        run: ./workflow.cmd secure.audit
-
   build:
     name: Build
     needs: build-deps-image
