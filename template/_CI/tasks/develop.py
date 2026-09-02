@@ -35,7 +35,13 @@ def pre_commit_install(context: Context) -> None:
 @logged('develop.pre-commit')
 @run('uv run pre-commit run --all-files')
 def pre_commit(context: Context) -> None:
-    """Run all pre-commit hooks on the entire codebase."""
+    """Run the commit-stage hooks over the entire codebase.
+
+    This is the hooks' own view of the world — pre-commit runs the commit stage by default, so
+    what this covers is the staged bundle (formatting, ruff, pylint, complexipy) widened to
+    every file. It is not the full check: ty, pyscn, the test suite and the derived files live
+    on pre-push. `./workflow.cmd preflight` is the command that runs everything.
+    """
 
 
 @task

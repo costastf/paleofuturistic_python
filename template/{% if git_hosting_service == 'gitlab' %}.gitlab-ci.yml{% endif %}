@@ -87,6 +87,25 @@ test:
   script:
     - ./workflow.cmd test.tox
 
+# The same command the pre-push hook runs, which is the point: a derived file that is stale
+# here would have failed the push too, so this job is a backstop rather than a surprise. It
+# covers what no other job does — that the README badges and the coverage ratchet's
+# `fail_under` match what the tools now measure.
+#
+# `--check` is not optional here. The job has no write access to the repository, so it could
+# not commit a refreshed badge even if it wanted to; its only useful move is to fail and name
+# the command that fixes it.
+preflight:
+  stage: ci
+  image: $DEPS_IMAGE
+  needs:
+    - job: build-deps-image
+      artifacts: true
+  before_script:
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+  script:
+    - ./workflow.cmd preflight --check
+
 secure:
   stage: ci
   image: $DEPS_IMAGE

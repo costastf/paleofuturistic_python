@@ -1255,51 +1255,109 @@ def pre_commit_hooks(project):
         yield from repo['hooks']
 
 
-def test_no_commit_stage_hook_rewrites_tracked_files(generated_project):
+def hook_stages(hook):
+    """Return a hook's stages, defaulting to pre-commit as pre-commit itself does."""
+    return hook.get('stages') or ['pre-commit']
+
+
+def invoked_task(hook):
+    """Return the workflow task a hook runs, seeing through any `sh -c …` wrapper."""
+    match = re.search(r'\./workflow\.cmd\s+([\w.-]+)', hook['entry'])
+    return match.group(1) if match else ''
+
+
+def registry_steps(project):
+    """Return ``{step name: scope}`` parsed out of the generated `_CI/tasks/preflight.py`.
+
+    Read as source rather than imported: importing it would pull in invoke and every task
+    module behind it, which this suite has no reason to install just to read a declaration.
+    """
+    source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(getattr(target, 'id', None) == 'STEPS' for target in node.targets):
+            continue
+        return {call.args[0].value: call.args[1].id for call in node.value.elts}
+    pytest.fail('preflight.py declares no STEPS registry')
+
+
+def test_no_commit_stage_hook_rewrites_unstaged_tracked_files(generated_project):
     """No `pre-commit`-stage hook runs a task that writes README.md or pyproject.toml.
 
-    The `test` aggregator updates the coverage badge and ratchets `fail_under`. Run from a
-    commit hook, pre-commit aborted the commit with "files were modified by this hook" —
-    after the message was written, for files the author never staged. That is what teaches
-    people `--no-verify`, which then disables every hook here at once.
+    `preflight` updates the four badges and ratchets `fail_under`; the `test` aggregator used
+    to do the coverage half of that. Run from a commit hook, either one aborted the commit with
+    "files were modified by this hook" — after the message was written, for files the author
+    never staged. That is what teaches people `--no-verify`, which then disables every hook
+    here at once. `preflight --check` on pre-push is the shape that gets the guarantee without
+    the writes, and `preflight.staged` is deliberately absent from this set: it rewrites only
+    files the author staged, which is a formatter doing its job.
     """
     project, _ = generated_project
-    mutating = {'test', 'document', 'build', 'quality.pyscn-analyze', 'test.coverage'}
+    mutating = {'preflight', 'test', 'document', 'build', 'quality.pyscn-analyze', 'test.coverage'}
     for hook in pre_commit_hooks(project):
-        if 'pre-commit' not in (hook.get('stages') or ['pre-commit']):
+        if 'pre-commit' not in hook_stages(hook):
             continue
-        invoked = hook['entry'].removeprefix('./workflow.cmd').strip()
+        invoked = invoked_task(hook)
         hook_id = hook['id']
         assert invoked not in mutating, f'commit-stage hook {hook_id!r} runs {invoked!r}, which rewrites files'
 
 
-def test_per_file_hooks_check_only_staged_files(generated_project):
-    """The per-file tools receive the staged files instead of sweeping the whole project.
+def test_commit_stage_is_one_invocation_of_the_per_file_steps(generated_project):
+    """The commit stage runs the staged bundle in a single `./workflow.cmd` invocation.
 
-    Each wraps the task in `sh -c … --paths="$*"`: pre-commit appends filenames as separate
-    arguments, and Invoke would read the second one as another task name, so they have to be
-    collapsed into one option value.
+    Each invocation costs ~1.3s of interpreter and import startup before a tool runs, so the
+    six hooks this replaced spent most of a commit's budget starting up: ~8s of startup to do
+    ~2s of checking. One hook pays it once, which is what keeps the stage worth leaving on.
     """
     project, _ = generated_project
-    hooks = {hook['id']: hook for hook in pre_commit_hooks(project)}
-    for hook_id in ('format', 'ruff', 'pylint', 'complexipy'):
-        hook = hooks[hook_id]
-        assert hook.get('pass_filenames') is True, f'{hook_id} does not receive the staged files'
-        assert '--paths="$*"' in hook['entry'], f'{hook_id} does not collapse filenames into --paths'
+    code_hooks = [
+        hook for hook in pre_commit_hooks(project) if 'pre-commit' in hook_stages(hook) and invoked_task(hook)
+    ]
+    invoked = sorted(invoked_task(hook) for hook in code_hooks)
+    assert invoked == ['preflight.staged', 'secure.validate-overrides'], (
+        f'the commit stage runs {invoked}, so it no longer pays startup exactly once for the code checks'
+    )
+    staged = next(hook for hook in code_hooks if invoked_task(hook) == 'preflight.staged')
+    assert staged.get('pass_filenames') is True, 'the staged bundle does not receive the staged files'
+    assert '--paths="$*"' in staged['entry'], 'the staged bundle does not collapse filenames into --paths'
 
 
-def test_whole_program_checks_are_not_scoped_to_staged_files(generated_project):
-    """Ty and pyscn keep seeing the whole project, because a per-file view answers wrongly.
+def test_commit_stage_filter_is_not_narrower_than_the_steps_it_runs(generated_project):
+    """The one remaining `files:` filter is the union of the per-file steps' own filters.
+
+    Collapsing six hooks into one left a single `files:` key in front of four tools that do not
+    agree on what they check — complexipy is `src/` only, the rest also cover `_CI/tasks/` and
+    `tests/`. The per-tool filters therefore moved into the registry, and this hook has to pass
+    through everything any of them wants: a filter narrower than the widest step would drop
+    files that step should have seen, silently.
+    """
+    project, _ = generated_project
+    source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
+    widest = re.search(r"CODE_FILES = re\.compile\(r'([^']+)'\)", source)
+    assert widest, 'preflight.py no longer declares CODE_FILES'
+    staged = next(hook for hook in pre_commit_hooks(project) if invoked_task(hook) == 'preflight.staged')
+    assert staged['files'] == widest.group(1), (
+        f"hook filter {staged['files']!r} does not match the registry's widest per-file filter {widest.group(1)!r}"
+    )
+
+
+def test_whole_program_steps_are_never_scoped_to_a_diff(generated_project):
+    """ty, pyscn and pytest are declared whole-program, and so never run at commit stage.
 
     ty: a changed signature fails in the *callers*, which a narrowed run never looks at.
     pyscn: dead code and duplicate blocks are relationships between files.
+    pytest: a passing changed test says nothing about the ones it broke.
+
+    Their cost also scales with the size of the project rather than of the change, which is
+    what would have made commits slower and slower as the project grew.
     """
     project, _ = generated_project
-    hooks = {hook['id']: hook for hook in pre_commit_hooks(project)}
-    for hook_id in ('ty', 'pyscn'):
-        hook = hooks[hook_id]
-        assert hook.get('pass_filenames') is False, f'{hook_id} was narrowed to staged files'
-        assert '--paths' not in hook['entry'], f'{hook_id} was narrowed to staged files'
+    steps = registry_steps(project)
+    for name in ('ty', 'pyscn', 'pytest', 'artifacts'):
+        assert steps.get(name) == 'WHOLE_PROGRAM', f'{name} is declared {steps.get(name)!r}, not whole-program'
+    commit_stage = {invoked_task(hook) for hook in pre_commit_hooks(project) if 'pre-commit' in hook_stages(hook)}
+    assert 'preflight' not in commit_stage, 'the whole-program bundle runs on every commit'
 
 
 def test_path_taking_tasks_accept_a_paths_argument(generated_project):
@@ -1316,23 +1374,30 @@ def test_path_taking_tasks_accept_a_paths_argument(generated_project):
     assert 'paths or PATHS' in lint_py, 'lint tasks do not fall back to the project-wide paths'
 
 
-def test_suite_runs_on_pre_push(generated_project):
-    """The test suite gates pushes, not commits, and uses the non-mutating task."""
+def test_whole_program_gate_runs_on_pre_push_in_check_mode(generated_project):
+    """The whole-program bundle gates pushes, not commits, and writes nothing tracked.
+
+    `--check` is what makes it safe to run from a hook at all: the same registry, the same
+    steps, no write to a tracked file, and a failure that names the command to fix it.
+    """
     project, _ = generated_project
     hooks = {hook['id']: hook for hook in pre_commit_hooks(project)}
-    test_hook = hooks['test']
-    assert test_hook['stages'] == ['pre-push'], f'test hook stages are {test_hook["stages"]}'
-    assert test_hook['entry'].endswith('test.pytest'), f'test hook runs {test_hook["entry"]!r}'
+    gate = hooks['preflight']
+    assert gate['stages'] == ['pre-push'], f'preflight hook stages are {gate["stages"]}'
+    assert invoked_task(gate) == 'preflight', f'preflight hook runs {gate["entry"]!r}'
+    assert '--check' in gate['entry'], f'the pre-push hook would rewrite tracked files: {gate["entry"]!r}'
+    assert gate.get('pass_filenames') is False, 'the whole-program gate was narrowed to the pushed files'
     installed = yaml.safe_load((project / '.pre-commit-config.yaml').read_text(encoding='utf-8'))
     assert 'pre-push' in installed['default_install_hook_types'], 'pre-push hooks would never be installed'
 
 
 def test_pre_push_gate_enforces_the_same_coverage_floor(generated_project):
-    """`test.pytest` and the `test` aggregator share one pytest invocation, so the floor holds.
+    """The gate's pytest step is the same task the `test` aggregator runs, so the floor holds.
 
     Coverage is enforced by pytest-cov from `[tool.coverage.report] fail_under`, driven by the
-    `--cov` flags in `addopts`. Moving the hook to `test.pytest` therefore drops the badge and
-    ratchet writes without weakening the gate.
+    `--cov` flags in `addopts`. Both the registry's `pytest` step and the aggregator delegate
+    to that one task, so gating on `preflight --check` instead of the aggregator drops the
+    badge and ratchet writes without weakening the gate.
     """
     project, _ = generated_project
     data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
@@ -1341,6 +1406,73 @@ def test_pre_push_gate_enforces_the_same_coverage_floor(generated_project):
     test_py = (project / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
     aggregator = test_py.split("@logged('test')", 1)[1]
     assert 'run_steps(pytest)' in aggregator, 'the aggregator no longer delegates to the same pytest task'
+    preflight_py = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
+    assert 'from .test import pytest' in preflight_py, 'the registry no longer runs the shared pytest task'
+
+
+def test_ci_runs_the_same_gate_as_the_pre_push_hook(generated_project):
+    """CI's preflight job runs the identical command the pre-push hook does.
+
+    This is the property that stops local and remote from disagreeing: a badge that is stale in
+    the pipeline would have failed the push, so the pipeline is a backstop rather than the
+    place you first hear about it. CI cannot commit a refresh either way — the checkout is
+    credential-less and the token is read-only — so failing with the fix command is all it can
+    usefully do.
+    """
+    project, cell = generated_project
+    gate = next(hook for hook in pre_commit_hooks(project) if hook['id'] == 'preflight')
+    command = gate['entry']
+    if cell['git_hosting_service'] == 'github':
+        workflow = yaml.safe_load(
+            (project / '.github' / 'workflows' / 'continuous-integration.yaml').read_text(encoding='utf-8')
+        )
+        job = workflow['jobs']['preflight']
+        commands = [step.get('run') for step in job['steps']]
+        assert job['permissions']['contents'] == 'read', 'the preflight job can write to the repository'
+    else:
+        pipeline = yaml.safe_load((project / '.gitlab-ci.yml').read_text(encoding='utf-8'))
+        commands = pipeline['preflight']['script']
+    assert command in commands, f'no CI job runs {command!r}; it runs {commands}'
+
+
+def test_readme_has_exactly_one_writer(generated_project):
+    """Every write to README.md goes through `apply_badge`, so check mode cannot drift.
+
+    `preflight --check` is only trustworthy if it compares against the same substitution the
+    writer applies. A second module that rewrote a badge its own way would be invisible to the
+    check — the badge would be updated by one code path and verified by another, which is the
+    failure this whole shape exists to prevent.
+    """
+    project, _ = generated_project
+    tasks = project / '_CI' / 'tasks'
+    for module in sorted(tasks.glob('*.py')):
+        source = module.read_text(encoding='utf-8')
+        if 'README.md' not in source or module.name == 'shared.py':
+            continue
+        assert 'write_text' not in source, f'{module.name} writes README.md without going through apply_badge'
+
+
+def test_derived_values_are_computed_in_both_modes_by_one_function(generated_project):
+    """Each derived value has a single updater that takes `write`, rather than a paired checker.
+
+    The generator and the gate being one function is what makes `preflight --check` mean
+    anything. Splitting them — a writer here, a verifier there — is exactly how a check ends up
+    passing on a value the writer would have changed.
+    """
+    project, _ = generated_project
+    tasks = project / '_CI' / 'tasks'
+    updaters = {
+        'quality.py': ['update_pyscn_badge'],
+        'test.py': ['update_coverage_badge', 'ratchet_fail_under'],
+        'document.py': ['update_package_version_badge', 'update_python_badge'],
+    }
+    for filename, names in updaters.items():
+        tree = ast.parse((tasks / filename).read_text(encoding='utf-8'))
+        functions = {node.name: node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)}
+        for name in names:
+            assert name in functions, f'{filename} no longer defines {name}'
+            kwonly = [argument.arg for argument in functions[name].args.kwonlyargs]
+            assert 'write' in kwonly, f'{name} takes no keyword-only `write`, so it cannot verify without writing'
 
 
 def test_local_task_module_ships_with_a_namespace(generated_project):

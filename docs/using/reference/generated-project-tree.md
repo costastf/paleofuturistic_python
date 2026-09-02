@@ -32,10 +32,11 @@ example_project/
 │       ├── github.py            (Only if git_hosting_service=github)
 │       ├── gitlab.py            (Only if git_hosting_service=gitlab)
 │       ├── lint.py              ruff/pylint/ty/complexipy/commitizen
+│       ├── preflight.py         Step registry; preflight + preflight.staged
 │       ├── quality.py           pyscn
 │       ├── release.py           Validate, bump, changelog, push, publish
 │       ├── secure.py            pip-audit, SBOM, (optional) DT upload
-│       ├── shared.py            @logged, @run, execute(), run_steps()
+│       ├── shared.py            @logged, @run, execute(), run_steps(), apply_badge()
 │       └── test.py              pytest + coverage
 ├── Dockerfile.deps              Multi-stage deps-cache image
 ├── LICENSE                      Selected at generation time

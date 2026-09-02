@@ -11,56 +11,66 @@ from .github import request_pages_build
 {% endif -%}
 from .quality import update_pyscn_badge
 {% if integrate_pages and git_hosting_service == 'github' -%}
-from .shared import execute, is_ci, logged, open_target, run, run_steps
+from .shared import apply_badge, execute, is_ci, logged, note, open_target, run, run_steps
 {%- else -%}
-from .shared import is_ci, logged, open_target, run, run_steps
+from .shared import apply_badge, is_ci, logged, note, open_target, run, run_steps
 {%- endif %}
 from .test import update_coverage_badge
 
 
-def update_package_version_badge() -> None:
-    """Update the package version badge in README.md from pyproject.toml."""
-    readme = Path('README.md')
+def update_package_version_badge(*, write: bool = True) -> str | None:
+    """Bring the README's version badge in line with the version in pyproject.toml.
+
+    Args:
+        write: Update README.md. When False, report what would change and touch nothing.
+
+    Returns:
+        None when the badge is already right, else a one-line reason it is not.
+    """
     pyproject = Path('pyproject.toml')
-    if not readme.exists() or not pyproject.exists():
-        return
+    if not pyproject.exists():
+        return None
     match = re.search(r'^version\s*=\s*"([^"]+)"', pyproject.read_text(encoding='utf-8'), re.MULTILINE)
     if not match:
-        return
+        return None
     version = match.group(1)
-    content = readme.read_text(encoding='utf-8')
-    updated = re.sub(
+    return apply_badge(
+        Path('README.md'),
         r'(\[!\[Version\]\(https://img\.shields\.io/badge/version-)[^)]+(\))',
         rf'\g<1>{version}-blue\2',
-        content,
+        label='version badge',
+        detail=version,
+        write=write,
     )
-    if updated != content:
-        readme.write_text(updated, encoding='utf-8')
-        print(f'Updated version badge to {version}.')
 
 
-def update_python_badge() -> None:
-    """Update the Python version badge in README.md from pyproject.toml classifiers."""
-    readme = Path('README.md')
+def update_python_badge(*, write: bool = True) -> str | None:
+    """Bring the README's Python badge in line with the classifiers in pyproject.toml.
+
+    Args:
+        write: Update README.md. When False, report what would change and touch nothing.
+
+    Returns:
+        None when the badge is already right, else a one-line reason it is not.
+    """
     pyproject = Path('pyproject.toml')
-    if not readme.exists() or not pyproject.exists():
-        return
+    if not pyproject.exists():
+        return None
     versions = re.findall(
         r'"Programming Language :: Python :: (\d+\.\d+)"',
         pyproject.read_text(encoding='utf-8'),
     )
     if not versions:
-        return
+        return None
     label = '%20%7C%20'.join(versions)
-    content = readme.read_text(encoding='utf-8')
-    updated = re.sub(
+    return apply_badge(
+        Path('README.md'),
         r'(\[!\[Python\]\(https://img\.shields\.io/badge/python-)[^)]+(\))',
         rf'\g<1>{label}-blue?logo=python&logoColor=white\2',
-        content,
+        label='Python badge',
+        detail=' | '.join(versions),
+        write=write,
     )
-    if updated != content:
-        readme.write_text(updated, encoding='utf-8')
-        print(f'Updated Python badge to {" | ".join(versions)}.')
 
 
 @task
@@ -100,10 +110,13 @@ def deploy_github(context: Context) -> None:
 @logged('document')
 def document(context: Context) -> None:
     """Build and open the documentation; reports all failures before exiting."""
-    update_package_version_badge()
-    update_python_badge()
-    update_coverage_badge()
-    update_pyscn_badge()
+    for reason in (
+        update_package_version_badge(),
+        update_python_badge(),
+        update_coverage_badge(),
+        update_pyscn_badge(),
+    ):
+        note(reason)
     run_steps(build, view)(context)
 
 

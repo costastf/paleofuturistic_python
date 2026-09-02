@@ -73,6 +73,40 @@ jobs:
       - name: Run tests
         run: ./workflow.cmd test.tox
 
+  preflight:
+    name: Preflight
+    needs: build-deps-image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Pulling the deps image from ghcr goes through GITHUB_TOKEN; without
+      # `packages: read` the manifest request comes back 403.
+      packages: read
+    container:
+      image: ${{ needs.build-deps-image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          # See the note above the jobs for why.
+          persist-credentials: false
+
+      # The same command the pre-push hook runs, which is the point: a derived file that is
+      # stale here would have failed the push too, so this job is a backstop rather than a
+      # surprise. It covers what no other job does — that the README badges and the coverage
+      # ratchet's `fail_under` match what the tools now measure.
+      #
+      # `--check` is not optional here. `permissions: contents: read` and the
+      # `persist-credentials: false` checkout above mean this job could not commit a
+      # refreshed badge even if it wanted to; its only useful move is to fail and name the
+      # command that fixes it.
+      - name: Verify checks and derived files
+        run: ./workflow.cmd preflight --check
+
   secure:
     name: Security audit
     needs: build-deps-image

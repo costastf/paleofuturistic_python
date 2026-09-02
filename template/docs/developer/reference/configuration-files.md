@@ -33,37 +33,49 @@ Empty placeholder. Tox config lives in `pyproject.toml`'s `[tool.tox]`. The file
 
 Hook definitions, split across three git stages:
 
-| Stage | Hooks | Scope |
-|---|---|---|
-| `commit-msg` | commitizen (conventional-commit format) | the message |
-| `pre-commit` | ruff format, ruff, pylint, complexipy | **staged files only** |
-| `pre-commit` | ty, pyscn, `.security-overrides` validation | whole project |
-| `pre-push` | the test suite | whole project |
+| Stage | Hooks | Scope | Cost on a fresh project |
+|---|---|---|---|
+| `commit-msg` | commitizen (conventional-commit format) | the message | ~2s |
+| `pre-commit` | `preflight.staged` — ruff format, ruff, pylint, complexipy | **staged files only** | ~2.9s |
+| `pre-commit` | `.security-overrides` validation | that file, when staged | ~1.5s |
+| `pre-push` | `preflight --check` — ty, pyscn, tests, derived files | whole project | ~10s |
 
-**Per-file tools get only the staged files.** A one-line change costs a one-file check
-rather than a sweep of `src/ _CI/tasks/ tests/`. Each of those hooks wraps the task in
-`sh -c '… --paths="$*"' --`, which collapses the file list pre-commit appends into the
-single `--paths` value Invoke expects — passed bare, Invoke reads the second filename as
-another task name and fails. Filenames containing spaces are not supported by that
-marshalling.
+**The commit stage is one hook, one invocation.** It used to be six, and that was the
+expensive part: `./workflow.cmd` spends about 1.3s on interpreter and imports before any tool
+runs, so six hooks paid ~8s of startup to do ~2s of checking. The same four checks in one
+invocation measure ~2.9s, of which 1.6s is the single startup.
 
-**Two checks stay whole-project deliberately**, because a per-file view gives a wrong
-answer rather than a partial one:
+Which tools run there is decided by the step registry in `_CI/tasks/preflight.py`, not by this
+file. The registry also holds the per-tool path filters that used to be the `files:` key of
+each hook (complexipy is `src/` only; the rest also cover `_CI/tasks/` and `tests/`), so a
+commit touching only `tests/` still skips complexipy. The one `files:` left here is the union
+of them, and an invariant test asserts it is never narrower than the widest step's own filter.
 
-- **ty** — type checking is whole-program. A changed signature surfaces as an error in the
-  *callers*, so narrowing the input hides exactly the errors worth catching.
-- **pyscn** — reports dead code and duplicate blocks, both relationships *between* files. A
-  function only looks dead once you know nothing else calls it.
+The hook wraps the task in `sh -c '… --paths="$*"' --`, which collapses the file list
+pre-commit appends into the single `--paths` value Invoke expects — passed bare, Invoke reads
+the second filename as another task name and fails. Filenames containing spaces are not
+supported by that marshalling.
 
-Any of these tasks also takes `--paths` directly, e.g.
-`./workflow.cmd lint.pylint --paths="src/thing.py"`.
+**What runs on pre-commit is what can be judged from the staged files alone.** That is a rule
+about correctness, not speed. ty, pyscn and the test suite are whole-program: a changed
+signature surfaces as an error in its *callers*, a function only looks dead once you know
+nothing else calls it, and a passing changed test says nothing about the ones it broke.
+Narrowing any of them to a diff does not make it faster, it makes it answer wrongly — and
+their cost scales with the size of the *project* rather than of the change, which is what
+would have made commits slower and slower as the project grew. They moved to pre-push, where
+they run once per push and leave commit latency flat.
 
-**The suite sits on pre-push** on purpose. Running it on every commit was slow enough to
-push people towards `--no-verify`, which disables *all* of these at once; on pre-push it
-still stops anything broken reaching the remote. It also runs `test.pytest` rather than
-the `test` aggregator, so it gates without rewriting the README badge or ratcheting
-`fail_under` — writes that belong to a deliberate `./workflow.cmd test`, not to a hook
-firing mid-commit.
+**The pre-push hook runs `preflight --check`, and the `--check` is the load-bearing part.**
+`preflight` on its own writes the four README badges and ratchets `fail_under`; from a hook
+that meant aborting with "files were modified by this hook" for files the author never staged,
+which is what teaches people `--no-verify` and so disables every hook here at once. `--check`
+runs the identical registry, writes nothing tracked, and fails naming the command that fixes
+it. It is also the exact command the CI preflight job runs, so a stale badge cannot pass
+locally and then fail in the pipeline.
+
+Every underlying task remains callable on its own, which is the escape hatch when you want one
+tool: `./workflow.cmd lint.pylint --paths="src/thing.py"`. Need to push past the gate once?
+`SKIP=preflight git push` leaves the other hooks in place, unlike `--no-verify`.
 
 Edit to add hooks; don't remove the existing ones without thinking — they keep the main
 branch clean.

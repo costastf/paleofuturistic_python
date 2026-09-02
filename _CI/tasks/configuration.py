@@ -22,7 +22,11 @@ IGNORE_PATTERNS = shutil.ignore_patterns('.git', '.venv', '__pycache__', '*.pyc'
 # vulnerable dependency fails fast. It is also the step the `<PROJECT>_SECURITY_OVERRIDE`
 # plumbing below exists to serve — until it was listed here, that env var was set for
 # nothing and the `.security-overrides` expiry mechanism gated no automated run at all.
-QA_STEPS = ('format', 'lint', 'secure.audit', 'test.tox', 'build', 'document')
+# `preflight` sits after the tools it aggregates rather than replacing them: run on its own it
+# would hide which of format/lint failed behind one red step. Here it adds what nothing else in
+# this list covers — pyscn, and the badge and `fail_under` writes — so every matrix cell proves
+# the does-it-all command works on a freshly generated project, not just its parts.
+QA_STEPS = ('format', 'lint', 'preflight', 'secure.audit', 'test.tox', 'build', 'document')
 TEMPLATE_SECURITY_OVERRIDE_ENV = 'TEMPLATE_SECURITY_OVERRIDE'
 SECURITY_OVERRIDES_FILE = PROJECT_ROOT_DIRECTORY / '.security-overrides'
 

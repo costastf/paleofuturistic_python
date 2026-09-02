@@ -10,6 +10,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager, suppress
 from contextvars import ContextVar
 from functools import wraps
+from pathlib import Path
 from typing import IO, Any, NamedTuple
 from urllib.parse import urlsplit, urlunsplit
 
@@ -280,6 +281,61 @@ def image_digest_reference(context: Context, engine: str, image: str) -> str:
                 return reference
     print(f'No repo digest recorded for {image}; falling back to the tag.')
     return image
+
+
+def apply_badge(
+    path: Path,
+    pattern: str,
+    replacement: str,
+    *,
+    label: str,
+    detail: str,
+    write: bool,
+    flags: int = 0,
+    announce: bool = True,
+) -> str | None:
+    """Bring a derived value in ``path`` up to date, or report that it is not.
+
+    Every derived value committed to the repository — the four README badges and the coverage
+    ratchet's ``fail_under`` — is written through here, in one of two modes. ``write=True``
+    updates the file; ``write=False`` leaves it alone and reports what it would have changed.
+    The two modes therefore cannot disagree about what "up to date" means: it is the same
+    substitution either way, compared against the same file. A second implementation for the
+    verifying side is exactly how a check drifts from the generator it is supposed to guard.
+
+    ``announce=False`` suppresses the success line for callers that print their own — the
+    coverage ratchet reports every outcome in one ``[ratchet]`` line and would otherwise say
+    the same thing twice.
+
+    Returns None when the file already holds the right value, and a one-line reason otherwise.
+    Callers decide what a stale value costs: ``document`` reports it and carries on, while
+    ``preflight --check`` fails on it. A missing file is not a staleness — nothing can be
+    concluded from it — so it reads as up to date here and is diagnosed by the caller, which
+    is the only one that knows whether the input should have existed.
+    """
+    if not path.exists():
+        return None
+    content = path.read_text(encoding='utf-8')
+    updated = re.sub(pattern, replacement, content, flags=flags)
+    if updated == content:
+        return None
+    if write:
+        path.write_text(updated, encoding='utf-8')
+        if announce:
+            print(f'Updated {label} to {detail}.')
+        return None
+    return f'{label} in {path} is stale — {detail} was measured'
+
+
+def note(reason: str | None) -> None:
+    """Print a staleness reason from ``apply_badge``, if there is one.
+
+    The write-mode callers use this: a derived value that could not be brought up to date is
+    worth saying out loud, but it does not fail the task that happened to notice. Only
+    ``preflight --check`` treats the same reason as a failure.
+    """
+    if reason:
+        print(reason)
 
 
 def execute(context: Context, cmd: str) -> None:
