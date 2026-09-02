@@ -72,7 +72,7 @@ what the collapsed hook no longer does for you: `./workflow.cmd lint.pylint --pa
 | `lint.complexipy` | Cognitive complexity check on `src/`. |
 | `lint.commitizen` | Validate commit messages since last tag. |
 | `test.pytest` | pytest with coverage, xdist, HTML reports. Forward extra pytest args with `--args="…"` (e.g. `--args="-k test_hello"`). |
-| `test.tox` | Full multi-version tox matrix in parallel. Pass `--env=py313` to run a single environment. |
+| `test.tox` | Full multi-version tox matrix in parallel, then `coverage combine` into one `reports/coverage.json` — the union across interpreters, which is what the badge and the ratchet read. Pass `--env=py313` to run a single environment. |
 | `test.coverage` | Print coverage report from the latest run. |
 | `test.view` | Open HTML test + coverage reports in browser. |
 | `quality.pyscn-analyze` | Full pyscn analysis with HTML report. |

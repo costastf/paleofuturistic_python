@@ -370,7 +370,25 @@ dependency_groups = ["test"]
 # env scans the same project root and combines partially-written DBs from the
 # sibling env, producing intermittent `no such table: file` SQLite errors).
 set_env = { COVERAGE_FILE = ".coverage.{envname}" }
-commands = [["pytest", { replace = "posargs", default = [], extend = true }]]
+# Per-env *report* paths for the same reason as the per-env data file above. `addopts` sends
+# every report to one fixed path, so under `run-parallel` all five envs were writing
+# `reports/coverage.json` and `reports/tests.html` at once. Nothing read those files
+# afterwards, so it stayed invisible — until the coverage badge and the `fail_under` ratchet
+# started reading `coverage.json`, at which point they would be reading whichever env
+# happened to finish last, possibly mid-write.
+#
+# pytest-cov keys reports by type, so a `json:`/`html:` spec here replaces the one from
+# `addopts` rather than adding to it; `--html` is single-valued and behaves the same way.
+# `test.tox` combines the per-env data into one `reports/coverage.json` afterwards.
+commands = [
+    [
+        "pytest",
+        "--cov-report=json:reports/coverage.{envname}.json",
+        "--cov-report=html:reports/coverage.{envname}",
+        "--html=reports/tests.{envname}.html",
+        { replace = "posargs", default = [], extend = true },
+    ],
+]
 
 {#- Template-maintainer note (never rendered): one digest per supported Python, because only
     one of them ships into any given project. `./workflow.cmd maintain.bump-uv` re-resolves all

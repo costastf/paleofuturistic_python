@@ -1485,6 +1485,48 @@ def test_ci_runs_the_same_gate_as_the_pre_push_hook(generated_project):
     assert command in commands, f'no CI job runs {command!r}; it runs {commands}'
 
 
+def test_matrix_envs_do_not_share_report_paths(generated_project):
+    """Every tox env writes its reports to its own paths.
+
+    `addopts` sends each report to one fixed path, so under `run-parallel` all five envs wrote
+    `reports/coverage.json` and `reports/tests.html` simultaneously. It stayed invisible while
+    nothing read those files; the moment the coverage badge and the `fail_under` ratchet read
+    `coverage.json`, they would be reading whichever env finished last, possibly mid-write.
+    """
+    project, _ = generated_project
+    data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
+    commands = data['tool']['tox']['env_run_base']['commands']
+    specs = [argument for command in commands for argument in command if isinstance(argument, str)]
+    for flag in ('--cov-report=json:', '--cov-report=html:', '--html='):
+        overrides = [spec for spec in specs if spec.startswith(flag)]
+        assert overrides, f'no per-env override for {flag}'
+        for spec in overrides:
+            assert '{envname}' in spec, f'{spec!r} is a fixed path, so parallel envs clobber each other'
+
+
+def test_matrix_coverage_is_combined_before_anything_reads_it(generated_project):
+    """`test.tox` erases, runs the matrix, then combines into the one report the badge reads.
+
+    Combining takes the union of the lines each interpreter executed, which is the only
+    correct reading of a version matrix: version-gated code cannot be fully covered by any
+    single env, so reading one env's report understates coverage on exactly the code the
+    matrix exists to exercise. The erase is what stops a `.coverage.<env>` left over from an
+    env since removed from `env_list` being folded into that union.
+    """
+    project, _ = generated_project
+    test_py = (project / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
+    # Past the closing `"""`, so the docstring's own mention of combine_coverage — which
+    # precedes every command — cannot satisfy the ordering assertions below.
+    body = test_py.split("@logged('test.tox')", 1)[1].split('@task', 1)[0].split('"""')[-1]
+    for step in ('coverage erase', 'tox run', 'combine_coverage'):
+        assert step in body, f'test.tox no longer runs {step!r}'
+    assert body.index('coverage erase') < body.index('tox run'), 'stale coverage data is not cleared first'
+    assert body.index('tox run') < body.index('combine_coverage'), 'coverage is combined before the matrix runs'
+    combine = test_py.split('def combine_coverage', 1)[1].split('\n@task', 1)[0]
+    assert 'coverage combine' in combine, 'the per-env data is never merged'
+    assert 'coverage json -o {COVERAGE_REPORT}' in combine, 'the union never reaches the report the badge reads'
+
+
 def test_readme_has_exactly_one_writer(generated_project):
     """Every write to README.md goes through `apply_badge`, so check mode cannot drift.
 

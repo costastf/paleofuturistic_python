@@ -187,17 +187,62 @@ def view(context: Context) -> None:
     open_target(context, 'reports/coverage/index.html')
 
 
+def combine_coverage(context: Context) -> None:
+    """Merge the matrix's per-env coverage data into one report.
+
+    ``coverage combine`` takes the *union* of the lines each interpreter executed — a line
+    counts as covered if any env ran it — which is the only correct reading of a version
+    matrix. Version-gated code is the case that makes it obvious:
+
+        if sys.version_info >= (3, 11):
+            import tomllib
+        else:
+            import tomli as tomllib
+
+    Under py310 the ``else`` runs; under py311+ the ``if`` does. No single env can cover both,
+    so every env reports a miss on code the matrix as a whole exercises fully. Reading one
+    env's report — which is what the badge did before, whichever env won the race — therefore
+    understates coverage on exactly the code a five-interpreter matrix exists to test.
+
+    Averaging the per-env percentages would be meaningless: coverage is not a noisy
+    measurement of one quantity, it is the set of lines that ran.
+
+    What the union does *not* tell you is that a line reached only under py314 still works
+    under py310. Nothing about coverage ever did — it measures reach, not correctness, and the
+    tests are what check the latter on all five interpreters.
+
+    ``[tool.coverage.paths]`` is what lets this work at all: each env installs the package into
+    its own site-packages, and that mapping folds those paths back onto ``src/``.
+    """
+    # `--keep` leaves the per-env data files in place, so a single interpreter's numbers can
+    # still be inspected after the fact. `test.tox` erases them before the run instead, which
+    # is what stops a stale env's data from being folded into the union.
+    execute(context, 'uv run coverage combine --keep')
+    execute(context, f'uv run coverage json -o {COVERAGE_REPORT}')
+    # The per-env HTML reports stay for drilling into a single interpreter; this is the
+    # combined view, and the path `test.view` opens.
+    execute(context, 'uv run coverage html -d reports/coverage')
+
+
 @task
 @logged('test.tox')
 def tox(context: Context, env: str = '') -> None:
     """Run the pytest matrix across supported Python versions via tox.
+
+    Leaves one `reports/coverage.json` covering the whole matrix — see `combine_coverage` for
+    why that is a union and not an average, and `[tool.tox.env_run_base]` for why each env
+    writes its own reports on the way there.
 
     Args:
         context: Invoke context.
         env: A single tox environment to run, e.g. ``--env=py313``. When
             omitted, the full matrix runs in parallel.
     """
+    # A `.coverage.<env>` left behind by an env that has since been removed from `env_list`
+    # would be folded into the union and inflate it, so the slate is wiped before the run.
+    execute(context, 'uv run coverage erase')
     execute(context, f'uv run tox run -e {env}' if env else 'uv run tox run-parallel')
+    combine_coverage(context)
 
 
 @task

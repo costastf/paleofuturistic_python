@@ -39,6 +39,23 @@ Coverage regressions still can't slip in silently — they just can't slip in *o
 
 tox + tox-uv runs the test suite against every Python version in the project's range. Configured in `pyproject.toml`'s `[tool.tox]`, generated from `min_python_version` / `max_python_version` at template-render time.
 
+**Coverage across the matrix is a union, not an average.** Each env writes its own coverage data (`.coverage.<envname>`) and its own reports (`reports/coverage.<envname>.json`, `reports/tests.<envname>.html`), and `test.tox` then runs `coverage combine` to produce the single `reports/coverage.json` that the badge and the ratchet read. A line counts as covered if *any* interpreter executed it.
+
+That is the only correct reading of a version matrix, and version-gated code shows why:
+
+```python
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
+```
+
+Under py310 the `else` runs; under py311+ the `if` does. No single env can cover both, so every env reports a miss on code the matrix as a whole exercises completely. On a scaffold with one such branch, each env reports 84.6% with one missing line and one missing branch, while the combined report is 100% with none — the union is the honest number, and averaging the percentages would just be 84.6% again for code that is fully exercised.
+
+What the union does *not* tell you is that a line reached only under py314 also works under py310. Coverage never told you that — it measures reach, not correctness, and the tests check the latter on every interpreter.
+
+One consequence worth knowing: because the ratchet bumps `fail_under` against the union, trimming `env_list` later can genuinely lower measured coverage and fail the next run. That is the ratchet working — coverage really did drop — and lowering the bar is a deliberate, reviewable change, as it is in every other case.
+
 `./workflow.cmd test` runs only one Python version (whichever the active uv venv resolved to). The full matrix runs in CI per shipped workflow, or locally via `./workflow.cmd test.tox` (add `--env=py310` to run a single version). See [Choose the Python version range](../how-to/choose-python-version-range.md) for how the matrix is derived.
 
 ## What we don't ship
