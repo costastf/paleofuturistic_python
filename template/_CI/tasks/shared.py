@@ -223,7 +223,7 @@ def open_on_wsl(context: Context, target: str) -> None:
         return
     # The empty "" is `start`'s window-title argument. Without it cmd.exe reads the
     # quoted path as the title and opens nothing at all.
-    context.run(f'cmd.exe /c start "" "{windows_path}"', echo=True, warn=True)
+    context.run(f"cmd.exe /c start '' '{windows_path}'", echo=True, warn=True)
 
 
 def open_target(context: Context, target: str) -> None:
