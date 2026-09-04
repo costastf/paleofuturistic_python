@@ -17,7 +17,7 @@ The single source of truth for project metadata and tool configuration. Sections
 | `[tool.pytest.ini_options]` | Template (framework), you (markers) | Don't disable coverage; add markers as needed. |
 | `[tool.coverage]` | Template | `fail_under` is ratcheted upward automatically once the ratchet engages. Don't lower it. |
 | `[tool.test-ratchet]` | Template (knob), you (mode) | `mode = "auto-detect"` (default) keeps the coverage ratchet dormant while the scaffolded `test_sanity` is in place; `mode = "strict"` engages it on run #1. See [Testing strategy](../explanation/testing-strategy.md#dormant-during-scaffold). |
-| `[tool.tox]` | Template | Generated from `min_python_version` / `max_python_version`. |
+| `[tool.tox]` | Template (framework), you (`env_list`) | Generated from `min_python_version` / `max_python_version`. Each env writes its own reports and coverage data, which `test.tox` then combines — see [Testing strategy](../explanation/testing-strategy.md#layer-3--tox). Trimming `env_list` shortens the gate locally *and* in CI, which is why it is the only supported way to make the matrix cheaper. |
 | `[tool.commitizen]` | Template | Conventional-Commits parser config used by `cz changelog` and the lint hook. The template does **not** use commitizen's autorelease — the bump is chosen explicitly via `./workflow.cmd release -i <type>`. |
 | `[tool.docker-versions]` | Template | The one image `Dockerfile.deps` builds on, pinned by tag *and* digest. |
 
@@ -33,37 +33,61 @@ Empty placeholder. Tox config lives in `pyproject.toml`'s `[tool.tox]`. The file
 
 Hook definitions, split across three git stages:
 
-| Stage | Hooks | Scope |
-|---|---|---|
-| `commit-msg` | commitizen (conventional-commit format) | the message |
-| `pre-commit` | ruff format, ruff, pylint, complexipy | **staged files only** |
-| `pre-commit` | ty, pyscn, `.security-overrides` validation | whole project |
-| `pre-push` | the test suite | whole project |
+| Stage | Hooks | Scope | Cost on a fresh project |
+|---|---|---|---|
+| `commit-msg` | commitizen (conventional-commit format) | the message | ~2s |
+| `pre-commit` | `preflight.staged` — ruff format, ruff, pylint, complexipy | **staged files only** | ~2.9s |
+| `pre-commit` | `.security-overrides` validation | that file, when staged | ~1.5s |
+| `pre-push` | `preflight` — ty, pyscn, the tox matrix, the wheel, derived files | whole project | ~19s |
 
-**Per-file tools get only the staged files.** A one-line change costs a one-file check
-rather than a sweep of `src/ _CI/tasks/ tests/`. Each of those hooks wraps the task in
-`sh -c '… --paths="$*"' --`, which collapses the file list pre-commit appends into the
-single `--paths` value Invoke expects — passed bare, Invoke reads the second filename as
-another task name and fails. Filenames containing spaces are not supported by that
-marshalling.
+**The commit stage is one hook, one invocation.** It used to be six, and that was the
+expensive part: `./workflow.cmd` spends about 1.3s on interpreter and imports before any tool
+runs, so six hooks paid ~8s of startup to do ~2s of checking. The same four checks in one
+invocation measure ~2.9s, of which 1.6s is the single startup.
 
-**Two checks stay whole-project deliberately**, because a per-file view gives a wrong
-answer rather than a partial one:
+Which tools run there is decided by the step registry in `_CI/tasks/preflight.py`, not by this
+file. The registry also holds the per-tool path filters that used to be the `files:` key of
+each hook (complexipy is `src/` only; the rest also cover `_CI/tasks/` and `tests/`), so a
+commit touching only `tests/` still skips complexipy. The one `files:` left here is the union
+of them, and an invariant test asserts it is never narrower than the widest step's own filter.
 
-- **ty** — type checking is whole-program. A changed signature surfaces as an error in the
-  *callers*, so narrowing the input hides exactly the errors worth catching.
-- **pyscn** — reports dead code and duplicate blocks, both relationships *between* files. A
-  function only looks dead once you know nothing else calls it.
+The hook wraps the task in `sh -c '… --paths="$*"' --`, which collapses the file list
+pre-commit appends into the single `--paths` value Invoke expects — passed bare, Invoke reads
+the second filename as another task name and fails. Filenames containing spaces are not
+supported by that marshalling.
 
-Any of these tasks also takes `--paths` directly, e.g.
-`./workflow.cmd lint.pylint --paths="src/thing.py"`.
+**What runs on pre-commit is what can be judged from the staged files alone.** That is a rule
+about correctness, not speed. ty, pyscn, the test matrix and the wheel are whole-program: a
+changed signature surfaces as an error in its *callers*, a function only looks dead once you
+know nothing else calls it, a passing changed test says nothing about the ones it broke, and a
+package builds from the whole tree or not at all.
+Narrowing any of them to a diff does not make it faster, it makes it answer wrongly — and
+their cost scales with the size of the *project* rather than of the change, which is what
+would have made commits slower and slower as the project grew. They moved to pre-push, where
+they run once per push and leave commit latency flat.
 
-**The suite sits on pre-push** on purpose. Running it on every commit was slow enough to
-push people towards `--no-verify`, which disables *all* of these at once; on pre-push it
-still stops anything broken reaching the remote. It also runs `test.pytest` rather than
-the `test` aggregator, so it gates without rewriting the README badge or ratcheting
-`fail_under` — writes that belong to a deliberate `./workflow.cmd test`, not to a hook
-firing mid-commit.
+**No hook writes anything.** The commit stage used to apply formatting, and that was the odd
+one out twice over: the automated entry points behaved differently from the command a person
+types, and it rewrote the *worktree* while git was mid-commit — which suits a partially staged
+file badly, since the formatter rewrites the whole file including hunks you deliberately left
+out of the index. Unformatted code now fails the commit and names `./workflow.cmd format`. That
+is one extra command, and it owns neither problem.
+
+**The pre-push hook runs `preflight`, with no flag, and that is the load-bearing part.**
+Verifying is the default and `preflight --write` is what updates the four README badges and
+ratchets `fail_under`. From a hook, writing meant aborting with "files were modified by this
+hook" for files the author never staged, which is what teaches people `--no-verify` and so
+disables every hook here at once. The default runs the identical registry, writes nothing
+tracked, and fails naming the command that fixes it. It is also the exact command the CI
+pipeline runs — the whole of it, since the separate lint, test and build jobs folded into this
+one — so nothing in the pipeline can reject what your push accepted, and reproducing a failure
+from the pipeline log means typing what you see. That parity is also why there is no flag to make it run less: a `--quick` that
+dropped the matrix would be a documented way to reopen the gap. The knob that shortens the
+matrix is `env_list` in `pyproject.toml`, which shortens it for CI too.
+
+Every underlying task remains callable on its own, which is the escape hatch when you want one
+tool: `./workflow.cmd lint.pylint --paths="src/thing.py"`. Need to push past the gate once?
+`SKIP=preflight git push` leaves the other hooks in place, unlike `--no-verify`.
 
 Edit to add hooks; don't remove the existing ones without thinking — they keep the main
 branch clean.
@@ -97,7 +121,7 @@ Polyglot launcher: a shell script on Unix, a batch file on Windows. Resolves to 
 
 ## `.github/` or `.gitlab-ci.yml`
 
-The chosen host's CI config (only one of these exists per project, per the `git_hosting_service` answer). Edit to add jobs; preserve the existing lint/test/build flow if you want `copier update` to keep working.
+The chosen host's CI config (only one of these exists per project, per the `git_hosting_service` answer). The checks live in a single `preflight` job running `./workflow.cmd preflight` — the same command the pre-push hook runs — so there is nothing to keep in step with a second list. Edit to add jobs; leave that one alone if you want `copier update` to keep working.
 
 ## `.copier-answers.yml`
 

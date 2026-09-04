@@ -11,77 +11,68 @@ repos:
         language: system
         pass_filenames: true
         stages: [commit-msg]
-      # The per-file tools below receive only the staged files, so a one-line change costs a
-      # one-file check instead of a whole-project sweep. `sh -c … --` collapses the file list
-      # pre-commit appends into the single `--paths` value Invoke expects; Invoke would
-      # otherwise read the second filename as another task name and fail. (Filenames
-      # containing spaces are not supported by that marshalling — as with `lint-commit`.)
-      - id: format
-        name: Format code and sort imports
-        entry: sh -c './workflow.cmd format --paths="$*"' --
-        language: system
-        pass_filenames: true
-        files: ^(_CI/tasks/|src/|tests/).*\.py$
-        stages: [pre-commit]
-      - id: ruff
-        name: Lint with ruff
-        entry: sh -c './workflow.cmd lint.ruff --paths="$*"' --
-        language: system
-        pass_filenames: true
-        files: ^(_CI/tasks/|src/|tests/).*\.py$
-        stages: [pre-commit]
-      - id: pylint
-        name: Lint with pylint
-        entry: sh -c './workflow.cmd lint.pylint --paths="$*"' --
-        language: system
-        pass_filenames: true
-        files: ^(_CI/tasks/|src/|tests/).*\.py$
-        stages: [pre-commit]
-      - id: complexipy
-        name: Complexity check with complexipy
-        entry: sh -c './workflow.cmd lint.complexipy --paths="$*"' --
-        language: system
-        pass_filenames: true
-        files: ^(src/).*\.py$
-        stages: [pre-commit]
-      # ty stays whole-project. Type checking is whole-program: a signature change surfaces
-      # as an error in the *callers*, so handing it only the changed files would hide the
-      # errors that matter most. It is fast enough that scoping buys little anyway.
-      - id: ty
-        name: Type check with ty
-        entry: ./workflow.cmd lint.ty
-        language: system
-        pass_filenames: false
-        files: ^(_CI/tasks/|src/|tests/).*\.py$
-        stages: [pre-commit]
-      # pyscn stays whole-project too: it reports dead code and duplicate blocks, both of
-      # which are relationships *between* files. A single-file view cannot see either — a
-      # function only looks dead once you know nothing else calls it.
-      - id: pyscn
-        name: Quality check with pyscn
-        entry: ./workflow.cmd quality.pyscn-check
-        language: system
-        pass_filenames: false
-        files: ^(src/).*\.py$
-        stages: [pre-commit]
-      # Pre-push, not pre-commit, and `test.pytest` rather than the `test` aggregator.
+      # One hook, one invocation, for every check that can be judged from the staged files
+      # alone — formatting, ruff, pylint, complexipy. It used to be four hooks, plus ty and
+      # pyscn, and that shape cost most of a commit's time budget starting processes: each
+      # `./workflow.cmd` spends about 1.3s on interpreter and imports before a tool runs, so
+      # six hooks paid ~8s of startup to do ~2s of checking. Collapsed, the same four checks
+      # measure ~2.9s on a fresh project, of which 1.6s is the one startup.
       #
-      # The aggregator also updates the README coverage badge and ratchets `fail_under` in
-      # pyproject.toml. Doing that from a commit hook meant pre-commit aborted the commit
-      # with "files were modified by this hook" — after the commit message was already
-      # written — for files the author had not staged. Those writes belong to a deliberate
-      # `./workflow.cmd test`, where the bump can be reviewed and committed on purpose.
+      # Which tools belong here is decided in `_CI/tasks/preflight.py`, not here: the hook
+      # runs `preflight.staged`, which reads the step registry and applies each step's own
+      # path filter (complexipy is `src/` only, the rest also cover `_CI/tasks/` and
+      # `tests/`) — filters that lived in the `files:` keys of the hooks this replaces. The
+      # `files:` below is therefore the union of them, and an invariant test asserts this
+      # hook and the registry's per-file steps agree.
       #
-      # Running the whole suite on every commit was the other half of the problem: slow
-      # enough to teach people `--no-verify`, which switches off every hook here. On
-      # pre-push it still blocks anything broken from reaching the remote, without
-      # standing between the author and each commit.
-      - id: test
-        name: Run tests
-        entry: ./workflow.cmd test.pytest
+      # `sh -c … --` collapses the file list pre-commit appends into the single `--paths`
+      # value Invoke expects; Invoke would otherwise read the second filename as another task
+      # name and fail. (Filenames containing spaces are not supported by that marshalling —
+      # as with `lint-commit`.)
+      #
+      # This hook reports; it does not rewrite. It used to apply formatting, and that was the
+      # odd one out twice over: the automated entry points behaved differently from the command
+      # a person types, and it edited the *worktree* while git was mid-commit, which suits a
+      # partially staged file badly — the formatter rewrites the whole file, including hunks
+      # deliberately left out of the index. Unformatted code now fails the commit and names
+      # `./workflow.cmd format`, which is one extra command and owns neither problem.
+      #
+      # So no hook in this file writes anything at all, which is the same promise `preflight`
+      # makes without a flag.
+      - id: staged
+        name: Check staged files (formatting, ruff, pylint, complexipy)
+        entry: sh -c './workflow.cmd preflight.staged --paths="$*"' --
+        language: system
+        pass_filenames: true
+        files: ^(_CI/tasks/|src/|tests/).*\.py$
+        stages: [pre-commit]
+      # Everything whole-program runs here instead of on every commit: ty needs the callers of
+      # a changed signature, pyscn needs every file to know what is dead or duplicated, the
+      # matrix needs the suite on every interpreter, and a wheel builds from the whole tree or
+      # not at all. Their cost scales with the size of the *project*, not of the change, so on
+      # pre-commit they were the one thing that would make commits slower as the project grew.
+      # On pre-push they run once per push and keep commit latency flat (~19s on a scaffold).
+      #
+      # No flag: `preflight` verifies by default and writing is opt-in, which is what makes
+      # it safe to run from a hook at all. `preflight --write` updates the four README badges
+      # and ratchets `fail_under` in pyproject.toml; from a hook that aborted the push having
+      # modified files the author never staged, which is exactly what teaches people
+      # `--no-verify` and so disables every hook here at once. Those writes belong to a
+      # deliberate `./workflow.cmd preflight --write`.
+      #
+      # It also means this hook and the CI pipeline run the same command, character for
+      # character — the whole pipeline, since the separate lint, test and build jobs folded
+      # into it — so nothing in CI can reject what this accepted, and reproducing a pipeline
+      # failure needs no flag. There is deliberately no flag to make it run *less*: the knob
+      # that shortens the matrix is `env_list` in pyproject.toml, which shortens CI too and so
+      # cannot open a gap. `SKIP=preflight git push` is the escape hatch when you need one;
+      # unlike `--no-verify` it leaves the other hooks in place.
+      - id: preflight
+        name: Preflight checks (ty, pyscn, test matrix, wheel, derived files)
+        entry: ./workflow.cmd preflight
         language: system
         pass_filenames: false
-        files: ^(src/|tests/).*\.py$
+        files: ^(_CI/tasks/|src/|tests/).*\.py$
         stages: [pre-push]
       - id: security-overrides
         name: Validate .security-overrides

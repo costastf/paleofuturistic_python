@@ -1,32 +1,35 @@
 """Build task definitions."""
 
-import re
 from pathlib import Path
 from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .secure import secure
-from .shared import logged, run, run_steps
+from .secure import sbom
+from .shared import apply_badge, logged, note, run, run_steps
 
 STATUS_COLORS = {'passing': 'brightgreen', 'failing': 'red'}
 
 
 def update_build_badge(status: str) -> None:
-    """Update the build badge in README.md."""
-    readme = Path('README.md')
-    if not readme.exists():
-        return
-    color = STATUS_COLORS.get(status, 'lightgrey')
-    content = readme.read_text(encoding='utf-8')
-    updated = re.sub(
-        r'(\[!\[Build\]\(https://img\.shields\.io/badge/build-)[^)]+(\))',
-        rf'\g<1>{status}-{color}\2',
-        content,
+    """Record the outcome of a build run in the README's build badge.
+
+    Unlike the badges ``preflight`` owns, this one is not derived from a report that can be
+    recomputed later — it records what happened when ``build`` last ran. So there is nothing
+    for ``preflight --check`` to verify it against, and it is written here, by the task that
+    knows the answer. It still goes through ``apply_badge`` so that every write to README.md
+    in this tree happens in exactly one place.
+    """
+    note(
+        apply_badge(
+            Path('README.md'),
+            r'(\[!\[Build\]\(https://img\.shields\.io/badge/build-)[^)]+(\))',
+            rf'\g<1>{status}-{STATUS_COLORS.get(status, "lightgrey")}\2',
+            label='build badge',
+            detail=status,
+            write=True,
+        )
     )
-    if updated != content:
-        readme.write_text(updated, encoding='utf-8')
-        print(f'Updated build badge to {status}.')
 
 
 @task
@@ -38,14 +41,28 @@ def package(context: Context) -> None:
 
 @task
 @logged('build')
-def build(context: Context) -> None:
-    """Run security checks and build the package; reports all failures before exiting."""
+def build(context: Context, *, badge: bool = True) -> None:
+    """Compose the SBOM and build the package; reports all failures before exiting.
+
+    Deterministic from the tree: the SBOM comes from the lockfile, and `uv build` ships it
+    inside the wheel. There is no dependency audit here on purpose — see `secure.sbom` — so a
+    wheel can still be built when a fresh advisory lands. `release.dist` audits before it
+    builds, which is where refusing to proceed actually protects someone.
+
+    Args:
+        context: Invoke context.
+        badge: Record the outcome in the README's build badge. ``preflight`` passes False:
+            README.md is a tracked file, and `preflight --check` must leave every one of them
+            alone. It runs this for the wheel, not for the badge.
+    """
     try:
-        run_steps(secure, package)(context)
+        run_steps(sbom, package)(context)
     except SystemExit:
-        update_build_badge('failing')
+        if badge:
+            update_build_badge('failing')
         raise
-    update_build_badge('passing')
+    if badge:
+        update_build_badge('passing')
 
 
 namespace = Collection('build')

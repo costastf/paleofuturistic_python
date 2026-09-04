@@ -281,14 +281,23 @@ def validate_overrides(context: Context) -> None:  # noqa: ARG001
 
 
 @task
-@logged('secure')
-def secure(context: Context) -> None:
-    """Run all security checks; reports all failures before exiting."""
+@logged('secure.sbom')
+def sbom(context: Context) -> None:
+    """Compose the SBOM and validate it; reports all failures before exiting.
+
+    The half of this module that `build` depends on. `uv build` ships
+    ``src/<package>/sbom.cdx.json`` inside the wheel, so composing it is a build *input*
+    rather than a security check — it is a description of what the artifact contains, and it
+    is derived entirely from the lockfile and the tree.
+
+    That is why it is separated from `audit`, which `build` deliberately no longer runs: an
+    audit's answer depends on the advisory database on the day it runs, so bundling the two
+    meant a newly published CVE made it impossible to produce a wheel from code that built
+    yesterday — a hotfix blocked by an advisory it has nothing to do with. The audit is a gate
+    on *publishing*, where the outside world is actually exposed, and it runs there
+    (`release.dist`), on a schedule, and on any change to the dependency surface.
+    """
     failed = False
-    try:
-        audit(context)
-    except SystemExit:
-        failed = True
     try:
         sbom_extract(context, write=True)
     except SystemExit:
@@ -301,9 +310,32 @@ def secure(context: Context) -> None:
         raise SystemExit(1)
 
 
+@task
+@logged('secure')
+def secure(context: Context) -> None:
+    """Run every security task — audit and SBOM; reports all failures before exiting.
+
+    The human-facing "all of it". Nothing in the automated flow calls this: `build` takes
+    `sbom` alone, and the audit runs from `release.dist`, the daily schedule, and the
+    dependency-change job. See `sbom` for why they are apart.
+    """
+    failed = False
+    try:
+        audit(context)
+    except SystemExit:
+        failed = True
+    try:
+        sbom(context)
+    except SystemExit:
+        failed = True
+    if failed:
+        raise SystemExit(1)
+
+
 namespace = Collection('secure')
 namespace.add_task(cast(Task, secure), default=True, name='all')
 namespace.add_task(cast(Task, audit))
+namespace.add_task(cast(Task, sbom))
 namespace.add_task(cast(Task, sbom_extract))
 namespace.add_task(cast(Task, sbom_validate))
 namespace.add_task(cast(Task, validate_overrides))

@@ -65,7 +65,20 @@ build-deps-image:
     reports:
       dotenv: .deps-image.env
 
-lint:
+# One job runs the checks, because it runs the same command the pre-push hook does, character
+# for character. Verifying is that command's default and writing is opt-in, so there is no flag
+# here to keep in step with the hook. Separate lint, test and build jobs used to re-run, in a
+# different shape, the work this command already covers — so a green push could still meet a
+# red pipeline over which of the two had been kept in step. Absorbing them costs the wall-clock those jobs bought by running in parallel;
+# `run_steps` still reports every failure in one pass, so it costs time, not diagnosis.
+#
+# Anything that fails here would have failed the push: format, lint, ty, pyscn, the tox matrix,
+# the wheel, and the README badges and coverage ratchet matching what the tools measure.
+#
+# Note the absence of `--write`. The job has no write access to the repository, so it could
+# not commit a refreshed badge even if it wanted to; its only useful move is to fail and name
+# the command that fixes it.
+preflight:
   stage: ci
   image: $DEPS_IMAGE
   needs:
@@ -74,40 +87,35 @@ lint:
   before_script:
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
   script:
-    - ./workflow.cmd lint
+    - ./workflow.cmd preflight
 
-test:
-  stage: ci
-  image: $DEPS_IMAGE
-  needs:
-    - job: build-deps-image
-      artifacts: true
-  before_script:
-    - git config --global --add safe.directory "$CI_PROJECT_DIR"
-  script:
-    - ./workflow.cmd test.tox
-
+# Not on every pipeline. An audit's answer depends on the advisory database on the day it
+# runs, not on the branch, so running it everywhere fails merge requests for something the
+# author did not introduce and cannot fix in their branch — and a pipeline that goes red for
+# reasons outside the author's control is one people learn to ignore. The `changes:` rule
+# narrows it to the files that can actually introduce a vulnerable dependency.
+#
+# What that leaves uncovered — a dependency that turns vulnerable while nobody is touching
+# it, and `.security-overrides` entries coming due — belongs to a scheduled pipeline. Add one
+# under CI/CD → Schedules; `$CI_PIPELINE_SOURCE == "schedule"` below is what makes it run the
+# audit regardless of what changed. Publishing is gated separately: `release.dist` audits
+# before it builds.
 secure:
   stage: ci
   image: $DEPS_IMAGE
   needs:
     - job: build-deps-image
       artifacts: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - changes:
+        - uv.lock
+        - pyproject.toml
+        - .security-overrides
   before_script:
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
   script:
     - ./workflow.cmd secure.audit
-
-build:
-  stage: ci
-  image: $DEPS_IMAGE
-  needs:
-    - job: build-deps-image
-      artifacts: true
-  before_script:
-    - git config --global --add safe.directory "$CI_PROJECT_DIR"
-  script:
-    - ./workflow.cmd build
 
 publish:
   stage: publish

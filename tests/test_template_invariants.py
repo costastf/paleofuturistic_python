@@ -552,18 +552,38 @@ def test_deps_image_reference_is_digest_pinned(generated_project):
         assert '--digest-file' in host_py
 
 
-def test_security_audit_runs_in_ci(generated_project):
-    """The chosen host's pipeline runs `secure.audit`.
+def test_security_audit_is_automated_without_failing_unrelated_changes(generated_project):
+    """The audit runs automatically, but never on a push that cannot have caused it.
 
-    Without this the `.security-overrides` expiry mechanism gates nothing: pip-audit was
-    reachable only as a local command, so a dependency with a known CVE shipped green.
+    Two failure modes, and the fix for one is the cause of the other. Reachable only as a
+    local command, the `.security-overrides` expiry mechanism gates nothing and a dependency
+    with a known CVE ships green. Wired to every push, it fails pull requests for advisories
+    published overnight that the author did not introduce and cannot fix in their branch —
+    and a pipeline that goes red for reasons outside the author's control is one people learn
+    to ignore.
+
+    So it is automated on the axis it actually varies along: time (a schedule) and the
+    dependency surface (the files that can introduce a vulnerable package). Publishing is
+    gated separately by `release.dist`.
     """
     project, cell = generated_project
+    dependency_surface = {'uv.lock', 'pyproject.toml'}
     if cell['git_hosting_service'] == 'github':
         pipeline = (project / '.github' / 'workflows' / 'continuous-integration.yaml').read_text(encoding='utf-8')
+        assert 'secure.audit' not in pipeline, 'the per-push pipeline audits every change'
+        audit_workflow = yaml.safe_load(
+            (project / '.github' / 'workflows' / 'security-audit.yaml').read_text(encoding='utf-8')
+        )
+        # yaml parses a bare `on:` key as the boolean True, hence the lookup.
+        triggers = audit_workflow.get('on') or audit_workflow[True]
+        paths = set(triggers['push']['paths'])
+        assert dependency_surface <= paths, f'the audit is not triggered by {dependency_surface - paths}'
     else:
-        pipeline = (project / '.gitlab-ci.yml').read_text(encoding='utf-8')
-    assert 'secure.audit' in pipeline, 'no pipeline job runs secure.audit'
+        jobs = yaml.safe_load((project / '.gitlab-ci.yml').read_text(encoding='utf-8'))
+        rules = jobs['secure']['rules']
+        assert any('schedule' in str(rule.get('if', '')) for rule in rules), 'no scheduled audit'
+        changes = {path for rule in rules for path in rule.get('changes') or []}
+        assert dependency_surface <= changes, f'the audit is not triggered by {dependency_surface - changes}'
 
 
 def test_scheduled_security_audit_ships_for_github(generated_project):
@@ -584,17 +604,54 @@ def test_scheduled_security_audit_ships_for_github(generated_project):
     assert config['jobs']['secure']['permissions'] == {'contents': 'read', 'packages': 'read'}
 
 
-def test_qa_steps_include_the_security_audit():
-    """`secure.audit` is in QA_STEPS, so every matrix cell audits its generated project.
+def test_building_a_wheel_does_not_depend_on_the_advisory_database(generated_project):
+    """`build` composes the SBOM and builds; it does not audit.
 
-    The matrix runner already exports `<PROJECT>_SECURITY_OVERRIDE` for this step; until
-    it was listed here that plumbing fed nothing.
+    The SBOM belongs to the build — `uv build` ships it inside the wheel, and it is derived
+    from the lockfile and the tree. The audit does not: its answer depends on the advisory
+    database on the day it runs, so bundling them meant a newly published CVE made it
+    impossible to produce a wheel from code that built yesterday, blocking a hotfix on an
+    advisory it had nothing to do with.
+    """
+    project, _ = generated_project
+    build_py = (project / '_CI' / 'tasks' / 'build.py').read_text(encoding='utf-8')
+    assert 'run_steps(sbom, package)' in build_py, 'build no longer composes the SBOM before building'
+    assert 'from .secure import sbom' in build_py, 'build imports more of secure than the SBOM half'
+    # The word appears in the docstring explaining its absence; what must not appear is a call.
+    assert 'audit(' not in build_py, 'build audits dependencies again, so a fresh CVE blocks every wheel'
+
+
+def test_publishing_audits_before_it_builds(generated_project):
+    """`release.dist` audits, so the decoupling above does not leave publishing unguarded.
+
+    Publishing is the moment the outside world is exposed to what these dependencies
+    contain, and the one place where refusing to proceed protects somebody.
+    """
+    project, _ = generated_project
+    release_py = (project / '_CI' / 'tasks' / 'release.py').read_text(encoding='utf-8')
+    dist = release_py.split("@logged('release.dist')", 1)[1].split('@task', 1)[0]
+    assert 'audit(context)' in dist, 'release.dist publishes without auditing'
+    assert dist.index('audit(context)') < dist.index('build(context)'), 'the audit runs after the build'
+
+
+def test_qa_steps_cover_what_preflight_does_not():
+    """QA_STEPS runs the generated project's own gate, plus the two things it leaves out.
+
+    `preflight` covers format, lint, ty, pyscn, the tox matrix, the wheel and the derived
+    files, so naming those separately would re-run them in a different shape and leave the
+    matrix with two lists of checks to keep in step — the same duplication the generated
+    project's pipeline shed. What has to be listed is what `preflight` deliberately omits:
+    the dependency audit, and the docs build.
+
+    `secure.audit` in particular has to be here explicitly. The matrix runner exports
+    `<PROJECT>_SECURITY_OVERRIDE` for it, and that plumbing feeds nothing unless it runs.
     """
     from _CI.tasks.configuration import QA_STEPS  # noqa: PLC0415
 
     assert 'secure.audit' in QA_STEPS
-    # Fail fast: audit before the slow tox matrix.
-    assert QA_STEPS.index('secure.audit') < QA_STEPS.index('test.tox')
+    assert 'preflight --write' in QA_STEPS, 'the matrix no longer exercises the generated gate'
+    # Fail fast: the cheapest failure first, before a five-interpreter matrix.
+    assert QA_STEPS.index('secure.audit') < QA_STEPS.index('preflight --write')
 
 
 def workflow_run_scripts(workflow):
@@ -1255,51 +1312,110 @@ def pre_commit_hooks(project):
         yield from repo['hooks']
 
 
-def test_no_commit_stage_hook_rewrites_tracked_files(generated_project):
+def hook_stages(hook):
+    """Return a hook's stages, defaulting to pre-commit as pre-commit itself does."""
+    return hook.get('stages') or ['pre-commit']
+
+
+def invoked_task(hook):
+    """Return the workflow task a hook runs, seeing through any `sh -c …` wrapper."""
+    match = re.search(r'\./workflow\.cmd\s+([\w.-]+)', hook['entry'])
+    return match.group(1) if match else ''
+
+
+def registry_steps(project):
+    """Return ``{step name: scope}`` parsed out of the generated `_CI/tasks/preflight.py`.
+
+    Read as source rather than imported: importing it would pull in invoke and every task
+    module behind it, which this suite has no reason to install just to read a declaration.
+    """
+    source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(getattr(target, 'id', None) == 'STEPS' for target in node.targets):
+            continue
+        return {call.args[0].value: call.args[1].id for call in node.value.elts}
+    pytest.fail('preflight.py declares no STEPS registry')
+
+
+def test_no_commit_stage_hook_rewrites_unstaged_tracked_files(generated_project):
     """No `pre-commit`-stage hook runs a task that writes README.md or pyproject.toml.
 
-    The `test` aggregator updates the coverage badge and ratchets `fail_under`. Run from a
-    commit hook, pre-commit aborted the commit with "files were modified by this hook" —
-    after the message was written, for files the author never staged. That is what teaches
-    people `--no-verify`, which then disables every hook here at once.
+    `preflight` updates the four badges and ratchets `fail_under`; the `test` aggregator used
+    to do the coverage half of that. Run from a commit hook, either one aborted the commit with
+    "files were modified by this hook" — after the message was written, for files the author
+    never staged. That is what teaches people `--no-verify`, which then disables every hook
+    here at once. `preflight --check` on pre-push is the shape that gets the guarantee without
+    the writes, and `preflight.staged` is deliberately absent from this set: it rewrites only
+    files the author staged, which is a formatter doing its job.
     """
     project, _ = generated_project
-    mutating = {'test', 'document', 'build', 'quality.pyscn-analyze', 'test.coverage'}
+    mutating = {'preflight', 'test', 'document', 'build', 'quality.pyscn-analyze', 'test.coverage'}
     for hook in pre_commit_hooks(project):
-        if 'pre-commit' not in (hook.get('stages') or ['pre-commit']):
+        if 'pre-commit' not in hook_stages(hook):
             continue
-        invoked = hook['entry'].removeprefix('./workflow.cmd').strip()
+        invoked = invoked_task(hook)
         hook_id = hook['id']
         assert invoked not in mutating, f'commit-stage hook {hook_id!r} runs {invoked!r}, which rewrites files'
 
 
-def test_per_file_hooks_check_only_staged_files(generated_project):
-    """The per-file tools receive the staged files instead of sweeping the whole project.
+def test_commit_stage_is_one_invocation_of_the_per_file_steps(generated_project):
+    """The commit stage runs the staged bundle in a single `./workflow.cmd` invocation.
 
-    Each wraps the task in `sh -c … --paths="$*"`: pre-commit appends filenames as separate
-    arguments, and Invoke would read the second one as another task name, so they have to be
-    collapsed into one option value.
+    Each invocation costs ~1.3s of interpreter and import startup before a tool runs, so the
+    six hooks this replaced spent most of a commit's budget starting up: ~8s of startup to do
+    ~2s of checking. One hook pays it once, which is what keeps the stage worth leaving on.
     """
     project, _ = generated_project
-    hooks = {hook['id']: hook for hook in pre_commit_hooks(project)}
-    for hook_id in ('format', 'ruff', 'pylint', 'complexipy'):
-        hook = hooks[hook_id]
-        assert hook.get('pass_filenames') is True, f'{hook_id} does not receive the staged files'
-        assert '--paths="$*"' in hook['entry'], f'{hook_id} does not collapse filenames into --paths'
+    code_hooks = [
+        hook for hook in pre_commit_hooks(project) if 'pre-commit' in hook_stages(hook) and invoked_task(hook)
+    ]
+    invoked = sorted(invoked_task(hook) for hook in code_hooks)
+    assert invoked == ['preflight.staged', 'secure.validate-overrides'], (
+        f'the commit stage runs {invoked}, so it no longer pays startup exactly once for the code checks'
+    )
+    staged = next(hook for hook in code_hooks if invoked_task(hook) == 'preflight.staged')
+    assert staged.get('pass_filenames') is True, 'the staged bundle does not receive the staged files'
+    assert '--paths="$*"' in staged['entry'], 'the staged bundle does not collapse filenames into --paths'
 
 
-def test_whole_program_checks_are_not_scoped_to_staged_files(generated_project):
-    """Ty and pyscn keep seeing the whole project, because a per-file view answers wrongly.
+def test_commit_stage_filter_is_not_narrower_than_the_steps_it_runs(generated_project):
+    """The one remaining `files:` filter is the union of the per-file steps' own filters.
+
+    Collapsing six hooks into one left a single `files:` key in front of four tools that do not
+    agree on what they check — complexipy is `src/` only, the rest also cover `_CI/tasks/` and
+    `tests/`. The per-tool filters therefore moved into the registry, and this hook has to pass
+    through everything any of them wants: a filter narrower than the widest step would drop
+    files that step should have seen, silently.
+    """
+    project, _ = generated_project
+    source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
+    widest = re.search(r"CODE_FILES = re\.compile\(r'([^']+)'\)", source)
+    assert widest, 'preflight.py no longer declares CODE_FILES'
+    staged = next(hook for hook in pre_commit_hooks(project) if invoked_task(hook) == 'preflight.staged')
+    assert staged['files'] == widest.group(1), (
+        f"hook filter {staged['files']!r} does not match the registry's widest per-file filter {widest.group(1)!r}"
+    )
+
+
+def test_whole_program_steps_are_never_scoped_to_a_diff(generated_project):
+    """ty, pyscn and pytest are declared whole-program, and so never run at commit stage.
 
     ty: a changed signature fails in the *callers*, which a narrowed run never looks at.
     pyscn: dead code and duplicate blocks are relationships between files.
+    tox: a passing changed test says nothing about the ones it broke, on any interpreter.
+    build: a wheel is built from the whole tree or not at all.
+
+    Their cost also scales with the size of the project rather than of the change, which is
+    what would have made commits slower and slower as the project grew.
     """
     project, _ = generated_project
-    hooks = {hook['id']: hook for hook in pre_commit_hooks(project)}
-    for hook_id in ('ty', 'pyscn'):
-        hook = hooks[hook_id]
-        assert hook.get('pass_filenames') is False, f'{hook_id} was narrowed to staged files'
-        assert '--paths' not in hook['entry'], f'{hook_id} was narrowed to staged files'
+    steps = registry_steps(project)
+    for name in ('ty', 'pyscn', 'tox', 'build', 'artifacts'):
+        assert steps.get(name) == 'WHOLE_PROGRAM', f'{name} is declared {steps.get(name)!r}, not whole-program'
+    commit_stage = {invoked_task(hook) for hook in pre_commit_hooks(project) if 'pre-commit' in hook_stages(hook)}
+    assert 'preflight' not in commit_stage, 'the whole-program bundle runs on every commit'
 
 
 def test_path_taking_tasks_accept_a_paths_argument(generated_project):
@@ -1316,23 +1432,31 @@ def test_path_taking_tasks_accept_a_paths_argument(generated_project):
     assert 'paths or PATHS' in lint_py, 'lint tasks do not fall back to the project-wide paths'
 
 
-def test_suite_runs_on_pre_push(generated_project):
-    """The test suite gates pushes, not commits, and uses the non-mutating task."""
+def test_whole_program_gate_runs_on_pre_push_without_writing(generated_project):
+    """The whole-program bundle gates pushes, not commits, and writes nothing tracked.
+
+    It needs no flag to be safe: `preflight` verifies by default and `--write` is opt-in, which
+    is the point of that inversion — the hook, the pipeline, and the command you type to
+    reproduce a failure are all the same string.
+    """
     project, _ = generated_project
     hooks = {hook['id']: hook for hook in pre_commit_hooks(project)}
-    test_hook = hooks['test']
-    assert test_hook['stages'] == ['pre-push'], f'test hook stages are {test_hook["stages"]}'
-    assert test_hook['entry'].endswith('test.pytest'), f'test hook runs {test_hook["entry"]!r}'
+    gate = hooks['preflight']
+    assert gate['stages'] == ['pre-push'], f'preflight hook stages are {gate["stages"]}'
+    assert invoked_task(gate) == 'preflight', f'preflight hook runs {gate["entry"]!r}'
+    assert '--write' not in gate['entry'], f'the pre-push hook would rewrite tracked files: {gate["entry"]!r}'
+    assert gate.get('pass_filenames') is False, 'the whole-program gate was narrowed to the pushed files'
     installed = yaml.safe_load((project / '.pre-commit-config.yaml').read_text(encoding='utf-8'))
     assert 'pre-push' in installed['default_install_hook_types'], 'pre-push hooks would never be installed'
 
 
 def test_pre_push_gate_enforces_the_same_coverage_floor(generated_project):
-    """`test.pytest` and the `test` aggregator share one pytest invocation, so the floor holds.
+    """The gate's pytest step is the same task the `test` aggregator runs, so the floor holds.
 
     Coverage is enforced by pytest-cov from `[tool.coverage.report] fail_under`, driven by the
-    `--cov` flags in `addopts`. Moving the hook to `test.pytest` therefore drops the badge and
-    ratchet writes without weakening the gate.
+    `--cov` flags in `addopts`. Both the registry's `pytest` step and the aggregator delegate
+    to that one task, so gating on `preflight --check` instead of the aggregator drops the
+    badge and ratchet writes without weakening the gate.
     """
     project, _ = generated_project
     data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
@@ -1341,6 +1465,317 @@ def test_pre_push_gate_enforces_the_same_coverage_floor(generated_project):
     test_py = (project / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
     aggregator = test_py.split("@logged('test')", 1)[1]
     assert 'run_steps(pytest)' in aggregator, 'the aggregator no longer delegates to the same pytest task'
+    preflight_py = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
+    assert 'tox' in registry_steps(project), 'the registry no longer runs the matrix'
+    imported_from_test = preflight_py.split('from .test import', 1)[1].split('\n', 1)[0]
+    assert 'tox' in imported_from_test, (
+        'the registry no longer runs the shared tox task, so the floor it enforces can drift'
+    )
+
+
+def test_the_gate_offers_no_way_to_run_less_than_ci(generated_project):
+    """`preflight` takes no flag that trims what it runs, because CI runs this same command.
+
+    A `--quick` that dropped the matrix would be a documented way to make local and CI
+    disagree, and the obvious thing to reach for in a hurry. The knob that shortens the matrix
+    is `env_list`, which shortens it for CI too and so cannot open a gap. The two flags it does
+    take add rather than remove: `--write` updates the derived files, and `--audit-dependencies`
+    runs a step no gate runs anywhere.
+    """
+    project, _ = generated_project
+    preflight_py = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
+    signature = preflight_py.split('def preflight(', 1)[1].split(')', 1)[0]
+    parameters = {part.split(':')[0].strip() for part in signature.split(',')}
+    assert parameters == {'context', 'write', 'audit_dependencies'}, (
+        f'preflight grew a parameter that can change what it runs: {parameters}'
+    )
+
+
+def test_no_ci_job_reruns_what_the_gate_already_covers(generated_project):
+    """CI has one job for the checks, and it is the gate.
+
+    Separate lint, test and build jobs re-ran, in a different shape, work `preflight --check`
+    already covers — which is how a green push comes to meet a red pipeline: two lists of
+    checks, one of them out of step. The cost of folding them in is the wall-clock their
+    parallelism bought, not diagnosis; `run_steps` still reports every failure in one pass.
+    """
+    project, cell = generated_project
+    duplicated = ('./workflow.cmd lint', './workflow.cmd test', './workflow.cmd build')
+    if cell['git_hosting_service'] == 'github':
+        pipeline = (project / '.github' / 'workflows' / 'continuous-integration.yaml').read_text(encoding='utf-8')
+        jobs = set(yaml.safe_load(pipeline)['jobs'])
+        assert jobs == {'build-deps-image', 'preflight'}, f'the pipeline runs {jobs}'
+    else:
+        pipeline = (project / '.gitlab-ci.yml').read_text(encoding='utf-8')
+        jobs = {name for name in yaml.safe_load(pipeline) if not name.startswith(('stages', 'variables'))}
+        assert jobs == {'build-deps-image', 'preflight', 'secure', 'publish'}, f'the pipeline runs {jobs}'
+    commands = [line.strip().lstrip('- ') for line in pipeline.splitlines() if './workflow.cmd' in line]
+    for command in commands:
+        assert not command.startswith(duplicated), f'{command!r} re-runs what preflight --check covers'
+
+
+def test_ci_runs_the_same_gate_as_the_pre_push_hook(generated_project):
+    """CI's preflight job runs the identical command the pre-push hook does.
+
+    This is the property that stops local and remote from disagreeing: a badge that is stale in
+    the pipeline would have failed the push, so the pipeline is a backstop rather than the
+    place you first hear about it. CI cannot commit a refresh either way — the checkout is
+    credential-less and the token is read-only — so failing with the fix command is all it can
+    usefully do.
+    """
+    project, cell = generated_project
+    gate = next(hook for hook in pre_commit_hooks(project) if hook['id'] == 'preflight')
+    command = gate['entry']
+    if cell['git_hosting_service'] == 'github':
+        workflow = yaml.safe_load(
+            (project / '.github' / 'workflows' / 'continuous-integration.yaml').read_text(encoding='utf-8')
+        )
+        job = workflow['jobs']['preflight']
+        commands = [step.get('run') for step in job['steps']]
+        assert job['permissions']['contents'] == 'read', 'the preflight job can write to the repository'
+    else:
+        pipeline = yaml.safe_load((project / '.gitlab-ci.yml').read_text(encoding='utf-8'))
+        commands = pipeline['preflight']['script']
+    assert command in commands, f'no CI job runs {command!r}; it runs {commands}'
+
+
+def test_task_output_stays_in_order_when_redirected(generated_project):
+    """The streams are line-buffered, so a log read after the fact attributes output correctly.
+
+    Python block-buffers stdout when it is not a terminal — which is every CI log and every
+    `> run.log` — while a subprocess invoke spawns writes to the same descriptor immediately.
+    Our own lines therefore arrived in chunks *after* the command they introduce, so the
+    echoed command sat below its own output and a task's prints appeared under the previous
+    task's command. `Wrote SBOM to …` reading as though `uv run coverage json` had produced it
+    is what that looked like, and the SBOM tasks have no command of their own to echo, so
+    nothing contradicted the impression.
+    """
+    project, _ = generated_project
+    shared = (project / '_CI' / 'tasks' / 'shared.py').read_text(encoding='utf-8')
+    assert 'line_buffering=True' in shared, 'the streams are block-buffered again when redirected'
+
+
+def test_a_failing_run_writes_no_derived_values(generated_project):
+    """Once a check has failed, the steps that write derived files are skipped.
+
+    Every step otherwise runs even after one fails, so a single run reports everything that is
+    wrong. That is right for reporting and wrong for writing: a badge computed from a tree
+    whose checks just failed is a claim the tree does not support. Before this, `preflight`
+    would print "Updated build badge to passing" on a run that went on to fail, and write a
+    grade-A pyscn badge over a project whose tests were red — the aggregator it replaced
+    short-circuited instead, so this restores a property the template already had.
+
+    Skipped rather than reordered, so a late failure cannot retroactively undo an earlier
+    write, and `secure.audit` being last means an advisory does not stop a badge from updating.
+    """
+    project, _ = generated_project
+    source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
+    body = source.split('def run_scope', 1)[1]
+    assert 'if failed and writes_derived' in body, 'a failing run can still write derived values'
+    assert 'writes_derived = write and step.write is not None' in source, (
+        'the plan no longer marks which steps write derived files'
+    )
+    # The writers have to be last for the skip to cover them; `artifacts` is the final
+    # non-network step, and `build`'s badge precedes it.
+    steps = list(registry_steps(project))
+    assert steps[-1] == 'audit', f'audit is no longer last, so its failure would skip the writers: {steps}'
+    assert steps[-2] == 'artifacts', f'artifacts is not the last checked step: {steps}'
+
+
+def test_no_automated_run_edits_source(generated_project):
+    """Nothing in the registry can write source — there is no step that could.
+
+    The commit hook used to apply formatting. That made the automated entry points behave
+    differently from the command a person types, and it rewrote the *worktree* while git was
+    mid-commit, which suits a partially staged file badly: the formatter rewrites the whole
+    file, hunks deliberately left out of the index included. Reporting and naming
+    `./workflow.cmd format` costs one command and owns neither problem.
+
+    So the property is now absolute rather than conditional, and this asserts the absence of
+    the machinery rather than its correct use: no step declares a source-writing variant, and
+    the concept of "fixing" is gone from the module.
+    """
+    project, _ = generated_project
+    source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
+    assert 'fixes_source' not in source, 'a step can write source again'
+    assert 'ruff_format' not in source, 'the registry reaches the formatter again'
+
+    # Every write variant in the registry produces a derived file, which is what `--write` is
+    # for; `plan_scope` marks exactly those so a failing run can skip them.
+    assert 'writes_derived = write and step.write is not None' in source, (
+        'the plan no longer marks which steps write derived files'
+    )
+
+    # And the hook asks for no fixing, because there is nothing to ask for.
+    hook = next(h for h in pre_commit_hooks(project) if invoked_task(h) == 'preflight.staged')
+    assert '--fix' not in hook['entry'], f'the commit hook rewrites files again: {hook["entry"]!r}'
+
+
+def test_running_the_hooks_by_hand_matches_what_git_will_do(generated_project):
+    """`develop.pre-commit` defaults to the staged files, like the hook it is named after.
+
+    It passed `--all-files` unconditionally, so the command behaved differently from the hook:
+    `--all-files` is every *tracked* file. The default now matches, and the flag widens —
+    the same direction as `preflight --write`, where the bare command is the narrow, read-only
+    one and a flag opts into more.
+    """
+    project, _ = generated_project
+    develop = (project / '_CI' / 'tasks' / 'develop.py').read_text(encoding='utf-8')
+    body = develop.split("@logged('develop.pre-commit')", 1)[1].split('@task', 1)[0]
+    assert "'uv run pre-commit run'" in body, 'the default no longer runs the hooks on staged files'
+    assert 'all_files: bool = False' in body, 'widening to every tracked file is not opt-in'
+
+
+def test_the_staged_bundle_defaults_to_what_is_staged(generated_project):
+    """`preflight.staged` with no paths checks the index, not the whole project.
+
+    It used to fall back to every project path, so typing the command by hand swept everything
+    — the opposite of what its name promises. pre-commit still passes the list explicitly,
+    having applied its own filtering and possibly split the files across invocations.
+    """
+    project, _ = generated_project
+    source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
+    assert 'git diff --cached --name-only' in source, 'the staged bundle no longer reads the index'
+    body = source.split("@logged('preflight.staged')", 1)[1].split('@task', 1)[0]
+    assert 'paths or staged_files(context)' in body, 'an explicit --paths no longer wins'
+    assert 'Nothing staged' in body, 'an empty index is not reported'
+
+
+def test_the_gate_renders_no_report_it_does_not_read(generated_project):
+    """`preflight` produces the JSON its derived values need, and no browsable report.
+
+    The rule, applied the same way to both tools that offer one. pyscn allows a single output
+    format per run, so an HTML report there costs a whole second analysis; coverage renders one
+    from data it already has, for a fraction of a second. Different prices, same answer —
+    nothing in a hook or a pipeline opens an HTML report, and a gate that produces artefacts
+    for an absent reader is a gate doing work nobody asked for. Two tools behaving alike in the
+    pipeline is worth more than the fraction of a second.
+
+    The reports are not lost, they are moved to where someone is actually looking:
+    `quality.pyscn-analyze` produces the pyscn HTML and opens it, and `test.coverage` renders
+    the coverage HTML from whatever the last run measured.
+    """
+    project, _ = generated_project
+    tasks = project / '_CI' / 'tasks'
+    gate_pyscn = (tasks / 'quality.py').read_text(encoding='utf-8').split('def pyscn_json_report', 1)[1]
+    gate_pyscn = gate_pyscn.split('\n@', 1)[0]
+    assert 'ANALYZE_JSON' in gate_pyscn, 'the gate no longer produces the JSON the badge reads'
+    assert 'ANALYZE_HTML' not in gate_pyscn, 'the gate produces a pyscn HTML report nothing reads'
+
+    test_py = (tasks / 'test.py').read_text(encoding='utf-8')
+    gate_coverage = test_py.split('def combine_coverage', 1)[1].split('\n@', 1)[0]
+    assert 'coverage json' in gate_coverage, 'the gate no longer produces the JSON the badge reads'
+    assert 'coverage html' not in gate_coverage, 'the gate renders a coverage HTML report nothing reads'
+
+    on_demand = test_py.split("@logged('test.coverage')", 1)[1].split('\n@task', 1)[0]
+    assert 'coverage html' in on_demand, 'nothing renders the combined coverage report any more'
+
+
+def test_pyscn_never_opens_a_browser_by_itself(generated_project):
+    """Every pyscn run that writes HTML passes `--no-open`.
+
+    pyscn launches a browser as soon as it writes an HTML report — verified with a stub
+    `xdg-open`, which fires once for a bare `analyze` and not at all with `--no-open`. That
+    made `quality.pyscn-analyze` open the report twice, once by itself and once from its own
+    deliberate `open_target`, and made `pyscn_analyze_only` — "without opening the report" —
+    open one anyway. It also had a tool reaching for a browser on a CI runner, where
+    `is_ci()` exists precisely to prevent that.
+
+    Whether a report is worth opening is the task's call, not the tool's.
+    """
+    project, _ = generated_project
+    quality_py = (project / '_CI' / 'tasks' / 'quality.py').read_text(encoding='utf-8')
+    # Command strings only — prose about `pyscn analyze` is not an invocation of it.
+    html_runs = [line for line in quality_py.splitlines() if 'uv run pyscn analyze' in line and '--json' not in line]
+    assert html_runs, 'no pyscn invocation produces an HTML report any more'
+    for line in html_runs:
+        assert '--no-open' in line, f'{line.strip()!r} lets pyscn open a browser on its own'
+
+
+def test_matrix_envs_do_not_share_report_paths(generated_project):
+    """Every tox env writes its reports to its own paths.
+
+    `addopts` sends each report to one fixed path, so under `run-parallel` all five envs wrote
+    `reports/coverage.json` and `reports/tests.html` simultaneously. It stayed invisible while
+    nothing read those files; the moment the coverage badge and the `fail_under` ratchet read
+    `coverage.json`, they would be reading whichever env finished last, possibly mid-write.
+    """
+    project, _ = generated_project
+    data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
+    commands = data['tool']['tox']['env_run_base']['commands']
+    specs = [argument for command in commands for argument in command if isinstance(argument, str)]
+    for flag in ('--cov-report=json:', '--cov-report=html:', '--html='):
+        overrides = [spec for spec in specs if spec.startswith(flag)]
+        assert overrides, f'no per-env override for {flag}'
+        for spec in overrides:
+            assert '{envname}' in spec, f'{spec!r} is a fixed path, so parallel envs clobber each other'
+
+
+def test_matrix_coverage_is_combined_before_anything_reads_it(generated_project):
+    """`test.tox` erases, runs the matrix, then combines into the one report the badge reads.
+
+    Combining takes the union of the lines each interpreter executed, which is the only
+    correct reading of a version matrix: version-gated code cannot be fully covered by any
+    single env, so reading one env's report understates coverage on exactly the code the
+    matrix exists to exercise. The erase is what stops a `.coverage.<env>` left over from an
+    env since removed from `env_list` being folded into that union.
+    """
+    project, _ = generated_project
+    test_py = (project / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
+    # Past the closing `"""`, so the docstring's own mention of combine_coverage — which
+    # precedes every command — cannot satisfy the ordering assertions below.
+    body = test_py.split("@logged('test.tox')", 1)[1].split('@task', 1)[0].split('"""')[-1]
+    for step in ('erase_coverage_data', 'tox run', 'combine_coverage'):
+        assert step in body, f'test.tox no longer runs {step!r}'
+    assert body.index('erase_coverage_data') < body.index('tox run'), 'stale coverage data is not cleared first'
+    # Not `coverage erase`: it leaves `.coverage.<envname>` in place, so a retired env's data
+    # would still be combined into the union that feeds the badge and the ratchet.
+    erase = test_py.split('def erase_coverage_data', 1)[1].split('\ndef ', 1)[0]
+    assert "Path().glob('.coverage.*')" in erase, 'the per-env data files are no longer cleared'
+    assert body.index('tox run') < body.index('combine_coverage'), 'coverage is combined before the matrix runs'
+    combine = test_py.split('def combine_coverage', 1)[1].split('\n@task', 1)[0]
+    assert 'coverage combine' in combine, 'the per-env data is never merged'
+    assert 'coverage json -o {COVERAGE_REPORT}' in combine, 'the union never reaches the report the badge reads'
+
+
+def test_readme_has_exactly_one_writer(generated_project):
+    """Every write to README.md goes through `apply_badge`, so check mode cannot drift.
+
+    `preflight --check` is only trustworthy if it compares against the same substitution the
+    writer applies. A second module that rewrote a badge its own way would be invisible to the
+    check — the badge would be updated by one code path and verified by another, which is the
+    failure this whole shape exists to prevent.
+    """
+    project, _ = generated_project
+    tasks = project / '_CI' / 'tasks'
+    for module in sorted(tasks.glob('*.py')):
+        source = module.read_text(encoding='utf-8')
+        if 'README.md' not in source or module.name == 'shared.py':
+            continue
+        assert 'write_text' not in source, f'{module.name} writes README.md without going through apply_badge'
+
+
+def test_derived_values_are_computed_in_both_modes_by_one_function(generated_project):
+    """Each derived value has a single updater that takes `write`, rather than a paired checker.
+
+    The generator and the gate being one function is what makes `preflight --check` mean
+    anything. Splitting them — a writer here, a verifier there — is exactly how a check ends up
+    passing on a value the writer would have changed.
+    """
+    project, _ = generated_project
+    tasks = project / '_CI' / 'tasks'
+    updaters = {
+        'quality.py': ['update_pyscn_badge'],
+        'test.py': ['update_coverage_badge', 'ratchet_fail_under'],
+        'document.py': ['update_package_version_badge', 'update_python_badge'],
+    }
+    for filename, names in updaters.items():
+        tree = ast.parse((tasks / filename).read_text(encoding='utf-8'))
+        functions = {node.name: node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)}
+        for name in names:
+            assert name in functions, f'{filename} no longer defines {name}'
+            kwonly = [argument.arg for argument in functions[name].args.kwonlyargs]
+            assert 'write' in kwonly, f'{name} takes no keyword-only `write`, so it cannot verify without writing'
 
 
 def test_local_task_module_ships_with_a_namespace(generated_project):

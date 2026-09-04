@@ -9,30 +9,67 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 | Task | Default of | What it does |
 | --- | --- | --- |
 | `bootstrap` | `develop.bootstrap` | First-run setup; idempotent. Pass `--force` to re-run. |
+| `preflight` | `preflight.all` | **Everything, then the derived files.** The one to run before opening a pull request. |
 | `format` | `format.ruff` | Ruff format + import sort. |
 | `lint` | `lint.all` | Runs ruff, pylint, ty, complexipy, commitizen. |
 | `test` | `test.all` | pytest with coverage and xdist. |
-| `build` | `build.package` | Security checks + `uv build`. |
+| `build` | `build.package` | SBOM compose + validate, then `uv build`. No dependency audit — see `secure`. |
 | `release` | `release` | Validate, branch, bump, changelog, push, open PR/MR. |
 | `quality` | `quality.pyscn-analyze` | pyscn static analysis with HTML report. |
-| `secure` | `secure.all` | pip-audit + SBOM generate + (optional) DT upload. |
+| `secure` | `secure.all` | Every security task at once: pip-audit + SBOM compose/validate. Nothing automated calls it; the pieces have their own homes. |
 | `document` | `document` | properdocs build + view in browser. |
 | `container` | `container.publish` | Build deps image; in CI pushes to the registry. |
+
+## `preflight` — the one command that does it all
+
+| Task | Args | What it does |
+| --- | --- | --- |
+| `preflight` | `--write`, `--audit-dependencies` | Verify formatting, lint, type-check, pyscn, the full tox matrix, the wheel, and the four README badges plus the coverage ratchet against what the tools just measured — failing with everything out of date. This bare command is what the pre-push hook and the CI pipeline run. `--write` updates the badges and the ratchet instead of comparing them; it is opt-in because a command named for an inspection should not modify the tree. Never edits source either way — unformatted code fails and points at `format`. `--audit-dependencies` adds the pip-audit run, off by default because its answer depends on the advisory database rather than on your tree. |
+| `preflight.staged` | `--paths="<paths>"` | Only the checks that can be judged from the given files alone, and by default only the files you have staged. What the pre-commit hook runs. Reports rather than fixes, like every other entry point — unformatted code names `format`. |
+
+Both read one registry — `STEPS` in `_CI/tasks/preflight.py` — which declares every check
+once, along with its scope, its path filter, and whether it writes. The pre-commit hook, the
+pre-push hook and the CI preflight job all consume that declaration instead of keeping their
+own lists, so a check added to the registry reaches its tier without editing three files.
+
+Write mode and check mode run the *same* steps; only the derived-files step and `build` differ
+between them, and they differ by swapping one callable. That is deliberate: a separate
+implementation for the verifying side is how a gate drifts from the generator it guards. Every
+derived value — the badges, `fail_under` — is written through a single function that takes
+`write`, so what check mode compares is exactly what write mode would have produced.
+
+Neither mode edits your code. `preflight` writes derived files only; formatting is verified
+here and fixed by a deliberate `./workflow.cmd format`, or by the commit hook on the files you
+just staged. A command you run before opening a pull request should not be able to reformat
+something you never looked at and fold it into your commit.
+
+`preflight` — bare, no flags — is what the pre-push hook and the entire CI pipeline run, one
+job, since the separate lint, test and build jobs folded into it. Verifying being the default is
+what makes that literal: reproducing a pipeline failure means typing the command you see in the
+log. There is deliberately no flag that trims it either: shortening the matrix is `env_list`'s
+job, and that shortens CI too. Note that check mode still refreshes `reports/` — pytest's
+coverage JSON and pyscn's analysis are the *inputs* the comparison reads, and both are
+gitignored. What it never touches is a tracked file.
 
 ## `develop` — local dev environment
 
 | Task | Args | What it does |
 | --- | --- | --- |
 | `develop.bootstrap` | `--force` | Run all bootstrap steps. Idempotent. |
-| `develop.pre-commit` | `--install` / `--uninstall` / `--update` | Manage pre-commit hooks. |
+| `develop.pre-commit-install` | — | Install the hooks into `.git/hooks/` (all three stages at once). |
+| `develop.pre-commit` | `--all-files` | A dry run of your next commit: the commit-stage hooks over the files you staged, through pre-commit itself — so it exercises the hook wiring (`files:` filters, `SKIP`, the `--paths` marshalling) as well as the checks. `--all-files` widens it to every tracked file, for right after installing hooks or a `copier update`. Read-only, as the hooks are; not the full check either — `preflight` is what runs everything. |
 | `develop.bump-uv` | `--version=<v>` | Move every uv pin to the newest release at least 7 days old: the four version literals, the base image's tag *and* its re-resolved digest, and `uv.lock`. Warns when the bump crosses a minor version. `--version` takes a specific release, ignoring the cool-down. See [Dependency groups](dependency-groups.md#the-uv-pin-and-the-one-command-that-moves-it). |
 
 ## `format`, `lint`, `test`, `quality`
 
 Every task in this group that takes paths accepts `--paths="<space-separated paths>"`, and
-defaults to the whole project when it is omitted. The pre-commit hooks use it to check only
-the staged files — see [`.pre-commit-config.yaml`](configuration-files.md#pre-commit-configyaml)
-for which hooks are scoped that way and which are deliberately not.
+defaults to the whole project when it is omitted. `preflight.staged` uses it to check only the
+staged files, applying each step's own filter — see
+[`.pre-commit-config.yaml`](configuration-files.md#pre-commit-configyaml) for how the hook
+feeds it, and the registry in `_CI/tasks/preflight.py` for which steps can be narrowed at all.
+
+Calling one of these directly is also the way to run a single tool over a single file, which is
+what the collapsed hook no longer does for you: `./workflow.cmd lint.pylint --paths="src/thing.py"`.
 
 | Task | What it does |
 | --- | --- |
@@ -43,11 +80,11 @@ for which hooks are scoped that way and which are deliberately not.
 | `lint.complexipy` | Cognitive complexity check on `src/`. |
 | `lint.commitizen` | Validate commit messages since last tag. |
 | `test.pytest` | pytest with coverage, xdist, HTML reports. Forward extra pytest args with `--args="…"` (e.g. `--args="-k test_hello"`). |
-| `test.tox` | Full multi-version tox matrix in parallel. Pass `--env=py313` to run a single environment. |
-| `test.coverage` | Print coverage report from the latest run. |
+| `test.tox` | Full multi-version tox matrix in parallel, then `coverage combine` into one `reports/coverage.json` — the union across interpreters, which is what the badge and the ratchet read. Pass `--env=py313` to run a single environment. |
+| `test.coverage` | Print the coverage report from the latest run and render the browsable HTML into `reports/coverage/`. After `test.tox` that is the union across the matrix. This is where the HTML comes from: `preflight` produces only the JSON it reads. |
 | `test.view` | Open HTML test + coverage reports in browser. |
 | `quality.pyscn-analyze` | Full pyscn analysis with HTML report. |
-| `quality.pyscn-check` | CI-friendly pass/fail quality gate. |
+| `quality.pyscn-check` | CI-friendly pass/fail quality gate. Writes no report, so it has no grade to offer the badge — `quality.pyscn-analyze` is what produces one. |
 
 ## `release` — versioning and publishing
 
@@ -58,7 +95,7 @@ for which hooks are scoped that way and which are deliberately not.
 | `release.bump` | `-i <type>` | `cz bump` with the given increment (major/minor/patch/alpha/beta/rc). |
 | `release.changelog` | `--write` | Generate changelog. `--write` persists and commits, signing per `commit.gpgsign`. |
 | `release.push` | — | `git push` + `git push --tags`. |
-| `release.dist` | — | Clean and build into `dist/`, leaving the artifacts for inspection{% if git_hosting_service == 'github' %} or attestation{% endif %}. |
+| `release.dist` | — | Audit dependencies, then clean and build into `dist/`, leaving the artifacts for inspection{% if git_hosting_service == 'github' %} or attestation{% endif %}. The audit is here rather than in `build`: publishing is where a live advisory should stop you. |
 | `release.publish` | `--prebuilt` | Build + `uv publish` + SBOM upload (if DT enabled). Invoked from CI on release-tag merge. `--prebuilt` publishes what `release.dist` already built instead of rebuilding. |
 | `release.clean` | — | Remove `dist/` and `sbom.json`. |
 {%- if integrate_dependency_track %}
@@ -69,7 +106,8 @@ for which hooks are scoped that way and which are deliberately not.
 
 | Task | Args | What it does |
 | --- | --- | --- |
-| `secure.audit` | — | pip-audit honoring `.security-overrides`. |
+| `secure.audit` | — | pip-audit honoring `.security-overrides`. Runs on a schedule, on pushes that change the dependency surface, and before publishing — deliberately not on every push, and not from `build`. |
+| `secure.sbom` | — | The half `build` depends on: `sbom-extract --write` + `sbom-validate`. |
 | `secure.sbom-extract` | `--write` | Compose a CycloneDX 1.7 SBOM with metadata header (lifecycles, tools, supplier, authors), a two-level dependency graph (project → runtime + dev + build-environment; build-environment → vendored + pipeline), and per-component licence + hash + external-reference enrichment. Prints to stdout; with `--write` lands at `src/<slug>/sbom.cdx.json` so `uv build` ships it inside the wheel. |
 | `secure.sbom-validate` | — | Validate the SBOM against the CycloneDX 1.7 JSON schema (runs the validator in a clean `uv run python` subprocess so the venv-installed `jsonschema` wins over the older vendored one). Re-runs sbom-extract first if the file is missing. |
 {%- if integrate_dependency_track %}
@@ -83,7 +121,7 @@ for which hooks are scoped that way and which are deliberately not.
 | `document.build` | — | `properdocs build` — generate the static site under `site/`. |
 | `document.serve` | — | `properdocs serve` — serve the site locally with live reload (Ctrl-C to stop). |
 | `document.view` | — | Open the rendered site in the default browser (skipped in CI). |
-| `document` (aggregator) | — | Update badges, then `build` + `view`. |
+| `document` (aggregator) | — | Update the badges it can compute from what is already on disk, then `build` + `view`. It reuses existing reports rather than producing them, so a badge whose report is missing is reported and left alone; `preflight` is what runs the tools and refreshes all of them. |
 {%- if integrate_pages and git_hosting_service == 'github' %}
 | `document.deploy-github` | — | `properdocs gh-deploy --force` — build and publish to the `gh-pages` branch (consumed by the shipped Pages workflow). Only present when `integrate_pages=true` and `git_hosting_service=github`. |
 {%- endif %}

@@ -45,12 +45,18 @@ This installs uv-managed virtualenvs for every dependency group and registers pr
 These commands are the heartbeat of every project this template generates:
 
 ```bash
+./workflow.cmd preflight # All the checks below, and verify the README badges and coverage bar
 ./workflow.cmd format    # Ruff format + import sort
 ./workflow.cmd lint      # Ruff check, pylint, ty (type checker), complexipy, commitizen
 ./workflow.cmd test      # pytest with coverage and parallel execution
 ./workflow.cmd quality   # pyscn code quality check
 ./workflow.cmd build     # Produce a wheel + sdist in dist/ (also runs pip-audit and exports SBOM)
 ```
+
+`preflight` is the one to remember; the rest are there for when you want a single tool. Run it
+before you open a pull request and it leaves the tree in the state CI expects — including the
+badges, which are computed from the reports the tools just produced. It never edits your code:
+`format` is what reformats, and the commit hook does it for the files you stage.
 
 You should see a passing test for the example `hello()` function and a wheel appear under `dist/`.
 Some of the other QA tools also produce output you can look into later.
@@ -79,10 +85,14 @@ The prefixes drive the **release notes**: commitizen reads the commit history wh
 Now that you have git properly setup in your project you can execute the following command to perform all QA checks from step 3:
 
 ```bash
-./workflow.cmd develop.pre-commit
+./workflow.cmd preflight
 ```
 
-This command also runs before any commit is made.
+The hooks run this automatically: on every commit, the checks that can be judged from the
+files you staged; on every push, `preflight` itself — the same command, which is also the whole
+CI pipeline. It verifies the badges and the coverage bar rather than writing them, so a push
+cannot leave them stale for CI to complain about. When it does complain, it names the command
+that fixes them: `./workflow.cmd preflight --write`.
 
 ## You're done
 

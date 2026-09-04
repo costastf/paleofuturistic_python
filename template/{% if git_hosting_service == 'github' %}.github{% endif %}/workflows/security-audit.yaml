@@ -1,14 +1,32 @@
 name: Security audit
 
+# Every trigger the audit has, and none of them is "every push".
+#
 # A dependency can turn out to be vulnerable, and a `.security-overrides` entry can
 # expire, without anyone pushing a commit. Tied to `push` alone the audit only fires on
 # activity, so a quiet repository quietly stops being checked — and the expiry dates in
-# `.security-overrides` would never come due. This run is what makes them load-bearing.
+# `.security-overrides` would never come due. The schedule is what makes them load-bearing.
+#
+# The reverse is just as important: an audit on *every* push fails pull requests for
+# something the author did not do and cannot fix in their branch. A docstring change going
+# red because a CVE was published overnight is noise, and noise is what teaches people to
+# ignore a red pipeline. So the push trigger is narrowed to the files that can actually
+# introduce a vulnerable dependency — change the dependency surface and you own the result;
+# touch anything else and the schedule handles it.
+#
+# Publishing is gated separately, by `release.dist`, which audits before it builds. That is
+# the moment the outside world is exposed, and the one place refusing to proceed protects
+# somebody.
 on:
   schedule:
     # Daily. The minute is deliberately not :00 — GitHub sheds on-the-hour scheduled
     # jobs when the queue is busy. Adjust the cadence to taste.
     - cron: '17 3 * * *'
+  push:
+    paths:
+      - 'uv.lock'
+      - 'pyproject.toml'
+      - '.security-overrides'
   workflow_dispatch:
 
 permissions:

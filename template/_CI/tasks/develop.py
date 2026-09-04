@@ -33,9 +33,30 @@ def pre_commit_install(context: Context) -> None:
 
 @task
 @logged('develop.pre-commit')
-@run('uv run pre-commit run --all-files')
-def pre_commit(context: Context) -> None:
-    """Run all pre-commit hooks on the entire codebase."""
+def pre_commit(context: Context, all_files: bool = False) -> None:
+    """Run the commit-stage hooks exactly as git will run them.
+
+    A dry run of your next commit: pre-commit's own view of the staged files, through the
+    installed configuration, so it exercises what `preflight.staged` alone does not — that the
+    `sh -c … --paths="$*"` marshalling holds, that the `files:` filters select what you think
+    they do, that `SKIP` is honoured, and the other commit-stage hooks run too.
+
+    It used to pass `--all-files` unconditionally, which made the command behave differently
+    from the hook it is named after: `--all-files` means every *tracked* file, not the staged
+    ones. Now the default matches the hook and the flag widens it, the way `--write` widens
+    `preflight` rather than the other way round.
+
+    Nothing here writes: the hooks report, and `./workflow.cmd format` is what applies
+    formatting. Neither is this the full check — ty, pyscn, the test matrix and the derived
+    files are on pre-push, and `./workflow.cmd preflight` is the command that runs everything.
+
+    Args:
+        context: Invoke context.
+        all_files: Run the same hooks over every tracked file instead of the staged ones.
+            Useful right after installing hooks into an existing codebase, or after a
+            `copier update`, to see the whole backlog at once.
+    """
+    execute(context, 'uv run pre-commit run --all-files' if all_files else 'uv run pre-commit run')
 
 
 @task

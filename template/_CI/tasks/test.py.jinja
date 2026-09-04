@@ -14,7 +14,7 @@ else:
 
 from invoke import Collection, Context, Task, task
 
-from .shared import execute, logged, open_target, run_steps
+from .shared import apply_badge, execute, logged, note, open_target, run_steps
 
 COVERAGE_REPORT = Path('reports/coverage.json')
 PYPROJECT = Path('pyproject.toml')
@@ -61,7 +61,7 @@ def scaffold_is_pristine() -> bool:
     return SCAFFOLD_TEST_FILE.exists() and SCAFFOLD_MARKER in SCAFFOLD_TEST_FILE.read_text(encoding='utf-8')
 
 
-def ratchet_fail_under() -> None:
+def ratchet_fail_under(*, write: bool = True) -> str | None:
     """Bump ``fail_under`` in pyproject.toml after a green test run, gated on the scaffold signal.
 
     In ``auto-detect`` mode (the default), the ratchet is dormant while the scaffolded
@@ -76,17 +76,24 @@ def ratchet_fail_under() -> None:
 
     Every invocation prints a single status line so the user can tell at a glance whether the
     ratchet is dormant, just bumped, or holding steady.
+
+    Args:
+        write: Update pyproject.toml. When False, report what would change and touch nothing,
+            which is how ``preflight --check`` gates a push on a bump nobody committed.
+
+    Returns:
+        None when ``fail_under`` is already where it belongs, else a one-line reason it is not.
     """
-    if not COVERAGE_REPORT.exists() or not PYPROJECT.exists():
-        return
     pct = read_coverage_pct()
     if pct is None:
-        return
+        return f'no usable coverage report at {COVERAGE_REPORT} — run ./workflow.cmd test'
 
-    content = PYPROJECT.read_text(encoding='utf-8')
+    # No pyproject.toml, or no `fail_under` in it, means there is no ratchet to move — not a
+    # staleness anyone can act on, so both read as up to date.
+    content = PYPROJECT.read_text(encoding='utf-8') if PYPROJECT.exists() else ''
     match = re.search(r'^fail_under\s*=\s*(\d+)', content, re.MULTILINE)
     if not match:
-        return
+        return None
     current = int(match.group(1))
 
     try:
@@ -99,36 +106,53 @@ def ratchet_fail_under() -> None:
         print(f'[ratchet] coverage={pct}% — scaffold still pristine (test_sanity present); ratchet dormant')
         print(f'[ratchet]   ratchet engages when you remove `test_sanity` in {SCAFFOLD_TEST_FILE}')
         print('[ratchet]   to engage immediately, set [tool.test-ratchet] mode = "strict" in pyproject.toml')
-        return
+        return None
 
-    if pct > current:
-        updated = content[: match.start()] + f'fail_under = {pct}' + content[match.end() :]
-        PYPROJECT.write_text(updated, encoding='utf-8')
-        print(f'[ratchet] coverage={pct}% — fail_under bumped {current} → {pct}')
-    else:
+    if pct <= current:
         print(f'[ratchet] coverage={pct}% — fail_under stays at {current}')
+        return None
+    # Anchored to the start of a line so the bar in `[tool.coverage.report]` is the only
+    # `fail_under` this can reach; a `fail_under` inside a docstring or comment is indented.
+    reason = apply_badge(
+        PYPROJECT,
+        r'^fail_under\s*=\s*\d+',
+        f'fail_under = {pct}',
+        label='coverage ratchet',
+        detail=f'fail_under = {pct} (was {current})',
+        write=write,
+        flags=re.MULTILINE,
+        announce=False,
+    )
+    if write:
+        print(f'[ratchet] coverage={pct}% — fail_under bumped {current} → {pct}')
+    return reason
 
 
-def update_coverage_badge() -> None:
-    """Update the coverage badge in README.md from the latest coverage report."""
-    readme = Path('README.md')
-    if not readme.exists() or not COVERAGE_REPORT.exists():
-        return
+def update_coverage_badge(*, write: bool = True) -> str | None:
+    """Bring the README's coverage badge in line with the latest coverage report.
+
+    Args:
+        write: Update README.md. When False, report what would change and touch nothing.
+
+    Returns:
+        None when the badge is already right, else a one-line reason it is not.
+    """
+    if not COVERAGE_REPORT.exists():
+        return f'no coverage report at {COVERAGE_REPORT} — run ./workflow.cmd test'
     try:
         report = json.loads(COVERAGE_REPORT.read_text(encoding='utf-8'))
         pct = round(report['totals']['percent_covered'])
     except (ValueError, KeyError):
-        return
+        return f'{COVERAGE_REPORT} holds no total coverage — run ./workflow.cmd test'
     color = coverage_color(pct)
-    content = readme.read_text(encoding='utf-8')
-    updated = re.sub(
+    return apply_badge(
+        Path('README.md'),
         r'(\[!\[Coverage\]\(https://img\.shields\.io/badge/coverage-)[^)]+(\))',
         rf'\g<1>{pct}%25-{color}\2',
-        content,
+        label='coverage badge',
+        detail=f'{pct}%',
+        write=write,
     )
-    if updated != content:
-        readme.write_text(updated, encoding='utf-8')
-        print(f'Updated coverage badge to {pct}%.')
 
 
 @task
@@ -147,11 +171,17 @@ def pytest(context: Context, args: str = '') -> None:
 @task
 @logged('test.coverage')
 def coverage(context: Context) -> None:
-    """Show test coverage report in terminal."""
+    """Show coverage in the terminal and render the browsable report.
+
+    Whatever the last run measured: after `test.pytest` that is one interpreter, after
+    `test.tox` it is the union across the matrix. This is where the HTML report comes from —
+    `preflight` deliberately does not produce one, because nothing in a gate reads it.
+    """
     execute(context, 'uv run coverage report')
     execute(context, f'uv run coverage json -o {COVERAGE_REPORT}')
-    update_coverage_badge()
-    ratchet_fail_under()
+    execute(context, 'uv run coverage html -d reports/coverage')
+    note(update_coverage_badge())
+    note(ratchet_fail_under())
 
 
 @task
@@ -163,17 +193,98 @@ def view(context: Context) -> None:
     open_target(context, 'reports/coverage/index.html')
 
 
+def erase_coverage_data() -> None:
+    """Delete every coverage data file, the per-env ones included.
+
+    `coverage erase` is not enough: it removes the base `.coverage` and, unless parallel mode
+    is configured, nothing else. A `.coverage.<envname>` left behind by an env since dropped
+    from `env_list` therefore survives it, and the next `coverage combine` folds that env's
+    lines into the union — inflating the coverage badge and, worse, the ratchet's `fail_under`,
+    which only ever moves up. Verified against coverage 7: after `coverage erase`, a planted
+    `.coverage.py39` was still combined.
+
+    `.coverage.*` cannot match `.coveragerc` — there is no dot before `rc` — so a config file
+    is never in scope here.
+    """
+    for data_file in (Path('.coverage'), *Path().glob('.coverage.*')):
+        data_file.unlink(missing_ok=True)
+
+
+def combine_coverage(context: Context) -> None:
+    """Merge the matrix's per-env coverage data into one report.
+
+    ``coverage combine`` takes the *union* of the lines each interpreter executed — a line
+    counts as covered if any env ran it — which is the only correct reading of a version
+    matrix. Version-gated code is the case that makes it obvious:
+
+        if sys.version_info >= (3, 11):
+            import tomllib
+        else:
+            import tomli as tomllib
+
+    Under py310 the ``else`` runs; under py311+ the ``if`` does. No single env can cover both,
+    so every env reports a miss on code the matrix as a whole exercises fully. Reading one
+    env's report — which is what the badge did before, whichever env won the race — therefore
+    understates coverage on exactly the code a five-interpreter matrix exists to test.
+
+    Averaging the per-env percentages would be meaningless: coverage is not a noisy
+    measurement of one quantity, it is the set of lines that ran.
+
+    What the union does *not* tell you is that a line reached only under py314 still works
+    under py310. Nothing about coverage ever did — it measures reach, not correctness, and the
+    tests are what check the latter on all five interpreters.
+
+    ``[tool.coverage.paths]`` is what lets this work at all: each env installs the package into
+    its own site-packages, and that mapping folds those paths back onto ``src/``.
+
+    "Combined 4 files, skipped 1" is coverage deduplicating on the sha3 of the *data file*,
+    not on what it measured: `DataFileClassifier` skips a file whose hash it has already
+    combined. On a matrix where every env measures the same lines, some of the SQLite files
+    come out byte-identical and the rest differ only in row and page layout — measured with
+    five envs recording the same files, lines and arc counts, where py310 and py311 hashed
+    identically and the other three did not. Nothing is lost either way: a skipped file's
+    measurements are by definition already merged, and an env that measured something unique
+    cannot hash the same as another.
+    """
+    # JSON only, and no HTML. The gate produces what the gate consumes: `reports/coverage.json`
+    # is what the badge and the ratchet read, and an HTML report has no reader in a hook or a
+    # pipeline — the same reason pyscn's HTML pass left this path. `test.coverage` renders it
+    # on demand, and the per-env reports are already on disk for a single interpreter.
+    #
+    # Not `--keep`. Left in place, the per-env files still look like parallel data to
+    # coverage, so the very next `coverage json` combines them all over again and reports
+    # doing so a second time. Nothing is lost by consuming them: the per-env *reports* under
+    # `reports/` are what anyone actually reads to see one interpreter's numbers.
+    execute(context, 'uv run coverage combine')
+    execute(context, f'uv run coverage json -o {COVERAGE_REPORT}')
+
+
 @task
 @logged('test.tox')
 def tox(context: Context, env: str = '') -> None:
     """Run the pytest matrix across supported Python versions via tox.
+
+    Leaves one `reports/coverage.json` covering the whole matrix — see `combine_coverage` for
+    why that is a union and not an average, and `[tool.tox.env_run_base]` for why each env
+    writes its own reports on the way there.
 
     Args:
         context: Invoke context.
         env: A single tox environment to run, e.g. ``--env=py313``. When
             omitted, the full matrix runs in parallel.
     """
+    # A `.coverage.<env>` left behind by an env that has since been removed from `env_list`
+    # would be folded into the union and inflate it, so the slate is wiped before the run —
+    # by hand, because `coverage erase` leaves exactly those files alone.
+    erase_coverage_data()
+    # The live progress list prints one `env: OK ✔ in Xs` line per environment and always ends
+    # up one short — nothing is skipped, it is whichever env finished *last*, whose line is
+    # swallowed as the run ends and the summary is printed. Confirmed across runs: the absent
+    # env is the one with the longest duration in the summary, and it changes from run to run.
+    # `--parallel-no-spinner` does not help. The summary block below the list is the complete
+    # view, and `coverage combine` reporting how many data files it merged is the harder check.
     execute(context, f'uv run tox run -e {env}' if env else 'uv run tox run-parallel')
+    combine_coverage(context)
 
 
 @task
@@ -181,8 +292,8 @@ def tox(context: Context, env: str = '') -> None:
 def test(context: Context) -> None:
     """Run all test steps; reports all failures before exiting."""
     run_steps(pytest)(context)
-    update_coverage_badge()
-    ratchet_fail_under()
+    note(update_coverage_badge())
+    note(ratchet_fail_under())
 
 
 namespace = Collection('test')
