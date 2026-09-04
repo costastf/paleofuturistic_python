@@ -13,7 +13,7 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 | `format` | `format.ruff` | Ruff format + import sort. |
 | `lint` | `lint.all` | Runs ruff, pylint, ty, complexipy, commitizen. |
 | `test` | `test.all` | pytest with coverage and xdist. |
-| `build` | `build.package` | SBOM compose + validate, then `uv build`. No dependency audit — see `secure`. |
+| `build` | `build.package` | SBOM compose + validate, then `uv build`. No dependency audit — see `secure` — and no README badge: the CI badge points at {% if git_hosting_service == 'github' %}GitHub's workflow-status endpoint{% else %}GitLab's pipeline-status endpoint{% endif %}, which is always current. |
 | `release` | `release` | Validate, branch, bump, changelog, push, open PR/MR. |
 | `quality` | `quality.pyscn-analyze` | pyscn static analysis with HTML report. |
 | `secure` | `secure.all` | Every security task at once: pip-audit + SBOM compose/validate. Nothing automated calls it; the pieces have their own homes. |
@@ -26,6 +26,11 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 | --- | --- | --- |
 | `preflight` | `--write`, `--audit-dependencies` | Verify formatting, lint, type-check, pyscn, the full tox matrix, the wheel, and the four README badges plus the coverage ratchet against what the tools just measured — failing with everything out of date. This bare command is what the pre-push hook and the CI pipeline run. `--write` updates the badges and the ratchet instead of comparing them; it is opt-in because a command named for an inspection should not modify the tree. Never edits source either way — unformatted code fails and points at `format`. `--audit-dependencies` adds the pip-audit run, off by default because its answer depends on the advisory database rather than on your tree. |
 | `preflight.staged` | `--paths="<paths>"` | Only the checks that can be judged from the given files alone, and by default only the files you have staged. What the pre-commit hook runs. Reports rather than fixes, like every other entry point — unformatted code names `format`. |
+
+The badges it checks are the four written from reports — version, Python, coverage, pyscn —
+plus the CI badge, whose *URL* is derived from `origin` once and then never changes, because
+{% if git_hosting_service == 'github' %}GitHub{% else %}GitLab{% endif %} renders the current
+status itself. A project with no remote yet keeps the placeholder rather than failing the gate.
 
 Both read one registry — `STEPS` in `_CI/tasks/preflight.py` — which declares every check
 once, along with its scope, its path filter, and whether it writes. The pre-commit hook, the

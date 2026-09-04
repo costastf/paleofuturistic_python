@@ -1351,7 +1351,9 @@ def test_no_commit_stage_hook_rewrites_unstaged_tracked_files(generated_project)
     files the author staged, which is a formatter doing its job.
     """
     project, _ = generated_project
-    mutating = {'preflight', 'test', 'document', 'build', 'quality.pyscn-analyze', 'test.coverage'}
+    # `build` is deliberately absent: it stopped writing the README when the CI badge moved to
+    # the host's own status endpoint, and the SBOM and wheel it does write are gitignored.
+    mutating = {'preflight', 'test', 'document', 'quality.pyscn-analyze', 'test.coverage'}
     for hook in pre_commit_hooks(project):
         if 'pre-commit' not in hook_stages(hook):
             continue
@@ -1738,6 +1740,38 @@ def test_matrix_coverage_is_combined_before_anything_reads_it(generated_project)
     assert 'coverage json -o {COVERAGE_REPORT}' in combine, 'the union never reaches the report the badge reads'
 
 
+def test_the_ci_badge_is_the_hosts_own(generated_project):
+    """The CI badge points at the host's status endpoint, and no task records a build status.
+
+    It used to be written locally by `build`, recording whether *that* run passed — which told
+    a reader nothing, could claim "passing" on a run that then failed, and on GitLab was never
+    written at all: `build.py` matched only the `Build` badge that GitHub projects render, so
+    every GitLab project shipped a `pipeline-unknown` badge nothing could update.
+
+    The host renders the current status on every page load, so only the URL is derived, from
+    `origin`, and it stops changing once written. A project with no readable `origin` keeps its
+    placeholder rather than being reported stale — not pushed anywhere is not the same as wrong.
+    """
+    project, cell = generated_project
+    tasks = project / '_CI' / 'tasks'
+    # Asserted against code, not prose: the docstring explains the absence, so matching the
+    # word "README" would fail on the explanation itself.
+    build_py = (tasks / 'build.py').read_text(encoding='utf-8')
+    assert "Path('README.md')" not in build_py, 'build writes the README again'
+    assert 'apply_badge' not in build_py, 'build writes a badge again'
+
+    host_module = (tasks / f'{cell["git_hosting_service"]}.py').read_text(encoding='utf-8')
+    assert 'def pipeline_badge' in host_module, 'the host module builds no CI badge'
+    expected = 'actions/workflows' if cell['git_hosting_service'] == 'github' else 'badges/main/pipeline.svg'
+    assert expected in host_module, f'the CI badge does not point at the host: {expected!r} missing'
+
+    document = (tasks / 'document.py').read_text(encoding='utf-8')
+    assert 'def update_pipeline_badge' in document, 'nothing points the CI badge anywhere'
+    updater = document.split('def update_pipeline_badge', 1)[1].split('\ndef ', 1)[0]
+    unknown_remote = updater.split('pipeline_badge(context)', 1)[1].split('return apply_badge', 1)[0]
+    assert 'return None' in unknown_remote, 'a project without a remote is reported stale, not left alone'
+
+
 def test_readme_has_exactly_one_writer(generated_project):
     """Every write to README.md goes through `apply_badge`, so check mode cannot drift.
 
@@ -1767,7 +1801,7 @@ def test_derived_values_are_computed_in_both_modes_by_one_function(generated_pro
     updaters = {
         'quality.py': ['update_pyscn_badge'],
         'test.py': ['update_coverage_badge', 'ratchet_fail_under'],
-        'document.py': ['update_package_version_badge', 'update_python_badge'],
+        'document.py': ['update_package_version_badge', 'update_python_badge', 'update_pipeline_badge'],
     }
     for filename, names in updaters.items():
         tree = ast.parse((tasks / filename).read_text(encoding='utf-8'))

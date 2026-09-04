@@ -51,7 +51,7 @@ from typing import NamedTuple, cast
 from invoke import Collection, Context, Task, task
 
 from .build import build
-from .document import update_package_version_badge, update_python_badge
+from .document import update_package_version_badge, update_pipeline_badge, update_python_badge
 from .lint import complexipy, format_check, pylint, ruff_lint, ty
 from .quality import pyscn_check, pyscn_json_report, update_pyscn_badge
 from .secure import audit
@@ -133,7 +133,7 @@ def pyscn(context: Context) -> None:
 
 
 @logged('preflight.artifacts')
-def artifacts(context: Context, *, write: bool) -> None:  # noqa: ARG001
+def artifacts(context: Context, *, write: bool) -> None:
     """Bring every derived value committed to the repository up to date, or verify it.
 
     Decorated, unlike the other two wrappers here, because it is the only step whose work is
@@ -156,6 +156,7 @@ def artifacts(context: Context, *, write: bool) -> None:  # noqa: ARG001
         for reason in (
             update_package_version_badge(write=write),
             update_python_badge(write=write),
+            update_pipeline_badge(context, write=write),
             update_coverage_badge(write=write),
             update_pyscn_badge(write=write),
             ratchet_fail_under(write=write),
@@ -183,13 +184,7 @@ STEPS = (
     # every version in `env_list`. It costs about one extra suite-length, because the envs run
     # in parallel. `test.pytest` remains the fast inner-loop task; this is the gate.
     Step('tox', WHOLE_PROGRAM, check=tox),
-    # The build badge is the one derived value that records an *event* — what happened when
-    # the package was last built — rather than a value recomputable from a report. So write
-    # mode records it, and check mode passes `badge=False` and leaves it alone: README.md is
-    # tracked, and check mode touches no tracked file. That does mean a stale build badge is
-    # the one thing `--check` cannot catch. It is also the one badge CI could never fix, since
-    # its checkout has no credentials and its token is read-only.
-    Step('build', WHOLE_PROGRAM, check=partial(build, badge=False), write=partial(build, badge=True)),
+    Step('build', WHOLE_PROGRAM, check=build),
     # After pyscn and tox, which produce the reports it reads.
     Step(
         'artifacts',

@@ -6,9 +6,11 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-{% if integrate_pages and git_hosting_service == 'github' -%}
-from .github import request_pages_build
-{% endif -%}
+{% if git_hosting_service == 'github' -%}
+from .github import pipeline_badge{% if integrate_pages %}, request_pages_build{% endif %}
+{%- else -%}
+from .gitlab import pipeline_badge
+{%- endif %}
 from .quality import update_pyscn_badge
 {% if integrate_pages and git_hosting_service == 'github' -%}
 from .shared import apply_badge, execute, is_ci, logged, note, open_target, run, run_steps
@@ -40,6 +42,38 @@ def update_package_version_badge(*, write: bool = True) -> str | None:
         rf'\g<1>{version}-blue\2',
         label='version badge',
         detail=version,
+        write=write,
+    )
+
+
+def update_pipeline_badge(context: Context, *, write: bool = True) -> str | None:
+    """Point the CI badge at the host's own status endpoint, derived from `origin`.
+
+    The only derived value here whose *content* never goes stale: the host renders the current
+    status on every page load, so this writes a URL once and then has nothing left to do. It
+    replaces a badge that recorded whether the last local `build` passed — which said nothing
+    to a reader, could claim "passing" on a failing run, and on GitLab was never written at
+    all, `build.py` having matched only the `Build` badge that GitHub projects render.
+
+    A project with no readable `origin` has not been pushed anywhere yet. That is not a stale
+    badge, so it reads as up to date and the placeholder stays.
+
+    Args:
+        context: Invoke context, for reading `origin`.
+        write: Update README.md. When False, report what would change and touch nothing.
+
+    Returns:
+        None when the badge already points at the right place, else a one-line reason.
+    """
+    badge = pipeline_badge(context)
+    if not badge:
+        return None
+    return apply_badge(
+        Path('README.md'),
+        r'\[!\[(?:Build|Pipeline)\]\([^)]+\)\]\([^)]+\)',
+        badge.replace('\\', '\\\\'),
+        label='CI badge',
+        detail="the host's live status endpoint",
         write=write,
     )
 
@@ -113,6 +147,7 @@ def document(context: Context) -> None:
     for reason in (
         update_package_version_badge(),
         update_python_badge(),
+        update_pipeline_badge(context),
         update_coverage_badge(),
         update_pyscn_badge(),
     ):
