@@ -193,6 +193,23 @@ def view(context: Context) -> None:
     open_target(context, 'reports/coverage/index.html')
 
 
+def erase_coverage_data() -> None:
+    """Delete every coverage data file, the per-env ones included.
+
+    `coverage erase` is not enough: it removes the base `.coverage` and, unless parallel mode
+    is configured, nothing else. A `.coverage.<envname>` left behind by an env since dropped
+    from `env_list` therefore survives it, and the next `coverage combine` folds that env's
+    lines into the union — inflating the coverage badge and, worse, the ratchet's `fail_under`,
+    which only ever moves up. Verified against coverage 7: after `coverage erase`, a planted
+    `.coverage.py39` was still combined.
+
+    `.coverage.*` cannot match `.coveragerc` — there is no dot before `rc` — so a config file
+    is never in scope here.
+    """
+    for data_file in (Path('.coverage'), *Path().glob('.coverage.*')):
+        data_file.unlink(missing_ok=True)
+
+
 def combine_coverage(context: Context) -> None:
     """Merge the matrix's per-env coverage data into one report.
 
@@ -253,8 +270,9 @@ def tox(context: Context, env: str = '') -> None:
             omitted, the full matrix runs in parallel.
     """
     # A `.coverage.<env>` left behind by an env that has since been removed from `env_list`
-    # would be folded into the union and inflate it, so the slate is wiped before the run.
-    execute(context, 'uv run coverage erase')
+    # would be folded into the union and inflate it, so the slate is wiped before the run —
+    # by hand, because `coverage erase` leaves exactly those files alone.
+    erase_coverage_data()
     execute(context, f'uv run tox run -e {env}' if env else 'uv run tox run-parallel')
     combine_coverage(context)
 

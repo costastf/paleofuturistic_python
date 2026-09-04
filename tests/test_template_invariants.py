@@ -1679,9 +1679,13 @@ def test_matrix_coverage_is_combined_before_anything_reads_it(generated_project)
     # Past the closing `"""`, so the docstring's own mention of combine_coverage — which
     # precedes every command — cannot satisfy the ordering assertions below.
     body = test_py.split("@logged('test.tox')", 1)[1].split('@task', 1)[0].split('"""')[-1]
-    for step in ('coverage erase', 'tox run', 'combine_coverage'):
+    for step in ('erase_coverage_data', 'tox run', 'combine_coverage'):
         assert step in body, f'test.tox no longer runs {step!r}'
-    assert body.index('coverage erase') < body.index('tox run'), 'stale coverage data is not cleared first'
+    assert body.index('erase_coverage_data') < body.index('tox run'), 'stale coverage data is not cleared first'
+    # Not `coverage erase`: it leaves `.coverage.<envname>` in place, so a retired env's data
+    # would still be combined into the union that feeds the badge and the ratchet.
+    erase = test_py.split('def erase_coverage_data', 1)[1].split('\ndef ', 1)[0]
+    assert "Path().glob('.coverage.*')" in erase, 'the per-env data files are no longer cleared'
     assert body.index('tox run') < body.index('combine_coverage'), 'coverage is combined before the matrix runs'
     combine = test_py.split('def combine_coverage', 1)[1].split('\n@task', 1)[0]
     assert 'coverage combine' in combine, 'the per-env data is never merged'
