@@ -57,7 +57,7 @@ gitignored. What it never touches is a tracked file.
 | --- | --- | --- |
 | `develop.bootstrap` | `--force` | Run all bootstrap steps. Idempotent. |
 | `develop.pre-commit-install` | — | Install the hooks into `.git/hooks/` (all three stages at once). |
-| `develop.pre-commit` | — | Run the *commit-stage* hooks over every **tracked** file — not just the staged ones, which is what `--all-files` means. Read-only, as the hooks are. Not the full check either: ty, pyscn, tests and the derived files are on pre-push, and `preflight` is what runs everything. |
+| `develop.pre-commit` | `--all-files` | A dry run of your next commit: the commit-stage hooks over the files you staged, through pre-commit itself — so it exercises the hook wiring (`files:` filters, `SKIP`, the `--paths` marshalling) as well as the checks. `--all-files` widens it to every tracked file, for right after installing hooks or a `copier update`. Read-only, as the hooks are; not the full check either — `preflight` is what runs everything. |
 | `develop.bump-uv` | `--version=<v>` | Move every uv pin to the newest release at least 7 days old: the four version literals, the base image's tag *and* its re-resolved digest, and `uv.lock`. Warns when the bump crosses a minor version. `--version` takes a specific release, ignoring the cool-down. See [Dependency groups](dependency-groups.md#the-uv-pin-and-the-one-command-that-moves-it). |
 
 ## `format`, `lint`, `test`, `quality`

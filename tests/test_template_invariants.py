@@ -1611,6 +1611,21 @@ def test_no_automated_run_edits_source(generated_project):
     assert '--fix' not in hook['entry'], f'the commit hook rewrites files again: {hook["entry"]!r}'
 
 
+def test_running_the_hooks_by_hand_matches_what_git_will_do(generated_project):
+    """`develop.pre-commit` defaults to the staged files, like the hook it is named after.
+
+    It passed `--all-files` unconditionally, so the command behaved differently from the hook:
+    `--all-files` is every *tracked* file. The default now matches, and the flag widens —
+    the same direction as `preflight --write`, where the bare command is the narrow, read-only
+    one and a flag opts into more.
+    """
+    project, _ = generated_project
+    develop = (project / '_CI' / 'tasks' / 'develop.py').read_text(encoding='utf-8')
+    body = develop.split("@logged('develop.pre-commit')", 1)[1].split('@task', 1)[0]
+    assert "'uv run pre-commit run'" in body, 'the default no longer runs the hooks on staged files'
+    assert 'all_files: bool = False' in body, 'widening to every tracked file is not opt-in'
+
+
 def test_the_staged_bundle_defaults_to_what_is_staged(generated_project):
     """`preflight.staged` with no paths checks the index, not the whole project.
 
