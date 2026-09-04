@@ -144,8 +144,16 @@ def pyscn(context: Context) -> None:
     run_steps(pyscn_json_report, pyscn_check)(context)
 
 
+@logged('preflight.artifacts')
 def artifacts(context: Context, *, write: bool) -> None:  # noqa: ARG001
     """Bring every derived value committed to the repository up to date, or verify it.
+
+    Decorated, unlike the other two wrappers here, because it is the only step whose work is
+    entirely its own: `formatting` and `pyscn` delegate to tasks that announce themselves, so
+    they are already bracketed in the log. This one wrote nothing to the log at all when every
+    derived value was already correct — which is the case you most want evidence of, since
+    verifying the badges and the ratchet is the one thing `preflight` does that no other step
+    covers. Silence read as "it did not run".
 
     The four README badges and the coverage ratchet's ``fail_under`` are all computed from
     reports produced earlier in this same run, so by the time this step executes the inputs
