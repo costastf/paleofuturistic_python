@@ -213,11 +213,17 @@ def combine_coverage(context: Context) -> None:
 
     ``[tool.coverage.paths]`` is what lets this work at all: each env installs the package into
     its own site-packages, and that mapping folds those paths back onto ``src/``.
+
+    A per-env data file whose lines are all covered by another env's is deduplicated rather
+    than merged, which is why the count coverage reports can read "combined 4, skipped 1" on a
+    project where every interpreter happens to cover exactly the same lines. As soon as an env
+    contributes something unique — the version-gated case above — it is combined.
     """
-    # `--keep` leaves the per-env data files in place, so a single interpreter's numbers can
-    # still be inspected after the fact. `test.tox` erases them before the run instead, which
-    # is what stops a stale env's data from being folded into the union.
-    execute(context, 'uv run coverage combine --keep')
+    # Not `--keep`. Left in place, the per-env files still look like parallel data to
+    # coverage, so the very next `coverage json` combines them all over again and reports
+    # doing so a second time. Nothing is lost by consuming them: the per-env *reports* under
+    # `reports/` are what anyone actually reads to see one interpreter's numbers.
+    execute(context, 'uv run coverage combine')
     execute(context, f'uv run coverage json -o {COVERAGE_REPORT}')
     # The per-env HTML reports stay for drilling into a single interpreter; this is the
     # combined view, and the path `test.view` opens.

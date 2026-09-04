@@ -72,19 +72,33 @@ def pyscn_check(context: Context) -> None:
 
 
 @logged('quality.pyscn-analyze')
-def pyscn_analyze_only(context: Context, *, badge: bool = True) -> None:
+def pyscn_analyze_only(context: Context) -> None:
     """Run pyscn analyze without opening the report.
 
-    Args:
-        context: Invoke context.
-        badge: Update the README badge from the fresh report. ``preflight`` passes False:
-            it owns every write to a tracked file, so that all of them can be verified
-            together in check mode instead of one task at a time.
+    Two analyses, because pyscn refuses more than one output format per run — ``--html
+    --json`` together fails with "only one output format flag can be specified". So each
+    format costs its own full analysis, and each prints its own summary table. That is the
+    price of wanting both reports; ``pyscn_json_report`` is the path for callers that only
+    need one.
     """
     execute(context, 'uv run pyscn analyze src/')
     execute(context, 'uv run pyscn analyze --json src/')
-    if badge:
-        note(update_pyscn_badge())
+    note(update_pyscn_badge())
+
+
+@logged('quality.pyscn-analyze')
+def pyscn_json_report(context: Context) -> None:
+    """Produce just the JSON report, which is all the badge is derived from.
+
+    The gate's path. An HTML report exists to be looked at, and nothing in `preflight` or a
+    hook looks at one — so paying for a second full analysis to produce it, and printing a
+    second identical summary table, bought nothing. `quality.pyscn-analyze` is where the
+    HTML report is wanted, because that task opens it.
+
+    The badge is deliberately not written here: `preflight` owns every write to a tracked
+    file so that check mode can verify all of them together.
+    """
+    execute(context, 'uv run pyscn analyze --json src/')
 
 
 @task

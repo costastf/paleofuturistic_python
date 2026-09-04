@@ -11,16 +11,17 @@ Two ideas do most of the work:
 *Scope decides the tier.* ``PER_FILE`` steps can answer correctly from the staged files alone,
 so they run on every commit and cost time proportional to the change. ``WHOLE_PROGRAM`` steps
 cannot: ty needs the callers of a changed signature, pyscn needs every file to know what is
-dead or duplicated, pytest needs the suite. Those cost time proportional to the *project*, so
-they run once per push instead of once per commit, which keeps commit latency flat as the
-project grows. This is a rule about correctness, not speed: a whole-program check narrowed to a
-diff does not run faster, it answers wrongly.
+dead or duplicated, the matrix needs the suite on every interpreter, and a wheel builds from
+the whole tree or not at all. Those cost time proportional to the *project*, so they run once
+per push instead of once per commit, which keeps commit latency flat as the project grows.
+This is a rule about correctness, not speed: a whole-program check narrowed to a diff does not
+run faster, it answers wrongly.
 
 *Write mode and check mode are the same steps.* ``preflight`` brings the tree up to date;
 ``preflight --check`` runs the identical registry and fails on anything it would have changed.
-Only ``format`` and ``artifacts`` differ between the two, and they differ by swapping one
-callable, not by taking a separate path. Nothing in this file re-implements a check for the
-verifying side, because that is how a gate drifts from the generator it guards.
+Only ``format``, ``build`` and ``artifacts`` differ between the two, and each differs by
+swapping one callable, not by taking a separate path. Nothing in this file re-implements a
+check for the verifying side, because that is how a gate drifts from the generator it guards.
 
 Note that check mode still writes ``reports/`` — pytest's coverage JSON and pyscn's analysis
 are the *inputs* the artifact comparison reads, and they are gitignored derived files. What
@@ -38,7 +39,7 @@ from .build import build
 from .document import update_package_version_badge, update_python_badge
 from .format_ import ruff_format
 from .lint import complexipy, format_check, pylint, ruff_lint, ty
-from .quality import pyscn_analyze_only, pyscn_check, update_pyscn_badge
+from .quality import pyscn_check, pyscn_json_report, update_pyscn_badge
 from .secure import audit
 from .shared import logged, run_steps
 from .test import ratchet_fail_under, tox, update_coverage_badge
@@ -90,9 +91,14 @@ def pyscn(context: Context) -> None:
     The analysis runs in both modes because its JSON report is what the ``artifacts`` step
     compares the badge against — the gate alone writes no report and so has no grade to offer,
     which is the reason the badge used to sit at "not rated" forever. Writing the badge is the
-    ``artifacts`` step's job, so ``badge=False`` here keeps exactly one writer for it.
+    ``artifacts`` step's job, which keeps exactly one writer for it.
+
+    Only the JSON report, though. pyscn allows one output format per run, so an HTML report
+    would mean a second full analysis printing a second identical summary table — and nothing
+    in this path opens an HTML report. `quality.pyscn-analyze` is where that is worth paying
+    for, because it opens the thing it produced.
     """
-    run_steps(partial(pyscn_analyze_only, badge=False), pyscn_check)(context)
+    run_steps(pyscn_json_report, pyscn_check)(context)
 
 
 def artifacts(context: Context, *, write: bool) -> None:  # noqa: ARG001

@@ -40,7 +40,7 @@ Coverage regressions still can't slip in silently — they just can't slip in *o
 
 tox + tox-uv runs the test suite against every Python version in the project's range. Configured in `pyproject.toml`'s `[tool.tox]`, generated from the Python version range chosen at generation time.
 
-**Coverage across the matrix is a union, not an average.** Each env writes its own coverage data (`.coverage.<envname>`) and its own reports (`reports/coverage.<envname>.json`, `reports/tests.<envname>.html`), and `test.tox` then runs `coverage combine` to produce the single `reports/coverage.json` that the badge and the ratchet read. A line counts as covered if *any* interpreter executed it.
+**Coverage across the matrix is a union, not an average.** Each env writes its own coverage data (`.coverage.<envname>`, consumed by the combine) and its own reports (`reports/coverage.<envname>.json`, `reports/tests.<envname>.html`), and `test.tox` then runs `coverage combine` to produce the single `reports/coverage.json` that the badge and the ratchet read. A line counts as covered if *any* interpreter executed it.
 
 That is the only correct reading of a version matrix, and version-gated code shows why:
 
