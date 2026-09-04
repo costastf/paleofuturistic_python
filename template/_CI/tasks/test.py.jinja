@@ -237,10 +237,14 @@ def combine_coverage(context: Context) -> None:
     ``[tool.coverage.paths]`` is what lets this work at all: each env installs the package into
     its own site-packages, and that mapping folds those paths back onto ``src/``.
 
-    A per-env data file whose lines are all covered by another env's is deduplicated rather
-    than merged, which is why the count coverage reports can read "combined 4, skipped 1" on a
-    project where every interpreter happens to cover exactly the same lines. As soon as an env
-    contributes something unique — the version-gated case above — it is combined.
+    "Combined 4 files, skipped 1" is coverage deduplicating on the sha3 of the *data file*,
+    not on what it measured: `DataFileClassifier` skips a file whose hash it has already
+    combined. On a matrix where every env measures the same lines, some of the SQLite files
+    come out byte-identical and the rest differ only in row and page layout — measured with
+    five envs recording the same files, lines and arc counts, where py310 and py311 hashed
+    identically and the other three did not. Nothing is lost either way: a skipped file's
+    measurements are by definition already merged, and an env that measured something unique
+    cannot hash the same as another.
     """
     # JSON only, and no HTML. The gate produces what the gate consumes: `reports/coverage.json`
     # is what the badge and the ratchet read, and an HTML report has no reader in a hook or a
