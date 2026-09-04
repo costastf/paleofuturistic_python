@@ -1537,6 +1537,27 @@ def test_ci_runs_the_same_gate_as_the_pre_push_hook(generated_project):
     assert command in commands, f'no CI job runs {command!r}; it runs {commands}'
 
 
+def test_pyscn_never_opens_a_browser_by_itself(generated_project):
+    """Every pyscn run that writes HTML passes `--no-open`.
+
+    pyscn launches a browser as soon as it writes an HTML report — verified with a stub
+    `xdg-open`, which fires once for a bare `analyze` and not at all with `--no-open`. That
+    made `quality.pyscn-analyze` open the report twice, once by itself and once from its own
+    deliberate `open_target`, and made `pyscn_analyze_only` — "without opening the report" —
+    open one anyway. It also had a tool reaching for a browser on a CI runner, where
+    `is_ci()` exists precisely to prevent that.
+
+    Whether a report is worth opening is the task's call, not the tool's.
+    """
+    project, _ = generated_project
+    quality_py = (project / '_CI' / 'tasks' / 'quality.py').read_text(encoding='utf-8')
+    # Command strings only — prose about `pyscn analyze` is not an invocation of it.
+    html_runs = [line for line in quality_py.splitlines() if 'uv run pyscn analyze' in line and '--json' not in line]
+    assert html_runs, 'no pyscn invocation produces an HTML report any more'
+    for line in html_runs:
+        assert '--no-open' in line, f'{line.strip()!r} lets pyscn open a browser on its own'
+
+
 def test_matrix_envs_do_not_share_report_paths(generated_project):
     """Every tox env writes its reports to its own paths.
 

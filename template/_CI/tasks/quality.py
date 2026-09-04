@@ -10,6 +10,14 @@ from .configuration import PYSCN_REPORTS_DIR
 from .shared import apply_badge, execute, is_ci, logged, note, open_target, run, run_steps
 
 GRADE_COLORS = {'A': 'brightgreen', 'B': 'green', 'C': 'yellow', 'D': 'orange', 'F': 'red'}
+# `--no-open` because pyscn opens the HTML report in a browser itself as soon as it writes
+# one. Left to its own devices it opened the report twice from `pyscn-analyze` — once by
+# itself and once from the deliberate `open_target` below — and opened it at all from
+# `pyscn_analyze_only`, whose whole point is not to. Which report gets opened, and whether
+# opening one is wanted here at all, is this module's decision to make; `is_ci()` is part of
+# it, and a tool reaching for a browser on a CI runner is not.
+ANALYZE_HTML = 'uv run pyscn analyze --html --no-open src/'
+ANALYZE_JSON = 'uv run pyscn analyze --json src/'
 BADGE_PATTERN = r'(\[!\[pyscn quality\]\(https://img\.shields\.io/badge/pyscn-)[^)]+(\))'
 
 
@@ -56,9 +64,9 @@ def update_pyscn_badge(*, write: bool = True) -> str | None:
 @task
 @logged('quality.pyscn-analyze')
 def pyscn_analyze(context: Context) -> None:
-    """Run pyscn comprehensive analysis with HTML report."""
-    execute(context, 'uv run pyscn analyze src/')
-    execute(context, 'uv run pyscn analyze --json src/')
+    """Run pyscn comprehensive analysis with HTML report, and open it."""
+    execute(context, ANALYZE_HTML)
+    execute(context, ANALYZE_JSON)
     note(update_pyscn_badge())
     if not is_ci():
         open_target(context, str(latest_pyscn_report()))
@@ -81,8 +89,8 @@ def pyscn_analyze_only(context: Context) -> None:
     price of wanting both reports; ``pyscn_json_report`` is the path for callers that only
     need one.
     """
-    execute(context, 'uv run pyscn analyze src/')
-    execute(context, 'uv run pyscn analyze --json src/')
+    execute(context, ANALYZE_HTML)
+    execute(context, ANALYZE_JSON)
     note(update_pyscn_badge())
 
 
@@ -98,7 +106,7 @@ def pyscn_json_report(context: Context) -> None:
     The badge is deliberately not written here: `preflight` owns every write to a tracked
     file so that check mode can verify all of them together.
     """
-    execute(context, 'uv run pyscn analyze --json src/')
+    execute(context, ANALYZE_JSON)
 
 
 @task
