@@ -45,7 +45,7 @@ This installs uv-managed virtualenvs for every dependency group and registers pr
 These commands are the heartbeat of every project this template generates:
 
 ```bash
-./workflow.cmd preflight # All of the below, then update the README badges and the coverage bar
+./workflow.cmd preflight # All the checks below, then update the README badges and the coverage bar
 ./workflow.cmd format    # Ruff format + import sort
 ./workflow.cmd lint      # Ruff check, pylint, ty (type checker), complexipy, commitizen
 ./workflow.cmd test      # pytest with coverage and parallel execution
@@ -55,7 +55,8 @@ These commands are the heartbeat of every project this template generates:
 
 `preflight` is the one to remember; the rest are there for when you want a single tool. Run it
 before you open a pull request and it leaves the tree in the state CI expects — including the
-badges, which are computed from the reports the tools just produced.
+badges, which are computed from the reports the tools just produced. It never edits your code:
+`format` is what reformats, and the commit hook does it for the files you stage.
 
 You should see a passing test for the example `hello()` function and a wheel appear under `dist/`.
 Some of the other QA tools also produce output you can look into later.

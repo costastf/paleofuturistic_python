@@ -1537,6 +1537,37 @@ def test_ci_runs_the_same_gate_as_the_pre_push_hook(generated_project):
     assert command in commands, f'no CI job runs {command!r}; it runs {commands}'
 
 
+def test_no_whole_project_run_edits_source(generated_project):
+    """Only the staged bundle may fix source. `preflight` writes derived files and nothing else.
+
+    `preflight` is what you run before opening a pull request. Reformatting the whole tree there
+    means a file you never looked at can be rewritten and folded into your commit, unreviewed —
+    and the commit hook has already formatted everything you staged, so the pass was a no-op in
+    the normal flow anyway. Unformatted code now fails the gate and names `./workflow.cmd
+    format`, which is deliberate and reviewable like every other write in this design.
+
+    The hook keeps fixing, because there the files are ones the author just staged and
+    pre-commit's "files were modified by this hook" puts the result in front of them.
+    """
+    project, _ = generated_project
+    source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
+
+    # Exactly one step edits source, and it says so.
+    fixers = [line for line in source.splitlines() if 'fixes_source=True' in line]
+    assert len(fixers) == 1, f'{len(fixers)} steps claim to edit source; expected only format'
+    assert "Step('format'" in fixers[0], f'an unexpected step edits source: {fixers[0].strip()!r}'
+
+    # `fix` is the gate on reaching it, and only the staged bundle passes it.
+    # To the next module-level `def`, so the whole method body is in scope rather than the
+    # docstring's first paragraph.
+    runner = source.split('def runner', 1)[1].split('\ndef ', 1)[0]
+    assert 'if self.fixes_source and not fix' in runner, 'a source fixer is reachable without fix'
+    staged = source.split("@logged('preflight.staged')", 1)[1].split('@task', 1)[0]
+    assert 'fix=True' in staged, 'the commit hook no longer fixes the files it was handed'
+    whole = source.split("@logged('preflight')", 1)[1].split('namespace =', 1)[0]
+    assert 'fix=True' not in whole, 'the whole-project run can edit source'
+
+
 def test_the_gate_renders_no_report_it_does_not_read(generated_project):
     """`preflight` produces the JSON its derived values need, and no browsable report.
 

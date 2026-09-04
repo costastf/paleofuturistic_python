@@ -66,6 +66,12 @@ their cost scales with the size of the *project* rather than of the change, whic
 would have made commits slower and slower as the project grew. They moved to pre-push, where
 they run once per push and leave commit latency flat.
 
+The commit stage is also the only place anything of yours gets rewritten. `preflight` verifies
+formatting over the whole project but never fixes it — a command you run before opening a pull
+request should not reformat files you were not looking at — so unformatted code fails the gate
+and points at `./workflow.cmd format`. Here, the files are ones you just staged, and the abort
+puts the result in front of you.
+
 **The pre-push hook runs `preflight --check`, and the `--check` is the load-bearing part.**
 `preflight` on its own writes the four README badges and ratchets `fail_under`; from a hook
 that meant aborting with "files were modified by this hook" for files the author never staged,

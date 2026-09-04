@@ -24,7 +24,7 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 
 | Task | Args | What it does |
 | --- | --- | --- |
-| `preflight` | `--check`, `--audit-dependencies` | Format, lint, type-check, pyscn, the full tox matrix, the wheel, then write the four README badges and ratchet `fail_under`. `--check` verifies instead of writing and fails on anything stale. `--audit-dependencies` adds the pip-audit run, which is off by default because its answer depends on the advisory database rather than on your tree. |
+| `preflight` | `--check`, `--audit-dependencies` | Verify formatting, lint, type-check, pyscn, the full tox matrix, the wheel, then write the four README badges and ratchet `fail_under`. Never edits source — unformatted code fails and points at `format`. `--check` verifies the derived files instead of writing them and fails on anything stale. `--audit-dependencies` adds the pip-audit run, which is off by default because its answer depends on the advisory database rather than on your tree. |
 | `preflight.staged` | `--paths="<paths>"` | Only the checks that can be judged from the given files alone. What the pre-commit hook runs. |
 
 Both read one registry — `STEPS` in `_CI/tasks/preflight.py` — which declares every check
@@ -32,11 +32,16 @@ once, along with its scope, its path filter, and whether it writes. The pre-comm
 pre-push hook and the CI preflight job all consume that declaration instead of keeping their
 own lists, so a check added to the registry reaches its tier without editing three files.
 
-Write mode and check mode run the *same* steps; only `format` and the derived-files step differ
+Write mode and check mode run the *same* steps; only the derived-files step and `build` differ
 between them, and they differ by swapping one callable. That is deliberate: a separate
 implementation for the verifying side is how a gate drifts from the generator it guards. Every
 derived value — the badges, `fail_under` — is written through a single function that takes
 `write`, so what check mode compares is exactly what write mode would have produced.
+
+Neither mode edits your code. `preflight` writes derived files only; formatting is verified
+here and fixed by a deliberate `./workflow.cmd format`, or by the commit hook on the files you
+just staged. A command you run before opening a pull request should not be able to reformat
+something you never looked at and fold it into your commit.
 
 `preflight --check` is what the pre-push hook and the entire CI pipeline run — one job, since
 the separate lint, test and build jobs folded into it — which is the property that keeps local
