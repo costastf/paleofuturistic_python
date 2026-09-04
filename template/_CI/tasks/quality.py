@@ -18,6 +18,12 @@ GRADE_COLORS = {'A': 'brightgreen', 'B': 'green', 'C': 'yellow', 'D': 'orange', 
 # it, and a tool reaching for a browser on a CI runner is not.
 ANALYZE_HTML = 'uv run pyscn analyze --html --no-open src/'
 ANALYZE_JSON = 'uv run pyscn analyze --json src/'
+# Deliberately *not* `--quiet`, despite its help promising "Suppress output unless issues
+# found". It suppresses the issues too: with it, a failure reports only "Found 1 quality
+# issue(s)", while without it the same run names the finding —
+# `src/pkg/mod.py:21:1: tangled is too complex (16 > 15)`. The two lines it prints on a passing
+# run are the price of that one line on a failing one.
+CHECK = 'uv run pyscn check src/'
 BADGE_PATTERN = r'(\[!\[pyscn quality\]\(https://img\.shields\.io/badge/pyscn-)[^)]+(\))'
 
 
@@ -74,9 +80,17 @@ def pyscn_analyze(context: Context) -> None:
 
 @task
 @logged('quality.pyscn-check')
-@run('uv run pyscn check src/')
+@run(CHECK)
 def pyscn_check(context: Context) -> None:
-    """Run pyscn CI-friendly quality gate."""
+    """Run pyscn's CI-friendly quality gate.
+
+    Not the same judgment as the badge, which is worth knowing. This applies hard per-dimension
+    thresholds — a function over the complexity limit, critical dead code, a dependency cycle —
+    and fails. `analyze` computes a lenient aggregate health score and never fails: a module
+    with a 16-branch function still grades A while this rejects it. So the two invocations in
+    `preflight` are not a duplicate; one produces the grade the badge shows, the other decides
+    whether the tree passes.
+    """
 
 
 @logged('quality.pyscn-analyze')
