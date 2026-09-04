@@ -41,6 +41,17 @@ def pre_commit(context: Context) -> None:
     what this covers is the staged bundle (formatting, ruff, pylint, complexipy) widened to
     every file. It is not the full check: ty, pyscn, the test suite and the derived files live
     on pre-push. `./workflow.cmd preflight` is the command that runs everything.
+
+    `--all-files` means every *tracked* file, not the staged ones — and because this is the
+    hook path, it runs in fix mode, so it reformats files you never staged. That is the one
+    place a whole-project run edits your code; `preflight` deliberately does not, and
+    `./workflow.cmd format` is the other command that does it on purpose.
+
+    pre-commit also splits a long file list across several concurrent invocations of the hook
+    — six for a 23-file project — so the single-startup shape of the collapsed hook applies
+    per partition here. Measured as a wash against forcing `require_serial`, 9.4s versus
+    10.1s, because the concurrency pays for the extra startups; a normal commit stages few
+    enough files to be one invocation anyway.
     """
 
 
