@@ -30,15 +30,18 @@ repos:
       # name and fail. (Filenames containing spaces are not supported by that marshalling —
       # as with `lint-commit`.)
       #
-      # `--fix` is why this hook rewrites files: formatting is applied, not just reported.
-      # Those are files the author staged, and pre-commit's "files were modified by this hook"
-      # is the intended nudge to stage the result. The flag is passed here rather than being
-      # the task's default so that the one editing step in the whole workflow is visible in
-      # the configuration that asks for it. What no commit-stage hook may touch is a tracked
-      # file the author did *not* stage — see the pre-push hook below.
+      # This hook reports; it does not rewrite. It used to apply formatting, and that was the
+      # odd one out twice over: the automated entry points behaved differently from the command
+      # a person types, and it edited the *worktree* while git was mid-commit, which suits a
+      # partially staged file badly — the formatter rewrites the whole file, including hunks
+      # deliberately left out of the index. Unformatted code now fails the commit and names
+      # `./workflow.cmd format`, which is one extra command and owns neither problem.
+      #
+      # So no hook in this file writes anything at all, which is the same promise `preflight`
+      # makes without a flag.
       - id: staged
-        name: Check staged files (format, ruff, pylint, complexipy)
-        entry: sh -c './workflow.cmd preflight.staged --fix --paths="$*"' --
+        name: Check staged files (formatting, ruff, pylint, complexipy)
+        entry: sh -c './workflow.cmd preflight.staged --paths="$*"' --
         language: system
         pass_filenames: true
         files: ^(_CI/tasks/|src/|tests/).*\.py$

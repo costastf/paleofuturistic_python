@@ -42,10 +42,9 @@ def pre_commit(context: Context) -> None:
     every file. It is not the full check: ty, pyscn, the test suite and the derived files live
     on pre-push. `./workflow.cmd preflight` is the command that runs everything.
 
-    `--all-files` means every *tracked* file, not the staged ones — and because this is the
-    hook path, it runs in fix mode, so it reformats files you never staged. That is the one
-    place a whole-project run edits your code; `preflight` deliberately does not, and
-    `./workflow.cmd format` is the other command that does it on purpose.
+    `--all-files` means every *tracked* file, not the staged ones. It writes nothing, as the
+    hooks no longer do: `./workflow.cmd format` is what applies formatting, being the command
+    named for it.
 
     pre-commit also splits a long file list across several concurrent invocations of the hook
     — six for a 23-file project — so the single-startup shape of the collapsed hook applies

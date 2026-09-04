@@ -25,7 +25,7 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 | Task | Args | What it does |
 | --- | --- | --- |
 | `preflight` | `--write`, `--audit-dependencies` | Verify formatting, lint, type-check, pyscn, the full tox matrix, the wheel, and the four README badges plus the coverage ratchet against what the tools just measured — failing with everything out of date. This bare command is what the pre-push hook and the CI pipeline run. `--write` updates the badges and the ratchet instead of comparing them; it is opt-in because a command named for an inspection should not modify the tree. Never edits source either way — unformatted code fails and points at `format`. `--audit-dependencies` adds the pip-audit run, off by default because its answer depends on the advisory database rather than on your tree. |
-| `preflight.staged` | `--paths="<paths>"`, `--fix` | Only the checks that can be judged from the given files alone. What the pre-commit hook runs, and it passes `--fix` so formatting is applied to the files you staged. Without the flag it reports, like every other gate. |
+| `preflight.staged` | `--paths="<paths>"` | Only the checks that can be judged from the given files alone, and by default only the files you have staged. What the pre-commit hook runs. Reports rather than fixes, like every other entry point — unformatted code names `format`. |
 
 Both read one registry — `STEPS` in `_CI/tasks/preflight.py` — which declares every check
 once, along with its scope, its path filter, and whether it writes. The pre-commit hook, the
@@ -57,7 +57,7 @@ gitignored. What it never touches is a tracked file.
 | --- | --- | --- |
 | `develop.bootstrap` | `--force` | Run all bootstrap steps. Idempotent. |
 | `develop.pre-commit-install` | — | Install the hooks into `.git/hooks/` (all three stages at once). |
-| `develop.pre-commit` | — | Run the *commit-stage* hooks over every **tracked** file — not the staged ones. Being the hook path it fixes formatting as it goes, so it is the one whole-project command that edits your code besides `format`. Not the full check either: ty, pyscn, tests and the derived files are on pre-push, and `preflight` is what runs everything. |
+| `develop.pre-commit` | — | Run the *commit-stage* hooks over every **tracked** file — not just the staged ones, which is what `--all-files` means. Read-only, as the hooks are. Not the full check either: ty, pyscn, tests and the derived files are on pre-push, and `preflight` is what runs everything. |
 | `develop.bump-uv` | `--version=<v>` | Move every uv pin to the newest release at least 7 days old: the four version literals, the base image's tag *and* its re-resolved digest, and `uv.lock`. Warns when the bump crosses a minor version. `--version` takes a specific release, ignoring the cool-down. See [Dependency groups](dependency-groups.md#the-uv-pin-and-the-one-command-that-moves-it). |
 
 ## `format`, `lint`, `test`, `quality`

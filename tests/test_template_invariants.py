@@ -1572,7 +1572,7 @@ def test_a_failing_run_writes_no_derived_values(generated_project):
     source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
     body = source.split('def run_scope', 1)[1]
     assert 'if failed and writes_derived' in body, 'a failing run can still write derived values'
-    assert 'writes_derived = write and step.write is not None and not step.fixes_source' in source, (
+    assert 'writes_derived = write and step.write is not None' in source, (
         'the plan no longer marks which steps write derived files'
     )
     # The writers have to be last for the skip to cover them; `artifacts` is the final
@@ -1582,41 +1582,48 @@ def test_a_failing_run_writes_no_derived_values(generated_project):
     assert steps[-2] == 'artifacts', f'artifacts is not the last checked step: {steps}'
 
 
-def test_no_whole_project_run_edits_source(generated_project):
-    """Only the staged bundle may fix source. `preflight` writes derived files and nothing else.
+def test_no_automated_run_edits_source(generated_project):
+    """Nothing in the registry can write source — there is no step that could.
 
-    `preflight` is what you run before opening a pull request. Reformatting the whole tree there
-    means a file you never looked at can be rewritten and folded into your commit, unreviewed —
-    and the commit hook has already formatted everything you staged, so the pass was a no-op in
-    the normal flow anyway. Unformatted code now fails the gate and names `./workflow.cmd
-    format`, which is deliberate and reviewable like every other write in this design.
+    The commit hook used to apply formatting. That made the automated entry points behave
+    differently from the command a person types, and it rewrote the *worktree* while git was
+    mid-commit, which suits a partially staged file badly: the formatter rewrites the whole
+    file, hunks deliberately left out of the index included. Reporting and naming
+    `./workflow.cmd format` costs one command and owns neither problem.
 
-    The hook keeps fixing, because there the files are ones the author just staged and
-    pre-commit's "files were modified by this hook" puts the result in front of them.
+    So the property is now absolute rather than conditional, and this asserts the absence of
+    the machinery rather than its correct use: no step declares a source-writing variant, and
+    the concept of "fixing" is gone from the module.
     """
     project, _ = generated_project
     source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
+    assert 'fixes_source' not in source, 'a step can write source again'
+    assert 'ruff_format' not in source, 'the registry reaches the formatter again'
 
-    # Exactly one step edits source, and it says so.
-    fixers = [line for line in source.splitlines() if 'fixes_source=True' in line]
-    assert len(fixers) == 1, f'{len(fixers)} steps claim to edit source; expected only format'
-    assert "Step('format'" in fixers[0], f'an unexpected step edits source: {fixers[0].strip()!r}'
+    # Every write variant in the registry produces a derived file, which is what `--write` is
+    # for; `plan_scope` marks exactly those so a failing run can skip them.
+    assert 'writes_derived = write and step.write is not None' in source, (
+        'the plan no longer marks which steps write derived files'
+    )
 
-    # `fix` is the gate on reaching it. Sliced to the next module-level `def`, so the whole
-    # method body is in scope rather than the docstring's first paragraph.
-    runner = source.split('def runner', 1)[1].split('\ndef ', 1)[0]
-    assert 'if self.fixes_source and not fix' in runner, 'a source fixer is reachable without fix'
-
-    # The whole-project task cannot fix at all: no such parameter, and it never passes one.
-    whole = source.split("@logged('preflight')", 1)[1].split('namespace =', 1)[0]
-    assert 'fix=' not in whole, 'the whole-project run can edit source'
-
-    # The staged task can, but only when asked — and the hook is what asks, in the config,
-    # which is where the one editing step in the workflow becomes visible to a reader.
-    staged = source.split("@logged('preflight.staged')", 1)[1].split('@task', 1)[0]
-    assert 'fix: bool = False' in staged, 'the staged bundle fixes source without being asked'
+    # And the hook asks for no fixing, because there is nothing to ask for.
     hook = next(h for h in pre_commit_hooks(project) if invoked_task(h) == 'preflight.staged')
-    assert '--fix' in hook['entry'], f'the commit hook no longer fixes what it was handed: {hook["entry"]!r}'
+    assert '--fix' not in hook['entry'], f'the commit hook rewrites files again: {hook["entry"]!r}'
+
+
+def test_the_staged_bundle_defaults_to_what_is_staged(generated_project):
+    """`preflight.staged` with no paths checks the index, not the whole project.
+
+    It used to fall back to every project path, so typing the command by hand swept everything
+    — the opposite of what its name promises. pre-commit still passes the list explicitly,
+    having applied its own filtering and possibly split the files across invocations.
+    """
+    project, _ = generated_project
+    source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
+    assert 'git diff --cached --name-only' in source, 'the staged bundle no longer reads the index'
+    body = source.split("@logged('preflight.staged')", 1)[1].split('@task', 1)[0]
+    assert 'paths or staged_files(context)' in body, 'an explicit --paths no longer wins'
+    assert 'Nothing staged' in body, 'an empty index is not reported'
 
 
 def test_the_gate_renders_no_report_it_does_not_read(generated_project):

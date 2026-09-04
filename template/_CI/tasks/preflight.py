@@ -25,13 +25,17 @@ differently between the two, and each differs by swapping one callable, not by t
 separate path. Nothing in this file re-implements a check for the verifying side, because that
 is how a gate drifts from the generator it guards.
 
-*No whole-project run edits your code.* What ``preflight`` writes is derived — the four badges
-and the coverage ratchet — never source. Formatting is verified here and fixed either by a
-deliberate ``./workflow.cmd format`` or by the commit hook, which fixes only the files you just
-staged and hands the result back through pre-commit's "files were modified by this hook". The
-alternative was a command you run before opening a pull request quietly reformatting files you
-were not looking at and folding them into your commit. ``fixes_source`` on a step and ``fix``
-on ``run_scope`` are what enforce it; see ``Step.runner``.
+*Nothing here edits your code.* Every step in this registry reports; what ``--write`` writes is
+derived — the four badges and the coverage ratchet — and never source. There is no step with a
+source-writing variant to reach, which is why this file has no notion of "fixing" at all.
+
+Formatting is applied by ``./workflow.cmd format``, a command named for the mutation it
+performs. The commit hook used to apply it too, and that turned out to be the odd one out in
+two ways: it made the automated entry points behave differently from the command a person
+types, and it edited the *worktree* while git was mid-commit, which is a poor fit for a
+partially staged file — the formatter rewrites the whole thing, hunks you deliberately left
+unstaged included. Reporting and letting the author run ``format`` costs one command and owns
+neither problem.
 
 Note that the default still writes ``reports/`` — pytest's coverage JSON and pyscn's analysis
 are the *inputs* the comparison reads, and they are gitignored derived files. What neither mode
@@ -48,7 +52,6 @@ from invoke import Collection, Context, Task, task
 
 from .build import build
 from .document import update_package_version_badge, update_python_badge
-from .format_ import ruff_format
 from .lint import complexipy, format_check, pylint, ruff_lint, ty
 from .quality import pyscn_check, pyscn_json_report, update_pyscn_badge
 from .secure import audit
@@ -76,15 +79,12 @@ class Step(NamedTuple):
         scope: ``PER_FILE`` or ``WHOLE_PROGRAM``. See the module docstring — this is what
             assigns the step to the commit tier or the push tier.
         check: The callable to run in check mode.
-        write: The callable to run in write mode, when it differs from ``check``. ``artifacts``
-            writes derived values where its check compares them; ``format`` formats where its
-            check merely reports, but only for the staged bundle (see ``fixes_source``). Every
-            other step is read-only and leaves this None.
+        write: The callable to run in write mode, when it differs from ``check``. Only steps
+            that produce *derived* files have one — ``artifacts`` and ``build``'s badge. No
+            step in this registry writes source: see the module docstring.
         files: Which paths the step accepts, for per-file steps handed a staged subset.
         network: True for steps that reach the network, which are opt-in — a push should not
             fail because a train went into a tunnel.
-        fixes_source: True when the write variant edits the project's own code rather than a
-            derived file. Only the staged bundle may run one — see ``runner``.
     """
 
     name: str
@@ -93,24 +93,10 @@ class Step(NamedTuple):
     write: Callable[..., None] | None = None
     files: re.Pattern[str] | None = None
     network: bool = False
-    fixes_source: bool = False
 
-    def runner(self, *, write: bool, fix: bool) -> Callable[..., None]:
-        """Return the callable this step uses in the requested mode.
-
-        ``fix`` is what separates the two entry points, and only ``preflight.staged`` passes
-        it. A write variant that edits *source* is reachable only through that hook, where the
-        files are ones the author just staged and pre-commit's "files were modified by this
-        hook" puts the result in front of them. No whole-project run can reach it, so
-        ``preflight`` cannot quietly reformat a file nobody was looking at and fold the change
-        into someone's commit. Write variants that produce *derived* files — the badges, the
-        coverage ratchet — are unaffected: computing those is what write mode is for.
-        """
-        if self.write is None or not write:
-            return self.check
-        if self.fixes_source and not fix:
-            return self.check
-        return self.write
+    def runner(self, *, write: bool) -> Callable[..., None]:
+        """Return the callable this step uses in the requested mode."""
+        return self.write if write and self.write is not None else self.check
 
 
 def formatting(context: Context, paths: str = '') -> None:
@@ -186,7 +172,7 @@ def artifacts(context: Context, *, write: bool) -> None:  # noqa: ARG001
 
 
 STEPS = (
-    Step('format', PER_FILE, check=formatting, write=ruff_format, files=CODE_FILES, fixes_source=True),
+    Step('format', PER_FILE, check=formatting, files=CODE_FILES),
     Step('ruff', PER_FILE, check=ruff_lint, files=CODE_FILES),
     Step('pylint', PER_FILE, check=pylint, files=CODE_FILES),
     Step('complexipy', PER_FILE, check=complexipy, files=SRC_FILES),
@@ -245,13 +231,12 @@ def scoped_paths(step: Step, paths: str) -> str | None:
     return ' '.join(kept) if kept else None
 
 
-def plan_scope(  # noqa: PLR0913
+def plan_scope(
     scope: str | None,
     *,
     write: bool,
     paths: str = '',
     network: bool = False,
-    fix: bool = False,
 ) -> list[tuple[Callable[[Context], None], bool]]:
     """Return ``(runner, writes_derived_files)`` for every step in ``scope``, in registry order.
 
@@ -262,8 +247,8 @@ def plan_scope(  # noqa: PLR0913
     """
     planned: list[tuple[Callable[[Context], None], bool]] = []
     for step in steps_for(scope, network=network):
-        writes_derived = write and step.write is not None and not step.fixes_source
-        runner = step.runner(write=write, fix=fix)
+        writes_derived = write and step.write is not None
+        runner = step.runner(write=write)
         if step.scope == WHOLE_PROGRAM:
             planned.append((runner, writes_derived))
             continue
@@ -274,14 +259,13 @@ def plan_scope(  # noqa: PLR0913
     return planned
 
 
-def run_scope(  # noqa: PLR0913
+def run_scope(
     context: Context,
     scope: str | None,
     *,
     write: bool,
     paths: str = '',
     network: bool = False,
-    fix: bool = False,
 ) -> None:
     """Run every registry step in ``scope``, accumulating failures.
 
@@ -306,7 +290,6 @@ def run_scope(  # noqa: PLR0913
         write: Run each step's write-mode callable, where it has one.
         paths: Space-separated paths to narrow per-file steps to.
         network: Include network steps.
-        fix: Allow the write variants that edit source. Only the staged bundle asks for this.
 
     Raises:
         SystemExit: If any step failed, after every step that could still run has run.
@@ -315,7 +298,7 @@ def run_scope(  # noqa: PLR0913
     # given. The accumulate-and-report-at-the-end behaviour is the same.
     failed = False
     skipped = False
-    for runner, writes_derived in plan_scope(scope, write=write, paths=paths, network=network, fix=fix):
+    for runner, writes_derived in plan_scope(scope, write=write, paths=paths, network=network):
         if failed and writes_derived:
             skipped = True
             continue
@@ -329,9 +312,23 @@ def run_scope(  # noqa: PLR0913
         raise SystemExit(1)
 
 
+def staged_files(context: Context) -> str:
+    """Return the files staged for commit, space-separated, or an empty string if none are.
+
+    Additions, copies, modifications and renames — not deletions, which have nothing left to
+    check. `git` failing at all (no repository, no index) also reads as "nothing staged": this
+    task is defined in terms of the index, so an absent one means there is no work, not an
+    error to raise.
+    """
+    result = context.run('git diff --cached --name-only --diff-filter=ACMR', hide=True, warn=True)
+    if result is None or result.failed:
+        return ''
+    return ' '.join(result.stdout.split())
+
+
 @task
 @logged('preflight.staged')
-def staged(context: Context, paths: str = '', fix: bool = False) -> None:
+def staged(context: Context, paths: str = '') -> None:
     """Run the checks that can be judged from the staged files alone.
 
     This is what the pre-commit hook calls, as a single invocation: `./workflow.cmd` costs
@@ -339,22 +336,24 @@ def staged(context: Context, paths: str = '', fix: bool = False) -> None:
     replaces spent most of a commit's budget starting up rather than checking. One hook pays
     that once.
 
-    Formatting is applied rather than merely reported, as it was before: these are files the
-    author staged, so rewriting them is fair game, and pre-commit's "files were modified by
-    this hook" is the intended signal to stage the result. The tracked files nobody staged —
-    README.md, pyproject.toml — belong to `preflight` and are never touched from here.
+    It reports and does not fix, like every other entry point here — `./workflow.cmd format` is
+    what applies formatting. A hook that rewrote your files made the automated paths behave
+    differently from the command you type, and rewrote whole files while git was mid-commit,
+    which does not suit a partially staged one.
 
     Args:
         context: Invoke context.
-        paths: Space-separated paths, normally the staged files. Each step sees only the
-            paths it accepts, and is skipped when none of them are its business. Defaults to
-            the whole project.
-        fix: Apply formatting rather than report it. Off by default, so the bare command
-            reports like every other gate; `.pre-commit-config.yaml` passes it, which is what
-            makes the hook's one editing step visible in the hook config rather than only in
-            this file.
+        paths: Space-separated paths to check. Defaults to the files staged for commit, which
+            is what the name promises — it used to default to the whole project, so typing this
+            by hand swept everything. pre-commit passes the list explicitly anyway, because it
+            has already applied its own filtering and may have split the files across several
+            invocations.
     """
-    run_scope(context, PER_FILE, write=fix, fix=fix, paths=paths)
+    targets = paths or staged_files(context)
+    if not targets:
+        print('Nothing staged, so nothing to check. `./workflow.cmd preflight` checks the project.')
+        return
+    run_scope(context, PER_FILE, write=False, paths=targets)
 
 
 @task

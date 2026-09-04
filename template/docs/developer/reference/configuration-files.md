@@ -66,11 +66,12 @@ their cost scales with the size of the *project* rather than of the change, whic
 would have made commits slower and slower as the project grew. They moved to pre-push, where
 they run once per push and leave commit latency flat.
 
-The commit stage is also the only place anything of yours gets rewritten. `preflight` verifies
-formatting over the whole project but never fixes it — a command you run before opening a pull
-request should not reformat files you were not looking at — so unformatted code fails the gate
-and points at `./workflow.cmd format`. Here, the files are ones you just staged, and the abort
-puts the result in front of you.
+**No hook writes anything.** The commit stage used to apply formatting, and that was the odd
+one out twice over: the automated entry points behaved differently from the command a person
+types, and it rewrote the *worktree* while git was mid-commit — which suits a partially staged
+file badly, since the formatter rewrites the whole file including hunks you deliberately left
+out of the index. Unformatted code now fails the commit and names `./workflow.cmd format`. That
+is one extra command, and it owns neither problem.
 
 **The pre-push hook runs `preflight`, with no flag, and that is the load-bearing part.**
 Verifying is the default and `preflight --write` is what updates the four README badges and
