@@ -75,7 +75,7 @@ what the collapsed hook no longer does for you: `./workflow.cmd lint.pylint --pa
 | `lint.commitizen` | Validate commit messages since last tag. |
 | `test.pytest` | pytest with coverage, xdist, HTML reports. Forward extra pytest args with `--args="…"` (e.g. `--args="-k test_hello"`). |
 | `test.tox` | Full multi-version tox matrix in parallel, then `coverage combine` into one `reports/coverage.json` — the union across interpreters, which is what the badge and the ratchet read. Pass `--env=py313` to run a single environment. |
-| `test.coverage` | Print coverage report from the latest run. |
+| `test.coverage` | Print the coverage report from the latest run and render the browsable HTML into `reports/coverage/`. After `test.tox` that is the union across the matrix. This is where the HTML comes from: `preflight` produces only the JSON it reads. |
 | `test.view` | Open HTML test + coverage reports in browser. |
 | `quality.pyscn-analyze` | Full pyscn analysis with HTML report. |
 | `quality.pyscn-check` | CI-friendly pass/fail quality gate. Writes no report, so it has no grade to offer the badge — `quality.pyscn-analyze` is what produces one. |

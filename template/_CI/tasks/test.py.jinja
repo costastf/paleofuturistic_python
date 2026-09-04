@@ -171,9 +171,15 @@ def pytest(context: Context, args: str = '') -> None:
 @task
 @logged('test.coverage')
 def coverage(context: Context) -> None:
-    """Show test coverage report in terminal."""
+    """Show coverage in the terminal and render the browsable report.
+
+    Whatever the last run measured: after `test.pytest` that is one interpreter, after
+    `test.tox` it is the union across the matrix. This is where the HTML report comes from —
+    `preflight` deliberately does not produce one, because nothing in a gate reads it.
+    """
     execute(context, 'uv run coverage report')
     execute(context, f'uv run coverage json -o {COVERAGE_REPORT}')
+    execute(context, 'uv run coverage html -d reports/coverage')
     note(update_coverage_badge())
     note(ratchet_fail_under())
 
@@ -219,15 +225,17 @@ def combine_coverage(context: Context) -> None:
     project where every interpreter happens to cover exactly the same lines. As soon as an env
     contributes something unique — the version-gated case above — it is combined.
     """
+    # JSON only, and no HTML. The gate produces what the gate consumes: `reports/coverage.json`
+    # is what the badge and the ratchet read, and an HTML report has no reader in a hook or a
+    # pipeline — the same reason pyscn's HTML pass left this path. `test.coverage` renders it
+    # on demand, and the per-env reports are already on disk for a single interpreter.
+    #
     # Not `--keep`. Left in place, the per-env files still look like parallel data to
     # coverage, so the very next `coverage json` combines them all over again and reports
     # doing so a second time. Nothing is lost by consuming them: the per-env *reports* under
     # `reports/` are what anyone actually reads to see one interpreter's numbers.
     execute(context, 'uv run coverage combine')
     execute(context, f'uv run coverage json -o {COVERAGE_REPORT}')
-    # The per-env HTML reports stay for drilling into a single interpreter; this is the
-    # combined view, and the path `test.view` opens.
-    execute(context, 'uv run coverage html -d reports/coverage')
 
 
 @task

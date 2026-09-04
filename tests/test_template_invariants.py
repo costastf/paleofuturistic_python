@@ -1537,6 +1537,36 @@ def test_ci_runs_the_same_gate_as_the_pre_push_hook(generated_project):
     assert command in commands, f'no CI job runs {command!r}; it runs {commands}'
 
 
+def test_the_gate_renders_no_report_it_does_not_read(generated_project):
+    """`preflight` produces the JSON its derived values need, and no browsable report.
+
+    The rule, applied the same way to both tools that offer one. pyscn allows a single output
+    format per run, so an HTML report there costs a whole second analysis; coverage renders one
+    from data it already has, for a fraction of a second. Different prices, same answer —
+    nothing in a hook or a pipeline opens an HTML report, and a gate that produces artefacts
+    for an absent reader is a gate doing work nobody asked for. Two tools behaving alike in the
+    pipeline is worth more than the fraction of a second.
+
+    The reports are not lost, they are moved to where someone is actually looking:
+    `quality.pyscn-analyze` produces the pyscn HTML and opens it, and `test.coverage` renders
+    the coverage HTML from whatever the last run measured.
+    """
+    project, _ = generated_project
+    tasks = project / '_CI' / 'tasks'
+    gate_pyscn = (tasks / 'quality.py').read_text(encoding='utf-8').split('def pyscn_json_report', 1)[1]
+    gate_pyscn = gate_pyscn.split('\n@', 1)[0]
+    assert 'ANALYZE_JSON' in gate_pyscn, 'the gate no longer produces the JSON the badge reads'
+    assert 'ANALYZE_HTML' not in gate_pyscn, 'the gate produces a pyscn HTML report nothing reads'
+
+    test_py = (tasks / 'test.py').read_text(encoding='utf-8')
+    gate_coverage = test_py.split('def combine_coverage', 1)[1].split('\n@', 1)[0]
+    assert 'coverage json' in gate_coverage, 'the gate no longer produces the JSON the badge reads'
+    assert 'coverage html' not in gate_coverage, 'the gate renders a coverage HTML report nothing reads'
+
+    on_demand = test_py.split("@logged('test.coverage')", 1)[1].split('\n@task', 1)[0]
+    assert 'coverage html' in on_demand, 'nothing renders the combined coverage report any more'
+
+
 def test_pyscn_never_opens_a_browser_by_itself(generated_project):
     """Every pyscn run that writes HTML passes `--no-open`.
 
