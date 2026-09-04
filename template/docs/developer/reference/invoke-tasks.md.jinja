@@ -24,8 +24,8 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 
 | Task | Args | What it does |
 | --- | --- | --- |
-| `preflight` | `--check`, `--audit-dependencies` | Verify formatting, lint, type-check, pyscn, the full tox matrix, the wheel, then write the four README badges and ratchet `fail_under`. Never edits source — unformatted code fails and points at `format`. `--check` verifies the derived files instead of writing them and fails on anything stale. `--audit-dependencies` adds the pip-audit run, which is off by default because its answer depends on the advisory database rather than on your tree. |
-| `preflight.staged` | `--paths="<paths>"` | Only the checks that can be judged from the given files alone. What the pre-commit hook runs. |
+| `preflight` | `--write`, `--audit-dependencies` | Verify formatting, lint, type-check, pyscn, the full tox matrix, the wheel, and the four README badges plus the coverage ratchet against what the tools just measured — failing with everything out of date. This bare command is what the pre-push hook and the CI pipeline run. `--write` updates the badges and the ratchet instead of comparing them; it is opt-in because a command named for an inspection should not modify the tree. Never edits source either way — unformatted code fails and points at `format`. `--audit-dependencies` adds the pip-audit run, off by default because its answer depends on the advisory database rather than on your tree. |
+| `preflight.staged` | `--paths="<paths>"`, `--fix` | Only the checks that can be judged from the given files alone. What the pre-commit hook runs, and it passes `--fix` so formatting is applied to the files you staged. Without the flag it reports, like every other gate. |
 
 Both read one registry — `STEPS` in `_CI/tasks/preflight.py` — which declares every check
 once, along with its scope, its path filter, and whether it writes. The pre-commit hook, the
@@ -43,10 +43,11 @@ here and fixed by a deliberate `./workflow.cmd format`, or by the commit hook on
 just staged. A command you run before opening a pull request should not be able to reformat
 something you never looked at and fold it into your commit.
 
-`preflight --check` is what the pre-push hook and the entire CI pipeline run — one job, since
-the separate lint, test and build jobs folded into it — which is the property that keeps local
-and remote from disagreeing. There is deliberately no flag that trims it: shortening the matrix
-is `env_list`'s job, and that shortens CI too. Note that check mode still refreshes `reports/` — pytest's
+`preflight` — bare, no flags — is what the pre-push hook and the entire CI pipeline run, one
+job, since the separate lint, test and build jobs folded into it. Verifying being the default is
+what makes that literal: reproducing a pipeline failure means typing the command you see in the
+log. There is deliberately no flag that trims it either: shortening the matrix is `env_list`'s
+job, and that shortens CI too. Note that check mode still refreshes `reports/` — pytest's
 coverage JSON and pyscn's analysis are the *inputs* the comparison reads, and both are
 gitignored. What it never touches is a tracked file.
 

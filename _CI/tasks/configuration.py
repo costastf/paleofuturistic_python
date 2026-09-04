@@ -31,7 +31,11 @@ IGNORE_PATTERNS = shutil.ignore_patterns('.git', '.venv', '__pycache__', '*.pyc'
 #
 # The audit runs first: it is the cheapest way to fail, and there is no sense spending a
 # five-interpreter matrix on a cell that a vulnerable pin already condemns.
-QA_STEPS = ('secure.audit', 'preflight', 'document')
+#
+# `--write` because a freshly generated project's badges all read "unknown": the matrix is
+# exercising the command that produces them, so it wants the writing half. The pipeline the
+# template ships runs the bare `preflight`, which compares instead.
+QA_STEPS = ('secure.audit', 'preflight --write', 'document')
 TEMPLATE_SECURITY_OVERRIDE_ENV = 'TEMPLATE_SECURITY_OVERRIDE'
 SECURITY_OVERRIDES_FILE = PROJECT_ROOT_DIRECTORY / '.security-overrides'
 

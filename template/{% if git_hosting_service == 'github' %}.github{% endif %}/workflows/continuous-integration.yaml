@@ -3,8 +3,10 @@ name: Continuous Integration
 on:
   push:
 
-# One job runs the checks, because it runs the same command the pre-push hook does:
-# `preflight --check`. Separate lint, test and build jobs used to re-run, in a different
+# One job runs the checks, because it runs the same command the pre-push hook does, character
+# for character: `preflight`. Verifying is that command's default and writing is opt-in, so
+# there is no flag here to keep in step with the hook, and reproducing a failure from this log
+# means typing what you see. Separate lint, test and build jobs used to re-run, in a different
 # shape, the work that command already covers — so a green push could still meet a red
 # pipeline over which of the two had been kept in step. Absorbing them costs the wall-clock
 # those jobs bought by running in parallel; `run_steps` still reports every failure in one
@@ -61,9 +63,9 @@ jobs:
       # you first hear about it. Format, lint, ty, pyscn, the tox matrix, the wheel, and the
       # README badges and coverage ratchet matching what the tools measure.
       #
-      # `--check` is not optional here. `permissions: contents: read` and the
+      # Note the absence of `--write`. `permissions: contents: read` and the
       # `persist-credentials: false` checkout above mean this job could not commit a
       # refreshed badge even if it wanted to; its only useful move is to fail and name the
       # command that fixes it.
       - name: Verify checks and derived files
-        run: ./workflow.cmd preflight --check
+        run: ./workflow.cmd preflight

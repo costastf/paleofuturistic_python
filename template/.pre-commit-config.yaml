@@ -30,13 +30,15 @@ repos:
       # name and fail. (Filenames containing spaces are not supported by that marshalling —
       # as with `lint-commit`.)
       #
-      # This hook does rewrite files: formatting is applied, not just reported. Those are
-      # files the author staged, and pre-commit's "files were modified by this hook" is the
-      # intended nudge to stage the result. What no commit-stage hook may touch is a tracked
+      # `--fix` is why this hook rewrites files: formatting is applied, not just reported.
+      # Those are files the author staged, and pre-commit's "files were modified by this hook"
+      # is the intended nudge to stage the result. The flag is passed here rather than being
+      # the task's default so that the one editing step in the whole workflow is visible in
+      # the configuration that asks for it. What no commit-stage hook may touch is a tracked
       # file the author did *not* stage — see the pre-push hook below.
       - id: staged
         name: Check staged files (format, ruff, pylint, complexipy)
-        entry: sh -c './workflow.cmd preflight.staged --paths="$*"' --
+        entry: sh -c './workflow.cmd preflight.staged --fix --paths="$*"' --
         language: system
         pass_filenames: true
         files: ^(_CI/tasks/|src/|tests/).*\.py$
@@ -48,23 +50,23 @@ repos:
       # pre-commit they were the one thing that would make commits slower as the project grew.
       # On pre-push they run once per push and keep commit latency flat (~19s on a scaffold).
       #
-      # `--check` is what makes this safe to run from a hook at all. `preflight` on its own
-      # writes the four README badges and ratchets `fail_under` in pyproject.toml; run from a
-      # commit hook that aborted the commit with "files were modified by this hook" — after
-      # the message was written, for files the author never staged — which is exactly what
-      # teaches people `--no-verify` and so disables every hook here at once. `--check` runs
-      # the identical steps, writes nothing tracked, and fails with the command to fix it.
-      # Those writes belong to a deliberate `./workflow.cmd preflight`.
+      # No flag: `preflight` verifies by default and writing is opt-in, which is what makes
+      # it safe to run from a hook at all. `preflight --write` updates the four README badges
+      # and ratchets `fail_under` in pyproject.toml; from a hook that aborted the push having
+      # modified files the author never staged, which is exactly what teaches people
+      # `--no-verify` and so disables every hook here at once. Those writes belong to a
+      # deliberate `./workflow.cmd preflight --write`.
       #
-      # It also means this hook and the CI pipeline run the same command — the whole pipeline,
-      # since the separate lint, test and build jobs folded into it — so nothing in CI can
-      # reject what this accepted. There is deliberately no flag to make it run less: the knob
+      # It also means this hook and the CI pipeline run the same command, character for
+      # character — the whole pipeline, since the separate lint, test and build jobs folded
+      # into it — so nothing in CI can reject what this accepted, and reproducing a pipeline
+      # failure needs no flag. There is deliberately no flag to make it run *less*: the knob
       # that shortens the matrix is `env_list` in pyproject.toml, which shortens CI too and so
       # cannot open a gap. `SKIP=preflight git push` is the escape hatch when you need one;
       # unlike `--no-verify` it leaves the other hooks in place.
       - id: preflight
         name: Preflight checks (ty, pyscn, test matrix, wheel, derived files)
-        entry: ./workflow.cmd preflight --check
+        entry: ./workflow.cmd preflight
         language: system
         pass_filenames: false
         files: ^(_CI/tasks/|src/|tests/).*\.py$

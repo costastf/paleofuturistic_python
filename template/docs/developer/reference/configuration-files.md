@@ -38,7 +38,7 @@ Hook definitions, split across three git stages:
 | `commit-msg` | commitizen (conventional-commit format) | the message | ~2s |
 | `pre-commit` | `preflight.staged` — ruff format, ruff, pylint, complexipy | **staged files only** | ~2.9s |
 | `pre-commit` | `.security-overrides` validation | that file, when staged | ~1.5s |
-| `pre-push` | `preflight --check` — ty, pyscn, the tox matrix, the wheel, derived files | whole project | ~19s |
+| `pre-push` | `preflight` — ty, pyscn, the tox matrix, the wheel, derived files | whole project | ~19s |
 
 **The commit stage is one hook, one invocation.** It used to be six, and that was the
 expensive part: `./workflow.cmd` spends about 1.3s on interpreter and imports before any tool
@@ -72,14 +72,15 @@ request should not reformat files you were not looking at — so unformatted cod
 and points at `./workflow.cmd format`. Here, the files are ones you just staged, and the abort
 puts the result in front of you.
 
-**The pre-push hook runs `preflight --check`, and the `--check` is the load-bearing part.**
-`preflight` on its own writes the four README badges and ratchets `fail_under`; from a hook
-that meant aborting with "files were modified by this hook" for files the author never staged,
-which is what teaches people `--no-verify` and so disables every hook here at once. `--check`
-runs the identical registry, writes nothing tracked, and fails naming the command that fixes
-it. It is also the exact command the CI pipeline runs — the whole of it, since the separate lint,
-test and build jobs folded into this one — so nothing in the pipeline can reject what your
-push accepted. That parity is also why there is no flag to make it run less: a `--quick` that
+**The pre-push hook runs `preflight`, with no flag, and that is the load-bearing part.**
+Verifying is the default and `preflight --write` is what updates the four README badges and
+ratchets `fail_under`. From a hook, writing meant aborting with "files were modified by this
+hook" for files the author never staged, which is what teaches people `--no-verify` and so
+disables every hook here at once. The default runs the identical registry, writes nothing
+tracked, and fails naming the command that fixes it. It is also the exact command the CI
+pipeline runs — the whole of it, since the separate lint, test and build jobs folded into this
+one — so nothing in the pipeline can reject what your push accepted, and reproducing a failure
+from the pipeline log means typing what you see. That parity is also why there is no flag to make it run less: a `--quick` that
 dropped the matrix would be a documented way to reopen the gap. The knob that shortens the
 matrix is `env_list` in `pyproject.toml`, which shortens it for CI too.
 
@@ -119,7 +120,7 @@ Polyglot launcher: a shell script on Unix, a batch file on Windows. Resolves to 
 
 ## `.github/` or `.gitlab-ci.yml`
 
-The chosen host's CI config (only one of these exists per project, per the `git_hosting_service` answer). The checks live in a single `preflight` job running `./workflow.cmd preflight --check` — the same command the pre-push hook runs — so there is nothing to keep in step with a second list. Edit to add jobs; leave that one alone if you want `copier update` to keep working.
+The chosen host's CI config (only one of these exists per project, per the `git_hosting_service` answer). The checks live in a single `preflight` job running `./workflow.cmd preflight` — the same command the pre-push hook runs — so there is nothing to keep in step with a second list. Edit to add jobs; leave that one alone if you want `copier update` to keep working.
 
 ## `.copier-answers.yml`
 

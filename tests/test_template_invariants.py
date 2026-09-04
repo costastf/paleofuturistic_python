@@ -649,9 +649,9 @@ def test_qa_steps_cover_what_preflight_does_not():
     from _CI.tasks.configuration import QA_STEPS  # noqa: PLC0415
 
     assert 'secure.audit' in QA_STEPS
-    assert 'preflight' in QA_STEPS, 'the matrix no longer exercises the generated gate'
+    assert 'preflight --write' in QA_STEPS, 'the matrix no longer exercises the generated gate'
     # Fail fast: the cheapest failure first, before a five-interpreter matrix.
-    assert QA_STEPS.index('secure.audit') < QA_STEPS.index('preflight')
+    assert QA_STEPS.index('secure.audit') < QA_STEPS.index('preflight --write')
 
 
 def workflow_run_scripts(workflow):
@@ -1432,18 +1432,19 @@ def test_path_taking_tasks_accept_a_paths_argument(generated_project):
     assert 'paths or PATHS' in lint_py, 'lint tasks do not fall back to the project-wide paths'
 
 
-def test_whole_program_gate_runs_on_pre_push_in_check_mode(generated_project):
+def test_whole_program_gate_runs_on_pre_push_without_writing(generated_project):
     """The whole-program bundle gates pushes, not commits, and writes nothing tracked.
 
-    `--check` is what makes it safe to run from a hook at all: the same registry, the same
-    steps, no write to a tracked file, and a failure that names the command to fix it.
+    It needs no flag to be safe: `preflight` verifies by default and `--write` is opt-in, which
+    is the point of that inversion — the hook, the pipeline, and the command you type to
+    reproduce a failure are all the same string.
     """
     project, _ = generated_project
     hooks = {hook['id']: hook for hook in pre_commit_hooks(project)}
     gate = hooks['preflight']
     assert gate['stages'] == ['pre-push'], f'preflight hook stages are {gate["stages"]}'
     assert invoked_task(gate) == 'preflight', f'preflight hook runs {gate["entry"]!r}'
-    assert '--check' in gate['entry'], f'the pre-push hook would rewrite tracked files: {gate["entry"]!r}'
+    assert '--write' not in gate['entry'], f'the pre-push hook would rewrite tracked files: {gate["entry"]!r}'
     assert gate.get('pass_filenames') is False, 'the whole-program gate was narrowed to the pushed files'
     installed = yaml.safe_load((project / '.pre-commit-config.yaml').read_text(encoding='utf-8'))
     assert 'pre-push' in installed['default_install_hook_types'], 'pre-push hooks would never be installed'
@@ -1477,14 +1478,15 @@ def test_the_gate_offers_no_way_to_run_less_than_ci(generated_project):
 
     A `--quick` that dropped the matrix would be a documented way to make local and CI
     disagree, and the obvious thing to reach for in a hurry. The knob that shortens the matrix
-    is `env_list`, which shortens it for CI too and so cannot open a gap. `--audit-dependencies`
-    is the one flag that adds a step, and it adds one no gate runs anywhere.
+    is `env_list`, which shortens it for CI too and so cannot open a gap. The two flags it does
+    take add rather than remove: `--write` updates the derived files, and `--audit-dependencies`
+    runs a step no gate runs anywhere.
     """
     project, _ = generated_project
     preflight_py = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
     signature = preflight_py.split('def preflight(', 1)[1].split(')', 1)[0]
     parameters = {part.split(':')[0].strip() for part in signature.split(',')}
-    assert parameters == {'context', 'check', 'audit_dependencies'}, (
+    assert parameters == {'context', 'write', 'audit_dependencies'}, (
         f'preflight grew a parameter that can change what it runs: {parameters}'
     )
 
@@ -1600,15 +1602,21 @@ def test_no_whole_project_run_edits_source(generated_project):
     assert len(fixers) == 1, f'{len(fixers)} steps claim to edit source; expected only format'
     assert "Step('format'" in fixers[0], f'an unexpected step edits source: {fixers[0].strip()!r}'
 
-    # `fix` is the gate on reaching it, and only the staged bundle passes it.
-    # To the next module-level `def`, so the whole method body is in scope rather than the
-    # docstring's first paragraph.
+    # `fix` is the gate on reaching it. Sliced to the next module-level `def`, so the whole
+    # method body is in scope rather than the docstring's first paragraph.
     runner = source.split('def runner', 1)[1].split('\ndef ', 1)[0]
     assert 'if self.fixes_source and not fix' in runner, 'a source fixer is reachable without fix'
-    staged = source.split("@logged('preflight.staged')", 1)[1].split('@task', 1)[0]
-    assert 'fix=True' in staged, 'the commit hook no longer fixes the files it was handed'
+
+    # The whole-project task cannot fix at all: no such parameter, and it never passes one.
     whole = source.split("@logged('preflight')", 1)[1].split('namespace =', 1)[0]
-    assert 'fix=True' not in whole, 'the whole-project run can edit source'
+    assert 'fix=' not in whole, 'the whole-project run can edit source'
+
+    # The staged task can, but only when asked — and the hook is what asks, in the config,
+    # which is where the one editing step in the workflow becomes visible to a reader.
+    staged = source.split("@logged('preflight.staged')", 1)[1].split('@task', 1)[0]
+    assert 'fix: bool = False' in staged, 'the staged bundle fixes source without being asked'
+    hook = next(h for h in pre_commit_hooks(project) if invoked_task(h) == 'preflight.staged')
+    assert '--fix' in hook['entry'], f'the commit hook no longer fixes what it was handed: {hook["entry"]!r}'
 
 
 def test_the_gate_renders_no_report_it_does_not_read(generated_project):

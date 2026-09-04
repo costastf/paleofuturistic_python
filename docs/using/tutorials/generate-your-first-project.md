@@ -45,7 +45,7 @@ This installs uv-managed virtualenvs for every dependency group and registers pr
 These commands are the heartbeat of every project this template generates:
 
 ```bash
-./workflow.cmd preflight # All the checks below, then update the README badges and the coverage bar
+./workflow.cmd preflight # All the checks below, and verify the README badges and coverage bar
 ./workflow.cmd format    # Ruff format + import sort
 ./workflow.cmd lint      # Ruff check, pylint, ty (type checker), complexipy, commitizen
 ./workflow.cmd test      # pytest with coverage and parallel execution
@@ -88,10 +88,11 @@ Now that you have git properly setup in your project you can execute the followi
 ./workflow.cmd preflight
 ```
 
-The hooks run a subset of this automatically: on every commit, the checks that can be judged
-from the files you staged; on every push, `preflight --check` — the same steps as above, but
-verifying the badges and the coverage bar instead of writing them, so a push cannot leave them
-stale for CI to complain about. When it does complain, it names the command that fixes it.
+The hooks run this automatically: on every commit, the checks that can be judged from the
+files you staged; on every push, `preflight` itself — the same command, which is also the whole
+CI pipeline. It verifies the badges and the coverage bar rather than writing them, so a push
+cannot leave them stale for CI to complain about. When it does complain, it names the command
+that fixes them: `./workflow.cmd preflight --write`.
 
 ## You're done
 

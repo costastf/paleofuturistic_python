@@ -17,11 +17,13 @@ per push instead of once per commit, which keeps commit latency flat as the proj
 This is a rule about correctness, not speed: a whole-program check narrowed to a diff does not
 run faster, it answers wrongly.
 
-*Write mode and check mode are the same steps.* ``preflight`` brings the derived files up to
-date; ``preflight --check`` runs the identical registry and fails on anything it would have
-changed. Only ``build`` and ``artifacts`` differ between the two, and each differs by swapping
-one callable, not by taking a separate path. Nothing in this file re-implements a check for the
-verifying side, because that is how a gate drifts from the generator it guards.
+*Verifying is the default; writing is a flag.* ``preflight`` runs the registry and compares
+the derived files against what the tools measured; ``preflight --write`` runs the identical
+registry and updates them. The bare command is therefore what the hooks and the pipeline run,
+so reproducing a pipeline failure needs no flag. Only ``build`` and ``artifacts`` behave
+differently between the two, and each differs by swapping one callable, not by taking a
+separate path. Nothing in this file re-implements a check for the verifying side, because that
+is how a gate drifts from the generator it guards.
 
 *No whole-project run edits your code.* What ``preflight`` writes is derived — the four badges
 and the coverage ratchet — never source. Formatting is verified here and fixed either by a
@@ -31,10 +33,10 @@ alternative was a command you run before opening a pull request quietly reformat
 were not looking at and folding them into your commit. ``fixes_source`` on a step and ``fix``
 on ``run_scope`` are what enforce it; see ``Step.runner``.
 
-Note that check mode still writes ``reports/`` — pytest's coverage JSON and pyscn's analysis
-are the *inputs* the artifact comparison reads, and they are gitignored derived files. What
-neither mode touches is source, and what check mode additionally leaves alone is every tracked
-file: README.md and pyproject.toml.
+Note that the default still writes ``reports/`` — pytest's coverage JSON and pyscn's analysis
+are the *inputs* the comparison reads, and they are gitignored derived files. What neither mode
+touches is source, and what the default additionally leaves alone is every tracked file:
+README.md and pyproject.toml.
 """
 
 import re
@@ -63,7 +65,7 @@ WHOLE_PROGRAM = 'whole-program'
 CODE_FILES = re.compile(r'^(_CI/tasks/|src/|tests/).*\.py$')
 SRC_FILES = re.compile(r'^src/.*\.py$')
 
-FIX_COMMAND = './workflow.cmd preflight'
+FIX_COMMAND = './workflow.cmd preflight --write'
 
 
 class Step(NamedTuple):
@@ -329,7 +331,7 @@ def run_scope(  # noqa: PLR0913
 
 @task
 @logged('preflight.staged')
-def staged(context: Context, paths: str = '') -> None:
+def staged(context: Context, paths: str = '', fix: bool = False) -> None:
     """Run the checks that can be judged from the staged files alone.
 
     This is what the pre-commit hook calls, as a single invocation: `./workflow.cmd` costs
@@ -347,21 +349,32 @@ def staged(context: Context, paths: str = '') -> None:
         paths: Space-separated paths, normally the staged files. Each step sees only the
             paths it accepts, and is skipped when none of them are its business. Defaults to
             the whole project.
+        fix: Apply formatting rather than report it. Off by default, so the bare command
+            reports like every other gate; `.pre-commit-config.yaml` passes it, which is what
+            makes the hook's one editing step visible in the hook config rather than only in
+            this file.
     """
-    run_scope(context, PER_FILE, write=True, fix=True, paths=paths)
+    run_scope(context, PER_FILE, write=fix, fix=fix, paths=paths)
 
 
 @task
 @logged('preflight')
-def preflight(context: Context, check: bool = False, audit_dependencies: bool = False) -> None:
+def preflight(context: Context, write: bool = False, audit_dependencies: bool = False) -> None:
     """Run every check this project has, and bring the derived files up to date.
 
-    The command to run before you open a pull request, and — as `--check` — the whole of the
-    CI pipeline as well as the pre-push hook. It verifies formatting, lints, type-checks, runs
-    pyscn, runs the test matrix and builds the wheel; then write mode writes the badges and the
-    coverage ratchet, and check mode compares them instead and fails listing everything out of
-    date. Neither mode edits source: unformatted code fails here and is fixed by
-    `./workflow.cmd format`.
+    The bare command is exactly what the pre-push hook and the CI pipeline run — no flag to
+    remember when you are reproducing a pipeline failure. It verifies formatting, lints,
+    type-checks, runs pyscn, runs the test matrix, builds the wheel, and compares the four
+    badges and the coverage ratchet against what the tools just measured, failing with
+    everything that is out of date.
+
+    `--write` is what updates those derived values, and it is opt-in because a command named
+    for an inspection should not modify the tree. Commands named for a mutation may — `format`,
+    `release.bump` — but this one is a gate, and `secure.sbom-extract --write` and
+    `release.changelog --write` already read that way.
+
+    Neither mode edits source. Unformatted code fails here and is fixed by
+    `./workflow.cmd format`, or by the commit hook on the files you staged.
 
     There is deliberately no flag for running a lighter version. The pipeline runs this exact
     command, so any switch that trimmed it would be a documented way to make the two disagree
@@ -372,8 +385,8 @@ def preflight(context: Context, check: bool = False, audit_dependencies: bool = 
 
     Args:
         context: Invoke context.
-        check: Verify instead of write. Nothing tracked is modified; a stale badge or an
-            unratcheted `fail_under` fails the run.
+        write: Update the derived values — the four README badges and the coverage ratchet —
+            instead of comparing them. Nothing else changes: the same steps run either way.
         audit_dependencies: Also run the dependency audit. Off by default, and not because of
             the network alone: an audit's answer depends on the advisory database on the day it
             runs rather than on this tree, so it can never have the property that makes the
@@ -381,7 +394,7 @@ def preflight(context: Context, check: bool = False, audit_dependencies: bool = 
             dependency-change job, and `release.dist` before publishing. This flag is for
             running it here too, when you want everything in one command.
     """
-    run_scope(context, None, write=not check, network=audit_dependencies)
+    run_scope(context, None, write=write, network=audit_dependencies)
 
 
 namespace = Collection('preflight')
