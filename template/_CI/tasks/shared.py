@@ -32,10 +32,17 @@ class RemoteRef(NamedTuple):
     path: str
 
 
+# `line_buffering` is what keeps a redirected log readable, which is to say every CI log.
+# Python block-buffers stdout when it is not a terminal, while a subprocess invoke spawns
+# writes to the same descriptor immediately — so our own lines (the `echo`d command, the
+# prints from a task) arrived in chunks *after* the output of the command they introduce.
+# `Wrote SBOM to …` appearing under `uv run coverage json` is what that looked like, and the
+# SBOM tasks are pure Python with no command of their own to echo, so there was nothing to
+# correct the impression. Line buffering costs a flush per line and puts them back in order.
 for _stream in (sys.stdout, sys.stderr):
     reconfigure = getattr(_stream, 'reconfigure', None)
     if reconfigure is not None:
-        reconfigure(encoding='utf-8', errors='replace')
+        reconfigure(encoding='utf-8', errors='replace', line_buffering=True)
 
 
 INDENT = '    '

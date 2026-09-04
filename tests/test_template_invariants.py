@@ -1537,6 +1537,22 @@ def test_ci_runs_the_same_gate_as_the_pre_push_hook(generated_project):
     assert command in commands, f'no CI job runs {command!r}; it runs {commands}'
 
 
+def test_task_output_stays_in_order_when_redirected(generated_project):
+    """The streams are line-buffered, so a log read after the fact attributes output correctly.
+
+    Python block-buffers stdout when it is not a terminal — which is every CI log and every
+    `> run.log` — while a subprocess invoke spawns writes to the same descriptor immediately.
+    Our own lines therefore arrived in chunks *after* the command they introduce, so the
+    echoed command sat below its own output and a task's prints appeared under the previous
+    task's command. `Wrote SBOM to …` reading as though `uv run coverage json` had produced it
+    is what that looked like, and the SBOM tasks have no command of their own to echo, so
+    nothing contradicted the impression.
+    """
+    project, _ = generated_project
+    shared = (project / '_CI' / 'tasks' / 'shared.py').read_text(encoding='utf-8')
+    assert 'line_buffering=True' in shared, 'the streams are block-buffered again when redirected'
+
+
 def test_a_failing_run_writes_no_derived_values(generated_project):
     """Once a check has failed, the steps that write derived files are skipped.
 
