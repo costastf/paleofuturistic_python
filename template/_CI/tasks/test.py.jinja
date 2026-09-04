@@ -273,6 +273,12 @@ def tox(context: Context, env: str = '') -> None:
     # would be folded into the union and inflate it, so the slate is wiped before the run —
     # by hand, because `coverage erase` leaves exactly those files alone.
     erase_coverage_data()
+    # The live progress list prints one `env: OK ✔ in Xs` line per environment and always ends
+    # up one short — nothing is skipped, it is whichever env finished *last*, whose line is
+    # swallowed as the run ends and the summary is printed. Confirmed across runs: the absent
+    # env is the one with the longest duration in the summary, and it changes from run to run.
+    # `--parallel-no-spinner` does not help. The summary block below the list is the complete
+    # view, and `coverage combine` reporting how many data files it merged is the harder check.
     execute(context, f'uv run tox run -e {env}' if env else 'uv run tox run-parallel')
     combine_coverage(context)
 
