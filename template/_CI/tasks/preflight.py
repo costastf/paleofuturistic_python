@@ -235,6 +235,35 @@ def scoped_paths(step: Step, paths: str) -> str | None:
     return ' '.join(kept) if kept else None
 
 
+def plan_scope(  # noqa: PLR0913
+    scope: str | None,
+    *,
+    write: bool,
+    paths: str = '',
+    network: bool = False,
+    fix: bool = False,
+) -> list[tuple[Callable[[Context], None], bool]]:
+    """Return ``(runner, writes_derived_files)`` for every step in ``scope``, in registry order.
+
+    The second element is what lets ``run_scope`` refuse to write from a failing run: it is
+    True for a step whose callable in *this* mode writes a derived file — ``artifacts`` and the
+    build badge. A source fixer is not one of those; it belongs to the staged bundle, where the
+    author is standing right there.
+    """
+    planned: list[tuple[Callable[[Context], None], bool]] = []
+    for step in steps_for(scope, network=network):
+        writes_derived = write and step.write is not None and not step.fixes_source
+        runner = step.runner(write=write, fix=fix)
+        if step.scope == WHOLE_PROGRAM:
+            planned.append((runner, writes_derived))
+            continue
+        narrowed = scoped_paths(step, paths)
+        if narrowed is None:
+            continue
+        planned.append((partial(runner, paths=narrowed), writes_derived))
+    return planned
+
+
 def run_scope(  # noqa: PLR0913
     context: Context,
     scope: str | None,
@@ -246,6 +275,21 @@ def run_scope(  # noqa: PLR0913
 ) -> None:
     """Run every registry step in ``scope``, accumulating failures.
 
+    Every step runs even after one fails, so a single run tells you everything that is wrong
+    rather than one thing per run — except the steps that *write* derived files, which are
+    skipped once anything before them has failed. A badge or a coverage bar computed from a
+    tree whose checks just failed is a claim the tree does not support: this is what stopped
+    `preflight` reporting "Updated build badge to passing" on a run that went on to fail, and
+    writing a grade-A pyscn badge over a project whose tests were red.
+
+    Skipped rather than reordered, so a failure late in the registry does not retroactively
+    undo an earlier write. `secure.audit` is deliberately last and opt-in, which means an
+    advisory published this morning does not stop your coverage badge from updating — it says
+    nothing about whether the derived values are right.
+
+    Check mode is unaffected: nothing is written there, and the comparison is exactly the
+    reporting that benefits from running everything.
+
     Args:
         context: Invoke context.
         scope: Which scope to run, or None for the whole registry.
@@ -255,18 +299,24 @@ def run_scope(  # noqa: PLR0913
         fix: Allow the write variants that edit source. Only the staged bundle asks for this.
 
     Raises:
-        SystemExit: If any step failed, after all of them have run.
+        SystemExit: If any step failed, after every step that could still run has run.
     """
-    planned: list[Callable[[Context], None]] = []
-    for step in steps_for(scope, network=network):
-        if step.scope == WHOLE_PROGRAM:
-            planned.append(step.runner(write=write, fix=fix))
+    # `run_steps` is not used here because it cannot express the skip: it runs everything it is
+    # given. The accumulate-and-report-at-the-end behaviour is the same.
+    failed = False
+    skipped = False
+    for runner, writes_derived in plan_scope(scope, write=write, paths=paths, network=network, fix=fix):
+        if failed and writes_derived:
+            skipped = True
             continue
-        narrowed = scoped_paths(step, paths)
-        if narrowed is None:
-            continue
-        planned.append(partial(step.runner(write=write, fix=fix), paths=narrowed))
-    run_steps(*planned)(context)
+        try:
+            runner(context)
+        except SystemExit:
+            failed = True
+    if skipped:
+        print(f'Derived files left alone: a check failed, so `{FIX_COMMAND}` has nothing trustworthy to write.')
+    if failed:
+        raise SystemExit(1)
 
 
 @task

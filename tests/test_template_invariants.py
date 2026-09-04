@@ -1537,6 +1537,33 @@ def test_ci_runs_the_same_gate_as_the_pre_push_hook(generated_project):
     assert command in commands, f'no CI job runs {command!r}; it runs {commands}'
 
 
+def test_a_failing_run_writes_no_derived_values(generated_project):
+    """Once a check has failed, the steps that write derived files are skipped.
+
+    Every step otherwise runs even after one fails, so a single run reports everything that is
+    wrong. That is right for reporting and wrong for writing: a badge computed from a tree
+    whose checks just failed is a claim the tree does not support. Before this, `preflight`
+    would print "Updated build badge to passing" on a run that went on to fail, and write a
+    grade-A pyscn badge over a project whose tests were red — the aggregator it replaced
+    short-circuited instead, so this restores a property the template already had.
+
+    Skipped rather than reordered, so a late failure cannot retroactively undo an earlier
+    write, and `secure.audit` being last means an advisory does not stop a badge from updating.
+    """
+    project, _ = generated_project
+    source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
+    body = source.split('def run_scope', 1)[1]
+    assert 'if failed and writes_derived' in body, 'a failing run can still write derived values'
+    assert 'writes_derived = write and step.write is not None and not step.fixes_source' in source, (
+        'the plan no longer marks which steps write derived files'
+    )
+    # The writers have to be last for the skip to cover them; `artifacts` is the final
+    # non-network step, and `build`'s badge precedes it.
+    steps = list(registry_steps(project))
+    assert steps[-1] == 'audit', f'audit is no longer last, so its failure would skip the writers: {steps}'
+    assert steps[-2] == 'artifacts', f'artifacts is not the last checked step: {steps}'
+
+
 def test_no_whole_project_run_edits_source(generated_project):
     """Only the staged bundle may fix source. `preflight` writes derived files and nothing else.
 
