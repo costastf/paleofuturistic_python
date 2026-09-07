@@ -87,8 +87,10 @@ dropped the matrix would be a documented way to reopen the gap. The knob that sh
 matrix is `env_list` in `pyproject.toml`, which shortens it for CI too.
 
 Every underlying task remains callable on its own, which is the escape hatch when you want one
-tool: `./workflow.cmd lint.pylint --paths="src/thing.py"`. Need to push past the gate once?
-`SKIP=preflight git push` leaves the other hooks in place, unlike `--no-verify`.
+tool: `./workflow.cmd lint.pylint --paths="src/thing.py"`. Need to push past the gate once? See
+[Skip a check, once](../how-to/skip-a-check.md) — `SKIP=preflight git push` leaves the other
+hooks in place, unlike `--no-verify`. Every variable this workflow reads is listed in
+[Environment variables and flags](environment-and-flags.md).
 
 Edit to add hooks; don't remove the existing ones without thinking — they keep the main
 branch clean.

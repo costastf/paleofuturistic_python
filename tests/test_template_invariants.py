@@ -211,6 +211,38 @@ def collect_nav_pages(nav_entry):
     return pages
 
 
+def test_every_environment_variable_the_workflow_reads_is_documented(generated_project):
+    """The reference page lists every variable the shipped tasks actually read.
+
+    A variable nobody documents is one nobody sets until a job fails for a reason the log does
+    not explain. This walks the task modules for the names they read — through the constants in
+    `configuration.py` as well as literal `os.environ` lookups — and requires each to appear on
+    the page. Host-specific ones only need to appear for the host that ships them.
+    """
+    project, _ = generated_project
+    tasks = project / '_CI' / 'tasks'
+    page = (project / 'docs' / 'developer' / 'reference' / 'environment-and-flags.md').read_text(encoding='utf-8')
+
+    sources = '\n'.join(path.read_text(encoding='utf-8') for path in tasks.glob('*.py'))
+    literal = set(re.findall(r"os\.environ(?:\.get)?\(\s*'([A-Z][A-Z0-9_]+)'", sources))
+    # The names the tasks reach through a constant rather than inline.
+    for constant in ('OWASP_DTRACK_SETTINGS', 'UV_PUBLISH_SETTINGS', 'OIDC_ENV_VARS'):
+        match = re.search(rf'^{constant} = \(([^)]*)\)', sources, re.MULTILINE)
+        if match:
+            literal.update(re.findall(r"'([A-Z][A-Z0-9_]+)'", match.group(1)))
+    override = re.search(r"SECURITY_OVERRIDE_ENV = '([A-Z_]+)'", sources)
+    if override:
+        literal.add(override.group(1))
+
+    # Set by the runner, not read by us, and covered in prose rather than the table.
+    ignored = {'PATH', 'HOME', 'COMSPEC', 'PAGER'}
+    # As a code span, not a substring: `INVOKE_SHELL` must not be satisfied by a page that
+    # happens to mention `INVOKE_SHELL_SOMETHING_ELSE`.
+    documented = set(re.findall(r'`([A-Z][A-Z0-9_]+)`', page))
+    undocumented = sorted(literal - ignored - documented)
+    assert not undocumented, f'variables the workflow reads but nobody documented: {undocumented}'
+
+
 def test_docs_nav_resolves(generated_project):
     """Every page listed in the generated properdocs.yml nav exists on disk, for every knob combo."""
     project, _ = generated_project

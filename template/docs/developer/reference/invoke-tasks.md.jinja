@@ -2,6 +2,9 @@
 
 Every task callable via `./workflow.cmd <namespace>.<task>`. Tasks are defined in `_CI/tasks/<module>.py` and registered in `_CI/tasks/__init__.py`.
 
+For why a knob is a sub-task, a flag or an environment variable — and what every variable this
+workflow reads does — see [Environment variables and flags](environment-and-flags.md).
+
 ## Top-level shortcuts
 
 The shortcuts below resolve to a namespace's default task (the one added with `default=True`).
