@@ -1,6 +1,7 @@
 """Quality task definitions."""
 
 import json
+from functools import partial
 from pathlib import Path
 from typing import cast
 
@@ -69,11 +70,21 @@ def update_pyscn_badge(*, write: bool = True) -> str | None:
 
 @task
 @logged('quality.pyscn-analyze')
-def pyscn_analyze(context: Context) -> None:
-    """Run pyscn comprehensive analysis with HTML report, and open it."""
+def pyscn_analyze(context: Context, write: bool = False) -> None:
+    """Run pyscn comprehensive analysis with HTML report, and open it.
+
+    Reports whether the badge still matches the grade it just measured; `--write` updates it.
+    Opt-in for the same reason as everywhere else: "analyze" names an inspection, and an
+    inspection should not modify the tree unasked. That it *may* write when asked is because
+    it produced the grade the badge shows — `analyze --json` is the only thing that does.
+
+    Args:
+        context: Invoke context.
+        write: Update the README's pyscn badge from this analysis.
+    """
     execute(context, ANALYZE_HTML)
     execute(context, ANALYZE_JSON)
-    note(update_pyscn_badge())
+    note(update_pyscn_badge(write=write))
     if not is_ci():
         open_target(context, str(latest_pyscn_report()))
 
@@ -94,7 +105,7 @@ def pyscn_check(context: Context) -> None:
 
 
 @logged('quality.pyscn-analyze')
-def pyscn_analyze_only(context: Context) -> None:
+def pyscn_analyze_only(context: Context, *, write: bool = False) -> None:
     """Run pyscn analyze without opening the report.
 
     Two analyses, because pyscn refuses more than one output format per run — ``--html
@@ -105,7 +116,7 @@ def pyscn_analyze_only(context: Context) -> None:
     """
     execute(context, ANALYZE_HTML)
     execute(context, ANALYZE_JSON)
-    note(update_pyscn_badge())
+    note(update_pyscn_badge(write=write))
 
 
 @logged('quality.pyscn-analyze')
@@ -125,16 +136,26 @@ def pyscn_json_report(context: Context) -> None:
 
 @task
 @logged('quality.pyscn')
-def pyscn(context: Context) -> None:
-    """Run all pyscn steps; reports all failures before exiting."""
-    run_steps(pyscn_analyze_only, pyscn_check)(context)
+def pyscn(context: Context, write: bool = False) -> None:
+    """Run all pyscn steps; reports all failures before exiting.
+
+    Args:
+        context: Invoke context.
+        write: Update the README's pyscn badge from this analysis.
+    """
+    run_steps(partial(pyscn_analyze_only, write=write), pyscn_check)(context)
 
 
 @task
 @logged('quality')
-def quality(context: Context) -> None:
-    """Run all quality steps; reports all failures before exiting."""
-    run_steps(pyscn)(context)
+def quality(context: Context, write: bool = False) -> None:
+    """Run all quality steps; reports all failures before exiting.
+
+    Args:
+        context: Invoke context.
+        write: Update the README's pyscn badge from this analysis.
+    """
+    run_steps(partial(pyscn, write=write))(context)
 
 
 namespace = Collection('quality')

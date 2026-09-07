@@ -12,34 +12,48 @@ from .github import pipeline_badge{% if integrate_pages %}, request_pages_build{
 from .gitlab import pipeline_badge
 {%- endif %}
 {% if integrate_pages and git_hosting_service == 'github' -%}
-from .shared import apply_badge, execute, is_ci, logged, note, open_target, run, run_steps
+from .shared import apply_badge, execute, is_ci, logged, open_target, run, run_steps
 {%- else -%}
-from .shared import apply_badge, is_ci, logged, note, open_target, run, run_steps
+from .shared import apply_badge, is_ci, logged, open_target, run, run_steps
 {%- endif %}
 
 
-def update_package_version_badge(*, write: bool = True) -> str | None:
+VERSION_BADGE = r'(\[!\[Version\]\(https://img\.shields\.io/badge/version-)[^)]+(\))'
+
+
+def update_package_version_badge(*, version: str = '', write: bool = True) -> str | None:
     """Bring the README's version badge in line with the version in pyproject.toml.
 
     Args:
+        version: Use this version instead of the one in pyproject.toml. `release.bump` passes
+            the version it is about to write, so the badge can be refreshed *before* `cz bump`
+            runs and be swept into the same commit the release tag points at.
         write: Update README.md. When False, report what would change and touch nothing.
 
     Returns:
         None when the badge is already right, else a one-line reason it is not.
     """
+    if version:
+        return apply_badge(
+            Path('README.md'),
+            VERSION_BADGE,
+            rf'\g<1>{version}-blue\2',
+            label='version badge',
+            detail=version,
+            write=write,
+        )
     pyproject = Path('pyproject.toml')
     if not pyproject.exists():
         return None
     match = re.search(r'^version\s*=\s*"([^"]+)"', pyproject.read_text(encoding='utf-8'), re.MULTILINE)
     if not match:
         return None
-    version = match.group(1)
     return apply_badge(
         Path('README.md'),
-        r'(\[!\[Version\]\(https://img\.shields\.io/badge/version-)[^)]+(\))',
-        rf'\g<1>{version}-blue\2',
+        VERSION_BADGE,
+        rf'\g<1>{match.group(1)}-blue\2',
         label='version badge',
-        detail=version,
+        detail=match.group(1),
         write=write,
     )
 
@@ -142,21 +156,13 @@ def deploy_github(context: Context) -> None:
 @logged('document')
 def document(context: Context) -> None:
     """Build and open the documentation; reports all failures before exiting."""
-    # Only the three derived from files this repository tracks: the version and the Python
-    # range come from pyproject.toml, the CI badge's URL from `origin`. All three are therefore
-    # current by construction whenever this runs.
-    #
-    # The coverage and pyscn badges are deliberately absent. They come from reports under
-    # `reports/`, which this task does not produce and which are gitignored — so it would be
-    # stamping in whatever a previous run happened to leave, silently, and a week-old number
-    # looks exactly like a fresh one. They belong to the commands that measure them:
-    # `test.tox --write`, `quality.pyscn-analyze`, or `preflight --write` for all five at once.
-    for reason in (
-        update_package_version_badge(),
-        update_python_badge(),
-        update_pipeline_badge(context),
-    ):
-        note(reason)
+    # No badge is written here. The three it could vouch for — version, Python range, and the
+    # CI badge's URL — are cheap and derived from tracked files, but "document" is not a command
+    # named for changing your README, and a default that writes is the thing every other task
+    # here stopped doing. `preflight --write` refreshes all five, and the gate names it when one
+    # is stale. The coverage and pyscn badges were dropped earlier for a stronger reason: they
+    # come from reports under `reports/` this task does not produce, so it was stamping in
+    # whatever a previous run left, and a week-old number looks exactly like a fresh one.
     run_steps(build, view)(context)
 
 
