@@ -18,17 +18,22 @@ repos:
       # six hooks paid ~8s of startup to do ~2s of checking. Collapsed, the same four checks
       # measure ~2.9s on a fresh project, of which 1.6s is the one startup.
       #
-      # Which tools belong here is decided in `_CI/tasks/preflight.py`, not here: the hook
-      # runs `preflight.staged`, which reads the step registry and applies each step's own
-      # path filter (complexipy is `src/` only, the rest also cover `_CI/tasks/` and
-      # `tests/`) — filters that lived in the `files:` keys of the hooks this replaces. The
-      # `files:` below is therefore the union of them, and an invariant test asserts this
-      # hook and the registry's per-file steps agree.
+      # `pass_filenames: false` and no arguments, because `preflight.staged` reads the index
+      # itself. That is what lets this line be the command you would type: the hook and the
+      # bare `./workflow.cmd preflight.staged` do exactly the same thing, which they did not
+      # when pre-commit had to hand over the list. It also retires the `sh -c … --paths="$*"`
+      # marshalling that collapsed pre-commit's filenames into the one option Invoke accepts —
+      # Invoke reads a bare second filename as another task name — along with that wrapper's
+      # inability to carry a filename containing a space.
       #
-      # `sh -c … --` collapses the file list pre-commit appends into the single `--paths`
-      # value Invoke expects; Invoke would otherwise read the second filename as another task
-      # name and fail. (Filenames containing spaces are not supported by that marshalling —
-      # as with `lint-commit`.)
+      # Note what `files:` below now does: it decides whether this hook *runs*, not what it
+      # looks at. Stage only a `.md` and the hook is skipped; stage a `.py` and the task reads
+      # the whole index, applying each step's own filter from the registry (complexipy is
+      # `src/` only, the rest also cover `_CI/tasks/` and `tests/`). So the pattern has to stay
+      # no narrower than the union of those filters, or staging a file some step cares about
+      # would not wake the hook at all. An invariant asserts exactly that.
+      #
+      # Which tools belong here is decided in `_CI/tasks/preflight.py`, not here.
       #
       # This hook reports; it does not rewrite. It used to apply formatting, and that was the
       # odd one out twice over: the automated entry points behaved differently from the command
@@ -41,9 +46,9 @@ repos:
       # makes without a flag.
       - id: staged
         name: Check staged files (formatting, ruff, pylint, complexipy)
-        entry: sh -c './workflow.cmd preflight.staged --paths="$*"' --
+        entry: ./workflow.cmd preflight.staged
         language: system
-        pass_filenames: true
+        pass_filenames: false
         files: ^(_CI/tasks/|src/|tests/).*\.py$
         stages: [pre-commit]
       # Everything whole-program runs here instead of on every commit: ty needs the callers of

@@ -314,11 +314,27 @@ def staged_files(context: Context) -> str:
     check. `git` failing at all (no repository, no index) also reads as "nothing staged": this
     task is defined in terms of the index, so an absent one means there is no work, not an
     error to raise.
+
+    Raises:
+        SystemExit: If a staged path contains a space. `--paths` is space-separated the whole
+            way down, so such a path cannot be forwarded; this refuses loudly rather than
+            letting it split into fragments that match no filter and are quietly skipped.
     """
     result = context.run('git diff --cached --name-only --diff-filter=ACMR', hide=True, warn=True)
     if result is None or result.failed:
         return ''
-    return ' '.join(result.stdout.split())
+    # Split on lines, not whitespace, so a path containing a space arrives intact and can be
+    # refused below rather than silently becoming two paths that match no filter and get
+    # dropped — a hook that passes because it checked nothing is worse than one that fails.
+    paths = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    unsupported = [path for path in paths if ' ' in path]
+    if unsupported:
+        print(f'Cannot check staged paths containing spaces: {", ".join(unsupported)}')
+        print('`--paths` is space-separated throughout this workflow, so such a path cannot be')
+        print('forwarded to the tools. Rename it, or check the whole project with')
+        print('`./workflow.cmd preflight`.')
+        raise SystemExit(1)
+    return ' '.join(paths)
 
 
 @task

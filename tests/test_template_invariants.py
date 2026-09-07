@@ -1378,8 +1378,13 @@ def test_commit_stage_is_one_invocation_of_the_per_file_steps(generated_project)
         f'the commit stage runs {invoked}, so it no longer pays startup exactly once for the code checks'
     )
     staged = next(hook for hook in code_hooks if invoked_task(hook) == 'preflight.staged')
-    assert staged.get('pass_filenames') is True, 'the staged bundle does not receive the staged files'
-    assert '--paths="$*"' in staged['entry'], 'the staged bundle does not collapse filenames into --paths'
+    # No filenames and no wrapper: the task reads the index itself, so this entry is the same
+    # command a person would type. Handing over the list needed `sh -c … --paths="$*"`, since
+    # Invoke reads a bare second filename as another task name.
+    assert staged.get('pass_filenames') is False, 'the hook hands over a file list again'
+    assert staged['entry'] == './workflow.cmd preflight.staged', (
+        f'the entry is not the bare command: {staged["entry"]!r}'
+    )
 
 
 def test_commit_stage_filter_is_not_narrower_than_the_steps_it_runs(generated_project):
@@ -1387,9 +1392,9 @@ def test_commit_stage_filter_is_not_narrower_than_the_steps_it_runs(generated_pr
 
     Collapsing six hooks into one left a single `files:` key in front of four tools that do not
     agree on what they check — complexipy is `src/` only, the rest also cover `_CI/tasks/` and
-    `tests/`. The per-tool filters therefore moved into the registry, and this hook has to pass
-    through everything any of them wants: a filter narrower than the widest step would drop
-    files that step should have seen, silently.
+    `tests/`. The per-tool filters therefore live in the registry, and this pattern decides
+    only whether the hook *wakes*: narrower than the widest step, and staging a file that step
+    cares about would leave the hook skipped and the file unchecked.
     """
     project, _ = generated_project
     source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
@@ -1641,6 +1646,13 @@ def test_the_staged_bundle_defaults_to_what_is_staged(generated_project):
     body = source.split("@logged('preflight.staged')", 1)[1].split('@task', 1)[0]
     assert 'paths or staged_files(context)' in body, 'an explicit --paths no longer wins'
     assert 'Nothing staged' in body, 'an empty index is not reported'
+
+    # A space in a staged path has to fail loudly. `--paths` is space-separated the whole way
+    # down, so such a path would otherwise split into fragments that match no step's filter and
+    # be dropped — leaving the hook to pass because it checked nothing at all.
+    reader = source.split('def staged_files', 1)[1].split('\n@', 1)[0]
+    assert 'splitlines()' in reader, 'the index is split on whitespace, so a path with a space breaks up'
+    assert 'unsupported' in reader, 'a staged path containing a space is not refused'
 
 
 def test_the_gate_renders_no_report_it_does_not_read(generated_project):
