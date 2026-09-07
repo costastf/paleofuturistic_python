@@ -59,6 +59,44 @@ def prepare_snapshot(tmpdir):
     return template_repo
 
 
+def report_failure(message, log_file):
+    """Record a QA failure in the cell's log, or on stdout when running a single combo."""
+    if log_file is not None:
+        with log_file.open('a', encoding='utf-8') as handle:
+            handle.write(f'\n{message}\n')
+    else:
+        print(emojize_message(message, success=False))
+
+
+def untracked_after_qa(project_dir):
+    """Return paths the QA run left untracked, which should be none.
+
+    The template's promise is that running its workflow does not litter: everything the tasks
+    write — `reports/`, `.coverage*`, `.tox/`, `dist/`, the SBOM, the caches — is matched by the
+    `.gitignore` it ships. Nothing asserted that, so a tool added later, or a trimmed ignore
+    rule, would show up first as a confusing `git status` after someone's push, or as build
+    output swept into a commit by `git add -A`.
+
+    Only *untracked* files count. `QA_STEPS` runs `preflight --write`, which updates the badges
+    on purpose, so modified tracked files are expected here.
+
+    This lives in the template's own tests rather than shipping into generated projects: the
+    assertion is only sound on a freshly generated, fully committed tree, which is what this
+    runner has. In a real project a developer's own work-in-progress is indistinguishable from
+    workflow output, and a shipped check would fail half the time and police the owner besides.
+    """
+    result = subprocess.run(
+        ['git', 'status', '--porcelain', '--untracked-files=all'],
+        cwd=str(project_dir),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return [f'git status failed: {result.stderr.strip()}']
+    return [line[3:] for line in result.stdout.splitlines() if line.startswith('??')]
+
+
 def run_combo(template_repo, output_root, extra_context, label, log_file=None):
     """Generate the template with extra_context and run QA_STEPS. Return True on success."""
     combo_root = output_root / label
@@ -103,13 +141,17 @@ def run_combo(template_repo, output_root, extra_context, label, log_file=None):
 
     for step in QA_STEPS:
         if not run_command(f'./workflow.cmd {step}', cwd=project_dir, env=step_env, log_file=log_file):
-            failure_msg = f'[{label}] task "{step}" failed'
-            if log_file is not None:
-                with log_file.open('a', encoding='utf-8') as handle:
-                    handle.write(f'\n{failure_msg}\n')
-            else:
-                print(emojize_message(failure_msg, success=False))
+            report_failure(f'[{label}] task "{step}" failed', log_file)
             return False
+
+    untracked = untracked_after_qa(project_dir)
+    if untracked:
+        report_failure(
+            f'[{label}] the workflow left untracked files, so .gitignore has a hole: '
+            f'{", ".join(untracked)}',
+            log_file,
+        )
+        return False
     return True
 
 
