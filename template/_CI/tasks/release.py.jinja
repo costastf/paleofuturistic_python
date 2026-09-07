@@ -81,15 +81,11 @@ def validate(context: Context) -> None:
 def bump(context: Context, increment: str = '') -> None:
     """Bump the version, refresh the version badge, and create a git tag.
 
-    The badge is refreshed *before* `cz bump` rather than after, so it lands in the commit the
-    release tag points at. `cz bump` commits every modified tracked file — verified: a README
-    edited beforehand is swept into its commit — which is what makes that work, and which is
-    also why `release` runs `validate` first to insist on a clean tree.
-
-    Without this the badge went stale at every release: `cz bump` writes the new version to
-    pyproject.toml and commits, nothing updated the README, and the next `preflight` on main
-    failed with "version badge in README.md is stale". A release should not land a README that
-    contradicts the version it released.
+    The badge is refreshed *before* `cz bump`, so it lands in the commit the release tag points
+    at: `cz bump` commits every modified tracked file — verified, a README edited beforehand is
+    swept into its commit — which is also why `release` runs `validate` first to insist on a
+    clean tree. Otherwise the release would land a README contradicting the version it
+    released, and the next `preflight` on main would fail on the stale badge.
 
     Args:
         context: Invoke context.

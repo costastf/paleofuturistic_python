@@ -71,19 +71,19 @@ def report_failure(message, log_file):
 def untracked_after_qa(project_dir):
     """Return paths the QA run left untracked, which should be none.
 
-    The template's promise is that running its workflow does not litter: everything the tasks
-    write — `reports/`, `.coverage*`, `.tox/`, `dist/`, the SBOM, the caches — is matched by the
-    `.gitignore` it ships. Nothing asserted that, so a tool added later, or a trimmed ignore
-    rule, would show up first as a confusing `git status` after someone's push, or as build
-    output swept into a commit by `git add -A`.
+    The template promises that running its workflow does not litter: everything the tasks write
+    — `reports/`, `.coverage*`, `.tox/`, `dist/`, the SBOM, the caches — is matched by the
+    `.gitignore` it ships. A tool added later, or a trimmed ignore rule, would otherwise show up
+    first as a confusing `git status` after someone's push, or as build output swept into a
+    commit by `git add -A`.
 
-    Only *untracked* files count. `QA_STEPS` runs `preflight --write`, which updates the badges
-    on purpose, so modified tracked files are expected here.
+    Only *untracked* files count: `QA_STEPS` runs `preflight --write`, so modified tracked files
+    are expected.
 
-    This lives in the template's own tests rather than shipping into generated projects: the
-    assertion is only sound on a freshly generated, fully committed tree, which is what this
-    runner has. In a real project a developer's own work-in-progress is indistinguishable from
-    workflow output, and a shipped check would fail half the time and police the owner besides.
+    It lives in the template's own tests rather than shipping into generated projects, because
+    the assertion is only sound on a freshly generated, fully committed tree, which is what this
+    runner has. In a real project a developer's work-in-progress is indistinguishable from
+    workflow output, so a shipped check would fail half the time and police the owner besides.
     """
     result = subprocess.run(
         ['git', 'status', '--porcelain', '--untracked-files=all'],

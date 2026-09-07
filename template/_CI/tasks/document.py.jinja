@@ -61,11 +61,8 @@ def update_package_version_badge(*, version: str = '', write: bool = True) -> st
 def update_pipeline_badge(context: Context, *, write: bool = True) -> str | None:
     """Point the CI badge at the host's own status endpoint, derived from `origin`.
 
-    The only derived value here whose *content* never goes stale: the host renders the current
-    status on every page load, so this writes a URL once and then has nothing left to do. It
-    replaces a badge that recorded whether the last local `build` passed — which said nothing
-    to a reader, could claim "passing" on a failing run, and on GitLab was never written at
-    all, `build.py` having matched only the `Build` badge that GitHub projects render.
+    The one derived value whose *content* never goes stale: the host renders the current status
+    on every page load, so this writes a URL once and then has nothing left to do.
 
     A project with no readable `origin` has not been pushed anywhere yet. That is not a stale
     badge, so it reads as up to date and the placeholder stays.
@@ -156,13 +153,8 @@ def deploy_github(context: Context) -> None:
 @logged('document')
 def document(context: Context) -> None:
     """Build and open the documentation; reports all failures before exiting."""
-    # No badge is written here. The three it could vouch for — version, Python range, and the
-    # CI badge's URL — are cheap and derived from tracked files, but "document" is not a command
-    # named for changing your README, and a default that writes is the thing every other task
-    # here stopped doing. `preflight --write` refreshes all five, and the gate names it when one
-    # is stale. The coverage and pyscn badges were dropped earlier for a stronger reason: they
-    # come from reports under `reports/` this task does not produce, so it was stamping in
-    # whatever a previous run left, and a week-old number looks exactly like a fresh one.
+    # No badge is written here: "document" is not a command named for changing your README.
+    # `preflight --write` refreshes all five, and the gate names it when one is stale.
     run_steps(build, view)(context)
 
 

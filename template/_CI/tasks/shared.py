@@ -32,13 +32,11 @@ class RemoteRef(NamedTuple):
     path: str
 
 
-# `line_buffering` is what keeps a redirected log readable, which is to say every CI log.
-# Python block-buffers stdout when it is not a terminal, while a subprocess invoke spawns
-# writes to the same descriptor immediately — so our own lines (the `echo`d command, the
-# prints from a task) arrived in chunks *after* the output of the command they introduce.
-# `Wrote SBOM to …` appearing under `uv run coverage json` is what that looked like, and the
-# SBOM tasks are pure Python with no command of their own to echo, so there was nothing to
-# correct the impression. Line buffering costs a flush per line and puts them back in order.
+# `line_buffering` keeps a redirected log readable, which is to say every CI log. Python
+# block-buffers stdout when it is not a terminal, while a subprocess invoke spawns writes to the
+# same descriptor immediately — so without it our own lines (the echoed command, a task's
+# prints) arrive in chunks *after* the output of the command they introduce, and a pure-Python
+# task's output reads as though the previous command produced it. A flush per line fixes it.
 for _stream in (sys.stdout, sys.stderr):
     reconfigure = getattr(_stream, 'reconfigure', None)
     if reconfigure is not None:
@@ -303,22 +301,20 @@ def apply_badge(
 ) -> str | None:
     """Bring a derived value in ``path`` up to date, or report that it is not.
 
-    Every derived value committed to the repository — the four README badges and the coverage
-    ratchet's ``fail_under`` — is written through here, in one of two modes. ``write=True``
+    Every derived value committed to the repository — the README badges and the coverage
+    ratchet's ``fail_under`` — is written through here in one of two modes. ``write=True``
     updates the file; ``write=False`` leaves it alone and reports what it would have changed.
-    The two modes therefore cannot disagree about what "up to date" means: it is the same
-    substitution either way, compared against the same file. A second implementation for the
-    verifying side is exactly how a check drifts from the generator it is supposed to guard.
+    The two cannot disagree about what "up to date" means, being the same substitution against
+    the same file; a second implementation for the verifying side is how a check drifts from the
+    generator it guards.
 
-    ``announce=False`` suppresses the success line for callers that print their own — the
-    coverage ratchet reports every outcome in one ``[ratchet]`` line and would otherwise say
-    the same thing twice.
+    ``announce=False`` suppresses the success line for callers that print their own, such as the
+    coverage ratchet's single ``[ratchet]`` line.
 
-    Returns None when the file already holds the right value, and a one-line reason otherwise.
-    Callers decide what a stale value costs: ``document`` reports it and carries on, while
-    ``preflight --check`` fails on it. A missing file is not a staleness — nothing can be
-    concluded from it — so it reads as up to date here and is diagnosed by the caller, which
-    is the only one that knows whether the input should have existed.
+    Returns None when the file already holds the right value, else a one-line reason. Callers
+    decide what a stale value costs. A missing file is not a staleness — nothing can be
+    concluded from it — so it reads as up to date here, and the caller diagnoses it, being the
+    only one that knows whether the input should have existed.
     """
     if not path.exists():
         return None
@@ -337,9 +333,8 @@ def apply_badge(
 def note(reason: str | None) -> None:
     """Print a staleness reason from ``apply_badge``, if there is one.
 
-    The write-mode callers use this: a derived value that could not be brought up to date is
-    worth saying out loud, but it does not fail the task that happened to notice. Only
-    ``preflight --check`` treats the same reason as a failure.
+    A derived value that could not be brought up to date is worth saying out loud without
+    failing the task that noticed. Only ``preflight`` treats the same reason as a failure.
     """
     if reason:
         print(reason)

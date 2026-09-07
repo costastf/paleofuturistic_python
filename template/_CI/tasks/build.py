@@ -25,10 +25,8 @@ def build(context: Context) -> None:
     wheel can still be built when a fresh advisory lands. `release.dist` audits before it
     builds, which is where refusing to proceed actually protects someone.
 
-    It also no longer records its outcome in a README badge. That badge said whether the last
-    *local* build passed, which tells a reader nothing and could claim "passing" on a run that
-    went on to fail; the CI badge now points at the host's own status endpoint, which is always
-    current. See `document.update_pipeline_badge`.
+    It records no outcome in a README badge: the CI badge points at the host's own status
+    endpoint, which is always current. See `document.update_pipeline_badge`.
     """
     run_steps(sbom, package)(context)
 

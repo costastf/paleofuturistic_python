@@ -13,28 +13,27 @@ Three mechanisms, and they are not interchangeable:
 | **Flag** | a modifier *you* choose for one invocation | `--paths`, `--write`, `--env` |
 | **Environment variable** | something the *environment* supplies, not the operator | `CI`, `INVOKE_SHELL` |
 
-So: if it is a tool or a step you might run on its own, it is a sub-task. If it changes how a
-run behaves and a person decides it at the prompt, it is a flag. If it is a secret, a
-detection, or a knob owned by a tool this workflow calls, it is an environment variable.
+So: a tool or step you might run on its own is a sub-task; something a person decides at the
+prompt is a flag; a secret, a detection, or a knob owned by a tool this workflow calls is an
+environment variable.
 
-Two conventions on top of that, which hold everywhere:
+Two conventions hold on top of that:
 
-- **Flags add; they do not subtract.** The bare command is the narrow, read-only one — `--write`
-  updates derived files, `--all-files` widens a hook run, `--audit-dependencies` adds a step.
-  There is deliberately no flag that makes a gate check *less*, because a gate you can quietly
-  weaken is one that stops meaning anything. The knob that shortens the test matrix is
-  `env_list` in `pyproject.toml`, which shortens it for CI too and so cannot open a gap.
+- **Flags add; they do not subtract.** The bare command is the narrow, read-only one:
+  `--write` updates derived files, `--all-files` widens a hook run, `--audit-dependencies` adds
+  a step. No flag makes a gate check *less*, a gate you can quietly weaken being one that stops
+  meaning anything. `env_list` in `pyproject.toml` is what shortens the test matrix, and it
+  shortens CI with it.
 - **`--write` always means "update the derived files".** `preflight --write`, `test.tox --write`,
   `quality.pyscn-analyze --write`, `secure.sbom-extract --write`, `release.changelog --write`.
-  Without it those commands report what they would change, so no automated run can modify
-  anything you did not ask it to. See the [task catalog](invoke-tasks.md) for which commands
-  write what.
+  Without it they report what they would change, so no automated run modifies anything you did
+  not ask for. The [task catalog](invoke-tasks.md) says which commands write what.
 
-One deliberate exception to the table: `{{ project_slug | upper }}_SECURITY_OVERRIDE` exists as
-an environment variable *and* as `secure.audit --ignore` *and* as the `.security-overrides`
-file. Three doors to the same room, because a pipeline needs to suppress a finding without
-committing it, and a human wants the reverse. The precedence is documented in
-[Triage a security finding](../how-to/triage-a-security-finding.md).
+One deliberate exception: `{{ project_slug | upper }}_SECURITY_OVERRIDE` exists as an
+environment variable *and* as `secure.audit --ignore` *and* as the `.security-overrides` file.
+Three doors to the same room, because a pipeline needs to suppress a finding without committing
+it and a person wants the reverse. [Triage a security
+finding](../how-to/triage-a-security-finding.md) documents the precedence.
 
 ## Variables this workflow reads
 
@@ -68,7 +67,7 @@ is for your tests' own configuration and is read by nothing in this workflow.
 Sometimes you need the commit or the push to go through now. In rough order of how much you
 should prefer them:
 
-**Skip one hook.** `SKIP` takes the hook `id` from `.pre-commit-config.yaml`:
+**Skip one hook.** `SKIP` takes hook `id`s from `.pre-commit-config.yaml`:
 
 ```bash
 SKIP=preflight git push
@@ -76,17 +75,15 @@ SKIP=staged git commit -m "wip: half a thought"
 SKIP=staged,security-overrides git commit -m "…"
 ```
 
-Every other hook still runs, which is the point — you have suspended one check, not all of
-them, and the log says which ones ran.
+Every other hook still runs, which is the point: one check suspended rather than all of them,
+and the log says which.
 
-**Run the gate yourself first.** If the hook is failing on something you have already fixed
-elsewhere, `./workflow.cmd preflight` tells you the same thing without the commit in the way,
-and names the command that fixes each complaint.
+**Run the gate yourself.** `./workflow.cmd preflight` tells you the same thing without a commit
+in the way, and names the command that fixes each complaint.
 
-**`--no-verify`, and know what it costs.** `git commit --no-verify` and `git push --no-verify`
-switch off *every* hook at that stage — the commit-message check, the staged-file checks, the
-whole gate. Nothing tells you afterwards what was skipped. Prefer `SKIP` with a list.
+**`--no-verify`, and what it costs.** `git commit --no-verify` and `git push --no-verify` switch
+off *every* hook at that stage — the commit-message check, the staged-file checks, the whole
+gate — and nothing tells you afterwards what was skipped. Prefer `SKIP` with a list.
 
-Whatever you skip, CI runs `./workflow.cmd preflight` on the push regardless, so the check is
-deferred rather than avoided. That is deliberate: the hooks exist to tell you sooner, not to be
-the only thing standing between a mistake and the main branch.
+CI runs `./workflow.cmd preflight` on the push regardless, so a skipped check is deferred rather
+than avoided. See [Skip a check, once](../how-to/skip-a-check.md).

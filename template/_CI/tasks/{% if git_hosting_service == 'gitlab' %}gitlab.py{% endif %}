@@ -103,14 +103,13 @@ def origin_slug(context: Context) -> str:
 def pipeline_badge(context: Context) -> str:
     """Return the README markdown for GitLab's own pipeline-status badge, or '' if unknown.
 
-    GitLab serves a badge that always reflects the latest pipeline on the default branch, so
-    the status needs no writer here. The badge this replaces was never written at all on
-    GitLab: `build.py` matched the `Build` badge that only GitHub projects render, so every
-    GitLab project shipped a `pipeline-unknown` badge that nothing could ever update.
+    GitLab serves a badge that always reflects the latest pipeline on the default branch, so the
+    status needs no writer here. Only the *URL* is derived, from `origin`, and it stops changing
+    once written.
 
-    The host comes from `origin` rather than being assumed to be gitlab.com, for the same
-    reason as `origin_ref`. An empty string means `origin` is not readable yet, which is not
-    the same as the badge being wrong.
+    The host comes from `origin` rather than being assumed to be gitlab.com, for the same reason
+    as `origin_ref`. An empty string means `origin` is not readable yet, which is not the same
+    as a wrong badge.
     """
     origin = origin_ref(context)
     if not origin.host or not origin.path:

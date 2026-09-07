@@ -37,27 +37,22 @@ and then never changes, because
 status itself. A project with no remote yet keeps the placeholder rather than failing the gate.
 
 Both read one registry — `STEPS` in `_CI/tasks/preflight.py` — which declares every check
-once, along with its scope, its path filter, and whether it writes. The pre-commit hook, the
-pre-push hook and the CI preflight job all consume that declaration instead of keeping their
-own lists, so a check added to the registry reaches its tier without editing three files.
+once with its scope, its path filter and whether it writes. The two hooks and the CI job consume
+that declaration rather than keeping their own lists, so a check added to the registry reaches
+its tier without editing three files.
 
-Write mode and check mode run the *same* steps; only the derived-files step and `build` differ
-between them, and they differ by swapping one callable. That is deliberate: a separate
-implementation for the verifying side is how a gate drifts from the generator it guards. Every
-derived value — the badges, `fail_under` — is written through a single function that takes
-`write`, so what check mode compares is exactly what write mode would have produced.
+Both modes run the *same* steps; only the derived-files step and `build` differ, each by
+swapping one callable. Every derived value is written through a single function taking `write`,
+so what verifying compares is exactly what writing would have produced — a separate
+implementation for the verifying side is how a gate drifts from its generator.
 
-Neither mode edits your code. `preflight` writes derived files only; formatting is verified
-here and fixed by a deliberate `./workflow.cmd format`, or by the commit hook on the files you
-just staged. A command you run before opening a pull request should not be able to reformat
-something you never looked at and fold it into your commit.
+Neither mode edits your code. Formatting is verified here and fixed by `./workflow.cmd format`,
+or by the commit hook on the files you staged: a command you run before opening a pull request
+should not reformat something you never looked at and fold it into your commit.
 
-`preflight` — bare, no flags — is what the pre-push hook and the entire CI pipeline run, one
-job, since the separate lint, test and build jobs folded into it. Verifying being the default is
-what makes that literal: reproducing a pipeline failure means typing the command you see in the
-log. There is deliberately no flag that trims it either: shortening the matrix is `env_list`'s
-job, and that shortens CI too. Note that check mode still refreshes `reports/` — pytest's
-coverage JSON and pyscn's analysis are the *inputs* the comparison reads, and both are
+The bare `preflight` is what the pre-push hook and the entire CI pipeline run, so reproducing a
+pipeline failure means typing the command you see in the log. It does refresh `reports/` —
+pytest's coverage JSON and pyscn's analysis are the *inputs* it compares against, and both are
 gitignored. What it never touches is a tracked file.
 
 ## `develop` — local dev environment
@@ -77,8 +72,8 @@ staged files, applying each step's own filter — see
 [`.pre-commit-config.yaml`](configuration-files.md#pre-commit-configyaml) for how the hook
 feeds it, and the registry in `_CI/tasks/preflight.py` for which steps can be narrowed at all.
 
-Calling one of these directly is also the way to run a single tool over a single file, which is
-what the collapsed hook no longer does for you: `./workflow.cmd lint.pylint --paths="src/thing.py"`.
+Calling one directly is how to run a single tool over a single file:
+`./workflow.cmd lint.pylint --paths="src/thing.py"`.
 
 | Task | What it does |
 | --- | --- |

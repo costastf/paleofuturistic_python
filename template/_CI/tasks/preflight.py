@@ -1,46 +1,30 @@
 """Preflight task definitions.
 
-One registry, three consumers. Every check this project can run is declared once in ``STEPS``,
-and the three things that want to run checks — the pre-commit hook, ``preflight``, and the CI
-preflight job — all read that one declaration instead of keeping their own list. A check added
-here reaches its tier automatically, and an invariant test asserts the commit-stage hook holds
-exactly the per-file steps, so the hook cannot silently fall behind the registry.
+One registry, three consumers. Every check is declared once in ``STEPS``; the pre-commit hook,
+``preflight`` and the CI preflight job all read that declaration rather than keeping their own
+lists, so a check added here reaches its tier without editing three files. An invariant asserts
+the commit-stage hook holds exactly the per-file steps.
 
-Two ideas do most of the work:
+*Scope decides the tier.* ``PER_FILE`` steps answer correctly from the staged files alone, so
+they run on every commit and cost time proportional to the change. ``WHOLE_PROGRAM`` steps
+cannot: ty needs the callers of a changed signature, pyscn needs every file to know what is dead
+or duplicated, the matrix needs the suite on every interpreter, and a wheel builds from the whole
+tree or not at all. Those cost time proportional to the *project*, so they run once per push,
+which keeps commit latency flat as the project grows. It is a rule about correctness rather than
+speed: a whole-program check narrowed to a diff does not run faster, it answers wrongly.
 
-*Scope decides the tier.* ``PER_FILE`` steps can answer correctly from the staged files alone,
-so they run on every commit and cost time proportional to the change. ``WHOLE_PROGRAM`` steps
-cannot: ty needs the callers of a changed signature, pyscn needs every file to know what is
-dead or duplicated, the matrix needs the suite on every interpreter, and a wheel builds from
-the whole tree or not at all. Those cost time proportional to the *project*, so they run once
-per push instead of once per commit, which keeps commit latency flat as the project grows.
-This is a rule about correctness, not speed: a whole-program check narrowed to a diff does not
-run faster, it answers wrongly.
+*Verifying is the default; writing is a flag.* ``preflight`` compares the derived files against
+what the tools measured; ``preflight --write`` updates them. So the bare command is what the
+hooks and the pipeline run, and reproducing a pipeline failure needs no flag. Only ``build`` and
+``artifacts`` behave differently between the two, each by swapping one callable — nothing here
+re-implements a check for the verifying side, which is how a gate drifts from its generator.
 
-*Verifying is the default; writing is a flag.* ``preflight`` runs the registry and compares
-the derived files against what the tools measured; ``preflight --write`` runs the identical
-registry and updates them. The bare command is therefore what the hooks and the pipeline run,
-so reproducing a pipeline failure needs no flag. Only ``build`` and ``artifacts`` behave
-differently between the two, and each differs by swapping one callable, not by taking a
-separate path. Nothing in this file re-implements a check for the verifying side, because that
-is how a gate drifts from the generator it guards.
+*Nothing here edits your code.* What ``--write`` writes is derived: the badges and the coverage
+ratchet. No step has a source-writing variant, so this file has no notion of fixing at all.
+Formatting is applied by ``./workflow.cmd format``, named for the mutation it performs.
 
-*Nothing here edits your code.* Every step in this registry reports; what ``--write`` writes is
-derived — the four badges and the coverage ratchet — and never source. There is no step with a
-source-writing variant to reach, which is why this file has no notion of "fixing" at all.
-
-Formatting is applied by ``./workflow.cmd format``, a command named for the mutation it
-performs. The commit hook used to apply it too, and that turned out to be the odd one out in
-two ways: it made the automated entry points behave differently from the command a person
-types, and it edited the *worktree* while git was mid-commit, which is a poor fit for a
-partially staged file — the formatter rewrites the whole thing, hunks you deliberately left
-unstaged included. Reporting and letting the author run ``format`` costs one command and owns
-neither problem.
-
-Note that the default still writes ``reports/`` — pytest's coverage JSON and pyscn's analysis
-are the *inputs* the comparison reads, and they are gitignored derived files. What neither mode
-touches is source, and what the default additionally leaves alone is every tracked file:
-README.md and pyproject.toml.
+The default does write ``reports/`` — pytest's coverage JSON and pyscn's analysis are the
+*inputs* the comparison reads, and both are gitignored. What it never touches is a tracked file.
 """
 
 import re
@@ -79,9 +63,8 @@ class Step(NamedTuple):
         scope: ``PER_FILE`` or ``WHOLE_PROGRAM``. See the module docstring — this is what
             assigns the step to the commit tier or the push tier.
         check: The callable to run in check mode.
-        write: The callable to run in write mode, when it differs from ``check``. Only steps
-            that produce *derived* files have one — ``artifacts`` and ``build``'s badge. No
-            step in this registry writes source: see the module docstring.
+        write: The callable for write mode, where it differs from ``check``. Only steps that
+            produce *derived* files have one.
         files: Which paths the step accepts, for per-file steps handed a staged subset.
         network: True for steps that reach the network, which are opt-in — a push should not
             fail because a train went into a tunnel.
@@ -102,9 +85,7 @@ class Step(NamedTuple):
 def formatting(context: Context, paths: str = '') -> None:
     """Verify formatting, and name the command that fixes it.
 
-    The gate reports rather than reformats, so it owes the reader the one-line way out — the
-    same courtesy the derived-files step extends when a badge is stale. Fixing is a deliberate
-    `./workflow.cmd format`, or the commit hook doing it to files you staged.
+    The gate reports rather than reformats, so it owes the reader the way out.
 
     Raises:
         SystemExit: If anything is not formatted.
@@ -119,15 +100,13 @@ def formatting(context: Context, paths: str = '') -> None:
 def pyscn(context: Context) -> None:
     """Analyse with pyscn and gate on the result, without touching the badge.
 
-    The analysis runs in both modes because its JSON report is what the ``artifacts`` step
-    compares the badge against — the gate alone writes no report and so has no grade to offer,
-    which is the reason the badge used to sit at "not rated" forever. Writing the badge is the
-    ``artifacts`` step's job, which keeps exactly one writer for it.
+    The analysis runs in both modes: its JSON report is what the ``artifacts`` step compares the
+    badge against, and ``pyscn check`` writes no report, so it has no grade to offer. Writing
+    the badge belongs to ``artifacts``, which keeps one writer for it.
 
-    Only the JSON report, though. pyscn allows one output format per run, so an HTML report
-    would mean a second full analysis printing a second identical summary table — and nothing
-    in this path opens an HTML report. `quality.pyscn-analyze` is where that is worth paying
-    for, because it opens the thing it produced.
+    JSON only. pyscn allows one output format per run, so an HTML report costs a second full
+    analysis and a second identical summary table, and nothing in this path opens one.
+    `quality.pyscn-analyze` does, which is where that is worth paying for.
     """
     run_steps(pyscn_json_report, pyscn_check)(context)
 
@@ -136,17 +115,14 @@ def pyscn(context: Context) -> None:
 def artifacts(context: Context, *, write: bool) -> None:
     """Bring every derived value committed to the repository up to date, or verify it.
 
-    Decorated, unlike the other two wrappers here, because it is the only step whose work is
-    entirely its own: `formatting` and `pyscn` delegate to tasks that announce themselves, so
-    they are already bracketed in the log. This one wrote nothing to the log at all when every
-    derived value was already correct — which is the case you most want evidence of, since
-    verifying the badges and the ratchet is the one thing `preflight` does that no other step
-    covers. Silence read as "it did not run".
+    The badges and the coverage ratchet's ``fail_under``, all computed from reports produced
+    earlier in this same run, so the inputs exist by the time this executes. Verifying collects
+    every stale value before failing, so one run tells you everything to fix.
 
-    The four README badges and the coverage ratchet's ``fail_under`` are all computed from
-    reports produced earlier in this same run, so by the time this step executes the inputs
-    exist. In check mode nothing is written and every stale value is collected before failing,
-    so one run tells you everything you have to fix rather than one thing per run.
+    Decorated, unlike the other wrappers here, because its work is entirely its own —
+    `formatting` and `pyscn` delegate to tasks that announce themselves. Without a banner it
+    printed nothing at all when every value was already correct, which is the case most worth
+    having evidence of.
 
     Raises:
         SystemExit: In check mode, if any derived value is stale or its input is missing.
@@ -179,13 +155,13 @@ STEPS = (
     Step('complexipy', PER_FILE, check=complexipy, files=SRC_FILES),
     Step('ty', WHOLE_PROGRAM, check=ty),
     Step('pyscn', WHOLE_PROGRAM, check=pyscn),
-    # The whole matrix, not one interpreter. A single-interpreter gate would leave the one
-    # thing CI could tell you that you could not have known locally, and the project promises
-    # every version in `env_list`. It costs about one extra suite-length, because the envs run
-    # in parallel. `test.pytest` remains the fast inner-loop task; this is the gate.
+    # The whole matrix, not one interpreter: the project promises every version in `env_list`,
+    # and a single-interpreter gate would leave that the one thing CI knows and you cannot. It
+    # costs about one extra suite-length, the envs running in parallel. `test.pytest` is the
+    # fast inner-loop task; this is the gate.
     #
-    # `tox_matrix` rather than the `test.tox` task: that task reports on the coverage badge and
-    # can write it, and this step runs inside a hook and a pipeline where nothing may.
+    # `tox_matrix` rather than the `test.tox` task, which reports on the coverage badge and can
+    # write it — this step runs inside a hook and a pipeline, where nothing may.
     Step('tox', WHOLE_PROGRAM, check=tox_matrix),
     Step('build', WHOLE_PROGRAM, check=build),
     # After pyscn and tox, which produce the reports it reads.
@@ -238,10 +214,8 @@ def plan_scope(
 ) -> list[tuple[Callable[[Context], None], bool]]:
     """Return ``(runner, writes_derived_files)`` for every step in ``scope``, in registry order.
 
-    The second element is what lets ``run_scope`` refuse to write from a failing run: it is
-    True for a step whose callable in *this* mode writes a derived file — ``artifacts`` and the
-    build badge. A source fixer is not one of those; it belongs to the staged bundle, where the
-    author is standing right there.
+    The second element is what lets ``run_scope`` refuse to write from a failing run: True for
+    a step whose callable in *this* mode writes a derived file.
     """
     planned: list[tuple[Callable[[Context], None], bool]] = []
     for step in steps_for(scope, network=network):
@@ -267,20 +241,17 @@ def run_scope(
 ) -> None:
     """Run every registry step in ``scope``, accumulating failures.
 
-    Every step runs even after one fails, so a single run tells you everything that is wrong
-    rather than one thing per run — except the steps that *write* derived files, which are
-    skipped once anything before them has failed. A badge or a coverage bar computed from a
-    tree whose checks just failed is a claim the tree does not support: this is what stopped
-    `preflight` reporting "Updated build badge to passing" on a run that went on to fail, and
-    writing a grade-A pyscn badge over a project whose tests were red.
+    Every step runs even after one fails, so a single run reports everything that is wrong —
+    except the steps that *write* derived files, which are skipped once anything before them
+    has failed. A badge computed from a tree whose checks just failed is a claim the tree does
+    not support.
 
-    Skipped rather than reordered, so a failure late in the registry does not retroactively
-    undo an earlier write. `secure.audit` is deliberately last and opt-in, which means an
-    advisory published this morning does not stop your coverage badge from updating — it says
-    nothing about whether the derived values are right.
+    Skipped rather than reordered, so a late failure cannot retroactively undo an earlier
+    write. `secure.audit` being last and opt-in also means an advisory published this morning
+    does not stop a coverage badge updating; it says nothing about whether that badge is right.
 
-    Check mode is unaffected: nothing is written there, and the comparison is exactly the
-    reporting that benefits from running everything.
+    Verifying is unaffected: nothing is written, and the comparison *is* the reporting that
+    benefits from running everything.
 
     Args:
         context: Invoke context.
@@ -292,8 +263,8 @@ def run_scope(
     Raises:
         SystemExit: If any step failed, after every step that could still run has run.
     """
-    # `run_steps` is not used here because it cannot express the skip: it runs everything it is
-    # given. The accumulate-and-report-at-the-end behaviour is the same.
+    # Not `run_steps`, which cannot express the skip — it runs everything it is given. The
+    # accumulate-and-report-at-the-end behaviour is the same.
     failed = False
     skipped = False
     for runner, writes_derived in plan_scope(scope, write=write, paths=paths, network=network):
@@ -345,23 +316,16 @@ def staged_files(context: Context) -> str:
 def staged(context: Context, paths: str = '') -> None:
     """Run the checks that can be judged from the staged files alone.
 
-    This is what the pre-commit hook calls, as a single invocation: `./workflow.cmd` costs
-    about 1.3s of interpreter and import startup before any tool runs, so the six hooks this
-    replaces spent most of a commit's budget starting up rather than checking. One hook pays
-    that once.
+    What the pre-commit hook calls, in a single invocation: `./workflow.cmd` costs about 1.3s
+    of interpreter and import startup before any tool runs, so one hook pays that once where
+    four paid it four times.
 
-    It reports and does not fix, like every other entry point here — `./workflow.cmd format` is
-    what applies formatting. A hook that rewrote your files made the automated paths behave
-    differently from the command you type, and rewrote whole files while git was mid-commit,
-    which does not suit a partially staged one.
+    It reports rather than fixes, like every entry point here; `./workflow.cmd format` applies
+    formatting.
 
     Args:
         context: Invoke context.
-        paths: Space-separated paths to check. Defaults to the files staged for commit, which
-            is what the name promises — it used to default to the whole project, so typing this
-            by hand swept everything. pre-commit passes the list explicitly anyway, because it
-            has already applied its own filtering and may have split the files across several
-            invocations.
+        paths: Space-separated paths to check. Defaults to the files staged for commit.
     """
     targets = paths or staged_files(context)
     if not targets:
@@ -375,37 +339,33 @@ def staged(context: Context, paths: str = '') -> None:
 def preflight(context: Context, write: bool = False, audit_dependencies: bool = False) -> None:
     """Run every check this project has, and bring the derived files up to date.
 
-    The bare command is exactly what the pre-push hook and the CI pipeline run — no flag to
-    remember when you are reproducing a pipeline failure. It verifies formatting, lints,
-    type-checks, runs pyscn, runs the test matrix, builds the wheel, and compares the four
-    badges and the coverage ratchet against what the tools just measured, failing with
-    everything that is out of date.
+    The bare command is what the pre-push hook and the CI pipeline run, so reproducing a
+    pipeline failure needs no flag. It verifies formatting, lints, type-checks, runs pyscn, runs
+    the test matrix, builds the wheel, and compares the badges and the coverage ratchet against
+    what the tools just measured, failing with everything out of date.
 
-    `--write` is what updates those derived values, and it is opt-in because a command named
-    for an inspection should not modify the tree. Commands named for a mutation may — `format`,
-    `release.bump` — but this one is a gate, and `secure.sbom-extract --write` and
-    `release.changelog --write` already read that way.
+    `--write` updates those derived values. Opt-in, because a command named for an inspection
+    should not modify the tree; commands named for a mutation may, which is why `format` and
+    `release.bump` do.
 
     Neither mode edits source. Unformatted code fails here and is fixed by
     `./workflow.cmd format`, or by the commit hook on the files you staged.
 
-    There is deliberately no flag for running a lighter version. The pipeline runs this exact
-    command, so any switch that trimmed it would be a documented way to make the two disagree
-    — and the obvious thing to reach for when in a hurry. The knob that shortens the matrix is
-    `env_list` in pyproject.toml, which shortens it for CI too and so cannot open a gap. For
-    fast feedback while writing code, the individual tasks are still there: `test.pytest`,
-    `lint.pylint --paths=…`.
+    There is no flag for running a lighter version: the pipeline runs this exact command, so a
+    switch that trimmed it would be a documented way to make the two disagree, and the obvious
+    thing to reach for in a hurry. `env_list` in pyproject.toml is the knob that shortens the
+    matrix, and it shortens CI with it. For fast feedback while writing code the individual
+    tasks are there: `test.pytest`, `lint.pylint --paths=…`.
 
     Args:
         context: Invoke context.
-        write: Update the derived values — the four README badges and the coverage ratchet —
-            instead of comparing them. Nothing else changes: the same steps run either way.
-        audit_dependencies: Also run the dependency audit. Off by default, and not because of
-            the network alone: an audit's answer depends on the advisory database on the day it
-            runs rather than on this tree, so it can never have the property that makes the
-            rest of this worth gating a push on. It has its own homes — a daily schedule, the
-            dependency-change job, and `release.dist` before publishing. This flag is for
-            running it here too, when you want everything in one command.
+        write: Update the derived values instead of comparing them. The same steps run either
+            way.
+        audit_dependencies: Also run the dependency audit. Off by default because its answer
+            depends on the advisory database on the day it runs rather than on this tree, so it
+            cannot have the property that makes the rest worth gating a push on. Its homes are
+            a daily schedule, the dependency-change job, and `release.dist` before publishing;
+            this flag runs it here as well.
     """
     run_scope(context, None, write=write, network=audit_dependencies)
 

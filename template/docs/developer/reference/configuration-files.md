@@ -40,16 +40,15 @@ Hook definitions, split across three git stages:
 | `pre-commit` | `.security-overrides` validation | that file, when staged | ~1.5s |
 | `pre-push` | `preflight` — ty, pyscn, the tox matrix, the wheel, derived files | whole project | ~19s |
 
-**The commit stage is one hook, one invocation.** It used to be six, and that was the
-expensive part: `./workflow.cmd` spends about 1.3s on interpreter and imports before any tool
-runs, so six hooks paid ~8s of startup to do ~2s of checking. The same four checks in one
-invocation measure ~2.9s, of which 1.6s is the single startup.
+**The commit stage is one hook, one invocation.** `./workflow.cmd` spends about 1.3s on
+interpreter and imports before any tool runs, so one hook pays that once — ~2.9s for four
+checks on a fresh project, of which 1.6s is the startup.
 
 Which tools run there is decided by the step registry in `_CI/tasks/preflight.py`, not by this
-file. The registry also holds the per-tool path filters that used to be the `files:` key of
-each hook (complexipy is `src/` only; the rest also cover `_CI/tasks/` and `tests/`), so a
-commit touching only `tests/` still skips complexipy. The one `files:` left here is the union
-of them, and an invariant test asserts it is never narrower than the widest step's own filter.
+file, and the registry holds the per-tool path filters too (complexipy is `src/` only; the rest
+also cover `_CI/tasks/` and `tests/`), so a commit touching only `tests/` skips complexipy. The
+one `files:` here is the union of them, and an invariant asserts it is never narrower than the
+widest step's filter.
 
 The hook entry is the bare `./workflow.cmd preflight.staged`, with `pass_filenames: false`,
 because the task reads the index itself — so the line is the command you would type. That also
@@ -67,24 +66,21 @@ their cost scales with the size of the *project* rather than of the change, whic
 would have made commits slower and slower as the project grew. They moved to pre-push, where
 they run once per push and leave commit latency flat.
 
-**No hook writes anything.** The commit stage used to apply formatting, and that was the odd
-one out twice over: the automated entry points behaved differently from the command a person
-types, and it rewrote the *worktree* while git was mid-commit — which suits a partially staged
-file badly, since the formatter rewrites the whole file including hunks you deliberately left
-out of the index. Unformatted code now fails the commit and names `./workflow.cmd format`. That
-is one extra command, and it owns neither problem.
+**No hook writes anything.** Unformatted code fails the commit and names
+`./workflow.cmd format`. A hook that applied formatting itself would make the automated entry
+points behave differently from the command a person types, and would rewrite the *worktree*
+while git is mid-commit — which suits a partially staged file badly, the formatter rewriting the
+whole file including hunks deliberately left out of the index.
 
-**The pre-push hook runs `preflight`, with no flag, and that is the load-bearing part.**
-Verifying is the default and `preflight --write` is what updates the four README badges and
-ratchets `fail_under`. From a hook, writing meant aborting with "files were modified by this
-hook" for files the author never staged, which is what teaches people `--no-verify` and so
-disables every hook here at once. The default runs the identical registry, writes nothing
-tracked, and fails naming the command that fixes it. It is also the exact command the CI
-pipeline runs — the whole of it, since the separate lint, test and build jobs folded into this
-one — so nothing in the pipeline can reject what your push accepted, and reproducing a failure
-from the pipeline log means typing what you see. That parity is also why there is no flag to make it run less: a `--quick` that
-dropped the matrix would be a documented way to reopen the gap. The knob that shortens the
-matrix is `env_list` in `pyproject.toml`, which shortens it for CI too.
+**The pre-push hook runs `preflight` with no flag, and that is the load-bearing part.**
+Verifying is the default; `preflight --write` updates the badges and ratchets `fail_under`, and
+a hook that wrote would abort the push having modified files the author never staged — which is
+what teaches people `--no-verify`, and that disables every hook here at once.
+
+It is also the exact command the whole CI pipeline runs, so nothing in the pipeline can reject
+what your push accepted, and reproducing a failure means typing what you see in the log. That
+parity is why there is no flag to make it run *less*: `env_list` in `pyproject.toml` is what
+shortens the matrix, and it shortens CI with it.
 
 Every underlying task remains callable on its own, which is the escape hatch when you want one
 tool: `./workflow.cmd lint.pylint --paths="src/thing.py"`. Need to push past the gate once? See

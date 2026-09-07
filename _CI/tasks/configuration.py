@@ -18,23 +18,18 @@ UV_VERSION_ENV = 'TEMPLATE_UV_VERSION'
 
 PROJECT_SLUG = 'paleofuturistic_python_project'
 IGNORE_PATTERNS = shutil.ignore_patterns('.git', '.venv', '__pycache__', '*.pyc', '.copier-answers.yml')
-# `secure.audit` runs right after the static checks and before the slow tox matrix, so a
-# vulnerable dependency fails fast. It is also the step the `<PROJECT>_SECURITY_OVERRIDE`
-# plumbing below exists to serve — until it was listed here, that env var was set for
-# nothing and the `.security-overrides` expiry mechanism gated no automated run at all.
-# The same collapse the generated project's own pipeline went through, for the same reason:
 # `preflight` covers format, lint, ty, pyscn, the tox matrix, the wheel and the derived files,
-# so listing those separately re-ran the work in a different shape and gave the matrix two
-# lists of checks to keep in step. What is left is what `preflight` deliberately does not do —
-# the dependency audit, whose answer depends on the advisory database rather than on the
-# generated tree, and the docs build.
+# so what is left to list is what it deliberately does not do: the dependency audit, whose
+# answer depends on the advisory database rather than on the generated tree, and the docs build.
 #
-# The audit runs first: it is the cheapest way to fail, and there is no sense spending a
-# five-interpreter matrix on a cell that a vulnerable pin already condemns.
+# The audit runs first, being the cheapest way to fail — no sense spending a five-interpreter
+# matrix on a cell a vulnerable pin already condemns. It is also the step the
+# `<PROJECT>_SECURITY_OVERRIDE` plumbing below exists to serve, and the only automated run the
+# `.security-overrides` expiry mechanism gates.
 #
-# `--write` because a freshly generated project's badges all read "unknown": the matrix is
-# exercising the command that produces them, so it wants the writing half. The pipeline the
-# template ships runs the bare `preflight`, which compares instead.
+# `--write` because a freshly generated project's badges all read "unknown", and the matrix is
+# exercising the command that produces them. The pipeline the template ships runs the bare
+# `preflight`, which compares instead.
 QA_STEPS = ('secure.audit', 'preflight --write', 'document')
 TEMPLATE_SECURITY_OVERRIDE_ENV = 'TEMPLATE_SECURITY_OVERRIDE'
 SECURITY_OVERRIDES_FILE = PROJECT_ROOT_DIRECTORY / '.security-overrides'

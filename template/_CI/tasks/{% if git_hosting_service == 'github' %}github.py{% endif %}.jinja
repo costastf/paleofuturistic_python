@@ -92,13 +92,12 @@ def pipeline_badge(context: Context) -> str:
     """Return the README markdown for GitHub's own workflow-status badge, or '' if unknown.
 
     GitHub serves a badge that always reflects the latest run on the default branch, so the
-    status needs no writer here — which is the point. The badge this replaces was written by
-    whoever last ran `./workflow.cmd build`, recording whether *their* build passed; a reader
-    of the README learnt nothing from it, and it could say "passing" on a run that failed.
+    status needs no writer here. Only the *URL* is derived, from `origin`, and it stops changing
+    once written — a locally written status would describe whoever last ran `build` on their own
+    machine, and could say "passing" on a run that failed.
 
-    Only the *URL* is derived, from `origin`, and it stops changing once written. An empty
-    string means `origin` is not readable yet — a project that has not been pushed anywhere —
-    which is not the same as the badge being wrong, so the caller leaves the placeholder be.
+    An empty string means `origin` is not readable yet: a project not pushed anywhere is not the
+    same as a wrong badge, so the caller leaves the placeholder be.
     """
     slug = origin_slug(context)
     if not slug:

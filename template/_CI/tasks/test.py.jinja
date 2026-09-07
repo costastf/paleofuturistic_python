@@ -173,14 +173,13 @@ def pytest(context: Context, args: str = '') -> None:
 def coverage(context: Context) -> None:
     """Show coverage in the terminal and render the browsable report.
 
-    Whatever the last run measured: after `test.pytest` that is one interpreter, after
-    `test.tox` it is the union across the matrix. This is where the HTML report comes from —
-    `preflight` deliberately does not produce one, because nothing in a gate reads it.
+    Whatever the last run measured: one interpreter after `test.pytest`, the union across the
+    matrix after `test.tox`. The HTML report comes from here; `preflight` produces only the
+    JSON it reads, nothing in a gate opening a report.
 
-    It writes no badge, and says nothing about one. The coverage badge means coverage across
-    the whole matrix, and this reports whatever happens to be in the data file — so it cannot
-    tell whether the badge is stale without knowing something it did not measure. `test.tox`
-    is the command whose number *is* the badge's, and `preflight` is what fails on a stale one.
+    No badge is written or commented on. The badge means coverage across the whole matrix,
+    while this reports whatever is in the data file, so it cannot tell whether the badge is
+    stale. `test.tox` is the command whose number *is* the badge's.
     """
     execute(context, 'uv run coverage report')
     execute(context, f'uv run coverage json -o {COVERAGE_REPORT}')
@@ -199,15 +198,12 @@ def view(context: Context) -> None:
 def erase_coverage_data() -> None:
     """Delete every coverage data file, the per-env ones included.
 
-    `coverage erase` is not enough: it removes the base `.coverage` and, unless parallel mode
-    is configured, nothing else. A `.coverage.<envname>` left behind by an env since dropped
-    from `env_list` therefore survives it, and the next `coverage combine` folds that env's
-    lines into the union — inflating the coverage badge and, worse, the ratchet's `fail_under`,
-    which only ever moves up. Verified against coverage 7: after `coverage erase`, a planted
-    `.coverage.py39` was still combined.
+    `coverage erase` removes the base `.coverage` and, unless parallel mode is configured,
+    nothing else — verified against coverage 7, where a planted `.coverage.py39` survived it
+    and was combined by the next run. A data file left by an env since dropped from `env_list`
+    would inflate the union, and with it the ratchet's `fail_under`, which only moves up.
 
-    `.coverage.*` cannot match `.coveragerc` — there is no dot before `rc` — so a config file
-    is never in scope here.
+    `.coverage.*` cannot match `.coveragerc`, there being no dot before `rc`.
     """
     for data_file in (Path('.coverage'), *Path().glob('.coverage.*')):
         data_file.unlink(missing_ok=True)
@@ -216,48 +212,43 @@ def erase_coverage_data() -> None:
 def combine_coverage(context: Context) -> None:
     """Merge the matrix's per-env coverage data into one report.
 
-    ``coverage combine`` takes the *union* of the lines each interpreter executed — a line
-    counts as covered if any env ran it — which is the only correct reading of a version
-    matrix. Version-gated code is the case that makes it obvious:
+    ``coverage combine`` takes the *union* of the lines each interpreter executed: a line counts
+    as covered if any env ran it, which is the only correct reading of a version matrix.
+    Version-gated code makes it obvious:
 
         if sys.version_info >= (3, 11):
             import tomllib
         else:
             import tomli as tomllib
 
-    Under py310 the ``else`` runs; under py311+ the ``if`` does. No single env can cover both,
-    so every env reports a miss on code the matrix as a whole exercises fully. Reading one
-    env's report — which is what the badge did before, whichever env won the race — therefore
+    Under py310 the ``else`` runs; under py311+ the ``if`` does. No single env covers both, so
+    each reports a miss on code the matrix as a whole exercises fully — reading one env's report
     understates coverage on exactly the code a five-interpreter matrix exists to test.
 
-    Averaging the per-env percentages would be meaningless: coverage is not a noisy
-    measurement of one quantity, it is the set of lines that ran.
+    Averaging the per-env percentages would be meaningless: coverage is not a noisy measurement
+    of one quantity, it is the set of lines that ran.
 
-    What the union does *not* tell you is that a line reached only under py314 still works
-    under py310. Nothing about coverage ever did — it measures reach, not correctness, and the
-    tests are what check the latter on all five interpreters.
+    The union does not tell you that a line reached only under py314 works under py310. Coverage
+    measures reach, not correctness; the tests check the latter on all five.
 
-    ``[tool.coverage.paths]`` is what lets this work at all: each env installs the package into
+    ``[tool.coverage.paths]`` is what makes this possible: each env installs the package into
     its own site-packages, and that mapping folds those paths back onto ``src/``.
 
-    "Combined 4 files, skipped 1" is coverage deduplicating on the sha3 of the *data file*,
-    not on what it measured: `DataFileClassifier` skips a file whose hash it has already
-    combined. On a matrix where every env measures the same lines, some of the SQLite files
-    come out byte-identical and the rest differ only in row and page layout — measured with
-    five envs recording the same files, lines and arc counts, where py310 and py311 hashed
-    identically and the other three did not. Nothing is lost either way: a skipped file's
-    measurements are by definition already merged, and an env that measured something unique
-    cannot hash the same as another.
+    "Combined 4 files, skipped 1" is coverage deduplicating on the sha3 of the *data file*
+    rather than on what it measured — `DataFileClassifier` skips a hash it has already
+    combined. Where every env measures the same lines some of the SQLite files come out
+    byte-identical and the rest differ only in row and page layout. Nothing is lost: a skipped
+    file's measurements are already merged, and an env that measured something unique cannot
+    hash the same as another.
     """
-    # JSON only, and no HTML. The gate produces what the gate consumes: `reports/coverage.json`
-    # is what the badge and the ratchet read, and an HTML report has no reader in a hook or a
-    # pipeline — the same reason pyscn's HTML pass left this path. `test.coverage` renders it
-    # on demand, and the per-env reports are already on disk for a single interpreter.
+    # JSON only. The gate produces what the gate consumes: `reports/coverage.json` is what the
+    # badge and the ratchet read, and an HTML report has no reader in a hook or a pipeline.
+    # `test.coverage` renders one on demand.
     #
-    # Not `--keep`. Left in place, the per-env files still look like parallel data to
-    # coverage, so the very next `coverage json` combines them all over again and reports
-    # doing so a second time. Nothing is lost by consuming them: the per-env *reports* under
-    # `reports/` are what anyone actually reads to see one interpreter's numbers.
+    # Not `--keep`: left in place, the per-env files still look like parallel data to coverage,
+    # so the next `coverage json` combines them again and says so a second time. Nothing is
+    # lost by consuming them — the per-env *reports* under `reports/` are what anyone reads to
+    # see one interpreter's numbers.
     execute(context, 'uv run coverage combine')
     execute(context, f'uv run coverage json -o {COVERAGE_REPORT}')
 
@@ -266,26 +257,20 @@ def combine_coverage(context: Context) -> None:
 def tox_matrix(context: Context, env: str = '') -> None:
     """Run the matrix and combine its coverage, touching no derived value.
 
-    The gate's path, and the reason there are two: `preflight` runs this, and `preflight`
-    without `--write` must write nothing tracked. If the registry ran the `test.tox` task
-    instead, the badge would be written from inside a hook and a pipeline — which is the shape
-    three commits went into removing. `quality.pyscn-analyze` and `pyscn_json_report` split for
-    the same reason.
+    The gate's path, and why there are two: `preflight` runs this, and `preflight` without
+    `--write` must write nothing tracked, while the `test.tox` task reports on the coverage
+    badge and can write it. `quality.pyscn-analyze` and `pyscn_json_report` split likewise.
 
     Args:
         context: Invoke context.
         env: A single tox environment to run, e.g. ``py313``. Empty runs the whole matrix.
     """
-    # A `.coverage.<env>` left behind by an env that has since been removed from `env_list`
-    # would be folded into the union and inflate it, so the slate is wiped before the run —
-    # by hand, because `coverage erase` leaves exactly those files alone.
+    # By hand, because `coverage erase` leaves the per-env files alone — see the docstring.
     erase_coverage_data()
-    # The live progress list prints one `env: OK ✔ in Xs` line per environment and always ends
-    # up one short — nothing is skipped, it is whichever env finished *last*, whose line is
-    # swallowed as the run ends and the summary is printed. Confirmed across runs: the absent
-    # env is the one with the longest duration in the summary, and it changes from run to run.
-    # `--parallel-no-spinner` does not help. The summary block below the list is the complete
-    # view, and `coverage combine` reporting how many data files it merged is the harder check.
+    # The live progress list comes up one `env: OK ✔ in Xs` line short. Nothing is skipped: it
+    # is whichever env finished *last*, whose line is swallowed as the summary prints, so the
+    # absent env is the one with the longest duration and it changes between runs.
+    # `--parallel-no-spinner` does not help. The summary block below the list is complete.
     execute(context, f'uv run tox run -e {env}' if env else 'uv run tox run-parallel')
     combine_coverage(context)
 
@@ -295,15 +280,13 @@ def tox_matrix(context: Context, env: str = '') -> None:
 def tox(context: Context, env: str = '', write: bool = False) -> None:
     """Run the pytest matrix across supported Python versions via tox.
 
-    The one command whose coverage number *is* the badge's: the badge means coverage across
-    every interpreter in `env_list`, and this measures exactly that, so it is allowed to report
-    on the badge and — with `--write` — to update it. `test` and `test.coverage` measure one
-    interpreter, so they do neither.
+    The one command whose coverage number *is* the badge's — the badge means coverage across
+    every interpreter in `env_list`, which is exactly what this measures — so it may report on
+    the badge and, with `--write`, update it.
 
-    Without `--write` it says whether the badge and the coverage ratchet still match what the
-    matrix measured, and carries on regardless; this is not a gate, `preflight` is. The report
-    is the same function the gate calls with `write=False`, so the two cannot disagree about
-    what stale means.
+    Without the flag it says whether the badge and the ratchet still match, and carries on
+    regardless: this is not a gate, `preflight` is. The report calls the same function the gate
+    calls with `write=False`, so the two cannot disagree about what stale means.
 
     Args:
         context: Invoke context.
@@ -330,10 +313,9 @@ def tox(context: Context, env: str = '', write: bool = False) -> None:
 def test(context: Context) -> None:
     """Run all test steps; reports all failures before exiting.
 
-    One interpreter — the one the active virtualenv resolved to. It therefore writes no badge
-    and warns about none: the coverage badge means coverage across `env_list`, which this did
-    not measure, so anything it said about the badge would be a claim it cannot support.
-    `test.tox` measures the badge's quantity; `preflight` is what fails on a stale one.
+    One interpreter, the one the active virtualenv resolved to. No badge is written or
+    commented on: the badge means coverage across `env_list`, which this did not measure.
+    `test.tox` measures that; `preflight` fails on a stale badge.
     """
     run_steps(pytest)(context)
 

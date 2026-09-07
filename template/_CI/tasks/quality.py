@@ -11,19 +11,16 @@ from .configuration import PYSCN_REPORTS_DIR
 from .shared import apply_badge, execute, is_ci, logged, note, open_target, run, run_steps
 
 GRADE_COLORS = {'A': 'brightgreen', 'B': 'green', 'C': 'yellow', 'D': 'orange', 'F': 'red'}
-# `--no-open` because pyscn opens the HTML report in a browser itself as soon as it writes
-# one. Left to its own devices it opened the report twice from `pyscn-analyze` — once by
-# itself and once from the deliberate `open_target` below — and opened it at all from
-# `pyscn_analyze_only`, whose whole point is not to. Which report gets opened, and whether
-# opening one is wanted here at all, is this module's decision to make; `is_ci()` is part of
-# it, and a tool reaching for a browser on a CI runner is not.
+# `--no-open` because pyscn opens the HTML report in a browser itself as soon as it writes one,
+# which would mean two windows from `pyscn-analyze` and one from `pyscn_analyze_only`, whose
+# point is not to. Whether a report is worth opening is this module's decision — `is_ci()` is
+# part of it, and a tool reaching for a browser on a CI runner is not.
 ANALYZE_HTML = 'uv run pyscn analyze --html --no-open src/'
 ANALYZE_JSON = 'uv run pyscn analyze --json src/'
-# Deliberately *not* `--quiet`, despite its help promising "Suppress output unless issues
-# found". It suppresses the issues too: with it, a failure reports only "Found 1 quality
-# issue(s)", while without it the same run names the finding —
-# `src/pkg/mod.py:21:1: tangled is too complex (16 > 15)`. The two lines it prints on a passing
-# run are the price of that one line on a failing one.
+# Not `--quiet`, despite its help promising "Suppress output unless issues found": it
+# suppresses the issues too. With it a failure reports only "Found 1 quality issue(s)"; without
+# it the same run names the finding — `src/pkg/mod.py:21:1: tangled is too complex (16 > 15)`.
+# Two lines on a passing run buy that one line on a failing one.
 CHECK = 'uv run pyscn check src/'
 BADGE_PATTERN = r'(\[!\[pyscn quality\]\(https://img\.shields\.io/badge/pyscn-)[^)]+(\))'
 
@@ -41,10 +38,9 @@ def latest_pyscn_json() -> Path:
 def update_pyscn_badge(*, write: bool = True) -> str | None:
     """Bring the README's pyscn badge in line with the grade in the latest report.
 
-    The grade comes from ``pyscn analyze --json``, not from ``pyscn check``: the gate reports
-    pass or fail and writes no report at all, so it has no grade to offer. Anything that wants
-    this badge current has to run the analysis first — which is why ``preflight`` does, and why
-    a missing report is reported here rather than passed over in silence.
+    The grade comes from ``pyscn analyze --json``: ``pyscn check`` reports pass or fail and
+    writes no report, so it has no grade to offer. Anything wanting this badge current runs the
+    analysis first, and a missing report is reported rather than passed over.
 
     Args:
         write: Update README.md. When False, report what would change and touch nothing.
@@ -74,9 +70,8 @@ def pyscn_analyze(context: Context, write: bool = False) -> None:
     """Run pyscn comprehensive analysis with HTML report, and open it.
 
     Reports whether the badge still matches the grade it just measured; `--write` updates it.
-    Opt-in for the same reason as everywhere else: "analyze" names an inspection, and an
-    inspection should not modify the tree unasked. That it *may* write when asked is because
-    it produced the grade the badge shows — `analyze --json` is the only thing that does.
+    Opt-in because "analyze" names an inspection, and an inspection should not modify the tree
+    unasked. It may write when asked because it produced the grade the badge shows.
 
     Args:
         context: Invoke context.
@@ -95,12 +90,11 @@ def pyscn_analyze(context: Context, write: bool = False) -> None:
 def pyscn_check(context: Context) -> None:
     """Run pyscn's CI-friendly quality gate.
 
-    Not the same judgment as the badge, which is worth knowing. This applies hard per-dimension
-    thresholds — a function over the complexity limit, critical dead code, a dependency cycle —
-    and fails. `analyze` computes a lenient aggregate health score and never fails: a module
-    with a 16-branch function still grades A while this rejects it. So the two invocations in
-    `preflight` are not a duplicate; one produces the grade the badge shows, the other decides
-    whether the tree passes.
+    Not the same judgment as the badge. This applies hard per-dimension thresholds — a function
+    over the complexity limit, critical dead code, a dependency cycle — and fails. `analyze`
+    computes a lenient aggregate and never fails: a module with a 16-branch function grades A
+    while this rejects it. So the two invocations in `preflight` are not a duplicate — one
+    produces the grade the badge shows, the other decides whether the tree passes.
     """
 
 
@@ -108,11 +102,9 @@ def pyscn_check(context: Context) -> None:
 def pyscn_analyze_only(context: Context, *, write: bool = False) -> None:
     """Run pyscn analyze without opening the report.
 
-    Two analyses, because pyscn refuses more than one output format per run — ``--html
-    --json`` together fails with "only one output format flag can be specified". So each
-    format costs its own full analysis, and each prints its own summary table. That is the
-    price of wanting both reports; ``pyscn_json_report`` is the path for callers that only
-    need one.
+    Two analyses: pyscn refuses more than one output format per run — ``--html --json`` fails
+    with "only one output format flag can be specified" — so each format costs a full analysis
+    and prints its own summary table. ``pyscn_json_report`` is the path for callers needing one.
     """
     execute(context, ANALYZE_HTML)
     execute(context, ANALYZE_JSON)
@@ -123,13 +115,12 @@ def pyscn_analyze_only(context: Context, *, write: bool = False) -> None:
 def pyscn_json_report(context: Context) -> None:
     """Produce just the JSON report, which is all the badge is derived from.
 
-    The gate's path. An HTML report exists to be looked at, and nothing in `preflight` or a
-    hook looks at one — so paying for a second full analysis to produce it, and printing a
-    second identical summary table, bought nothing. `quality.pyscn-analyze` is where the
-    HTML report is wanted, because that task opens it.
+    The gate's path. An HTML report exists to be looked at, and nothing in `preflight` or a hook
+    looks at one, so a second full analysis and a second summary table would buy nothing.
+    `quality.pyscn-analyze` opens what it produces, which is where that is worth paying for.
 
-    The badge is deliberately not written here: `preflight` owns every write to a tracked
-    file so that check mode can verify all of them together.
+    The badge is not written here: `preflight` owns every write to a tracked file, so verifying
+    can compare all of them together.
     """
     execute(context, ANALYZE_JSON)
 
