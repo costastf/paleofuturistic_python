@@ -1824,13 +1824,25 @@ def test_only_what_measures_a_derived_value_may_write_it(generated_project):
     preflight = (tasks / 'preflight.py').read_text(encoding='utf-8')
     assert 'check=tox_matrix' in preflight, 'the gate runs the writing task instead of the matrix'
 
-    # `document` vouches only for what it can compute from tracked files.
+    # pyscn measured the grade, so it may write the badge — but only when asked.
+    quality = (tasks / 'quality.py').read_text(encoding='utf-8')
+    for task_name in ('def pyscn_analyze(', 'def pyscn_analyze_only(', 'def pyscn('):
+        signature = quality.split(task_name, 1)[1].split(')', 1)[0]
+        assert 'write: bool = False' in signature, f'{task_name} writes the pyscn badge unasked'
+
+    # And `document` writes no badge at all: building docs is not changing the README.
     document = (tasks / 'document.py').read_text(encoding='utf-8')
     aggregator = document.split("@logged('document')", 1)[1]
-    for absent in ('update_coverage_badge', 'update_pyscn_badge'):
-        assert absent not in aggregator, f'document writes {absent} from a report it does not produce'
-    for present in ('update_package_version_badge', 'update_python_badge', 'update_pipeline_badge'):
-        assert present in aggregator, f'document no longer refreshes {present}'
+    for absent in ('update_coverage_badge', 'update_pyscn_badge', 'update_package_version_badge'):
+        assert absent not in aggregator, f'document writes {absent} unasked'
+
+    # Which leaves no task writing a tracked file unasked: every write is behind `--write` or
+    # inside a command named for the mutation it performs.
+    release = (tasks / 'release.py').read_text(encoding='utf-8')
+    bump = release.split("@logged('release.bump')", 1)[1].split('\n@', 1)[0]
+    assert 'update_package_version_badge(version=' in bump, (
+        'release.bump lands a README that contradicts the version it released'
+    )
 
 
 def test_the_ci_badge_is_the_hosts_own(generated_project):

@@ -15,7 +15,7 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 | `test` | `test.all` | pytest with coverage and xdist. |
 | `build` | `build.package` | SBOM compose + validate, then `uv build`. No dependency audit — see `secure` — and no README badge: the CI badge points at {% if git_hosting_service == 'github' %}GitHub's workflow-status endpoint{% else %}GitLab's pipeline-status endpoint{% endif %}, which is always current. |
 | `release` | `release` | Validate, branch, bump, changelog, push, open PR/MR. |
-| `quality` | `quality.pyscn-analyze` | pyscn static analysis with HTML report. |
+| `quality` | `quality.pyscn-analyze` | pyscn static analysis with HTML report. Reports whether the badge matches; `--write` updates it. |
 | `secure` | `secure.all` | Every security task at once: pip-audit + SBOM compose/validate. Nothing automated calls it; the pieces have their own homes. |
 | `document` | `document` | properdocs build + view in browser. |
 | `container` | `container.publish` | Build deps image; in CI pushes to the registry. |
@@ -89,7 +89,7 @@ what the collapsed hook no longer does for you: `./workflow.cmd lint.pylint --pa
 | `test.tox` | Full multi-version tox matrix in parallel, then `coverage combine` into one `reports/coverage.json` — the union across interpreters, which is what the badge and the ratchet read. The only test command whose number *is* the badge's, so it reports whether the badge still matches and updates it with `--write`. `--env=py313` runs a single environment, which suppresses both and refuses `--write`. |
 | `test.coverage` | Print the coverage report from the latest run and render the browsable HTML into `reports/coverage/`. After `test.tox` that is the union across the matrix. This is where the HTML comes from: `preflight` produces only the JSON it reads. Writes no badge and says nothing about one — it reports whatever is in the data file, so it cannot know whether the badge is stale. |
 | `test.view` | Open HTML test + coverage reports in browser. |
-| `quality.pyscn-analyze` | Full pyscn analysis with HTML report. |
+| `quality.pyscn-analyze` | Full pyscn analysis with HTML report, opened unless in CI. Reports whether the pyscn badge still matches the grade it measured; `--write` updates it. |
 | `quality.pyscn-check` | CI-friendly pass/fail quality gate. Writes no report, so it has no grade to offer the badge — `quality.pyscn-analyze` is what produces one. |
 
 ## `release` — versioning and publishing
@@ -98,7 +98,7 @@ what the collapsed hook no longer does for you: `./workflow.cmd lint.pylint --pa
 | --- | --- | --- |
 | `release` | `-i <type>`, `--no-push` | Full release flow: validate, branch, bump, changelog, push, open PR/MR. |
 | `release.validate` | — | Working-tree-clean and in-sync-with-origin checks. |
-| `release.bump` | `-i <type>` | `cz bump` with the given increment (major/minor/patch/alpha/beta/rc). |
+| `release.bump` | `-i <type>` | Refresh the README version badge, then `cz bump` with the given increment (major/minor/patch/alpha/beta/rc). The badge goes first so `cz bump` sweeps it into the commit the release tag points at — otherwise a release lands a README contradicting the version it released. |
 | `release.changelog` | `--write` | Generate changelog. `--write` persists and commits, signing per `commit.gpgsign`. |
 | `release.push` | — | `git push` + `git push --tags`. |
 | `release.dist` | — | Audit dependencies, then clean and build into `dist/`, leaving the artifacts for inspection{% if git_hosting_service == 'github' %} or attestation{% endif %}. The audit is here rather than in `build`: publishing is where a live advisory should stop you. |
@@ -127,7 +127,7 @@ what the collapsed hook no longer does for you: `./workflow.cmd lint.pylint --pa
 | `document.build` | — | `properdocs build` — generate the static site under `site/`. |
 | `document.serve` | — | `properdocs serve` — serve the site locally with live reload (Ctrl-C to stop). |
 | `document.view` | — | Open the rendered site in the default browser (skipped in CI). |
-| `document` (aggregator) | — | Refresh the three badges derived from tracked files — version, Python range, CI status URL — then `build` + `view`. It deliberately leaves the coverage and pyscn badges alone: those come from reports under `reports/` that this task does not produce, so it would be stamping in whatever a previous run left, and a week-old number looks exactly like a fresh one. |
+| `document` (aggregator) | — | `build` + `view`. Writes no badge: building docs is not changing your README, and every other task here stopped writing unasked. `preflight --write` refreshes all five. |
 {%- if integrate_pages and git_hosting_service == 'github' %}
 | `document.deploy-github` | — | `properdocs gh-deploy --force` — build and publish to the `gh-pages` branch (consumed by the shipped Pages workflow). Only present when `integrate_pages=true` and `git_hosting_service=github`. |
 {%- endif %}

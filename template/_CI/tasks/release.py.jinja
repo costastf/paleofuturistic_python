@@ -20,7 +20,8 @@ from .secure import audit, sbom_upload
 {%- else %}
 from .secure import audit
 {%- endif %}
-from .shared import commit, execute, logged
+from .document import update_package_version_badge
+from .shared import commit, execute, logged, note
 
 
 @task
@@ -78,7 +79,17 @@ def validate(context: Context) -> None:
 @task
 @logged('release.bump')
 def bump(context: Context, increment: str = '') -> None:
-    """Bump the version and create a git tag.
+    """Bump the version, refresh the version badge, and create a git tag.
+
+    The badge is refreshed *before* `cz bump` rather than after, so it lands in the commit the
+    release tag points at. `cz bump` commits every modified tracked file — verified: a README
+    edited beforehand is swept into its commit — which is what makes that work, and which is
+    also why `release` runs `validate` first to insist on a clean tree.
+
+    Without this the badge went stale at every release: `cz bump` writes the new version to
+    pyproject.toml and commits, nothing updated the README, and the next `preflight` on main
+    failed with "version badge in README.md is stale". A release should not land a README that
+    contradicts the version it released.
 
     Args:
         context: Invoke context.
@@ -91,6 +102,7 @@ def bump(context: Context, increment: str = '') -> None:
         print('Usage: ./workflow.cmd release -i <increment>')
         print(f'  increment: {", ".join(valid)}')
         raise SystemExit(1)
+    note(update_package_version_badge(version=resolve_next_version(context, increment)))
     if increment in prerelease_types:
         execute(context, f'uv run cz bump --increment patch --prerelease {increment} --allow-no-commit --yes')
     else:
