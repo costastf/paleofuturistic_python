@@ -1773,9 +1773,9 @@ def test_matrix_coverage_is_combined_before_anything_reads_it(generated_project)
     test_py = (project / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
     # Past the closing `"""`, so the docstring's own mention of combine_coverage — which
     # precedes every command — cannot satisfy the ordering assertions below.
-    body = test_py.split("@logged('test.tox')", 1)[1].split('@task', 1)[0].split('"""')[-1]
+    body = test_py.split('def tox_matrix', 1)[1].split('\n@', 1)[0].split('"""')[-1]
     for step in ('erase_coverage_data', 'tox run', 'combine_coverage'):
-        assert step in body, f'test.tox no longer runs {step!r}'
+        assert step in body, f'the matrix no longer runs {step!r}'
     assert body.index('erase_coverage_data') < body.index('tox run'), 'stale coverage data is not cleared first'
     # Not `coverage erase`: it leaves `.coverage.<envname>` in place, so a retired env's data
     # would still be combined into the union that feeds the badge and the ratchet.
@@ -1785,6 +1785,52 @@ def test_matrix_coverage_is_combined_before_anything_reads_it(generated_project)
     combine = test_py.split('def combine_coverage', 1)[1].split('\n@task', 1)[0]
     assert 'coverage combine' in combine, 'the per-env data is never merged'
     assert 'coverage json -o {COVERAGE_REPORT}' in combine, 'the union never reaches the report the badge reads'
+
+
+def test_only_what_measures_a_derived_value_may_write_it(generated_project):
+    """A derived value is written by whatever produced the data behind it — and nothing else.
+
+    Not "only `preflight` writes", which was the earlier rule and too blunt. The coverage badge
+    means coverage across every interpreter in `env_list`, so `test.tox` may write it: that is
+    exactly what it measured. `test` and `test.coverage` measure one interpreter, so they may
+    neither write it nor comment on it — a single-interpreter number is not the badge's
+    quantity, and warning about it would be a claim they cannot support. Demonstrated before
+    the change: `test` wrote 85% from one interpreter and the gate then rejected it as stale
+    against the union's 100%.
+
+    `document` is the same argument for a different reason. Version, Python range and the CI
+    badge's URL come from tracked files, so it can vouch for those; coverage and pyscn come
+    from reports it does not produce, so it would be stamping in whatever a previous run left.
+
+    Writing stays opt-in via `--write` wherever it is allowed, and the gate verifies all five.
+    """
+    project, _ = generated_project
+    tasks = project / '_CI' / 'tasks'
+    test_py = (tasks / 'test.py').read_text(encoding='utf-8')
+
+    # One interpreter: no write, and no comment either.
+    for task_name in ("@logged('test')", "@logged('test.coverage')"):
+        body = test_py.split(task_name, 1)[1].split('\n@', 1)[0]
+        assert 'update_coverage_badge' not in body, f'{task_name} writes the coverage badge again'
+        assert 'ratchet_fail_under' not in body, f'{task_name} moves the ratchet again'
+
+    # The matrix: writes under --write, reports otherwise, refuses a narrowed run.
+    tox_task = test_py.split("@logged('test.tox')", 1)[1].split('\n@', 1)[0]
+    assert 'note(update_coverage_badge(write=write))' in tox_task, 'the matrix no longer owns the badge'
+    assert 'note(ratchet_fail_under(write=write))' in tox_task, 'the matrix no longer owns the ratchet'
+    assert 'if env and write:' in tox_task, 'a narrowed matrix can still write the badge'
+
+    # The registry runs the non-writing entry point, so a hook and a pipeline write nothing.
+    preflight = (tasks / 'preflight.py').read_text(encoding='utf-8')
+    assert 'check=tox_matrix' in preflight, 'the gate runs the writing task instead of the matrix'
+
+    # `document` vouches only for what it can compute from tracked files.
+    document = (tasks / 'document.py').read_text(encoding='utf-8')
+    aggregator = document.split("@logged('document')", 1)[1]
+    for absent in ('update_coverage_badge', 'update_pyscn_badge'):
+        assert absent not in aggregator, f'document writes {absent} from a report it does not produce'
+    for present in ('update_package_version_badge', 'update_python_badge', 'update_pipeline_badge'):
+        assert present in aggregator, f'document no longer refreshes {present}'
 
 
 def test_the_ci_badge_is_the_hosts_own(generated_project):

@@ -176,12 +176,15 @@ def coverage(context: Context) -> None:
     Whatever the last run measured: after `test.pytest` that is one interpreter, after
     `test.tox` it is the union across the matrix. This is where the HTML report comes from —
     `preflight` deliberately does not produce one, because nothing in a gate reads it.
+
+    It writes no badge, and says nothing about one. The coverage badge means coverage across
+    the whole matrix, and this reports whatever happens to be in the data file — so it cannot
+    tell whether the badge is stale without knowing something it did not measure. `test.tox`
+    is the command whose number *is* the badge's, and `preflight` is what fails on a stale one.
     """
     execute(context, 'uv run coverage report')
     execute(context, f'uv run coverage json -o {COVERAGE_REPORT}')
     execute(context, 'uv run coverage html -d reports/coverage')
-    note(update_coverage_badge())
-    note(ratchet_fail_under())
 
 
 @task
@@ -259,19 +262,19 @@ def combine_coverage(context: Context) -> None:
     execute(context, f'uv run coverage json -o {COVERAGE_REPORT}')
 
 
-@task
-@logged('test.tox')
-def tox(context: Context, env: str = '') -> None:
-    """Run the pytest matrix across supported Python versions via tox.
+@logged('test.matrix')
+def tox_matrix(context: Context, env: str = '') -> None:
+    """Run the matrix and combine its coverage, touching no derived value.
 
-    Leaves one `reports/coverage.json` covering the whole matrix — see `combine_coverage` for
-    why that is a union and not an average, and `[tool.tox.env_run_base]` for why each env
-    writes its own reports on the way there.
+    The gate's path, and the reason there are two: `preflight` runs this, and `preflight`
+    without `--write` must write nothing tracked. If the registry ran the `test.tox` task
+    instead, the badge would be written from inside a hook and a pipeline — which is the shape
+    three commits went into removing. `quality.pyscn-analyze` and `pyscn_json_report` split for
+    the same reason.
 
     Args:
         context: Invoke context.
-        env: A single tox environment to run, e.g. ``--env=py313``. When
-            omitted, the full matrix runs in parallel.
+        env: A single tox environment to run, e.g. ``py313``. Empty runs the whole matrix.
     """
     # A `.coverage.<env>` left behind by an env that has since been removed from `env_list`
     # would be folded into the union and inflate it, so the slate is wiped before the run —
@@ -288,12 +291,51 @@ def tox(context: Context, env: str = '') -> None:
 
 
 @task
+@logged('test.tox')
+def tox(context: Context, env: str = '', write: bool = False) -> None:
+    """Run the pytest matrix across supported Python versions via tox.
+
+    The one command whose coverage number *is* the badge's: the badge means coverage across
+    every interpreter in `env_list`, and this measures exactly that, so it is allowed to report
+    on the badge and — with `--write` — to update it. `test` and `test.coverage` measure one
+    interpreter, so they do neither.
+
+    Without `--write` it says whether the badge and the coverage ratchet still match what the
+    matrix measured, and carries on regardless; this is not a gate, `preflight` is. The report
+    is the same function the gate calls with `write=False`, so the two cannot disagree about
+    what stale means.
+
+    Args:
+        context: Invoke context.
+        env: A single tox environment to run, e.g. ``--env=py313``. When omitted, the full
+            matrix runs in parallel.
+        write: Update the coverage badge and the ratchet from this run. Refused with `--env`,
+            since one interpreter's coverage is not what the badge means.
+    """
+    if env and write:
+        print('--write needs the full matrix: the coverage badge means coverage across every')
+        print(f'interpreter in env_list, and --env={env} measures one. Drop --env, or use')
+        print('`./workflow.cmd preflight --write`.')
+        raise SystemExit(1)
+    tox_matrix(context, env=env)
+    if env:
+        # Nothing true can be said about the badge from one interpreter, so nothing is said.
+        return
+    note(update_coverage_badge(write=write))
+    note(ratchet_fail_under(write=write))
+
+
+@task
 @logged('test')
 def test(context: Context) -> None:
-    """Run all test steps; reports all failures before exiting."""
+    """Run all test steps; reports all failures before exiting.
+
+    One interpreter — the one the active virtualenv resolved to. It therefore writes no badge
+    and warns about none: the coverage badge means coverage across `env_list`, which this did
+    not measure, so anything it said about the badge would be a claim it cannot support.
+    `test.tox` measures the badge's quantity; `preflight` is what fails on a stale one.
+    """
     run_steps(pytest)(context)
-    note(update_coverage_badge())
-    note(ratchet_fail_under())
 
 
 namespace = Collection('test')

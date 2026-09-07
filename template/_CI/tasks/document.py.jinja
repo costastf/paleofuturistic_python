@@ -11,13 +11,11 @@ from .github import pipeline_badge{% if integrate_pages %}, request_pages_build{
 {%- else -%}
 from .gitlab import pipeline_badge
 {%- endif %}
-from .quality import update_pyscn_badge
 {% if integrate_pages and git_hosting_service == 'github' -%}
 from .shared import apply_badge, execute, is_ci, logged, note, open_target, run, run_steps
 {%- else -%}
 from .shared import apply_badge, is_ci, logged, note, open_target, run, run_steps
 {%- endif %}
-from .test import update_coverage_badge
 
 
 def update_package_version_badge(*, write: bool = True) -> str | None:
@@ -144,12 +142,19 @@ def deploy_github(context: Context) -> None:
 @logged('document')
 def document(context: Context) -> None:
     """Build and open the documentation; reports all failures before exiting."""
+    # Only the three derived from files this repository tracks: the version and the Python
+    # range come from pyproject.toml, the CI badge's URL from `origin`. All three are therefore
+    # current by construction whenever this runs.
+    #
+    # The coverage and pyscn badges are deliberately absent. They come from reports under
+    # `reports/`, which this task does not produce and which are gitignored — so it would be
+    # stamping in whatever a previous run happened to leave, silently, and a week-old number
+    # looks exactly like a fresh one. They belong to the commands that measure them:
+    # `test.tox --write`, `quality.pyscn-analyze`, or `preflight --write` for all five at once.
     for reason in (
         update_package_version_badge(),
         update_python_badge(),
         update_pipeline_badge(context),
-        update_coverage_badge(),
-        update_pyscn_badge(),
     ):
         note(reason)
     run_steps(build, view)(context)

@@ -56,7 +56,7 @@ from .lint import complexipy, format_check, pylint, ruff_lint, ty
 from .quality import pyscn_check, pyscn_json_report, update_pyscn_badge
 from .secure import audit
 from .shared import logged, run_steps
-from .test import ratchet_fail_under, tox, update_coverage_badge
+from .test import ratchet_fail_under, tox_matrix, update_coverage_badge
 
 PER_FILE = 'per-file'
 WHOLE_PROGRAM = 'whole-program'
@@ -183,7 +183,10 @@ STEPS = (
     # thing CI could tell you that you could not have known locally, and the project promises
     # every version in `env_list`. It costs about one extra suite-length, because the envs run
     # in parallel. `test.pytest` remains the fast inner-loop task; this is the gate.
-    Step('tox', WHOLE_PROGRAM, check=tox),
+    #
+    # `tox_matrix` rather than the `test.tox` task: that task reports on the coverage badge and
+    # can write it, and this step runs inside a hook and a pipeline where nothing may.
+    Step('tox', WHOLE_PROGRAM, check=tox_matrix),
     Step('build', WHOLE_PROGRAM, check=build),
     # After pyscn and tox, which produce the reports it reads.
     Step(

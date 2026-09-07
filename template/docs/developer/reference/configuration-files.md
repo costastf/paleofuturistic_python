@@ -17,7 +17,7 @@ The single source of truth for project metadata and tool configuration. Sections
 | `[tool.pytest.ini_options]` | Template (framework), you (markers) | Don't disable coverage; add markers as needed. |
 | `[tool.coverage]` | Template | `fail_under` is ratcheted upward automatically once the ratchet engages. Don't lower it. |
 | `[tool.test-ratchet]` | Template (knob), you (mode) | `mode = "auto-detect"` (default) keeps the coverage ratchet dormant while the scaffolded `test_sanity` is in place; `mode = "strict"` engages it on run #1. See [Testing strategy](../explanation/testing-strategy.md#dormant-during-scaffold). |
-| `[tool.tox]` | Template (framework), you (`env_list`) | Generated from `min_python_version` / `max_python_version`. Each env writes its own reports and coverage data, which `test.tox` then combines — see [Testing strategy](../explanation/testing-strategy.md#layer-3--tox). Trimming `env_list` shortens the gate locally *and* in CI, which is why it is the only supported way to make the matrix cheaper. |
+| `[tool.tox]` | Template (framework), you (`env_list`) | Generated from `min_python_version` / `max_python_version`. Each env writes its own reports and coverage data, which `test.tox` then combines — see [Testing strategy](../explanation/testing-strategy.md#layer-3-tox). Trimming `env_list` shortens the gate locally *and* in CI, which is why it is the only supported way to make the matrix cheaper. |
 | `[tool.commitizen]` | Template | Conventional-Commits parser config used by `cz changelog` and the lint hook. The template does **not** use commitizen's autorelease — the bump is chosen explicitly via `./workflow.cmd release -i <type>`. |
 | `[tool.docker-versions]` | Template | The one image `Dockerfile.deps` builds on, pinned by tag *and* digest. |
 
@@ -51,10 +51,11 @@ each hook (complexipy is `src/` only; the rest also cover `_CI/tasks/` and `test
 commit touching only `tests/` still skips complexipy. The one `files:` left here is the union
 of them, and an invariant test asserts it is never narrower than the widest step's own filter.
 
-The hook wraps the task in `sh -c '… --paths="$*"' --`, which collapses the file list
-pre-commit appends into the single `--paths` value Invoke expects — passed bare, Invoke reads
-the second filename as another task name and fails. Filenames containing spaces are not
-supported by that marshalling.
+The hook entry is the bare `./workflow.cmd preflight.staged`, with `pass_filenames: false`,
+because the task reads the index itself — so the line is the command you would type. That also
+means `files:` here decides whether the hook *wakes*, not what it looks at: stage a `.py` and
+the task reads the whole index, applying each step's own filter from the registry. A staged path
+containing a space is refused with an explanation, `--paths` being space-separated throughout.
 
 **What runs on pre-commit is what can be judged from the staged files alone.** That is a rule
 about correctness, not speed. ty, pyscn, the test matrix and the wheel are whole-program: a
