@@ -61,6 +61,41 @@ def test_pages_workflow_matches_choice(generated_project):
     assert (project / '.github' / 'workflows' / 'pages.yaml').exists() == expected
 
 
+def test_docs_publish_on_release_not_on_every_push(generated_project):
+    """The site is published when a release lands, by the same rule the package uses.
+
+    Built from every push to main, the docs describe code that is on main but in no release
+    yet, so a reader following them can reach for something they cannot install. And a
+    `push: tags:` trigger would be the same mistake mirrored: `release` pushes the tag from the
+    release branch before the pull request merges, so the site would go out for a version that
+    has not landed.
+
+    So both this and `publish.yaml` trigger on a push to main and ask one reusable workflow
+    whether it carried a v-prefixed tag — one copy of that question, so the package and its
+    documentation cannot disagree about what counts as released. `workflow_dispatch` stays,
+    because a project that has not released yet would otherwise never publish docs at all.
+    """
+    project, cell = generated_project
+    # Pages ships for GitHub only, as `test_pages_workflow_matches_choice` asserts.
+    if not cell['integrate_pages'] or cell['git_hosting_service'] != 'github':
+        return
+    workflows = project / '.github' / 'workflows'
+    shared = 'detect-release-tag.yaml'
+    assert (workflows / shared).is_file(), 'the shared release-tag detector does not ship'
+
+    pages = yaml.safe_load((workflows / 'pages.yaml').read_text(encoding='utf-8'))
+    triggers = pages.get('on') or pages[True]
+    assert 'tags' not in (triggers.get('push') or {}), 'a tag trigger fires before the release merges'
+    assert 'workflow_dispatch' in triggers, 'a project that has not released yet could never publish docs'
+    assert pages['jobs']['detect']['uses'].endswith(shared), 'pages does not use the shared detector'
+    guard = pages['jobs']['deploy']['if']
+    assert "needs.detect.outputs.tag != ''" in guard, f'pages deploys without a release tag: {guard!r}'
+    assert 'workflow_dispatch' in guard, f'a manual run could never deploy: {guard!r}'
+
+    publish = (workflows / 'publish.yaml').read_text(encoding='utf-8')
+    assert shared in publish, 'publish and pages no longer share one definition of "released"'
+
+
 def test_pages_task_definition_matches_choice(generated_project):
     """`deploy_github` is defined iff integrate_pages=true AND the host is github."""
     project, cell = generated_project

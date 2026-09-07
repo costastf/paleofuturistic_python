@@ -11,50 +11,12 @@ permissions:
   contents: read
 
 jobs:
+  # Shared with `pages.yaml`, so the package and its documentation cannot disagree about what
+  # counts as released. See that file for why neither uses a `push: tags:` trigger.
   detect:
-    name: Detect release tag
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/detect-release-tag.yaml
     permissions:
       contents: read
-    outputs:
-      {#- Escape curly braces for Copier. -#}
-      {%- raw %}
-      tag: ${{ steps.find.outputs.tag }}
-      {%- endraw %}
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-        with:
-          # Full history: the step below walks the pushed commits looking for a tag.
-          fetch-depth: 0
-          persist-credentials: false
-
-      - id: find
-        env:
-          {#- Escape curly braces for Copier. -#}
-          {%- raw %}
-          BEFORE: ${{ github.event.before }}
-          AFTER: ${{ github.sha }}
-          {%- endraw %}
-        run: |
-          if [ "${BEFORE}" = "0000000000000000000000000000000000000000" ]; then
-            range="${AFTER}"
-          else
-            range="${BEFORE}..${AFTER}"
-          fi
-          tag=""
-          for sha in $(git log "${range}" --format='%H'); do
-            candidate=$(git tag --points-at "${sha}" | grep -E '^v[0-9]' | head -n1 || true)
-            if [ -n "${candidate}" ]; then
-              tag="${candidate}"
-              break
-            fi
-          done
-          if [ -n "${tag}" ]; then
-            echo "Release tag detected: ${tag}"
-            echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
-          else
-            echo "No v-prefixed tag on the incoming commits; publish will skip."
-          fi
 
   build-deps-image:
     needs: detect

@@ -1,0 +1,57 @@
+name: Detect release tag
+
+# Shared by `publish.yaml` and `pages.yaml`, which both have to answer the same question: did
+# the push that triggered us carry a release? Neither can use a `push: tags:` trigger for it —
+# `release` pushes the tag from the release branch before the pull request merges, so a tag
+# trigger fires while the version is still unreleased. What marks a release is a v-prefixed tag
+# arriving on the default branch, which is what this walks the incoming commits to find.
+#
+# One copy rather than two, so the package and its documentation can never disagree about what
+# counts as released.
+on:
+  workflow_call:
+    outputs:
+      tag:
+        description: The release tag on the incoming commits, or an empty string if there is none
+        value: ${{ jobs.detect.outputs.tag }}
+
+jobs:
+  detect:
+    name: Detect release tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.find.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          # Full history: the step below walks the pushed commits looking for a tag.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - id: find
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          if [ -z "${BEFORE}" ] || [ "${BEFORE}" = "0000000000000000000000000000000000000000" ]; then
+            range="${AFTER}"
+          else
+            range="${BEFORE}..${AFTER}"
+          fi
+          tag=""
+          for sha in $(git log "${range}" --format='%H'); do
+            candidate=$(git tag --points-at "${sha}" | grep -E '^v[0-9]' | head -n1 || true)
+            if [ -n "${candidate}" ]; then
+              tag="${candidate}"
+              break
+            fi
+          done
+          if [ -n "${tag}" ]; then
+            echo "Release tag detected: ${tag}"
+            echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "No v-prefixed tag on the incoming commits."
+          fi
