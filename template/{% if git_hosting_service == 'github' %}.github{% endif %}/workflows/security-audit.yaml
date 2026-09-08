@@ -30,10 +30,13 @@ on:
       # root package's own version line in `uv.lock`. That one is worth auditing anyway, being
       # the commit that publishes.
       - 'uv.lock'
-      # The vendored CI dependencies. pip-audit cannot see them — they ship without
-      # `.dist-info`, so no installed-distribution scan finds them — but a change here is still
-      # the moment to look, and `secure.audit` reports what it can.
+      # The vendored CI dependencies: `secure.audit` audits `vendor.txt` by name, since the
+      # trees ship as source with no `.dist-info` for any installed-distribution scan to find.
+      # The tree and its patches are watched too — nothing audits a hand-edited vendored file,
+      # but a push that touches one is worth a human reading the diff.
       - '_CI/lib/vendor.txt'
+      - '_CI/lib/vendor/**'
+      - '_CI/lib/patches/**'
       - '.security-overrides'
   workflow_dispatch:
 

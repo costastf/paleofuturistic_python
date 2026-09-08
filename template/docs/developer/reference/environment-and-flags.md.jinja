@@ -58,6 +58,7 @@ Nothing here needs setting for local work. Every one has a default or a reason t
 {%- if integrate_dependency_track %}
 | `OWASP_DTRACK_URL`, `OWASP_DTRACK_API_KEY` | `secure.sbom-upload` | Where to upload the SBOM, and the key to do it with. Both must be present or the task refuses rather than half-uploading. |
 {%- endif %}
+| `PRE_COMMIT_FROM_REF`, `PRE_COMMIT_TO_REF` | `lint.commitizen` | The commit range a push would add, which pre-commit hands to pre-push hooks straight from git. It is the authoritative answer to "which messages are mine to fix", so it wins over anything the task can infer from the branch. Absent outside a pre-push hook, where the tracking branch stands in. |
 | `SKIP` | pre-commit, not this workflow | The escape hatch below. |
 
 `pytest` also loads a `.env` file if you keep one (`[tool.pytest.ini_options] env_files`), which

@@ -13,6 +13,14 @@ tree or not at all. Those cost time proportional to the *project*, so they run o
 which keeps commit latency flat as the project grows. It is a rule about correctness rather than
 speed: a whole-program check narrowed to a diff does not run faster, it answers wrongly.
 
+*A name carries a scope.* ``reports/coverage.json`` means coverage across every interpreter in
+``env_list``; ``reports/coverage.py310.json`` means one of them. Whatever writes one of those
+names has to be running at that scope, because the readers cannot tell — the badge and the
+ratchet read a filename, not a provenance. The same rule put the per-env report paths in
+``[tool.tox]``, keeps ``test.tox --env=py310`` out of the union's filename, and is why the CI
+badge is written but never verified: its value is a fact about a clone rather than about this
+tree, so no run here is at the right scope to judge it.
+
 *Verifying is the default; writing is a flag.* ``preflight`` compares the derived files against
 what the tools measured; ``preflight --write`` updates them. So the bare command is what the
 hooks and the pipeline run, and reproducing a pipeline failure needs no flag. ``artifacts`` is
@@ -24,8 +32,9 @@ generator.
 ratchet. No step has a source-writing variant, so this file has no notion of fixing at all.
 Formatting is applied by ``./workflow.cmd format``, named for the mutation it performs.
 
-The default does write ``reports/`` — pytest's coverage JSON and pyscn's analysis are the
-*inputs* the comparison reads, and both are gitignored. What it never touches is a tracked file.
+The default does write ``reports/``, and ``site/`` for the docs build — the coverage JSON and
+pyscn's analysis are the *inputs* the comparison reads, and all of it is gitignored. What it
+never touches is a tracked file.
 """
 
 import re
@@ -36,6 +45,7 @@ from typing import NamedTuple, cast
 from invoke import Collection, Context, Task, task
 
 from .build import build
+from .configuration import CODE_FILES, SRC_FILES
 from .document import build as document_build
 from .document import update_package_version_badge, update_pipeline_badge, update_python_badge
 from .lint import commitizen, complexipy, format_check, pylint, ruff_lint, ty
@@ -46,13 +56,6 @@ from .test import ratchet_fail_under, tox_matrix, update_coverage_badge
 
 PER_FILE = 'per-file'
 WHOLE_PROGRAM = 'whole-program'
-
-# Which paths each per-file step accepts. These moved out of `.pre-commit-config.yaml`: with one
-# hook for the whole bundle there is only one `files:` filter left, so the per-tool distinction
-# has to live somewhere it can still be applied — and here it is one source of truth that the
-# invariant suite can read, rather than six YAML patterns nobody diffs.
-CODE_FILES = re.compile(r'^(_CI/tasks/|src/|tests/).*\.py$')
-SRC_FILES = re.compile(r'^src/.*\.py$')
 
 FIX_COMMAND = './workflow.cmd preflight --write'
 
@@ -153,10 +156,14 @@ def artifacts(context: Context, *, write: bool) -> None:
     raise SystemExit(1)
 
 
+# Ordered by cost within each scope, so a failing run says what is wrong as early as it can.
+# The order matters twice over: `run_scope` runs every step regardless, so the ordering is all
+# that decides how long a verdict takes, and the commit hook runs the per-file steps alone.
+# pylint is the expensive one — astroid follows the import graph behind `_CI/tasks/`, five
+# seconds of it — so it goes behind everything cheaper that could also fail.
 STEPS = (
     Step('format', PER_FILE, check=formatting, files=CODE_FILES),
     Step('ruff', PER_FILE, check=ruff_lint, files=CODE_FILES),
-    Step('pylint', PER_FILE, check=pylint, files=CODE_FILES),
     Step('complexipy', PER_FILE, check=complexipy, files=SRC_FILES),
     Step('ty', WHOLE_PROGRAM, check=ty),
     # `cz bump` derives the version and the changelog from commit messages, so their format is
@@ -170,6 +177,7 @@ STEPS = (
     # tag, so without this step a bad link is first discovered by the release pipeline — after
     # the tag is pushed, the one moment there is no cheap way back.
     Step('docs', WHOLE_PROGRAM, check=document_build),
+    Step('pylint', PER_FILE, check=pylint, files=CODE_FILES),
     Step('pyscn', WHOLE_PROGRAM, check=pyscn),
     # The whole matrix, not one interpreter: the project promises every version in `env_list`,
     # and a single-interpreter gate would leave that the one thing CI knows and you cannot. It
@@ -259,9 +267,9 @@ def run_scope(
 
     Every step runs even after one fails, so a single run reports everything that is wrong —
     except the derived-value steps, skipped once anything before them has failed, in either
-    mode. A badge computed from a tree whose checks just failed is a claim the tree does not
-    support, and comparing against one is worse: the reports it would read are the ones the
-    failed step never produced.
+    mode. A badge computed from a tree whose checks just failed is a claim about that tree that
+    is not true, and one that failed *early* is worse: the step that produces its input may not
+    have run at all, in which case the comparison reads whatever a previous run left behind.
 
     Skipped rather than reordered, so a late failure cannot retroactively undo an earlier
     write. `secure.audit` being last and opt-in also means an advisory published this morning
@@ -293,8 +301,8 @@ def run_scope(
         except SystemExit:
             failed = True
     if skipped:
-        print(f'Derived files skipped: a check failed, so there is nothing trustworthy for `{FIX_COMMAND}` to')
-        print('compare against or write — the reports they are computed from were not produced.')
+        print(f'Derived files skipped: a check failed, so there is nothing for `{FIX_COMMAND}` to')
+        print('write that would be true of this tree. Fix what failed above and run it again.')
     if failed:
         raise SystemExit(1)
 
@@ -304,9 +312,9 @@ def run_scope(
 def staged(context: Context, paths: str = '') -> None:
     """Run the checks that can be judged from the staged files alone.
 
-    What the pre-commit hook calls, in a single invocation: `./workflow.cmd` costs about 1.3s
-    of interpreter and import startup before any tool runs, so one hook pays that once where
-    four paid it four times.
+    What the pre-commit hook calls, in a single invocation rather than one per tool: four
+    hooks would have pre-commit partition the staged files and report four verdicts about
+    different subsets of one commit.
 
     It reports rather than fixes, like every entry point here; `./workflow.cmd format` applies
     formatting.

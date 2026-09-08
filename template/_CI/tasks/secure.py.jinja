@@ -7,12 +7,12 @@ import os
 import re
 import urllib.error
 import urllib.request
-from datetime import date
+from datetime import date, timedelta
 from typing import NamedTuple, cast
 {%- else -%}
 import os
 import re
-from datetime import date
+from datetime import date, timedelta
 from typing import NamedTuple, cast
 {%- endif %}
 
@@ -20,15 +20,26 @@ from invoke import Collection, Context, Task, task
 
 {% if integrate_dependency_track -%}
 from .configuration import (
+    AUDIT_EXPORT,
     IGNORE_PATTERN,
+    MAX_SUPPRESSION_DAYS,
     OWASP_DTRACK_SETTINGS,
     PROJECT_NAME,
     SBOM_FILE,
     SECURITY_OVERRIDE_ENV,
     SECURITY_OVERRIDES_FILE,
+    VENDOR_TXT,
 )
 {%- else -%}
-from .configuration import IGNORE_PATTERN, SBOM_FILE, SECURITY_OVERRIDE_ENV, SECURITY_OVERRIDES_FILE
+from .configuration import (
+    AUDIT_EXPORT,
+    IGNORE_PATTERN,
+    MAX_SUPPRESSION_DAYS,
+    SBOM_FILE,
+    SECURITY_OVERRIDE_ENV,
+    SECURITY_OVERRIDES_FILE,
+    VENDOR_TXT,
+)
 {%- endif %}
 from .shared import execute, logged
 
@@ -52,6 +63,11 @@ def validate_override_entry(entry: str, source: str, *, require_expiry: bool = F
     With ``require_expiry``, a missing expiry is also an error. That is applied to
     suppressions arriving from outside the repository, where a permanent entry would
     leave no reviewable trace.
+
+    An expiry further out than ``MAX_SUPPRESSION_DAYS`` is an error too. The date exists to
+    force a re-review, and ``CVE-2024-1234::2999-12-31`` is a permanent suppression wearing
+    the costume of a bounded one — worse than the plain permanent form, which at least reads as
+    what it is and is refused outright from the two sources that leave no trace.
 
     Raises:
         SystemExit: with exit code 1 if the entry is malformed.
@@ -78,10 +94,18 @@ def validate_override_entry(entry: str, source: str, *, require_expiry: bool = F
             raise SystemExit(1)
         return
     try:
-        date.fromisoformat(expiry)
+        expires = date.fromisoformat(expiry)
     except ValueError as exc:
         print(f'{source}: invalid expiry {expiry!r}: {exc}; expected YYYY-MM-DD (or omit for a permanent suppression)')
         raise SystemExit(1) from None
+    horizon = date.today() + timedelta(days=MAX_SUPPRESSION_DAYS)  # noqa: DTZ011
+    if expires > horizon:
+        print(
+            f'{source}: expiry {expiry} is more than {MAX_SUPPRESSION_DAYS} days out, so it is not '
+            f'really an expiry. Pick a date by {horizon}, or say plainly that the suppression is '
+            f'permanent by omitting the date in {SECURITY_OVERRIDES_FILE}.'
+        )
+        raise SystemExit(1)
 
 
 def parse_suppressions(raw: str, source: str, *, require_expiry: bool = False) -> list[Suppression]:
@@ -139,6 +163,14 @@ def audit(context: Context, ignore: str | None = None) -> None:
     printed with its origin, so a suppression injected through CI configuration alone
     still shows up in the build log.
 
+    What is audited is the two requirement sets this project pins, not the environment it
+    happens to be running in. `pip-audit` with no `-r` enumerates *installed* distributions,
+    which on a Linux runner silently omits anything gated behind a platform marker, an extra,
+    or a group that was not synced — all of it pinned in `uv.lock` and listed in the SBOM — and
+    at the same time includes packages that are not dependencies at all. The vendored CI tree
+    is the other set: it ships as source with no `.dist-info`, so no installed-distribution
+    scan can see it, and it is code `./workflow.cmd` executes in every job.
+
     Args:
         context: Invoke context.
         ignore: Comma-separated vulnerability IDs to ignore.
@@ -168,7 +200,17 @@ def audit(context: Context, ignore: str | None = None) -> None:
             print(f'  {suppression.vulnerability_id} ({expiry}) from {suppression.source}')
     ignore_args = ' '.join(f'--ignore-vuln {vulnerability_id}' for vulnerability_id in active)
     ignore_opts = f' {ignore_args}' if ignore_args else ''
-    execute(context, f'uv run pip-audit{ignore_opts}')
+    # `--no-emit-project` because the project itself is not on PyPI to be audited; every group
+    # because the lint and test dependencies run in CI too; `--quiet` because otherwise the whole
+    # requirements file is echoed into the log next to the file it just wrote.
+    execute(context, f'uv run uv export --frozen --all-groups --no-emit-project --quiet -o {AUDIT_EXPORT}')
+    # `--disable-pip` in both: without it pip-audit builds a resolution environment for the
+    # requirements file, which needs a network it may not have. `--require-hashes` for the
+    # export, which uv writes fully hashed — it implies `--no-deps` and asserts that every pin
+    # carries a digest. `vendor.txt` comes from `uv pip compile` without hashes, so it gets the
+    # weaker pair rather than a hash requirement it cannot satisfy.
+    execute(context, f'uv run pip-audit -r {AUDIT_EXPORT} --require-hashes --disable-pip{ignore_opts}')
+    execute(context, f'uv run pip-audit -r {VENDOR_TXT} --no-deps --disable-pip{ignore_opts}')
 
 
 @task

@@ -42,8 +42,8 @@ def pre_commit(context: Context) -> None:
     commit-stage hooks run.
 
     Nothing here writes; the hooks report, and `./workflow.cmd format` applies formatting. Nor
-    is it the full check: ty, pyscn, the docs, the matrix and the derived files are on pre-push, and
-    `./workflow.cmd preflight` runs everything.
+    is it the full check: ty, commitizen, the docs build, pyscn, the matrix and the derived
+    files are on pre-push, and `./workflow.cmd preflight` runs everything.
 
     There is no whole-tree flag. The staged bundle passes no filenames — it reads the index,
     so it is the same command whether pre-commit or you invoke it — and `pre-commit run

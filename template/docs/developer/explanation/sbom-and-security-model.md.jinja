@@ -16,9 +16,11 @@ The pipeline answers those questions before the questions are asked.
 
 ## Layer 1 — pip-audit
 
-`./workflow.cmd secure.audit` runs [pip-audit](https://github.com/pypa/pip-audit) against `uv.lock`, comparing every pinned package against the [PyPI advisory database](https://github.com/pypa/advisory-database).
+`./workflow.cmd secure.audit` runs [pip-audit](https://github.com/pypa/pip-audit) over the two requirement sets this project pins — `uv.lock`, exported with every dependency group, and `_CI/lib/vendor.txt` — comparing each pinned package against the [PyPI advisory database](https://github.com/pypa/advisory-database).
 
-What it catches: a vulnerability with a known CVE/PYSEC ID affecting a version in the lockfile.
+Requirement files rather than the installed environment, which is what `pip-audit` reads by default. An installed-distribution scan sees whatever the current interpreter and platform happen to have synced: it silently omits a package gated behind a platform marker, an extra, or a group that was not installed — all of it pinned in the lockfile and listed in the SBOM — while including packages that are not dependencies at all. The vendored CI tree needs naming for a different reason: it ships as committed source with no `.dist-info`, so nothing that enumerates installed distributions can see it, and it is code `./workflow.cmd` executes in every job.
+
+What it catches: a vulnerability with a known CVE/PYSEC ID affecting a version in either file.
 
 What it doesn't catch:
 
@@ -35,10 +37,16 @@ ignore. It is triggered on the axes it varies along instead:
 - **On a schedule** (daily), which is what makes the expiry dates in `.security-overrides`
   load-bearing — a dependency can turn out to be vulnerable, and an override can come due,
   without anyone pushing anything.
-- **On pushes that change the dependency surface** — `uv.lock` and `.security-overrides`.
-  Change what you depend on and you own the result. Pushes only: a pull request from a fork
-  triggers nothing here, so the audit that covers a fork's dependencies is the scheduled one,
-  after the merge.
+- **On pushes that change the dependency surface** — `uv.lock`, `_CI/lib/vendor.txt`, the
+  vendored tree and its patches, and `.security-overrides`. Change what you depend on and you
+  own the result. A release lands here too: `version_provider = "uv"` re-locks, so the bump
+  commit carries `uv.lock`, and the commit that publishes is worth auditing anyway. Pushes
+  only: a pull request from a fork triggers nothing here, so the audit that covers a fork's
+  dependencies is the scheduled one, after the merge.
+- **A hand-edited vendored file is watched, not audited.** A push touching `_CI/lib/vendor/`
+  fires the job so the diff reaches a human. No scanner can say anything about a patched
+  vendored source: `vendor.txt` is what pip-audit reads, and it describes the packages that
+  *should* be there.
 - **Before publishing.** `release.dist` audits before it builds. That is the moment the outside
   world is exposed to these dependencies, and the one place where refusing to proceed protects
   somebody.

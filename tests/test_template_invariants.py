@@ -30,6 +30,7 @@ from _CI.tasks.configuration import (  # noqa: E402
     PROJECT_SLUG,
     UV_VERSION_ENV,
     generation_env,
+    matrix_combos,
     template_uv_version,
 )
 
@@ -261,11 +262,14 @@ def test_every_environment_variable_the_workflow_reads_is_documented(generated_p
     sources = '\n'.join(path.read_text(encoding='utf-8') for path in tasks.glob('*.py'))
     # Both forms. `os.environ['NAME']` is how the deps-image job reads its registry settings,
     # and matching only the call form meant six variables were exempt from this page.
+    # Either quote style: an f-string forces the inner lookup to double quotes, and matching
+    # only single ones left `os.environ["OWASP_DTRACK_URL"]` invisible to this walk.
+    quoted = '[\'"]'
     reads = (
-        r"os\.environ(?:\.get)?\(\s*'([A-Z][A-Z0-9_]+)'",
-        r"os\.environ\[\s*'([A-Z][A-Z0-9_]+)'\s*\]",
-        r"os\.getenv\(\s*'([A-Z][A-Z0-9_]+)'",
-        r"password_env='([A-Z][A-Z0-9_]+)'",
+        rf'os\.environ(?:\.get)?\(\s*{quoted}([A-Z][A-Z0-9_]+){quoted}',
+        rf'os\.environ\[\s*{quoted}([A-Z][A-Z0-9_]+){quoted}\s*\]',
+        rf'os\.getenv\(\s*{quoted}([A-Z][A-Z0-9_]+){quoted}',
+        rf'password_env={quoted}([A-Z][A-Z0-9_]+){quoted}',
     )
     literal = {name for pattern in reads for name in re.findall(pattern, sources)}
     # The names the tasks reach through a constant rather than inline.
@@ -967,19 +971,23 @@ def test_no_workflow_writes_the_token_into_a_git_remote(generated_project):
 def test_checkouts_do_not_persist_credentials(generated_project):
     """Every `actions/checkout` that precedes an SBOM-capable task refuses to persist auth.
 
-    The Pages deploy is the deliberate exception: `properdocs gh-deploy` pushes to the
-    `gh-pages` branch and needs the credential to survive the checkout.
+    The Pages *deploy job* is the deliberate exception: `properdocs gh-deploy` pushes to the
+    `gh-pages` branch and needs the credential to survive the checkout. Only that job — the
+    exemption used to be written per file, which silently covered every other job in
+    `pages.yaml` too, including ones added later.
     """
     project, cell = generated_project
     if cell['git_hosting_service'] != 'github':
         pytest.skip('GitHub-only workflows')
+    exempt = ('pages.yaml', 'deploy')
     for name, config in github_workflows(project):
         for job_name, job in config['jobs'].items():
             for step in job.get('steps') or []:
                 if not str(step.get('uses', '')).startswith('actions/checkout@'):
                     continue
                 persists = (step.get('with') or {}).get('persist-credentials')
-                if name == 'pages.yaml':
+                if (name, job_name) == exempt:
+                    assert persists is True, f'{name}:{job_name} cannot push gh-pages without the credential'
                     continue
                 assert persists is False, f'{name}:{job_name} checkout persists credentials'
 
@@ -1551,9 +1559,9 @@ def test_commit_stage_filter_is_not_narrower_than_the_steps_it_runs(generated_pr
     cares about would leave the hook skipped and the file unchecked.
     """
     project, _ = generated_project
-    source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
+    source = (project / '_CI' / 'tasks' / 'configuration.py').read_text(encoding='utf-8')
     widest = re.search(r"CODE_FILES = re\.compile\(r'([^']+)'\)", source)
-    assert widest, 'preflight.py no longer declares CODE_FILES'
+    assert widest, 'configuration.py no longer declares CODE_FILES'
     staged = next(hook for hook in pre_commit_hooks(project) if invoked_task(hook) == 'preflight.staged')
     assert staged['files'] == widest.group(1), (
         f"hook filter {staged['files']!r} does not match the registry's widest per-file filter {widest.group(1)!r}"
@@ -1691,14 +1699,21 @@ def test_no_ci_job_reruns_what_the_gate_already_covers(generated_project):
         pipeline = (project / '.gitlab-ci.yml').read_text(encoding='utf-8')
         jobs = {name for name in yaml.safe_load(pipeline) if not name.startswith(('stages', 'variables'))}
         assert jobs == {'build-deps-image', 'preflight', 'secure', 'publish'}, f'the pipeline runs {jobs}'
-    # Whole invocations, not prefixes: `startswith` also forbade a future `test.list-combos`,
-    # and `lstrip('- ')` strips any run of those two characters rather than one list marker.
+    # The task name, not the whole line: `startswith` also forbade a future
+    # `test.list-combos`, exact-match let `./workflow.cmd test --args=…` through, and
+    # `lstrip('- ')` strips any run of those two characters rather than one list marker.
+    forbidden = {command.split()[-1] for command in duplicated}
     for line in pipeline.splitlines():
         if './workflow.cmd' not in line:
             continue
-        command = re.sub(r'^\s*-\s*', '', line).strip()
-        invoked = command.split('#', 1)[0].strip()
-        assert invoked not in duplicated, f'{invoked!r} re-runs what preflight covers'
+        # After the comment is stripped, a line that only mentioned the launcher in prose has
+        # nothing left to check.
+        command = re.sub(r'^\s*-\s*', '', line.split('#', 1)[0]).strip()
+        if './workflow.cmd' not in command:
+            continue
+        invoked = command.split('./workflow.cmd', 1)[1].split()
+        task = invoked[0] if invoked else ''
+        assert task not in forbidden, f'{command!r} re-runs what preflight covers'
 
 
 def test_ci_runs_the_same_gate_as_the_pre_push_hook(generated_project):
@@ -1998,14 +2013,16 @@ def test_the_commit_message_check_is_bounded_to_this_push(generated_project):
     which drops the whole gate. It is unfixable by design, too: rewriting published history is
     worse than the lint it satisfies. A push answers for the commits it adds.
 
-    A shallow clone resolves neither the tracking branch nor `origin/HEAD` and lands on the
-    tip it was handed, which is why the fallback chain ends where it does.
+    The shapes each candidate covers are asserted by
+    `test_the_commit_message_check_sees_the_tip_in_every_checkout_shape`, which builds the
+    repositories and reads the resolved range. This one only pins the declaration: greps of a
+    function for its own literals are how the version of this check that shipped a no-op passed.
     """
     project, _ = generated_project
     lint = (project / '_CI' / 'tasks' / 'lint.py').read_text(encoding='utf-8')
-    scope = lint.split('def unpushed_range', 1)[1].split('\n@task', 1)[0]
-    for revision in ('@{upstream}', 'origin/HEAD', 'HEAD~1..HEAD'):
-        assert revision in scope, f'the range no longer falls back to {revision}'
+    scope = lint.split('def commit_ranges', 1)[1].split('\n@task', 1)[0]
+    for revision in ('PRE_COMMIT_FROM_REF', '@{upstream}', 'origin/HEAD', 'HEAD~1..HEAD'):
+        assert revision in scope, f'the range no longer considers {revision}'
     body = lint.split("@logged('lint.commitizen')", 1)[1].split('\n@task', 1)[0]
     # Past the docstring, which quotes the unbounded form to explain why it is gone.
     code = body.split('"""', 2)[2]
@@ -2026,6 +2043,14 @@ def test_importing_a_task_module_does_not_cost_a_second(generated_project):
     secure = (tasks / 'secure.py').read_text(encoding='utf-8')
     module_scope = secure.split('\n@task', 1)[0]
     assert 'from .sbom import' not in module_scope, 'importing secure.py pays for cyclonedx again'
+    # Every module, not just `secure.py`: any of them importing `.sbom` at module scope brings
+    # the cost back, since `preflight` imports most of them.
+    for module in sorted(tasks.glob('*.py')):
+        if module.name == 'sbom.py':
+            continue
+        head = module.read_text(encoding='utf-8').split('\ndef ', 1)[0].split('\n@', 1)[0]
+        assert 'from .sbom import' not in head, f'{module.name} imports the SBOM composer at module scope'
+        assert 'import cyclonedx' not in head, f'{module.name} imports cyclonedx at module scope'
     sbom = (tasks / 'sbom.py').read_text(encoding='utf-8')
     assert 'from cyclonedx.validation' not in sbom.split('\ndef ', 1)[0], (
         'the JSON validator is imported before anything validates'
@@ -2045,9 +2070,9 @@ def test_the_push_hook_names_every_check_it_runs(generated_project):
     # registry but off by default, being an answer about the advisory database rather than
     # about this tree.
     phrases = {
-        'ty': 'ty',
-        'commitizen': 'commitizen',
-        'docs': 'docs',
+        'ty': 'ty (types)',
+        'commitizen': 'commit messages',
+        'docs': 'docs build',
         'pyscn': 'pyscn',
         'tox': 'test matrix',
         'build': 'wheel',
@@ -2076,7 +2101,9 @@ def test_formatting_what_is_staged_needs_no_shell(generated_project):
     body = (project / '_CI' / 'tasks' / 'format_.py').read_text(encoding='utf-8')
     task_body = body.split("@logged('format')", 1)[1]
     assert 'staged: bool = False' in task_body, 'there is no way to format just what is staged'
-    assert "endswith('.py')" in task_body, 'a staged Markdown file is handed to ruff format'
+    assert 'CODE_FILES.match(path)' in task_body, (
+        "the formatter has its own idea of which files are the project's, so the two can drift"
+    )
     assert 'No staged Python files' in task_body, 'an empty index falls back to the whole tree'
     how_to = (project / 'docs' / 'developer' / 'how-to' / 'skip-a-check.md').read_text(encoding='utf-8')
     assert 'format --staged' in how_to, 'the how-to does not name the flag'
@@ -2087,6 +2114,200 @@ def test_formatting_what_is_staged_needs_no_shell(generated_project):
         line.strip() for index, block in enumerate(how_to.split('```')) if index % 2 for line in block.splitlines()
     ]
     assert 'git add -A' not in commands, 'the how-to sweeps the whole tree into the commit again'
+
+
+def git(repository, *arguments: str, check: bool = True):
+    """Run git in `repository` with a fixed identity, so nothing depends on the host config."""
+    identity = ('-c', 'user.name=t', '-c', 'user.email=t@example.invalid', '-c', 'commit.gpgsign=false')
+    return subprocess.run(
+        ['git', *identity, *arguments],
+        cwd=str(repository),
+        capture_output=True,
+        text=True,
+        check=check,
+    )
+
+
+def range_resolver(project):
+    """Return the generated `unpushed_range`, bound to a context that runs git for real.
+
+    Read out of the generated source rather than imported: importing `_CI.tasks.lint` pulls in
+    invoke and every sibling task module behind it. These three functions depend on nothing but
+    `os` and the context's `run`, so the smallest honest harness execs them alone.
+    """
+    source = (project / '_CI' / 'tasks' / 'lint.py').read_text(encoding='utf-8')
+    wanted = ('resolves', 'commit_ranges', 'unpushed_range')
+    body = [node for node in ast.parse(source).body if getattr(node, 'name', None) in wanted]
+    # One dict as globals, not globals-plus-locals: the functions call each other, so they have
+    # to land where their own name lookups go.
+    namespace = {'os': os, 'Context': object, 'Iterator': list}
+    module = ast.Module(body=body, type_ignores=[])
+    exec(compile(module, '<lint.py>', 'exec'), namespace)  # noqa: S102
+    assert set(wanted) <= set(namespace), f'lint.py no longer defines all of {wanted}'
+
+    class GitContext:
+        """The slice of invoke's Context these functions touch: `run` returning stdout and failure."""
+
+        def __init__(self, repository) -> None:
+            self.repository = repository
+
+        def run(self, command, *, hide=False, warn=False):  # noqa: ARG002
+            done = subprocess.run(  # noqa: S602 — the commands are this test's own git literals
+                command, shell=True, cwd=str(self.repository), capture_output=True, text=True, check=False
+            )
+            return SimpleNamespace(failed=done.returncode != 0, stdout=done.stdout)
+
+    return lambda repository: namespace['unpushed_range'](GitContext(repository))
+
+
+def commits_in(repository, revision_range):
+    """Return the subjects `cz check` would be handed for `revision_range`."""
+    if revision_range is None:
+        return []
+    listed = git(repository, 'log', '--format=%s', revision_range)
+    return [line for line in listed.stdout.splitlines() if line]
+
+
+def test_the_commit_message_check_sees_the_tip_in_every_checkout_shape(generated_project):
+    """Whatever the clone looks like, the range covers the commit that just arrived.
+
+    This is the test that was missing. Its string-level predecessor asserted the fallback chain
+    and passed while that chain resolved to nothing in GitHub CI: `actions/checkout` fetches one
+    commit and runs `checkout -B main refs/remotes/origin/main`, so the branch does track
+    `origin/main` and `origin/main` is `HEAD`. The range came out empty, the step reported
+    nothing to check, and the run that exists to catch what the hook cannot — a `--no-verify`
+    commit, a clone with no hooks — validated no message at all. GitLab's detached checkout took
+    a different branch of the same code and did fail, so one check gave two answers by host.
+
+    Also asserted: settled history stays out of the range, which is the deadlock the scoping
+    exists to avoid.
+    """
+    project, cell = generated_project
+    # `lint.py` ships identically in every cell, so one cell is enough for a test that builds
+    # repositories rather than reading files.
+    if cell['label'] != matrix_combos()[0]['label']:
+        return
+    resolve = range_resolver(project)
+    root = project.parent / 'range-shapes'
+    root.mkdir(exist_ok=True)
+
+    origin = root / 'origin.git'
+    git(root, 'init', '--quiet', '--bare', str(origin))
+    upstream = root / 'work'
+    upstream.mkdir()
+    git(upstream, 'init', '--quiet', '-b', 'main')
+    git(upstream, 'commit', '--quiet', '--allow-empty', '-m', 'feat: the first one')
+    git(upstream, 'commit', '--quiet', '--allow-empty', '-m', 'WIP unconventional')
+    git(upstream, 'remote', 'add', 'origin', str(origin))
+    git(upstream, 'push', '--quiet', 'origin', 'main')
+
+    # What `actions/checkout@v6` does: one commit, then a local branch tracking the remote.
+    github = root / 'github-runner'
+    github.mkdir()
+    git(github, 'init', '--quiet', '.')
+    git(github, 'remote', 'add', 'origin', str(origin))
+    git(
+        github,
+        '-c',
+        'protocol.version=2',
+        'fetch',
+        '--quiet',
+        '--no-tags',
+        '--prune',
+        '--depth=1',
+        'origin',
+        '+refs/heads/main*:refs/remotes/origin/main*',
+    )
+    git(github, 'checkout', '--quiet', '--force', '-B', 'main', 'refs/remotes/origin/main')
+    assert git(github, 'rev-parse', '--abbrev-ref', '@{upstream}').stdout.strip() == 'origin/main', (
+        'the premise of this test is gone: that checkout no longer sets branch tracking'
+    )
+    assert 'WIP unconventional' in commits_in(github, resolve(github)), (
+        'CI validates no message at all, on the only run that can catch one the hook did not see'
+    )
+
+    # What GitLab's runner does: a detached checkout at a shallow depth.
+    gitlab = root / 'gitlab-runner'
+    gitlab.mkdir()
+    git(gitlab, 'init', '--quiet', '.')
+    git(gitlab, 'remote', 'add', 'origin', str(origin))
+    git(gitlab, 'fetch', '--quiet', '--depth', '20', 'origin', 'main')
+    git(gitlab, 'checkout', '--quiet', '--detach', 'FETCH_HEAD')
+    assert 'WIP unconventional' in commits_in(gitlab, resolve(gitlab)), 'the detached shape checks nothing'
+
+    # A developer with the message still unpushed.
+    git(upstream, 'commit', '--quiet', '--allow-empty', '-m', 'nope: mine to fix')
+    assert 'nope: mine to fix' in commits_in(upstream, resolve(upstream)), 'an unpushed message goes unchecked'
+
+    # Once it is pushed and a good commit follows, the old one is nobody's problem.
+    git(upstream, 'push', '--quiet', 'origin', 'main')
+    git(upstream, 'commit', '--quiet', '--allow-empty', '-m', 'feat: moving on')
+    subjects = commits_in(upstream, resolve(upstream))
+    assert subjects == ['feat: moving on'], f'the range reaches back into settled history: {subjects}'
+
+    # pre-commit hands a pre-push hook the push's own range, and that wins when it is there.
+    base = git(upstream, 'rev-parse', 'HEAD~2').stdout.strip()
+    os.environ['PRE_COMMIT_FROM_REF'], os.environ['PRE_COMMIT_TO_REF'] = base, 'HEAD'
+    try:
+        assert 'nope: mine to fix' in commits_in(upstream, resolve(upstream)), (
+            'the range pre-commit supplies loses to an inference about it'
+        )
+    finally:
+        del os.environ['PRE_COMMIT_FROM_REF'], os.environ['PRE_COMMIT_TO_REF']
+
+    # No commits at all is the one case with nothing to say.
+    empty = root / 'fresh'
+    empty.mkdir()
+    git(empty, 'init', '--quiet', '.')
+    assert resolve(empty) is None, 'an empty repository resolves a range'
+
+
+def test_the_docs_build_runs_before_the_matrix(generated_project):
+    """`docs` sits ahead of the expensive steps, which is what makes its verdict early.
+
+    `run_scope` runs every step regardless of failure, so the registry's order is the only
+    thing that decides how long a verdict takes. The docs build costs 1.3s and the steps after
+    it cost twelve, so a broken cross-reference is reported at 1.7s of a 13.8s run — put it
+    behind the matrix instead and the same failure takes ten seconds to surface. pylint moved
+    behind it for the same reason: five of those twelve seconds are pylint's, and everything
+    cheaper that can also fail should have spoken first.
+    """
+    project, _ = generated_project
+    order = list(registry_steps(project))
+    for earlier, later in (('docs', 'pyscn'), ('docs', 'tox'), ('docs', 'build'), ('complexipy', 'pylint')):
+        assert order.index(earlier) < order.index(later), (
+            f'{earlier!r} now runs after {later!r}, so its verdict waits for a slower step'
+        )
+
+
+def test_the_coverage_floor_is_enforced_by_exactly_one_command(generated_project):
+    """Every coverage command except the union's own JSON write opts out of `fail_under`.
+
+    `[tool.coverage.report] fail_under` applies to whatever command reads the data, and the
+    floor is set from the union across `env_list` — so any command seeing one interpreter's
+    data would fail on a bar that data cannot clear. Correctness therefore rests on every call
+    site passing `--fail-under=0`, which is a rule about call sites rather than about
+    configuration, and this is the walk over them.
+    """
+    project, _ = generated_project
+    test_py = (project / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
+    combine = test_py.split('def combine_coverage', 1)[1].split('\n@', 1)[0]
+    union = [line for line in combine.splitlines() if 'coverage json -o' in line and '{COVERAGE_REPORT}' in line]
+    enforcing = [line.strip() for line in union if '--fail-under' not in line]
+    assert len(enforcing) == 1, f'the floor is enforced by {len(enforcing)} commands, not one: {enforcing}'
+
+    reads = [
+        line.strip()
+        for line in test_py.splitlines()
+        if re.search(r'uv run coverage (report|json|html)', line) and line.strip() not in enforcing
+    ]
+    assert reads, 'no coverage commands left to check, so this walk has stopped walking'
+    for command in reads:
+        assert '--fail-under=0' in command, f'{command} is gated by a floor its data cannot clear'
+
+    data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
+    addopts = data['tool']['pytest']['ini_options']['addopts']
+    assert '--cov-fail-under=0' in addopts, 'pytest-cov enforces the union floor per interpreter again'
 
 
 def test_matrix_envs_do_not_share_report_paths(generated_project):
@@ -2150,8 +2371,16 @@ def test_matrix_coverage_is_combined_before_anything_reads_it(generated_project)
     # And it gates only when the data under it is the union the floor was measured from.
     # `test.tox --env=py310` combines one env's data: enforcing there failed the command whose
     # whole purpose is looking at one interpreter, on any project with an engaged ratchet.
-    assert 'enforce' in combine, 'the floor is enforced against whatever data happens to be there'
-    assert 'combine_coverage(context, enforce=not env)' in test_py, 'a single-env run is gated by the union floor'
+    assert 'combine_coverage(context, scope=env)' in test_py, 'the combine no longer knows its scope'
+    # The two writes, by command line rather than by prose: the comments around them discuss
+    # `--fail-under=0` as well.
+    writes = [line for line in combine.splitlines() if 'coverage json -o' in line]
+    scoped = [line for line in writes if '{scope}' in line]
+    union = [line for line in writes if '{COVERAGE_REPORT}' in line]
+    assert scoped, "one interpreter's data is written to the union's name"
+    assert all('--fail-under=0' in line for line in scoped), 'one interpreter is gated by a floor set from five'
+    assert union, 'the union never reaches the report the badge reads'
+    assert not any('--fail-under=0' in line for line in union), 'the union run does not enforce the floor either'
 
 
 def test_only_what_measures_a_derived_value_may_write_it(generated_project):

@@ -194,7 +194,9 @@ def view(context: Context) -> None:
     """Run the tests and open the HTML test and coverage reports in a browser.
 
     Both reports are produced here, by the command that opens them. A plain run writes only
-    the JSON the gate reads: rendering HTML nobody looks at is most of a scaffold's test run.
+    the JSON the gate reads, because nothing in a hook or a pipeline opens an HTML report — the
+    saving is about half a second per matrix run, so the reason is the rule rather than the
+    clock.
     """
     execute(context, 'uv run pytest --html=reports/tests.html --self-contained-html')
     coverage(context)
@@ -221,7 +223,7 @@ def erase_coverage_data() -> None:
         data_file.unlink(missing_ok=True)
 
 
-def combine_coverage(context: Context, *, enforce: bool = True) -> None:
+def combine_coverage(context: Context, *, scope: str = '') -> None:
     """Merge the matrix's per-env coverage data into one report.
 
     ``coverage combine`` takes the *union* of the lines each interpreter executed: a line counts
@@ -262,14 +264,18 @@ def combine_coverage(context: Context, *, enforce: bool = True) -> None:
     # lost by consuming them — the per-env *reports* under `reports/` are what anyone reads to
     # see one interpreter's numbers.
     execute(context, 'uv run coverage combine')
-    # The one place `fail_under` is enforced, and only when the data under it is the union the
-    # floor was measured from. Every other coverage command in this workflow passes
-    # `--fail-under=0`, and `addopts` does too, because they see one interpreter — and a floor
-    # set from five is unreachable by one. `enforce=False` is that same case reaching here:
-    # `test.tox --env=py310` combines one env's data, and gating it would fail the command
-    # whose whole purpose is looking at one interpreter.
-    floor = '' if enforce else ' --fail-under=0'
-    execute(context, f'uv run coverage json -o {COVERAGE_REPORT}{floor}')
+    if scope:
+        # One interpreter's data, so it is written under that interpreter's name and gates
+        # nothing. `reports/coverage.json` means the union across `env_list` — every reader of
+        # it, the badge and the ratchet included, is entitled to that — and `fail_under` is set
+        # from the union, so no single env can clear it. `test.tox --env=py310` used to write
+        # both the wrong file and a failure.
+        execute(context, f'uv run coverage json -o reports/coverage.{scope}.json --fail-under=0')
+        return
+    # The one place `fail_under` is enforced: the only run whose data is the union it was
+    # measured from. Every other coverage command here passes `--fail-under=0`, and `addopts`
+    # does too, because each sees one interpreter.
+    execute(context, f'uv run coverage json -o {COVERAGE_REPORT}')
 
 
 @logged('test.matrix')
@@ -282,9 +288,10 @@ def tox_matrix(context: Context, env: str = '') -> None:
 
     Args:
         context: Invoke context.
-        env: A single tox environment to run, e.g. ``py313``. Empty runs the whole matrix, and
-            is the only case where the coverage floor is enforced: it is set from the union of
-            every interpreter, so no single one can clear it.
+        env: A single tox environment to run, e.g. ``py313``. Empty runs the whole matrix,
+            which is the only run that produces `reports/coverage.json` and the only one the
+            coverage floor is enforced against: the floor is set from the union of every
+            interpreter, so no single one can clear it.
     """
     # By hand, because `coverage erase` leaves the per-env files alone — see the docstring.
     erase_coverage_data()
@@ -293,7 +300,7 @@ def tox_matrix(context: Context, env: str = '') -> None:
     # absent env is the one with the longest duration and it changes between runs.
     # `--parallel-no-spinner` does not help. The summary block below the list is complete.
     execute(context, f'uv run tox run -e {env}' if env else 'uv run tox run-parallel')
-    combine_coverage(context, enforce=not env)
+    combine_coverage(context, scope=env)
 
 
 @task

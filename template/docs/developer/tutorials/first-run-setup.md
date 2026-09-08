@@ -56,9 +56,9 @@ Produces a wheel and an sdist under `dist/`. You can `uv pip install dist/<your-
 ./workflow.cmd preflight --write
 ```
 
-`preflight` is the gate: formatting, the linters, the type checker, pyscn, the test matrix on
-every interpreter in your range, the wheel, and the README badges against what those tools just
-measured. The pre-push hook and the CI pipeline run it bare, where it compares and fails on
+`preflight` is the gate: formatting, the linters, the type checker, your commit messages, the
+docs build, pyscn, the test matrix on every interpreter in your range, the wheel, and the README
+badges against what those tools just measured. The pre-push hook and the CI pipeline run it bare, where it compares and fails on
 anything out of date.
 
 `--write` is needed here because a generated README ships `coverage-unknown` and `pyscn-not

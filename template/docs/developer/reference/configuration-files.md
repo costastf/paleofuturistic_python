@@ -40,9 +40,11 @@ Hook definitions, split across three git stages:
 | `pre-commit` | `.security-overrides` validation | that file, when staged | ~1.5s |
 | `pre-push` | `preflight` — ty, commitizen, the docs build, pyscn, the tox matrix, the wheel, derived files | whole project | ~19s |
 
-**The commit stage is one hook, one invocation.** `./workflow.cmd` spends about 1.3s on
-interpreter and imports before any tool runs, so one hook pays that once — ~2.9s for four
-checks on a fresh project, of which 1.6s is the startup.
+**The commit stage is one hook, one invocation.** Four hooks would have pre-commit partition
+the staged files and run them concurrently, so a commit would get four verdicts about four
+subsets of itself. One hook is one verdict about one file list, in the order the registry
+declares — cheapest first, so a formatting slip is not something you wait for pylint to hear
+about.
 
 Which tools run there is decided by the step registry in `_CI/tasks/preflight.py`, not by this
 file, and the registry holds the per-tool path filters too (complexipy is `src/` only; the rest

@@ -12,9 +12,11 @@ repos:
         pass_filenames: true
         stages: [commit-msg]
       # One hook, one invocation, for every check that can be judged from the staged files
-      # alone: formatting, ruff, pylint, complexipy. `./workflow.cmd` spends about 1.3s on
-      # interpreter and imports before a tool runs, so one hook pays that once — measured at
-      # ~2.9s on a fresh project, of which 1.6s is the startup.
+      # alone: formatting, ruff, complexipy, pylint. Not four hooks, which pre-commit would
+      # partition and run concurrently: each partition prints its own banner, reads the index
+      # again, and reports a verdict about a different subset of one commit. Launcher startup
+      # is 0.12s since the SBOM composer stopped being imported eagerly, so the argument is one
+      # legible verdict rather than saved seconds.
       #
       # `pass_filenames: false` and no arguments, because `preflight.staged` reads the index
       # itself. That is what lets this line be the command you would type, and it means the two
@@ -61,7 +63,7 @@ repos:
       # meant to prove it green, while CI still ran it in full. An invariant asserts the
       # absence.
       - id: preflight
-        name: Preflight checks (ty, commitizen, docs, pyscn, test matrix, wheel, derived files)
+        name: Preflight checks (ty (types), commit messages, docs build, pyscn, test matrix, wheel, derived files)
         entry: ./workflow.cmd preflight
         language: system
         pass_filenames: false

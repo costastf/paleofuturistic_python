@@ -71,8 +71,9 @@ build-deps-image:
 # two lists of checks that can disagree; the cost of one job is the wall-clock their parallelism
 # bought, and `run_steps` still reports every failure in one pass.
 #
-# Anything failing here would have failed the push: format, lint, ty, pyscn, the tox matrix, the
-# wheel, and the badges and coverage ratchet matching what the tools measure.
+# Anything failing here would have failed the push: format, lint, ty, the commit messages this
+# push adds, the docs build, pyscn, the tox matrix, the wheel, and the badges and coverage
+# ratchet matching what the tools measure.
 #
 # No `--write`: the job has no write access to the repository, so its only useful move is to
 # fail and name the command that fixes it.
@@ -108,11 +109,14 @@ secure:
     # `uv.lock` covers every real dependency change: the project runs `--frozen` throughout,
     # so a `pyproject.toml` edit that changes what is installed changes the lockfile with it. A
     # release audits too — `version_provider = "uv"` re-locks, so a bump touches this file.
-    # `vendor.txt` is the vendored CI tree, which pip-audit cannot see for want of `.dist-info`
-    # but which is still worth looking at when it moves.
+    # `vendor.txt` is audited by name, the vendored trees having no `.dist-info` for an
+    # installed-distribution scan to find. The tree itself is watched so a hand-edited vendored
+    # file reaches a human, which is the only thing that can read one.
     - changes:
         - uv.lock
         - _CI/lib/vendor.txt
+        - _CI/lib/vendor/**
+        - _CI/lib/patches/**
         - .security-overrides
   before_script:
     - git config --global --add safe.directory "$CI_PROJECT_DIR"

@@ -5,7 +5,7 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .configuration import PATHS
+from .configuration import CODE_FILES, PATHS
 from .shared import execute, logged, run_steps, staged_files
 
 
@@ -39,10 +39,12 @@ def format_(context: Context, paths: str = '', staged: bool = False) -> None:
         print('--staged and --paths both say what to format. Pass one.')
         raise SystemExit(1)
     if staged:
-        # Python only, and existing: ruff refuses a Markdown file outright ("Markdown
-        # formatting is experimental") and a staged deletion has no file left to read.
-        # `staged_files` already drops deletions and refuses a path with a space in it.
-        paths = ' '.join(path for path in staged_files(context).split() if path.endswith('.py'))
+        # `CODE_FILES`, the same pattern the gate's per-file steps use, so the formatter's
+        # domain and the checks' domain cannot drift: a staged `docs/generate.py` is not
+        # something bare `format` touches either. That also excludes Markdown, which ruff
+        # refuses outright ("Markdown formatting is experimental"). `staged_files` has already
+        # dropped what git no longer has a file for.
+        paths = ' '.join(path for path in staged_files(context).split() if CODE_FILES.match(path))
         if not paths:
             print('No staged Python files, so nothing to format.')
             return

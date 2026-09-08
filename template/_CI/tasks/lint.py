@@ -1,5 +1,7 @@
 """Linting task definitions."""
 
+import os
+from collections.abc import Iterator
 from typing import cast
 
 from invoke import Collection, Context, Task, task
@@ -85,8 +87,24 @@ def resolves(context: Context, revision: str) -> bool:
     return bool(result and not result.failed)
 
 
+def commit_ranges(context: Context) -> Iterator[str]:
+    """Yield candidate ranges for "the commits this push adds", widest-trust first.
+
+    pre-commit exports `PRE_COMMIT_FROM_REF`/`PRE_COMMIT_TO_REF` to pre-push hooks, straight
+    from what git handed it: that is the push itself rather than an inference about it, so it
+    comes first and it is right even when the branch tracks nothing or pushes somewhere other
+    than its upstream. Then the tracking branch, then the remote's default branch.
+    """
+    from_ref, to_ref = os.environ.get('PRE_COMMIT_FROM_REF', ''), os.environ.get('PRE_COMMIT_TO_REF', '')
+    if from_ref and to_ref and resolves(context, from_ref) and resolves(context, to_ref):
+        yield f'{from_ref}..{to_ref}'
+    for base in ('@{upstream}', 'origin/HEAD'):
+        if resolves(context, base):
+            yield f'{base}..HEAD'
+
+
 def unpushed_range(context: Context) -> str | None:
-    """Return the commit range this push would add, or None when there is nothing to check.
+    """Return a commit range to check, or None when the repository holds no commit at all.
 
     Bounded on purpose. `--rev-range HEAD` reads every reachable commit, so one message that
     predates the convention — a squashed import, history from before this template was applied,
@@ -94,26 +112,28 @@ def unpushed_range(context: Context) -> str | None:
     `SKIP=preflight`, which drops the whole gate. And it is unfixable by design: rewriting
     published history is worse than the lint it satisfies.
 
-    What a push is responsible for is the commits it adds, so that is the range: the tracking
-    branch, then the remote's default branch, then the last commit. A shallow clone — what CI
-    checks out — resolves none of the first two and lands on the last, which is the tip it was
-    handed. `git rev-list` decides emptiness, because `cz check` treats an empty range as an
-    error rather than as nothing to do.
+    An empty candidate range falls through to the next one rather than ending the search, and
+    the last resort is the tip commit. That matters because of where the empty case comes from:
+    `actions/checkout` fetches one commit and runs `checkout -B main refs/remotes/origin/main`,
+    so in CI the branch *does* track `origin/main` and `origin/main` *is* `HEAD` — the range is
+    empty on every push. Returning None there would have the pipeline validate nothing at all,
+    on the one run that can catch what the hook cannot: a `--no-verify` commit, or a clone with
+    no hooks installed.
+
+    So the tip is always examined by something. Locally that is the commit you just made; in CI
+    it is the commit that arrived. A bad message already pushed does keep failing until another
+    commit lands on top — bounded to one commit rather than to all of history, which is the
+    property that matters.
     """
     if not resolves(context, 'HEAD'):
         return None
-    for candidate in ('@{upstream}', 'origin/HEAD'):
-        if resolves(context, candidate):
-            revision_range = f'{candidate}..HEAD'
-            break
-    else:
-        revision_range = 'HEAD~1..HEAD' if resolves(context, 'HEAD^') else 'HEAD'
-    if revision_range == 'HEAD':
-        return revision_range
-    counted = context.run(f'git rev-list --count {revision_range}', hide=True, warn=True)
-    if counted is None or counted.failed or counted.stdout.strip() == '0':
-        return None
-    return revision_range
+    for candidate in commit_ranges(context):
+        counted = context.run(f'git rev-list --count {candidate}', hide=True, warn=True)
+        if counted is not None and not counted.failed and counted.stdout.strip() not in ('', '0'):
+            return candidate
+    # The tip alone. `HEAD` is the form for a root commit, where `HEAD~1` does not exist — and
+    # a shallow graft is that same shape, its tip having no parent in the clone.
+    return 'HEAD~1..HEAD' if resolves(context, 'HEAD^') else 'HEAD'
 
 
 @task
@@ -136,7 +156,7 @@ def commitizen(context: Context, commit_msg_file: str | None = None) -> None:
         return
     revision_range = unpushed_range(context)
     if revision_range is None:
-        print('No commits to check — nothing new since the remote.')
+        print('No commits yet — nothing to check.')
         return
     execute(context, f'uv run cz check --rev-range {revision_range}')
 

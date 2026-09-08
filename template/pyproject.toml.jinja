@@ -279,9 +279,11 @@ disable = [
 addopts = [
     # A fixed worker count, not `-n auto`. Under `tox run-parallel` every env spawns its own
     # pool, so `auto` on a 16-core machine asks for five times sixteen workers and the run comes
-    # out slower than the same config on four cores. Four measured fastest on a 242-test suite
-    # at both 4 and 16 cores — 2.3x quicker than no xdist at all — and it leaves the machine
-    # usable while it runs. Raise it for a suite big enough to keep more workers busy.
+    # out slower than the same config on four cores. Four is chosen for the suite this project
+    # will have rather than the one it ships with: on the scaffold's two tests xdist costs more
+    # than it saves (about 0.5s per env), and it starts paying once a suite is large enough to
+    # spread. Raise it when four workers are the bottleneck; drop to `-n 0` while the suite is
+    # still tiny and you mind the second.
     "-n", "4",
     "--strict-markers",
     # Terminal summary and the JSON the badge and the ratchet read. No HTML: nothing in a hook

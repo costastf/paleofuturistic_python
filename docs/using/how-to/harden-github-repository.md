@@ -1,12 +1,12 @@
 # Harden the GitHub repository
 
-After generating with `git_hosting_service=github`, you have six workflow files under `.github/workflows/` and a release pipeline that wants to publish to PyPI. This page lists the GitHub-side settings worth applying before that pipeline ever fires.
+After generating with `git_hosting_service=github`, you have six workflow files under `.github/workflows/` (five without Pages) and a release pipeline that wants to publish to PyPI. This page lists the GitHub-side settings worth applying before that pipeline ever fires.
 
 ## Prerequisite security
 
 These are non-negotiable for any repository connected to CI/CD:
 
-- **Branch protection on `main`.** Require pull requests, require status checks, require a linear history. Block force pushes and deletions. Require only checks that run on every pull request: `security-audit` is filtered by `on.push.paths`, so requiring it leaves a pull request that touches nothing it watches waiting forever on a check that will never report.
+- **Branch protection on `main`.** Require pull requests, require status checks, require a linear history. Block force pushes and deletions. Require only checks that run on every pull request — and today that is none of the shipped ones. **Do not require `Preflight`**: the workflows trigger on `push`, so a pull request from a fork runs nothing in this repository and a required check would sit pending forever, leaving the repository unable to merge an external contribution. `security-audit` is filtered by `on.push.paths` on top of that. Require them once the workflows gain a `pull_request` trigger, which is a decision the template has not taken — see [Decisions not taken](https://github.com/costastf/paleofuturistic_python/blob/main/docs/maintaining/explanation/decisions-not-taken.md).
 - **Tag protection for `v*`.** Forbid deleting and editing release tags.
 - **Required approvals.** At least one reviewer per PR.
 
@@ -34,7 +34,7 @@ The workflow grants `id-token: write` on the publish job — that's what makes t
 
 ## Verify the workflows still pass
 
-After applying ruleset changes, push an empty commit and watch the Quality Assurance workflow run end-to-end. Anything blocked by your new rules will surface in the Actions tab.
+After applying ruleset changes, push an empty commit and watch the Continuous Integration workflow run end-to-end. Anything blocked by your new rules will surface in the Actions tab.
 
 ## See also
 
