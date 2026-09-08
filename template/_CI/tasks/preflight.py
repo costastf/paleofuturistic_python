@@ -36,6 +36,7 @@ from typing import NamedTuple, cast
 from invoke import Collection, Context, Task, task
 
 from .build import build
+from .document import build as document_build
 from .document import update_package_version_badge, update_pipeline_badge, update_python_badge
 from .lint import commitizen, complexipy, format_check, pylint, ruff_lint, ty
 from .quality import pyscn_check, pyscn_json_report, update_pyscn_badge
@@ -144,9 +145,12 @@ def artifacts(context: Context, *, write: bool) -> None:
         return
     for reason in reasons:
         print(reason)
+    # A reason survives `--write` only when a value could not be computed at all — a report
+    # missing, or unreadable. Both modes fail on it: "wrote nothing, exited 0" is the shape
+    # that lets a stale badge reach main through the command meant to refresh it.
     if not write:
         print(f'Run `{FIX_COMMAND}` and commit the result.')
-        raise SystemExit(1)
+    raise SystemExit(1)
 
 
 STEPS = (
@@ -170,6 +174,11 @@ STEPS = (
     # write it — this step runs inside a hook and a pipeline, where nothing may.
     Step('tox', WHOLE_PROGRAM, check=tox_matrix),
     Step('build', WHOLE_PROGRAM, check=build),
+    # `properdocs build --strict` fails on a broken cross-reference or a page missing from the
+    # nav, which are whole-program properties of the docs tree. Publishing happens on release,
+    # so without this a bad link is first discovered by the release pipeline, after the tag is
+    # pushed — the one moment there is no cheap way back.
+    Step('docs', WHOLE_PROGRAM, check=document_build),
     # After pyscn and tox, which produce the reports it reads.
     Step(
         'artifacts',

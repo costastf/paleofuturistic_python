@@ -210,9 +210,14 @@ def erase_coverage_data() -> None:
     and was combined by the next run. A data file left by an env since dropped from `env_list`
     would inflate the union, and with it the ratchet's `fail_under`, which only moves up.
 
+    The per-env *reports* go with them, for the same reason and one more: they are named
+    after an env, so one from a dropped `env_list` entry stays in `reports/` forever, looking
+    like a result from this run.
+
     `.coverage.*` cannot match `.coveragerc`, there being no dot before `rc`.
     """
-    for data_file in (Path('.coverage'), *Path().glob('.coverage.*')):
+    stale = (Path('.coverage'), *Path().glob('.coverage.*'), *Path('reports').glob('coverage.*.json'))
+    for data_file in stale:
         data_file.unlink(missing_ok=True)
 
 

@@ -105,9 +105,10 @@ secure:
       artifacts: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
+    # `uv.lock` covers every real dependency change: the project runs `--frozen` throughout,
+    # so a `pyproject.toml` edit that changes what is installed changes the lockfile with it.
     - changes:
         - uv.lock
-        - pyproject.toml
         - .security-overrides
   before_script:
     - git config --global --add safe.directory "$CI_PROJECT_DIR"

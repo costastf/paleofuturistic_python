@@ -33,6 +33,8 @@ jobs:
         with:
           # Full history: the step below walks the pushed commits looking for a tag.
           fetch-depth: 0
+          # Commits and tag refs are all it reads, so the blobs can stay on the server.
+          filter: blob:none
           persist-credentials: false
 
       - id: find

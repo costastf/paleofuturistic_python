@@ -35,8 +35,10 @@ ignore. It is triggered on the axes it varies along instead:
 - **On a schedule** (daily), which is what makes the expiry dates in `.security-overrides`
   load-bearing — a dependency can turn out to be vulnerable, and an override can come due,
   without anyone pushing anything.
-- **On pushes that change the dependency surface** — `uv.lock`, `pyproject.toml`,
-  `.security-overrides`. Change what you depend on and you own the result.
+- **On pushes that change the dependency surface** — `uv.lock` and `.security-overrides`.
+  Change what you depend on and you own the result. Pushes only: a pull request from a fork
+  triggers nothing here, so the audit that covers a fork's dependencies is the scheduled one,
+  after the merge.
 - **Before publishing.** `release.dist` audits before it builds. That is the moment the outside
   world is exposed to these dependencies, and the one place where refusing to proceed protects
   somebody.

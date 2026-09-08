@@ -669,7 +669,10 @@ def test_security_audit_is_automated_without_failing_unrelated_changes(generated
     gated separately by `release.dist`.
     """
     project, cell = generated_project
-    dependency_surface = {'uv.lock', 'pyproject.toml'}
+    # The lockfile alone. The project runs `--frozen` throughout, so a `pyproject.toml` edit
+    # that changes what is installed changes `uv.lock` with it, while the edits that do not —
+    # a ratchet bump, a `cz bump` — used to fire a full audit of an untouched dependency set.
+    dependency_surface = {'uv.lock'}
     if cell['git_hosting_service'] == 'github':
         pipeline = (project / '.github' / 'workflows' / 'continuous-integration.yaml').read_text(encoding='utf-8')
         assert 'secure.audit' not in pipeline, 'the per-push pipeline audits every change'
@@ -680,12 +683,14 @@ def test_security_audit_is_automated_without_failing_unrelated_changes(generated
         triggers = audit_workflow.get('on') or audit_workflow[True]
         paths = set(triggers['push']['paths'])
         assert dependency_surface <= paths, f'the audit is not triggered by {dependency_surface - paths}'
+        assert 'pyproject.toml' not in paths, 'a version bump fires a full dependency audit'
     else:
         jobs = yaml.safe_load((project / '.gitlab-ci.yml').read_text(encoding='utf-8'))
         rules = jobs['secure']['rules']
         assert any('schedule' in str(rule.get('if', '')) for rule in rules), 'no scheduled audit'
         changes = {path for rule in rules for path in rule.get('changes') or []}
         assert dependency_surface <= changes, f'the audit is not triggered by {dependency_surface - changes}'
+        assert 'pyproject.toml' not in changes, 'a version bump fires a full dependency audit'
 
 
 def test_scheduled_security_audit_ships_for_github(generated_project):
@@ -1466,7 +1471,17 @@ def registry_steps(project):
             continue
         if not any(getattr(target, 'id', None) == 'STEPS' for target in node.targets):
             continue
-        return {call.args[0].value: call.args[1].id for call in node.value.elts}
+        # Keywords as well as positions, and a failed read fails the assertion rather than
+        # raising out of the helper: `Step('ty', scope=WHOLE_PROGRAM)` is the same declaration.
+        steps = {}
+        for call in node.value.elts:
+            supplied = dict(zip(('name', 'scope'), call.args, strict=False))
+            supplied.update({word.arg: word.value for word in call.keywords})
+            name, scope = supplied.get('name'), supplied.get('scope')
+            assert isinstance(name, ast.Constant), f'a step in STEPS declares no literal name: {ast.dump(call)}'
+            assert isinstance(scope, ast.Name), f'step {name.value!r} declares no plain scope name'
+            steps[name.value] = scope.id
+        return steps
     pytest.fail('preflight.py declares no STEPS registry')
 
 
@@ -1856,6 +1871,107 @@ def test_pyscn_never_opens_a_browser_by_itself(generated_project):
     assert html_runs, 'no pyscn invocation produces an HTML report any more'
     for line in html_runs:
         assert '--no-open' in line, f'{line.strip()!r} lets pyscn open a browser on its own'
+
+
+def test_the_docs_build_is_in_the_gate(generated_project):
+    """`properdocs build --strict` runs on every push, not first at release time.
+
+    A broken cross-reference or a page missing from the nav fails `--strict`, and publishing
+    happens on a release tag. Without this step the first run that sees a bad link is the
+    release pipeline, after the tag is pushed — the one moment there is no cheap way back.
+    """
+    project, _ = generated_project
+    assert registry_steps(project).get('docs') == 'WHOLE_PROGRAM', 'the docs build is in no gate'
+    document = (project / '_CI' / 'tasks' / 'document.py').read_text(encoding='utf-8')
+    assert '--strict' in document, 'the docs build tolerates a broken link'
+
+
+def test_a_report_a_reader_would_misread_is_cleared_first(generated_project):
+    """Reports from a previous run do not survive into this one, pyscn's included.
+
+    pyscn timestamps every report, so nothing overwrites anything and `reports/` grows for as
+    long as the project runs its gate. Clearing also decides what an early failure means: with
+    the directory empty the badge reports that it has no grade to read, instead of certifying
+    one measured against a tree that has since changed. The per-env coverage reports go the
+    same way, and for one more reason — named after an env, one from a dropped `env_list`
+    entry would sit in `reports/` looking like a result from this run.
+    """
+    project, _ = generated_project
+    quality = (project / '_CI' / 'tasks' / 'quality.py').read_text(encoding='utf-8')
+    for name in ('pyscn_analyze', 'pyscn_analyze_only', 'pyscn_json_report'):
+        body = quality.split(f'def {name}', 1)[1].split('\ndef ', 1)[0]
+        assert 'clear_pyscn_reports()' in body, f'{name} can read a report from a previous run'
+    test_py = (project / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
+    erase = test_py.split('def erase_coverage_data', 1)[1].split('\ndef ', 1)[0]
+    assert "Path('reports').glob('coverage.*.json')" in erase, 'a retired env keeps its report'
+
+
+def test_a_derived_value_that_cannot_be_written_fails_the_write(generated_project):
+    """`preflight --write` exits non-zero when a value survives the writing.
+
+    A reason survives `--write` only when the value could not be computed at all — its report
+    missing, or unreadable. "Wrote nothing, exited 0" is the shape that lets a stale badge
+    reach main through the command meant to refresh it, so both modes fail on it and only the
+    hint about which command to run differs.
+    """
+    project, _ = generated_project
+    source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
+    body = source.split('def artifacts', 1)[1].split('\nSTEPS', 1)[0]
+    tail = body.split('for reason in reasons:', 1)[1]
+    assert 'if not write:' in tail, 'both modes print the same hint'
+    fix_hint, exit_call = tail.index('FIX_COMMAND'), tail.index('raise SystemExit(1)')
+    assert fix_hint < exit_call, 'the hint comes after the exit, so nobody reads it'
+    assert tail.split('raise SystemExit(1)')[0].count('if ') == 1, 'the exit is conditional again'
+
+
+def test_a_badge_the_reader_removed_is_reported_not_assumed(generated_project):
+    """A pattern that matches nothing says so, rather than reading as up to date.
+
+    `re.sub` cannot tell "already correct" from "not there": both leave the content
+    unchanged. So deleting or renaming a badge silently retired the check that guarded it,
+    and the gate went on passing with one fewer thing to verify. Removing a badge stays the
+    reader's decision — this workflow does not put it back — but it is said out loud.
+    """
+    project, _ = generated_project
+    shared = (project / '_CI' / 'tasks' / 'shared.py').read_text(encoding='utf-8')
+    body = shared.split('def apply_badge', 1)[1].split('\ndef ', 1)[0]
+    assert 're.search(pattern' in body, 'a missing badge is indistinguishable from a current one'
+    assert body.index('re.search(pattern') < body.index('re.sub('), 'the check comes after the substitution'
+
+
+def test_the_gate_verifies_the_import_order_format_writes(generated_project):
+    """Ruff `I` is selected wherever `format` fixes it, including under `_CI/`.
+
+    `format` runs `ruff check --select I --fix` over `src/`, `_CI/tasks/` and `tests/`, while
+    the gate only ran `ruff format --check`. Under `_CI/` ruff resolves `_CI/pyproject.toml`,
+    which selected the defaults — so import order drifted there unwatched and `format` swept
+    the correction into whatever commit came next, on files a `copier update` owns.
+    """
+    project, _ = generated_project
+    ci_config = tomllib.loads((project / '_CI' / 'pyproject.toml').read_text(encoding='utf-8'))
+    assert 'I' in ci_config['tool']['ruff']['lint']['select'], 'nothing checks the import order under _CI/'
+    root = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
+    selected = root['tool']['ruff']['lint']['select']
+    assert 'ALL' in selected or 'I' in selected, 'nothing checks the import order under src/'
+
+
+def test_a_failed_bump_leaves_no_badge_for_it(generated_project):
+    """`release.bump` puts the version badge back when `cz bump` refuses.
+
+    The badge is written first on purpose, so `cz bump` sweeps it into the commit the release
+    tag points at. That leaves the failure case to handle: `cz bump` refuses on a dirty tree,
+    an unparseable history or a hook it cannot satisfy, and a badge announcing a version
+    nobody released is worse than the failure that caused it. The restore reads the version
+    from pyproject.toml, which a failed bump has not touched, and goes through `apply_badge`
+    like every other write.
+    """
+    project, _ = generated_project
+    release = (project / '_CI' / 'tasks' / 'release.py').read_text(encoding='utf-8')
+    body = release.split('def bump', 1)[1].split('\n@task', 1)[0]
+    assert 'except SystemExit:' in body, 'a failed bump keeps the badge it wrote'
+    restore = body.split('except SystemExit:', 1)[1]
+    assert 'update_package_version_badge()' in restore, 'the restore does not go through the one writer'
+    assert 'raise' in restore, 'the failure is swallowed'
 
 
 def test_matrix_envs_do_not_share_report_paths(generated_project):

@@ -16,6 +16,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Floor for the workflow; the deploy job widens it to what `gh-deploy` needs. Without this
+# every job here would inherit the repository default token.
+permissions:
+  contents: read
+
 concurrency:
   group: pages
   cancel-in-progress: false

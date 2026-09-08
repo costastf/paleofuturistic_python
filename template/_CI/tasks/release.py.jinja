@@ -87,6 +87,11 @@ def bump(context: Context, increment: str = '') -> None:
     clean tree. Otherwise the release would land a README contradicting the version it
     released, and the next `preflight` on main would fail on the stale badge.
 
+    Writing before the step that can fail means putting the badge back when it does. `cz bump`
+    refuses on a dirty tree, an unparseable history or a hook it cannot satisfy, and a badge
+    announcing a version nobody released is worse than the failure that caused it. The restore
+    reads the version from pyproject.toml, which a failed bump has not touched.
+
     Args:
         context: Invoke context.
         increment: Version increment type — major, minor, patch, alpha, beta, or rc.
@@ -99,10 +104,18 @@ def bump(context: Context, increment: str = '') -> None:
         print(f'  increment: {", ".join(valid)}')
         raise SystemExit(1)
     note(update_package_version_badge(version=resolve_next_version(context, increment)))
-    if increment in prerelease_types:
-        execute(context, f'uv run cz bump --increment patch --prerelease {increment} --allow-no-commit --yes')
-    else:
-        execute(context, f'uv run cz bump --increment {increment} --allow-no-commit --yes')
+    try:
+        if increment in prerelease_types:
+            execute(context, f'uv run cz bump --increment patch --prerelease {increment} --allow-no-commit --yes')
+        else:
+            execute(context, f'uv run cz bump --increment {increment} --allow-no-commit --yes')
+    except SystemExit:
+        # A failed bump leaves the version in pyproject.toml alone, so writing the badge from
+        # pyproject.toml puts back exactly what was there — through the same substitution that
+        # changed it, so there is still one writer.
+        note(update_package_version_badge())
+        print('Version badge restored: the bump it announced did not happen.')
+        raise
 
 
 @task

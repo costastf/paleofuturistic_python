@@ -32,11 +32,12 @@ class RemoteRef(NamedTuple):
     path: str
 
 
-# `line_buffering` keeps a redirected log readable, which is to say every CI log. Python
-# block-buffers stdout when it is not a terminal, while a subprocess invoke spawns writes to the
-# same descriptor immediately — so without it our own lines (the echoed command, a task's
-# prints) arrive in chunks *after* the output of the command they introduce, and a pure-Python
-# task's output reads as though the previous command produced it. A flush per line fixes it.
+# `line_buffering` keeps a redirected log readable, which is to say every CI log. CPython
+# block-buffers stdout when it is not a terminal, while invoke re-emits a subprocess's output as
+# it arrives — so without it our own lines (the echoed command, a task's prints) surface in
+# chunks *after* the output of the command they introduce, and a pure-Python task's output reads
+# as though the previous command produced it. A flush per line fixes it. `IndentingStream` does
+# the same for the same reason: it is what `sys.stdout` is for the whole of a logged task.
 for _stream in (sys.stdout, sys.stderr):
     reconfigure = getattr(_stream, 'reconfigure', None)
     if reconfigure is not None:
@@ -97,7 +98,13 @@ class IndentingStream:
             chunks.append(ch)
             if ch == '\n':
                 self.at_line_start = True
-        return self.inner.write(''.join(chunks))
+        written = self.inner.write(''.join(chunks))
+        # Line-buffered by construction rather than by inheritance: this stands in for
+        # `sys.stdout` for the duration of a logged task, and the ordering the module-level
+        # `reconfigure` above buys is only kept if the substitute keeps it.
+        if '\n' in data:
+            self.inner.flush()
+        return written
 
     def flush(self) -> None:
         """Flush the wrapped stream."""
@@ -315,10 +322,17 @@ def apply_badge(
     decide what a stale value costs. A missing file is not a staleness — nothing can be
     concluded from it — so it reads as up to date here, and the caller diagnoses it, being the
     only one that knows whether the input should have existed.
+
+    A value the pattern does not find is not a staleness either: a badge removed from the
+    README is the reader's decision, and this workflow does not put it back. It says so, out
+    loud, because the alternative is a check that quietly stops existing.
     """
     if not path.exists():
         return None
     content = path.read_text(encoding='utf-8')
+    if not re.search(pattern, content, flags=flags):
+        print(f'No {label} in {path}, so nothing to keep current.')
+        return None
     updated = re.sub(pattern, replacement, content, flags=flags)
     if updated == content:
         return None

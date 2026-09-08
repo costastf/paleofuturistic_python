@@ -25,6 +25,19 @@ CHECK = 'uv run pyscn check src/'
 BADGE_PATTERN = r'(\[!\[pyscn quality\]\(https://img\.shields\.io/badge/pyscn-)[^)]+(\))'
 
 
+def clear_pyscn_reports() -> None:
+    """Delete every pyscn report, which each caller is about to replace.
+
+    pyscn timestamps its reports, so nothing overwrites anything and `reports/` grows for as
+    long as the project runs its gate. Clearing also decides what happens when an analysis
+    fails: with the directory empty, the badge reports that it has no grade to read instead of
+    certifying one measured against a tree that has since changed.
+    """
+    for suffix in ('html', 'json'):
+        for report in PYSCN_REPORTS_DIR.glob(f'analyze_*.{suffix}'):
+            report.unlink(missing_ok=True)
+
+
 def latest_pyscn_report() -> Path:
     """Return the most recently created pyscn HTML report."""
     return max(PYSCN_REPORTS_DIR.glob('analyze_*.html'), key=lambda p: p.stat().st_mtime)
@@ -77,6 +90,7 @@ def pyscn_analyze(context: Context, write: bool = False) -> None:
         context: Invoke context.
         write: Update the README's pyscn badge from this analysis.
     """
+    clear_pyscn_reports()
     execute(context, ANALYZE_HTML)
     execute(context, ANALYZE_JSON)
     note(update_pyscn_badge(write=write))
@@ -106,6 +120,7 @@ def pyscn_analyze_only(context: Context, *, write: bool = False) -> None:
     with "only one output format flag can be specified" — so each format costs a full analysis
     and prints its own summary table. ``pyscn_json_report`` is the path for callers needing one.
     """
+    clear_pyscn_reports()
     execute(context, ANALYZE_HTML)
     execute(context, ANALYZE_JSON)
     note(update_pyscn_badge(write=write))
@@ -122,6 +137,7 @@ def pyscn_json_report(context: Context) -> None:
     The badge is not written here: `preflight` owns every write to a tracked file, so verifying
     can compare all of them together.
     """
+    clear_pyscn_reports()
     execute(context, ANALYZE_JSON)
 
 
