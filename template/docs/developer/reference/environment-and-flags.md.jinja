@@ -45,9 +45,11 @@ Nothing here needs setting for local work. Every one has a default or a reason t
 | `{{ project_slug | upper }}_SECURITY_OVERRIDE` | `secure.audit` | Comma-separated pip-audit suppressions, each `<VULN_ID>::<YYYY-MM-DD>`. An expiry is **required** here, unlike in the file: a suppression that leaves no trace in the repository must not be able to last forever. |
 | `COVERAGE_FILE` | tox, per env | Set to `.coverage.{envname}` by `[tool.tox.env_run_base]` so the matrix's envs do not race one data file. Not yours to set. |
 {%- if git_hosting_service == 'github' %}
+| `GITHUB_REPOSITORY`, `GITHUB_ACTOR` | `container.deps-image`, in CI | Where to push the dependency image and who is pushing it, both injected by GitHub Actions. The image path is lowercased on the way through, ghcr.io rejecting uppercase while these preserve the repository's case. |
 | `GITHUB_TOKEN` | `release`, `document.deploy-github` | Opens the release pull request and pushes the docs to `gh-pages`. CI injects it; locally you need a PAT only if you run those tasks by hand. |
 {%- else %}
 | `GITLAB_TOKEN` | `release` | Opens the release merge request through the API. CI injects a job token; locally you need a PAT only if you run `release` by hand. |
+| `CI_REGISTRY`, `CI_REGISTRY_USER`, `CI_REGISTRY_PASSWORD`, `CI_REGISTRY_IMAGE` | `container.deps-image`, in CI | Where to push the dependency image and the job-token credentials to do it with, all four injected by GitLab. The shipped pipeline builds that image in a kaniko job with the Deploy Token below instead, so these are read when the task runs the push itself. |
 | `DEPS_IMAGE_USERNAME`, `DEPS_IMAGE_PASSWORD` | the deps-image job | A project Deploy Token with `read_registry` + `write_registry`. Mark both Protected and Masked, and scope them to the `deps` environment — an unscoped variable is readable by every job in every pipeline, including one added by a fork's merge request. |
 | `UV_LINK_MODE` | every job | Set to `copy` in `.gitlab-ci.yml`: hardlinks cannot span GitLab's mount boundaries, so `uv run` needs copies. |
 {%- endif %}

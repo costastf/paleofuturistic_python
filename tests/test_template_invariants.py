@@ -259,7 +259,15 @@ def test_every_environment_variable_the_workflow_reads_is_documented(generated_p
     page = (project / 'docs' / 'developer' / 'reference' / 'environment-and-flags.md').read_text(encoding='utf-8')
 
     sources = '\n'.join(path.read_text(encoding='utf-8') for path in tasks.glob('*.py'))
-    literal = set(re.findall(r"os\.environ(?:\.get)?\(\s*'([A-Z][A-Z0-9_]+)'", sources))
+    # Both forms. `os.environ['NAME']` is how the deps-image job reads its registry settings,
+    # and matching only the call form meant six variables were exempt from this page.
+    reads = (
+        r"os\.environ(?:\.get)?\(\s*'([A-Z][A-Z0-9_]+)'",
+        r"os\.environ\[\s*'([A-Z][A-Z0-9_]+)'\s*\]",
+        r"os\.getenv\(\s*'([A-Z][A-Z0-9_]+)'",
+        r"password_env='([A-Z][A-Z0-9_]+)'",
+    )
+    literal = {name for pattern in reads for name in re.findall(pattern, sources)}
     # The names the tasks reach through a constant rather than inline.
     for constant in ('OWASP_DTRACK_SETTINGS', 'UV_PUBLISH_SETTINGS', 'OIDC_ENV_VARS'):
         match = re.search(rf'^{constant} = \(([^)]*)\)', sources, re.MULTILINE)
@@ -1683,9 +1691,14 @@ def test_no_ci_job_reruns_what_the_gate_already_covers(generated_project):
         pipeline = (project / '.gitlab-ci.yml').read_text(encoding='utf-8')
         jobs = {name for name in yaml.safe_load(pipeline) if not name.startswith(('stages', 'variables'))}
         assert jobs == {'build-deps-image', 'preflight', 'secure', 'publish'}, f'the pipeline runs {jobs}'
-    commands = [line.strip().lstrip('- ') for line in pipeline.splitlines() if './workflow.cmd' in line]
-    for command in commands:
-        assert not command.startswith(duplicated), f'{command!r} re-runs what preflight covers'
+    # Whole invocations, not prefixes: `startswith` also forbade a future `test.list-combos`,
+    # and `lstrip('- ')` strips any run of those two characters rather than one list marker.
+    for line in pipeline.splitlines():
+        if './workflow.cmd' not in line:
+            continue
+        command = re.sub(r'^\s*-\s*', '', line).strip()
+        invoked = command.split('#', 1)[0].strip()
+        assert invoked not in duplicated, f'{invoked!r} re-runs what preflight covers'
 
 
 def test_ci_runs_the_same_gate_as_the_pre_push_hook(generated_project):

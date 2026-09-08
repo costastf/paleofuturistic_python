@@ -50,9 +50,28 @@ This runs pytest with coverage and parallel execution via xdist. The default pro
 
 Produces a wheel and an sdist under `dist/`. You can `uv pip install dist/<your-package>-*.whl` into a throwaway venv to confirm it imports.
 
+## Step 5 — Fill in the badges, once
+
+```bash
+./workflow.cmd preflight --write
+```
+
+`preflight` is the gate: formatting, the linters, the type checker, pyscn, the test matrix on
+every interpreter in your range, the wheel, and the README badges against what those tools just
+measured. The pre-push hook and the CI pipeline run it bare, where it compares and fails on
+anything out of date.
+
+`--write` is needed exactly once, here. A generated README ships `coverage-unknown` and
+`pyscn-not rated` because nothing has measured them yet, so the first bare run would fail on
+badges nobody could have filled in. Commit the result and the bare command is the one you want
+from then on — [Skip a check, once](../how-to/skip-a-check.md) covers what to do when it blocks
+you.
+
 ## You're ready
 
-You now have the loop you'll run hundreds of times: format → lint → test → build. Places to go next:
+You now have the loop you'll run hundreds of times: write code, `format`, and `preflight`
+before you push. The individual commands above are there for when you want one tool's answer on
+its own. Places to go next:
 
 - **Make a real change** — write a function, then [Make your first release](make-your-first-release.md).
 - **Add dependencies** — [Add a dependency](../how-to/add-a-dependency.md).
