@@ -776,8 +776,12 @@ def test_qa_steps_cover_what_preflight_does_not():
     assert 'preflight --write' in QA_STEPS, 'the matrix no longer exercises the generated gate'
     assert 'document' in QA_STEPS, 'nothing builds the generated docs'
 
-    auditing = [cell['label'] for cell in qa_cells() if cell['audit']]
-    assert len(auditing) == 1, f'expected exactly one auditing cell, got {auditing}'
+    # It rides with the matured cell rather than carrying a knob of its own.
+    matured = [cell['label'] for cell in qa_cells() if cell['mature']]
+    assert len(matured) == 1, f'expected exactly one matured cell to carry the audit, got {matured}'
+    runner = (REPO_ROOT / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
+    assert "audit=cell['mature']" in runner, 'the matrix no longer ties the audit to that cell'
+    assert 'audit=mature' in runner, 'a single combo run decides the audit some other way'
     # And after the writers, so the top of a cell's log is about the thing under test.
     assert QA_SETTLE_STEP not in QA_STEPS, 'the gate has to run after the writers, not among them'
 

@@ -34,8 +34,10 @@ QA_STEPS = ('preflight --write', 'document')
 # lockfile and ships the same `vendor.txt`, so the audit's answer cannot differ between them —
 # what differed was the exposure: nine jobs each querying the advisory database for ~125
 # packages, where one transient service error fails a cell for a reason that has nothing to do
-# with the template. It still runs, so the `<PROJECT>_SECURITY_OVERRIDE` plumbing below and the
-# `.security-overrides` expiry mechanism are still exercised, and `test.test` runs it too.
+# with the template. It rides with the matured cell rather than carrying a knob of its own,
+# there being one of those and a dependency audit belonging to a day-two project anyway. It
+# still runs, so the `<PROJECT>_SECURITY_OVERRIDE` plumbing below and the `.security-overrides`
+# expiry mechanism are still exercised, and `test.test` audits its own project too.
 #
 # Last, as in the generated project's own registry: it reports on the world rather than on this
 # tree, so the top of a cell's log should be about the thing under test.
@@ -146,7 +148,7 @@ def qa_cells() -> list[dict]:
     origin, so those paths run too. It is one extra cell rather than a fourth axis because
     nothing it touches interacts with the knobs.
     """
-    cells = [{**cell, 'mature': False, 'audit': False} for cell in matrix_combos()]
+    cells = [{**cell, 'mature': False} for cell in matrix_combos()]
     cells.append(
         {
             'label': combo_label(
@@ -159,9 +161,6 @@ def qa_cells() -> list[dict]:
             'integrate_dependency_track': True,
             'integrate_pages': True,
             'mature': True,
-            # The audit rides along here rather than in every cell — see `AUDIT_STEP`. A day-two
-            # project is where a dependency audit belongs anyway.
-            'audit': True,
         }
     )
     return cells

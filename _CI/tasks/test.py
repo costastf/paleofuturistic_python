@@ -143,8 +143,8 @@ def untracked_after_qa(project_dir):
 def run_combo(template_repo, output_root, extra_context, label, log_file=None, mature=False, audit=True):
     """Generate the template with extra_context and run the QA steps. Return True on success.
 
-    `mature` makes the cell look like a project on day two — see `qa_cells`. `audit` runs the
-    dependency audit, which one cell does rather than all of them — see `AUDIT_STEP`.
+    `mature` makes the cell look like a project on day two — see `qa_cells` — and carries the
+    dependency audit with it, which one cell runs rather than all of them; see `AUDIT_STEP`.
     """
     combo_root = output_root / label
     combo_root.mkdir(parents=True, exist_ok=True)
@@ -240,12 +240,11 @@ def test(context):
         'git_hosting_service': 'github (default) or gitlab',
         'integrate_dependency_track': 'Bool — opt the SBOM-upload code in (default true)',
         'integrate_pages': 'Bool — opt the Pages workflow + task in (default true)',
-        'mature': 'Bool — drop the scaffolded smoke test and add an origin (default false)',
-        'audit': 'Bool — also run the dependency audit (default true; the matrix runs it once)',
+        'mature': 'Bool — day-two project: no smoke test, an origin, and the dependency audit',
     }
 )
 def combo(context, git_hosting_service='github', integrate_dependency_track=True, integrate_pages=True,
-          mature=False, audit=True):
+          mature=False):
     """Run the full QA cycle for one matrix cell across all three template knobs."""
     tmpdir = Path(tempfile.mkdtemp(prefix='paleofuturistic_combo_'))
     try:
@@ -268,7 +267,8 @@ def combo(context, git_hosting_service='github', integrate_dependency_track=True
             ),
             label=label,
             mature=mature,
-            audit=audit,
+            # With the matured cell, as in the matrix: one audit per run of the whole thing.
+            audit=mature,
         )
         if not ok:
             print(emojize_message(f'Combo {label} failed', success=False))
@@ -317,7 +317,7 @@ def matrix(context, workers=1):
                     label=label,
                     log_file=log_path,
                     mature=cell['mature'],
-                    audit=cell['audit'],
+                    audit=cell['mature'],
                 )
             except Exception as exc:  # noqa: BLE001 — worker must not crash the pool
                 with log_path.open('a', encoding='utf-8') as handle:
@@ -355,15 +355,14 @@ def list_combos(context, as_json=False):
     if as_json:
         print(json.dumps(combos, separators=(',', ':')))
         return
-    print(f'{"label":<24} {"host":<7} {"dep_track":<10} {"pages":<6} {"mature":<7} {"audit":<6}')
+    print(f'{"label":<24} {"host":<7} {"dep_track":<10} {"pages":<6} {"mature":<6}')
     for cell in combos:
         print(
             f'{cell["label"]:<24} '
             f'{cell["git_hosting_service"]:<7} '
             f'{str(cell["integrate_dependency_track"]):<10} '
             f'{str(cell["integrate_pages"]):<6} '
-            f'{str(cell["mature"]):<7} '
-            f'{str(cell["audit"]):<6}'
+            f'{str(cell["mature"]):<6}'
         )
 
 
