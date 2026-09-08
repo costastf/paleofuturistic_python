@@ -16,15 +16,57 @@ from _CI import (PROJECT_ROOT_DIRECTORY,
                  make_file_executable)
 from _CI.tasks.configuration import (IGNORE_PATTERNS,
                                      PROJECT_SLUG,
+                                     QA_SETTLE_STEP,
                                      QA_STEPS,
                                      TEMPLATE_SECURITY_OVERRIDE_ENV,
+                                     base_context,
                                      combo_context,
                                      combo_label,
                                      generation_env,
-                                     matrix_combos,
+                                     qa_cells,
                                      read_template_overrides)
 
 REPORTS_DIR = PROJECT_ROOT_DIRECTORY / 'reports' / 'matrix'
+MATURE_ORIGIN = 'git@github.com:acme/widget.git'
+# What a matured cell puts in place of the scaffolding. Two facts make it a project on day
+# two rather than day one:
+#
+# `test_sanity` is gone, which is what takes the coverage ratchet out of auto-detect dormancy,
+# and `hello` is imported without being called, so the floor the ratchet records lands strictly
+# between 0 and 100 — the only range in which a writer and a checker can disagree.
+#
+# The gated module covers a different line on each interpreter, so the union the ratchet
+# measures is higher than any single cell of the matrix produces. That is the shape that
+# catches a coverage floor enforced per interpreter instead of against the union: the floor is
+# satisfiable only by the combined run, so every env fails on a bar its own numbers cannot
+# clear. The boundary is one minor above the oldest supported interpreter, so at least one env
+# falls on each side of it.
+MATURE_TEST_MODULE = '''"""Smoke tests for {slug}."""
+
+from {slug} import hello
+from {slug}.generation import label
+
+
+def test_hello_is_available() -> None:
+    """The package exports a greeter, which this leaves uncalled."""
+    assert callable(hello)
+
+
+def test_generation_is_named() -> None:
+    """The interpreter generation is one of the two this package knows."""
+    assert label() in {{'recent', 'legacy'}}
+'''
+MATURE_GATED_MODULE = '''"""Interpreter-dependent helper for {slug}."""
+
+import sys
+
+
+def label() -> str:
+    """Name the interpreter generation this is running on."""
+    if sys.version_info >= {boundary}:
+        return 'recent'
+    return 'legacy'
+'''
 
 
 def run_command(cmd, cwd=None, env=None, log_file=None):
@@ -97,8 +139,11 @@ def untracked_after_qa(project_dir):
     return [line[3:] for line in result.stdout.splitlines() if line.startswith('??')]
 
 
-def run_combo(template_repo, output_root, extra_context, label, log_file=None):
-    """Generate the template with extra_context and run QA_STEPS. Return True on success."""
+def run_combo(template_repo, output_root, extra_context, label, log_file=None, mature=False):
+    """Generate the template with extra_context and run the QA steps. Return True on success.
+
+    `mature` makes the cell look like a project on day two — see `qa_cells`.
+    """
     combo_root = output_root / label
     combo_root.mkdir(parents=True, exist_ok=True)
 
@@ -116,8 +161,17 @@ def run_combo(template_repo, output_root, extra_context, label, log_file=None):
 
     make_file_executable(project_dir / 'workflow.cmd')
 
+    if mature:
+        oldest = (extra_context or {}).get('min_python_version') or base_context()['min_python_version']
+        major, minor = (int(part) for part in oldest.split('.'))
+        test_module = project_dir / 'tests' / f'test_{PROJECT_SLUG}.py'
+        test_module.write_text(MATURE_TEST_MODULE.format(slug=PROJECT_SLUG), encoding='utf-8')
+        gated = project_dir / 'src' / PROJECT_SLUG / 'generation.py'
+        gated.write_text(MATURE_GATED_MODULE.format(slug=PROJECT_SLUG, boundary=(major, minor + 1)), encoding='utf-8')
+
     init_steps = (
         'git init -b main',
+        *((f'git remote add origin {MATURE_ORIGIN}',) if mature else ()),
         'git add -A',
         ('git -c commit.gpgsign=false -c user.name=ci -c user.email=ci@localhost '
          'commit -m "feat: initial project from template" '
@@ -139,10 +193,13 @@ def run_combo(template_repo, output_root, extra_context, label, log_file=None):
     if override_parts:
         step_env[f'{PROJECT_SLUG.upper()}_SECURITY_OVERRIDE'] = ','.join(override_parts)
 
-    for step in QA_STEPS:
-        if not run_command(f'./workflow.cmd {step}', cwd=project_dir, env=step_env, log_file=log_file):
-            report_failure(f'[{label}] task "{step}" failed', log_file)
-            return False
+    # Accumulate rather than stop at the first failure, matching what the matrix already does
+    # across cells and what `run_scope` does across steps. This loop is the slowest feedback
+    # in the system — eight cells at tens of seconds each — so one run reporting everything is
+    # worth the seconds it costs when something is already red. Stopping early also skipped the
+    # litter check below in precisely the cells that were already unhappy.
+    failed = [step for step in (*QA_STEPS, QA_SETTLE_STEP)
+              if not run_command(f'./workflow.cmd {step}', cwd=project_dir, env=step_env, log_file=log_file)]
 
     untracked = untracked_after_qa(project_dir)
     if untracked:
@@ -151,6 +208,9 @@ def run_combo(template_repo, output_root, extra_context, label, log_file=None):
             f'{", ".join(untracked)}',
             log_file,
         )
+    if failed or untracked:
+        if failed:
+            report_failure(f'[{label}] failed: {", ".join(failed)}', log_file)
         return False
     return True
 
@@ -177,9 +237,11 @@ def test(context):
         'git_hosting_service': 'github (default) or gitlab',
         'integrate_dependency_track': 'Bool — opt the SBOM-upload code in (default true)',
         'integrate_pages': 'Bool — opt the Pages workflow + task in (default true)',
+        'mature': 'Bool — drop the scaffolded smoke test and add an origin (default false)',
     }
 )
-def combo(context, git_hosting_service='github', integrate_dependency_track=True, integrate_pages=True):
+def combo(context, git_hosting_service='github', integrate_dependency_track=True, integrate_pages=True,
+          mature=False):
     """Run the full QA cycle for one matrix cell across all three template knobs."""
     tmpdir = Path(tempfile.mkdtemp(prefix='paleofuturistic_combo_'))
     try:
@@ -190,6 +252,7 @@ def combo(context, git_hosting_service='github', integrate_dependency_track=True
             git_hosting_service=git_hosting_service,
             integrate_dependency_track=integrate_dependency_track,
             integrate_pages=integrate_pages,
+            mature=mature,
         )
         ok = run_combo(
             template_repo,
@@ -200,6 +263,7 @@ def combo(context, git_hosting_service='github', integrate_dependency_track=True
                 integrate_pages=integrate_pages,
             ),
             label=label,
+            mature=mature,
         )
         if not ok:
             print(emojize_message(f'Combo {label} failed', success=False))
@@ -220,7 +284,7 @@ def matrix(context, workers=1):
     handled by the fan-out workflow instead. Pass --workers=2 to opt into
     local host-level parallelism.
     """
-    combos = matrix_combos()
+    combos = qa_cells()
     effective_workers = max(1, min(len(combos), workers))
 
     tmpdir = Path(tempfile.mkdtemp(prefix='paleofuturistic_matrix_'))
@@ -247,6 +311,7 @@ def matrix(context, workers=1):
                     ),
                     label=label,
                     log_file=log_path,
+                    mature=cell['mature'],
                 )
             except Exception as exc:  # noqa: BLE001 — worker must not crash the pool
                 with log_path.open('a', encoding='utf-8') as handle:
@@ -280,17 +345,18 @@ def matrix(context, workers=1):
 @task(help={'as_json': 'Emit the matrix as JSON (for GH Actions consumption)'})
 def list_combos(context, as_json=False):
     """Print the matrix — table by default, JSON array with --as-json."""
-    combos = matrix_combos()
+    combos = qa_cells()
     if as_json:
         print(json.dumps(combos, separators=(',', ':')))
         return
-    print(f'{"label":<18} {"host":<7} {"dep_track":<10} {"pages":<6}')
+    print(f'{"label":<24} {"host":<7} {"dep_track":<10} {"pages":<6} {"mature":<6}')
     for cell in combos:
         print(
-            f'{cell["label"]:<18} '
+            f'{cell["label"]:<24} '
             f'{cell["git_hosting_service"]:<7} '
             f'{str(cell["integrate_dependency_track"]):<10} '
-            f'{str(cell["integrate_pages"]):<6}'
+            f'{str(cell["integrate_pages"]):<6} '
+            f'{str(cell["mature"]):<6}'
         )
 
 

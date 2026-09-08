@@ -96,6 +96,41 @@ def test_docs_publish_on_release_not_on_every_push(generated_project):
     assert shared in publish, 'publish and pages no longer share one definition of "released"'
 
 
+def test_release_detection_pins_a_commit_and_bounds_its_search(generated_project):
+    """The detector reports the commit it found, and only looks at commits that arrived.
+
+    Callers check out `sha`, not `tag`: a tag is a mutable pointer, so a move between detection
+    and checkout would publish a different tree than was detected.
+
+    The search range comes from the event. Only a push has a previous tip to diff against; on a
+    manual run `github.event.before` is empty, and walking from the tip with no lower bound
+    would sweep in every release the branch ever carried and report the newest as arriving now
+    — publishing an old version's docs from a dispatch meant to republish the current ones.
+    """
+    project, cell = generated_project
+    if cell['git_hosting_service'] != 'github':
+        return
+    workflows = project / '.github' / 'workflows'
+    detector = (workflows / 'detect-release-tag.yaml').read_text(encoding='utf-8')
+    parsed = yaml.safe_load(detector)
+
+    outputs = ((parsed.get('on') or parsed[True])['workflow_call'])['outputs']
+    assert 'sha' in outputs, 'the detector reports a mutable tag name and nothing else'
+    assert 'sha=${tag_sha}' in detector, 'the sha output is declared but never written'
+
+    assert 'github.event_name' in detector, 'the search range ignores how the workflow was triggered'
+    assert '--max-count=1' in detector, 'a non-push event walks the whole history for a tag'
+    assert '-z "${BEFORE}"' not in detector, 'an empty before-sha is still read as a new branch'
+
+    consumers = ['publish.yaml']
+    if cell['integrate_pages']:
+        consumers.append('pages.yaml')
+    for name in consumers:
+        body = (workflows / name).read_text(encoding='utf-8')
+        assert 'ref: ${{ needs.detect.outputs.tag }}' not in body, f'{name} checks out a mutable tag name'
+        assert 'ref: ${{ needs.detect.outputs.sha }}' in body, f'{name} does not check out the detected commit'
+
+
 def test_pages_task_definition_matches_choice(generated_project):
     """`deploy_github` is defined iff integrate_pages=true AND the host is github."""
     project, cell = generated_project
@@ -717,8 +752,37 @@ def test_qa_steps_cover_what_preflight_does_not():
 
     assert 'secure.audit' in QA_STEPS
     assert 'preflight --write' in QA_STEPS, 'the matrix no longer exercises the generated gate'
-    # Fail fast: the cheapest failure first, before a five-interpreter matrix.
-    assert QA_STEPS.index('secure.audit') < QA_STEPS.index('preflight --write')
+    # The audit last, as in the generated project's own registry: it reports on the world
+    # rather than on this tree, so the top of each cell's log is about the thing under test.
+    assert QA_STEPS.index('secure.audit') > QA_STEPS.index('preflight --write')
+
+
+def test_the_matrix_verifies_what_it_wrote():
+    """The matrix runs the read-only gate after the writers, on a cell that has values to write.
+
+    `preflight --write` alone cannot catch a writer and a checker disagreeing: it writes and is
+    happy. Running the bare `preflight` afterwards asks the question the pipeline asks — is this
+    tree consistent with its derived files? — about a tree whose derived files were just
+    produced. A deadlock where writing a coverage floor makes the next run fail is invisible
+    until something re-reads.
+
+    The eight knob cells have nothing interesting to write: a generated project keeps the
+    scaffolded smoke test, so coverage is 100% and the ratchet stays dormant, and it has no
+    remote for the CI badge to name. One matured cell removes both of those, which is where a
+    disagreement can exist at all.
+    """
+    from _CI.tasks.configuration import QA_SETTLE_STEP, QA_STEPS, qa_cells  # noqa: PLC0415
+
+    assert QA_SETTLE_STEP == 'preflight', 'the matrix no longer re-checks the tree it wrote'
+    assert QA_SETTLE_STEP not in QA_STEPS, 'the gate has to run after the writers, not among them'
+
+    matured = [cell for cell in qa_cells() if cell['mature']]
+    assert len(matured) == 1, f'expected exactly one matured cell, got {[c["label"] for c in matured]}'
+
+    from _CI.tasks.test import MATURE_ORIGIN, MATURE_TEST_MODULE  # noqa: PLC0415
+
+    assert 'test_sanity' not in MATURE_TEST_MODULE, 'the ratchet stays dormant while test_sanity exists'
+    assert MATURE_ORIGIN, 'without an origin the CI badge has no slug to write'
 
 
 def workflow_run_scripts(workflow):
@@ -1486,7 +1550,7 @@ def test_whole_program_steps_are_never_scoped_to_a_diff(generated_project):
     """
     project, _ = generated_project
     steps = registry_steps(project)
-    for name in ('ty', 'pyscn', 'tox', 'build', 'artifacts'):
+    for name in ('ty', 'commitizen', 'pyscn', 'tox', 'build', 'artifacts'):
         assert steps.get(name) == 'WHOLE_PROGRAM', f'{name} is declared {steps.get(name)!r}, not whole-program'
     commit_stage = {invoked_task(hook) for hook in pre_commit_hooks(project) if 'pre-commit' in hook_stages(hook)}
     assert 'preflight' not in commit_stage, 'the whole-program bundle runs on every commit'
@@ -1519,23 +1583,44 @@ def test_whole_program_gate_runs_on_pre_push_without_writing(generated_project):
     assert gate['stages'] == ['pre-push'], f'preflight hook stages are {gate["stages"]}'
     assert invoked_task(gate) == 'preflight', f'preflight hook runs {gate["entry"]!r}'
     assert '--write' not in gate['entry'], f'the pre-push hook would rewrite tracked files: {gate["entry"]!r}'
+    # No `files:` either. `preflight` verifies README.md and pyproject.toml, so a filter over
+    # source paths would skip the gate on a push carrying only those — which is exactly what
+    # the recovery loop produces: `--write`, then commit the badges. CI would still run it.
+    assert 'files' not in gate, f'the pre-push gate is narrowed and can be skipped: {gate.get("files")!r}'
     assert gate.get('pass_filenames') is False, 'the whole-program gate was narrowed to the pushed files'
     installed = yaml.safe_load((project / '.pre-commit-config.yaml').read_text(encoding='utf-8'))
     assert 'pre-push' in installed['default_install_hook_types'], 'pre-push hooks would never be installed'
 
 
-def test_pre_push_gate_enforces_the_same_coverage_floor(generated_project):
-    """The gate's pytest step is the same task the `test` aggregator runs, so the floor holds.
+def test_the_coverage_floor_is_enforced_where_it_was_measured(generated_project):
+    """`fail_under` is enforced once, over the combined data, and nowhere else.
 
-    Coverage is enforced by pytest-cov from `[tool.coverage.report] fail_under`, driven by the
-    `--cov` flags in `addopts`. Both the registry's `pytest` step and the aggregator delegate
-    to that one task, so gating on `preflight --check` instead of the aggregator drops the
-    badge and ratchet writes without weakening the gate.
+    The ratchet sets the floor from coverage combined across the matrix, and no single env can
+    reach a union figure — a `sys.version_info` branch has one arm unreachable per interpreter
+    by construction. pytest-cov enforcing the same floor per env therefore deadlocks a project:
+    the ratchet bumps to the union, every env then fails below it, and the ratchet only moves
+    up. Reproduced end to end before this: 100% combined, 84.62% per env, no way out but
+    editing `fail_under` by hand.
+
+    So every per-interpreter reporter passes `--fail-under=0`, and `combine_coverage`'s
+    `coverage json` over the combined data is the single enforcement point.
     """
     project, _ = generated_project
     data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
-    assert '--cov' in data['tool']['pytest']['ini_options']['addopts']
+    addopts = data['tool']['pytest']['ini_options']['addopts']
+    assert '--cov' in addopts
+    assert '--cov-fail-under=0' in addopts, 'pytest-cov enforces a union floor per interpreter'
     assert 'fail_under' in data['tool']['coverage']['report']
+
+    test_py = (project / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
+    reporters = test_py.split("@logged('test.coverage')", 1)[1].split('\n@', 1)[0]
+    for command in ('coverage report', 'coverage json', 'coverage html'):
+        line = next(line for line in reporters.splitlines() if command in line)
+        assert '--fail-under=0' in line, f'{command} in test.coverage gates on a union floor'
+
+    combine = test_py.split('def combine_coverage', 1)[1].split('\n@', 1)[0]
+    enforcing = next(line for line in combine.splitlines() if 'coverage json' in line)
+    assert '--fail-under' not in enforcing, 'the one enforcement point stopped enforcing'
     test_py = (project / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
     aggregator = test_py.split("@logged('test')", 1)[1]
     assert 'run_steps(pytest)' in aggregator, 'the aggregator no longer delegates to the same pytest task'
@@ -1645,10 +1730,8 @@ def test_a_failing_run_writes_no_derived_values(generated_project):
     project, _ = generated_project
     source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
     body = source.split('def run_scope', 1)[1]
-    assert 'if failed and writes_derived' in body, 'a failing run can still write derived values'
-    assert 'writes_derived = write and step.write is not None' in source, (
-        'the plan no longer marks which steps write derived files'
-    )
+    assert 'if failed and derived' in body, 'a failing run can still write derived values'
+    assert 'derived = step.write is not None' in source, 'the plan no longer marks which steps produce derived files'
     # The writers have to be last for the skip to cover them; `artifacts` is the final
     # non-network step, and `build`'s badge precedes it.
     steps = list(registry_steps(project))
@@ -1676,9 +1759,7 @@ def test_no_automated_run_edits_source(generated_project):
 
     # Every write variant in the registry produces a derived file, which is what `--write` is
     # for; `plan_scope` marks exactly those so a failing run can skip them.
-    assert 'writes_derived = write and step.write is not None' in source, (
-        'the plan no longer marks which steps write derived files'
-    )
+    assert 'derived = step.write is not None' in source, 'the plan no longer marks which steps produce derived files'
 
     # And the hook asks for no fixing, because there is nothing to ask for.
     hook = next(h for h in pre_commit_hooks(project) if invoked_task(h) == 'preflight.staged')
@@ -1907,6 +1988,14 @@ def test_the_ci_badge_is_the_hosts_own(generated_project):
     updater = document.split('def update_pipeline_badge', 1)[1].split('\ndef ', 1)[0]
     unknown_remote = updater.split('pipeline_badge(context)', 1)[1].split('return apply_badge', 1)[0]
     assert 'return None' in unknown_remote, 'a project without a remote is reported stale, not left alone'
+    # And not verified at all: the value comes from `origin`, the developer's own configuration,
+    # so "is it stale?" has no tree-level answer. Verifying it would fail the gate for a
+    # contributor whose remote is legitimately a fork, and the fix it named would point
+    # upstream's badge at that fork.
+    body = updater.split('"""', 2)[2]
+    assert body.index('if not write:') < body.index('pipeline_badge(context)'), (
+        'the CI badge is compared against a remote the reader may not share'
+    )
 
 
 def test_readme_has_exactly_one_writer(generated_project):

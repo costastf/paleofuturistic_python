@@ -22,15 +22,24 @@ IGNORE_PATTERNS = shutil.ignore_patterns('.git', '.venv', '__pycache__', '*.pyc'
 # so what is left to list is what it deliberately does not do: the dependency audit, whose
 # answer depends on the advisory database rather than on the generated tree, and the docs build.
 #
-# The audit runs first, being the cheapest way to fail — no sense spending a five-interpreter
-# matrix on a cell a vulnerable pin already condemns. It is also the step the
-# `<PROJECT>_SECURITY_OVERRIDE` plumbing below exists to serve, and the only automated run the
-# `.security-overrides` expiry mechanism gates.
+# The audit runs last, for the same reason it is last in the generated project's own registry:
+# it reports on the world rather than on this tree, so it is the least interesting signal about
+# whether the template works, and the top of each cell's log should be about the thing under
+# test. It is still the step the `<PROJECT>_SECURITY_OVERRIDE` plumbing below exists to serve,
+# and the only automated run the `.security-overrides` expiry mechanism gates.
+#
+# Every step runs even after one fails — `run_combo` accumulates, as the matrix already does
+# across cells. The feedback loop here is the slowest in the system, eight cells at tens of
+# seconds each, so a fix-rerun cycle is what costs most and complete information is worth most.
 #
 # `--write` because a freshly generated project's badges all read "unknown", and the matrix is
 # exercising the command that produces them. The pipeline the template ships runs the bare
 # `preflight`, which compares instead.
-QA_STEPS = ('secure.audit', 'preflight --write', 'document')
+QA_STEPS = ('preflight --write', 'document', 'secure.audit')
+# Run after the writers: a project whose derived files were just written has to satisfy the
+# read-only gate the pipeline runs. A failure here is the writer and the checker disagreeing
+# about a value, which is invisible to a run that only ever writes.
+QA_SETTLE_STEP = 'preflight'
 TEMPLATE_SECURITY_OVERRIDE_ENV = 'TEMPLATE_SECURITY_OVERRIDE'
 SECURITY_OVERRIDES_FILE = PROJECT_ROOT_DIRECTORY / '.security-overrides'
 
@@ -97,10 +106,11 @@ def combo_context(*, git_hosting_service: str, integrate_dependency_track: bool,
     }
 
 
-def combo_label(*, git_hosting_service: str, integrate_dependency_track: bool, integrate_pages: bool) -> str:
+def combo_label(*, git_hosting_service: str, integrate_dependency_track: bool, integrate_pages: bool, mature: bool = False) -> str:
     """Stable short label for log files and CI job names: e.g. ``gh-dep1-pages0``."""
     host_short = 'gh' if git_hosting_service == 'github' else 'gl'
-    return f'{host_short}-dep{int(integrate_dependency_track)}-pages{int(integrate_pages)}'
+    suffix = '-mature' if mature else ''
+    return f'{host_short}-dep{int(integrate_dependency_track)}-pages{int(integrate_pages)}{suffix}'
 
 
 def matrix_combos() -> list[dict]:
@@ -120,3 +130,31 @@ def matrix_combos() -> list[dict]:
         for dep_track in (False, True)
         for pages in (False, True)
     ]
+
+
+def qa_cells() -> list[dict]:
+    """Cells `test.matrix` runs: every generation shape, plus one matured project.
+
+    A generated project is a day-one project: the scaffolded smoke test keeps coverage at 100%
+    and the ratchet dormant, and there is no remote for the CI badge to name. That leaves the
+    ratchet, the coverage floor and the badge slug unexercised by the eight knob cells, which
+    differ only in what copier renders. The matured cell removes the smoke test and adds an
+    origin, so those paths run too. It is one extra cell rather than a fourth axis because
+    nothing it touches interacts with the knobs.
+    """
+    cells = [{**cell, 'mature': False} for cell in matrix_combos()]
+    cells.append(
+        {
+            'label': combo_label(
+                git_hosting_service='github',
+                integrate_dependency_track=True,
+                integrate_pages=True,
+                mature=True,
+            ),
+            'git_hosting_service': 'github',
+            'integrate_dependency_track': True,
+            'integrate_pages': True,
+            'mature': True,
+        }
+    )
+    return cells
