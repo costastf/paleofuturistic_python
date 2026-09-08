@@ -26,9 +26,12 @@ did, so the log records what you suspended.
 The commit hook only ever complains about the files you staged, and formatting is one command:
 
 ```bash
-./workflow.cmd format
-git add -A
+./workflow.cmd format --paths="$(git diff --cached --name-only)"
+git add -u
 ```
+
+Scoped to what you staged, because `format` over the whole tree reformats files you never
+looked at, and `git add -A` would then fold them into this commit.
 
 For a blocked push, run the gate directly — it says everything that is wrong in one pass and
 names the fix for each:

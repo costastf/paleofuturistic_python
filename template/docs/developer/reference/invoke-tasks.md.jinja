@@ -27,7 +27,7 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 
 | Task | Args | What it does |
 | --- | --- | --- |
-| `preflight` | `--write`, `--audit-dependencies` | Verify formatting, lint, type-check, pyscn, the full tox matrix, the wheel, and the four README badges plus the coverage ratchet against what the tools just measured — failing with everything out of date. This bare command is what the pre-push hook and the CI pipeline run. `--write` updates the badges and the ratchet instead of comparing them; it is opt-in because a command named for an inspection should not modify the tree. Never edits source either way — unformatted code fails and points at `format`. `--audit-dependencies` adds the pip-audit run, off by default because its answer depends on the advisory database rather than on your tree. |
+| `preflight` | `--write`, `--audit-dependencies` | Verify formatting, lint, type-check, pyscn, the full tox matrix, the wheel, and the README badges plus the coverage ratchet against what the tools just measured — failing with everything out of date. This bare command is what the pre-push hook and the CI pipeline run. `--write` updates the badges and the ratchet instead of comparing them; it is opt-in because a command named for an inspection should not modify the tree. Never edits source either way — unformatted code fails and points at `format`. `--audit-dependencies` adds the pip-audit run, off by default because its answer depends on the advisory database rather than on your tree. |
 | `preflight.staged` | `--paths="<paths>"` | Only the checks that can be judged from the given files alone, and by default only the files you have staged. What the pre-commit hook runs. Reports rather than fixes, like every other entry point — unformatted code names `format`. |
 
 The badges it checks are the two written from reports — coverage and pyscn — plus version and
@@ -41,14 +41,14 @@ once with its scope, its path filter and whether it writes. The two hooks and th
 that declaration rather than keeping their own lists, so a check added to the registry reaches
 its tier without editing three files.
 
-Both modes run the *same* steps; only the derived-files step and `build` differ, each by
-swapping one callable. Every derived value is written through a single function taking `write`,
+Both modes run the *same* steps; only the derived-files step differs, by swapping one
+callable. Every derived value is written through a single function taking `write`,
 so what verifying compares is exactly what writing would have produced — a separate
 implementation for the verifying side is how a gate drifts from its generator.
 
 Neither mode edits your code. Formatting is verified here and fixed by `./workflow.cmd format`,
-or by the commit hook on the files you staged: a command you run before opening a pull request
-should not reformat something you never looked at and fold it into your commit.
+named for the mutation it performs: a command you run before opening a pull request should not
+reformat something you never looked at and fold it into your commit.
 
 The bare `preflight` is what the pre-push hook and the entire CI pipeline run, so reproducing a
 pipeline failure means typing the command you see in the log. It does refresh `reports/` —
@@ -61,7 +61,7 @@ gitignored. What it never touches is a tracked file.
 | --- | --- | --- |
 | `develop.bootstrap` | `--force` | Run all bootstrap steps. Idempotent. |
 | `develop.pre-commit-install` | — | Install the hooks into `.git/hooks/` (all three stages at once). |
-| `develop.pre-commit` | `--all-files` | A dry run of your next commit: the commit-stage hooks over the files you staged, through pre-commit itself — so it exercises the hook wiring (`files:` filters, `SKIP`, the entry itself) as well as the checks. `--all-files` widens it to every tracked file, for right after installing hooks or a `copier update`. Read-only, as the hooks are; not the full check either — `preflight` is what runs everything. |
+| `develop.pre-commit` | — | A dry run of your next commit: the commit-stage hooks over the files you staged, through pre-commit itself — so it exercises the hook wiring (`files:` filters, `SKIP`, the entry itself) as well as the checks. Read-only, as the hooks are; not the full check either — `preflight` is what runs everything, including every file rather than the staged ones. |
 | `develop.bump-uv` | `--version=<v>` | Move every uv pin to the newest release at least 7 days old: the four version literals, the base image's tag *and* its re-resolved digest, and `uv.lock`. Warns when the bump crosses a minor version. `--version` takes a specific release, ignoring the cool-down. See [Dependency groups](dependency-groups.md#the-uv-pin-and-the-one-command-that-moves-it). |
 
 ## `format`, `lint`, `test`, `quality`
@@ -125,7 +125,7 @@ Calling one directly is how to run a single tool over a single file:
 | `document.build` | — | `properdocs build` — generate the static site under `site/`. |
 | `document.serve` | — | `properdocs serve` — serve the site locally with live reload (Ctrl-C to stop). |
 | `document.view` | — | Open the rendered site in the default browser (skipped in CI). |
-| `document` (aggregator) | — | `build` + `view`. Writes no badge: building docs is not changing your README, and every other task here stopped writing unasked. `preflight --write` refreshes all five. |
+| `document` (aggregator) | — | `build` + `view`. Writes no badge: building docs is not changing your README, and every other task here stopped writing unasked. `preflight --write` refreshes all five of them. |
 {%- if integrate_pages and git_hosting_service == 'github' %}
 | `document.deploy-github` | — | `properdocs gh-deploy --force` — build and publish to the `gh-pages` branch (consumed by the shipped Pages workflow). Only present when `integrate_pages=true` and `git_hosting_service=github`. |
 {%- endif %}

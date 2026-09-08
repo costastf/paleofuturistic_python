@@ -20,8 +20,7 @@ environment variable.
 Two conventions hold on top of that:
 
 - **Flags add; they do not subtract.** The bare command is the narrow, read-only one:
-  `--write` updates derived files, `--all-files` widens a hook run, `--audit-dependencies` adds
-  a step. No flag makes a gate check *less*, a gate you can quietly weaken being one that stops
+  `--write` updates derived files and `--audit-dependencies` adds a step. No flag makes a gate check *less*, a gate you can quietly weaken being one that stops
   meaning anything. `env_list` in `pyproject.toml` is what shortens the test matrix, and it
   shortens CI with it.
 - **`--write` always means "update the derived files".** `preflight --write`, `test.tox --write`,
@@ -64,26 +63,9 @@ is for your tests' own configuration and is read by nothing in this workflow.
 
 ## Getting past a hook
 
-Sometimes you need the commit or the push to go through now. In rough order of how much you
-should prefer them:
+`SKIP` takes hook `id`s from `.pre-commit-config.yaml` and suspends those hooks for one
+command, which is the option to reach for first — `--no-verify` switches off every hook at that
+stage and tells you nothing afterwards about what it skipped. CI runs `./workflow.cmd preflight`
+on the push regardless, so either way a skipped check is deferred rather than avoided.
 
-**Skip one hook.** `SKIP` takes hook `id`s from `.pre-commit-config.yaml`:
-
-```bash
-SKIP=preflight git push
-SKIP=staged git commit -m "wip: half a thought"
-SKIP=staged,security-overrides git commit -m "…"
-```
-
-Every other hook still runs, which is the point: one check suspended rather than all of them,
-and the log says which.
-
-**Run the gate yourself.** `./workflow.cmd preflight` tells you the same thing without a commit
-in the way, and names the command that fixes each complaint.
-
-**`--no-verify`, and what it costs.** `git commit --no-verify` and `git push --no-verify` switch
-off *every* hook at that stage — the commit-message check, the staged-file checks, the whole
-gate — and nothing tells you afterwards what was skipped. Prefer `SKIP` with a list.
-
-CI runs `./workflow.cmd preflight` on the push regardless, so a skipped check is deferred rather
-than avoided. See [Skip a check, once](../how-to/skip-a-check.md).
+[Skip a check, once](../how-to/skip-a-check.md) has the commands and the order to try them in.

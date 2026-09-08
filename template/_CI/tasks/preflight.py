@@ -15,9 +15,10 @@ speed: a whole-program check narrowed to a diff does not run faster, it answers 
 
 *Verifying is the default; writing is a flag.* ``preflight`` compares the derived files against
 what the tools measured; ``preflight --write`` updates them. So the bare command is what the
-hooks and the pipeline run, and reproducing a pipeline failure needs no flag. Only ``build`` and
-``artifacts`` behave differently between the two, each by swapping one callable — nothing here
-re-implements a check for the verifying side, which is how a gate drifts from its generator.
+hooks and the pipeline run, and reproducing a pipeline failure needs no flag. ``artifacts`` is
+the only step that behaves differently between the two, and it does so by swapping one callable —
+nothing here re-implements a check for the verifying side, which is how a gate drifts from its
+generator.
 
 *Nothing here edits your code.* What ``--write`` writes is derived: the badges and the coverage
 ratchet. No step has a source-writing variant, so this file has no notion of fixing at all.
@@ -356,7 +357,7 @@ def preflight(context: Context, write: bool = False, audit_dependencies: bool = 
     `release.bump` do.
 
     Neither mode edits source. Unformatted code fails here and is fixed by
-    `./workflow.cmd format`, or by the commit hook on the files you staged.
+    `./workflow.cmd format`, which is named for the mutation it performs.
 
     There is no flag for running a lighter version: the pipeline runs this exact command, so a
     switch that trimmed it would be a documented way to make the two disagree, and the obvious

@@ -50,13 +50,13 @@ These commands are the heartbeat of every project this template generates:
 ./workflow.cmd lint      # Ruff check, pylint, ty (type checker), complexipy, commitizen
 ./workflow.cmd test      # pytest with coverage and parallel execution
 ./workflow.cmd quality   # pyscn code quality check
-./workflow.cmd build     # Produce a wheel + sdist in dist/ (also runs pip-audit and exports SBOM)
+./workflow.cmd build     # Produce a wheel + sdist in dist/ and export the SBOM
 ```
 
 `preflight` is the one to remember; the rest are there for when you want a single tool. Run it
 before you open a pull request and it leaves the tree in the state CI expects — including the
-badges, which are computed from the reports the tools just produced. It never edits your code:
-`format` is what reformats, and the commit hook does it for the files you stage.
+badges, which are computed from the reports the tools just produced. It never edits your code: `format` is what
+reformats, and it is the only command that does.
 
 You should see a passing test for the example `hello()` function and a wheel appear under `dist/`.
 Some of the other QA tools also produce output you can look into later.

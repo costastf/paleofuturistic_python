@@ -1473,13 +1473,13 @@ def registry_steps(project):
 def test_no_commit_stage_hook_rewrites_unstaged_tracked_files(generated_project):
     """No `pre-commit`-stage hook runs a task that writes README.md or pyproject.toml.
 
-    `preflight` updates the four badges and ratchets `fail_under`; the `test` aggregator used
+    `preflight` updates the README badges and ratchets `fail_under`; the `test` aggregator used
     to do the coverage half of that. Run from a commit hook, either one aborted the commit with
     "files were modified by this hook" — after the message was written, for files the author
     never staged. That is what teaches people `--no-verify`, which then disables every hook
-    here at once. `preflight --check` on pre-push is the shape that gets the guarantee without
-    the writes, and `preflight.staged` is deliberately absent from this set: it rewrites only
-    files the author staged, which is a formatter doing its job.
+    here at once. The bare `preflight` on pre-push is the shape that gets the guarantee without
+    the writes, and `preflight.staged` is absent from this set because it writes nothing at
+    all: it reports on the files the author staged and names the command that fixes them.
     """
     project, _ = generated_project
     # `build` is deliberately absent: it stopped writing the README when the CI badge moved to
@@ -1653,7 +1653,7 @@ def test_the_gate_offers_no_way_to_run_less_than_ci(generated_project):
 def test_no_ci_job_reruns_what_the_gate_already_covers(generated_project):
     """CI has one job for the checks, and it is the gate.
 
-    Separate lint, test and build jobs re-ran, in a different shape, work `preflight --check`
+    Separate lint, test and build jobs re-ran, in a different shape, work `preflight`
     already covers — which is how a green push comes to meet a red pipeline: two lists of
     checks, one of them out of step. The cost of folding them in is the wall-clock their
     parallelism bought, not diagnosis; `run_steps` still reports every failure in one pass.
@@ -1670,7 +1670,7 @@ def test_no_ci_job_reruns_what_the_gate_already_covers(generated_project):
         assert jobs == {'build-deps-image', 'preflight', 'secure', 'publish'}, f'the pipeline runs {jobs}'
     commands = [line.strip().lstrip('- ') for line in pipeline.splitlines() if './workflow.cmd' in line]
     for command in commands:
-        assert not command.startswith(duplicated), f'{command!r} re-runs what preflight --check covers'
+        assert not command.startswith(duplicated), f'{command!r} re-runs what preflight covers'
 
 
 def test_ci_runs_the_same_gate_as_the_pre_push_hook(generated_project):
@@ -1767,26 +1767,30 @@ def test_no_automated_run_edits_source(generated_project):
 
 
 def test_running_the_hooks_by_hand_matches_what_git_will_do(generated_project):
-    """`develop.pre-commit` defaults to the staged files, like the hook it is named after.
+    """`develop.pre-commit` runs the hooks exactly as git will, with nothing to widen.
 
-    It passed `--all-files` unconditionally, so the command behaved differently from the hook:
-    `--all-files` is every *tracked* file. The default now matches, and the flag widens —
-    the same direction as `preflight --write`, where the bare command is the narrow, read-only
-    one and a flag opts into more.
+    It passed `--all-files` unconditionally, so the command behaved differently from the hook it
+    is named after. The flag then survived as an option, which was worse: the staged bundle
+    passes no filenames and reads the index instead, so `pre-commit run --all-files` printed
+    "Nothing staged" and exited 0 — a whole-tree check that checked nothing. `preflight` is the
+    command that covers every file.
     """
     project, _ = generated_project
     develop = (project / '_CI' / 'tasks' / 'develop.py').read_text(encoding='utf-8')
     body = develop.split("@logged('develop.pre-commit')", 1)[1].split('@task', 1)[0]
     assert "'uv run pre-commit run'" in body, 'the default no longer runs the hooks on staged files'
-    assert 'all_files: bool = False' in body, 'widening to every tracked file is not opt-in'
+    # Past the docstring, which explains the flag's absence.
+    code = body.split('"""', 2)[2]
+    assert '--all-files' not in code, 'a widening flag is back, and it still cannot widen'
 
 
 def test_the_staged_bundle_defaults_to_what_is_staged(generated_project):
     """`preflight.staged` with no paths checks the index, not the whole project.
 
     It used to fall back to every project path, so typing the command by hand swept everything
-    — the opposite of what its name promises. pre-commit still passes the list explicitly,
-    having applied its own filtering and possibly split the files across invocations.
+    — the opposite of what its name promises. The hook passes no filenames either: it invokes
+    the bare command, so what the hook checks and what you check are the same list, read from
+    the same place.
     """
     project, _ = generated_project
     source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
@@ -2015,7 +2019,7 @@ def test_the_ci_badge_is_the_hosts_own(generated_project):
 def test_readme_has_exactly_one_writer(generated_project):
     """Every write to README.md goes through `apply_badge`, so check mode cannot drift.
 
-    `preflight --check` is only trustworthy if it compares against the same substitution the
+    A `preflight` that verifies is only trustworthy if it compares against the same substitution the
     writer applies. A second module that rewrote a badge its own way would be invisible to the
     check — the badge would be updated by one code path and verified by another, which is the
     failure this whole shape exists to prevent.
@@ -2032,7 +2036,7 @@ def test_readme_has_exactly_one_writer(generated_project):
 def test_derived_values_are_computed_in_both_modes_by_one_function(generated_project):
     """Each derived value has a single updater that takes `write`, rather than a paired checker.
 
-    The generator and the gate being one function is what makes `preflight --check` mean
+    The generator and the gate being one function is what makes a verifying `preflight` mean
     anything. Splitting them — a writer here, a verifier there — is exactly how a check ends up
     passing on a value the writer would have changed.
     """

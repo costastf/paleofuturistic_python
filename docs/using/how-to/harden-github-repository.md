@@ -1,12 +1,12 @@
 # Harden the GitHub repository
 
-After generating with `git_hosting_service=github`, you have three workflow files under `.github/workflows/` and a release pipeline that wants to publish to PyPI. This page lists the GitHub-side settings worth applying before that pipeline ever fires.
+After generating with `git_hosting_service=github`, you have six workflow files under `.github/workflows/` and a release pipeline that wants to publish to PyPI. This page lists the GitHub-side settings worth applying before that pipeline ever fires.
 
 ## Prerequisite security
 
 These are non-negotiable for any repository connected to CI/CD:
 
-- **Branch protection on `main`.** Require pull requests, require status checks, require a linear history. Block force pushes and deletions.
+- **Branch protection on `main`.** Require pull requests, require status checks, require a linear history. Block force pushes and deletions. Require only checks that run on every pull request: `security-audit` is filtered by `on.push.paths`, so requiring it leaves a pull request that touches nothing it watches waiting forever on a check that will never report.
 - **Tag protection for `v*`.** Forbid deleting and editing release tags.
 - **Required approvals.** At least one reviewer per PR.
 
