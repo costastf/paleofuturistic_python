@@ -20,6 +20,7 @@ from invoke import Collection, Context, Task, task
 
 {% if integrate_dependency_track -%}
 from .configuration import (
+    AUDIT_ATTEMPTS,
     AUDIT_EXPORT,
     IGNORE_PATTERN,
     MAX_SUPPRESSION_DAYS,
@@ -32,6 +33,7 @@ from .configuration import (
 )
 {%- else -%}
 from .configuration import (
+    AUDIT_ATTEMPTS,
     AUDIT_EXPORT,
     IGNORE_PATTERN,
     MAX_SUPPRESSION_DAYS,
@@ -41,7 +43,7 @@ from .configuration import (
     VENDOR_TXT,
 )
 {%- endif %}
-from .shared import execute, logged
+from .shared import execute, execute_with_retries, logged
 
 
 class Suppression(NamedTuple):
@@ -209,8 +211,16 @@ def audit(context: Context, ignore: str | None = None) -> None:
     # export, which uv writes fully hashed — it implies `--no-deps` and asserts that every pin
     # carries a digest. `vendor.txt` comes from `uv pip compile` without hashes, so it gets the
     # weaker pair rather than a hash requirement it cannot satisfy.
-    execute(context, f'uv run pip-audit -r {AUDIT_EXPORT} --require-hashes --disable-pip{ignore_opts}')
-    execute(context, f'uv run pip-audit -r {VENDOR_TXT} --no-deps --disable-pip{ignore_opts}')
+    #
+    # Retried, unlike every other command in this workflow: this one asks a service on the
+    # internet about 125 packages one request at a time, and a reset connection partway through
+    # has established nothing. A finding is not retried — see `execute_with_retries`.
+    for requirements, mode in ((AUDIT_EXPORT, '--require-hashes'), (VENDOR_TXT, '--no-deps')):
+        execute_with_retries(
+            context,
+            f'uv run pip-audit -r {requirements} {mode} --disable-pip{ignore_opts}',
+            attempts=AUDIT_ATTEMPTS,
+        )
 
 
 @task

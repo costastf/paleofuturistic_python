@@ -29,6 +29,11 @@ PROJECT_NAME = '{{ project_slug }}'
 # SBOM ships inside the wheel via the package data tree, so consumers of the
 # released artefact can extract it via importlib.resources or by unzipping.
 SBOM_FILE = Path('src') / PROJECT_NAME / 'sbom.cdx.json'
+# How many times `secure.audit` will re-run a pip-audit invocation that crashed. Three is one
+# original plus two retries: enough for a single reset connection or a service blip, few enough
+# that a service which is properly down still fails the run inside a minute.
+AUDIT_ATTEMPTS = 3
+
 # How far out a suppression's expiry may be set. The date is there to force a re-review, so a
 # distant one defeats the mechanism while looking like it honours it.
 MAX_SUPPRESSION_DAYS = 365

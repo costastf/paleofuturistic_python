@@ -6,6 +6,7 @@ import platform
 import re
 import shutil
 import sys
+import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager, suppress
 from contextvars import ContextVar
@@ -397,6 +398,36 @@ def execute(context: Context, cmd: str) -> None:
     result = context.run(cmd, echo=True, warn=True, **kwargs)
     if result is None or result.failed:
         raise SystemExit(1)
+
+
+def execute_with_retries(context: Context, cmd: str, *, attempts: int, backoff: int = 3) -> None:
+    """Execute a command, retrying only when it *crashed* rather than reported a verdict.
+
+    For a network-dependent tool the two failures are different things. A tool that ran and
+    found something has answered, and running it again will say the same. A tool that died
+    mid-request has answered nothing — `pip-audit` walks the advisory database one package at a
+    time with no retry of its own, so a single reset connection fails a whole run.
+
+    Both exit 1, so the exit code cannot tell them apart. An uncaught traceback can: a tool that
+    reached its conclusion prints a report, and one that crashed prints a Python stack. That is
+    a crude signal, and deliberately biased — an unrecognised failure is *not* retried, so the
+    worst this can do is fail as it would have anyway.
+
+    Raises:
+        SystemExit: If the command reported a failure, or crashed on the last attempt.
+    """
+    shell = os.environ.get('INVOKE_SHELL')
+    kwargs: dict[str, object] = {'shell': shell} if shell else {}
+    for attempt in range(1, attempts + 1):
+        result = context.run(cmd, echo=True, warn=True, **kwargs)
+        if result is not None and not result.failed:
+            return
+        output = '' if result is None else f'{result.stdout}{result.stderr}'
+        if 'Traceback (most recent call last)' not in output or attempt == attempts:
+            raise SystemExit(1)
+        delay = backoff * attempt
+        print(f'That was a crash rather than a finding — retrying in {delay}s ({attempt}/{attempts - 1} used).')
+        time.sleep(delay)
 
 
 def signing_requested(context: Context) -> bool:

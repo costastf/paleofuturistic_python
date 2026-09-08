@@ -2318,6 +2318,35 @@ def test_the_coverage_floor_is_enforced_by_exactly_one_command(generated_project
     assert '--cov-fail-under=0' in addopts, 'pytest-cov enforces the union floor per interpreter again'
 
 
+def test_the_audit_retries_a_crash_and_not_a_finding(generated_project):
+    """`secure.audit` re-runs a pip-audit that died mid-request, but never one that reported.
+
+    It is the one network-dependent step in the workflow, and it asks a service about ~125
+    packages one request at a time with no retry of its own — a single reset connection fails a
+    run that established nothing. Observed in CI: `ConnectionResetError(104)` out of
+    `pip_audit/_service/pypi.py`, on a cell whose dependencies were identical to eight others
+    that passed.
+
+    A finding is the opposite case: the tool reached its conclusion, and running it again says
+    the same thing more slowly. Both exit 1, so the discriminator is the uncaught traceback a
+    crash leaves behind — biased so that an unrecognised failure is not retried at all.
+    """
+    project, _ = generated_project
+    shared = (project / '_CI' / 'tasks' / 'shared.py').read_text(encoding='utf-8')
+    runner = shared.split('def execute_with_retries', 1)[1].split('\ndef ', 1)[0]
+    assert 'Traceback (most recent call last)' in runner, 'a crash is indistinguishable from a verdict'
+    assert 'attempt == attempts' in runner, 'the retries are unbounded'
+    body = runner.split('"""', 2)[2]
+    assert body.index('not in output') < body.index('time.sleep'), 'a reported failure is retried too'
+
+    secure = (project / '_CI' / 'tasks' / 'secure.py').read_text(encoding='utf-8')
+    audit = secure.split("@logged('secure.audit')", 1)[1].split('\n@task', 1)[0]
+    invocations = [line for line in audit.splitlines() if 'pip-audit' in line and 'uv run' in line]
+    assert invocations, 'the audit no longer runs pip-audit'
+    assert 'execute_with_retries(' in audit, 'the audit gave up its retries'
+    assert "execute(context, f'uv run pip-audit" not in audit, 'a pip-audit invocation bypasses the retries'
+
+
 def test_matrix_envs_do_not_share_report_paths(generated_project):
     """Every tox env writes its report to its own path, and a plain run renders nothing else.
 
