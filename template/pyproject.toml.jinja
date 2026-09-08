@@ -283,6 +283,11 @@ addopts = [
     "--cov-report=html:reports/coverage",
     "--cov-report=json:reports/coverage.json",
     "--html=reports/tests.html", "--self-contained-html",
+    # pytest-cov enforces `[tool.coverage.report] fail_under` once per interpreter, and no single
+    # interpreter can clear a floor the ratchet set from the union of the whole matrix — a line
+    # only the newest version reaches is missing from every older run. The floor is enforced
+    # where the union exists, in `combine_coverage`; here it is switched off.
+    "--cov-fail-under=0",
 ]
 markers = []
 filterwarnings = []

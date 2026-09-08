@@ -54,12 +54,17 @@ repos:
       # in pyproject.toml is what shortens the matrix, and it shortens CI with it.
       # `SKIP=preflight git push` is the escape hatch — unlike `--no-verify` it leaves the
       # other hooks in place. See docs/developer/how-to/skip-a-check.md.
+      #
+      # No `files:` filter, unlike the commit-stage hook. `preflight` verifies README.md and
+      # pyproject.toml among other things, so a push carrying only those — exactly what the
+      # recovery loop produces, `--write` then commit — would skip the gate on the very push
+      # meant to prove it green, while CI still ran it in full. An invariant asserts the
+      # absence.
       - id: preflight
         name: Preflight checks (ty, pyscn, test matrix, wheel, derived files)
         entry: ./workflow.cmd preflight
         language: system
         pass_filenames: false
-        files: ^(_CI/tasks/|src/|tests/).*\.py$
         stages: [pre-push]
       - id: security-overrides
         name: Validate .security-overrides

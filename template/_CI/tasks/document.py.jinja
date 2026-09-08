@@ -17,7 +17,6 @@ from .shared import apply_badge, execute, is_ci, logged, open_target, run, run_s
 from .shared import apply_badge, is_ci, logged, open_target, run, run_steps
 {%- endif %}
 
-
 VERSION_BADGE = r'(\[!\[Version\]\(https://img\.shields\.io/badge/version-)[^)]+(\))'
 
 
@@ -64,8 +63,15 @@ def update_pipeline_badge(context: Context, *, write: bool = True) -> str | None
     The one derived value whose *content* never goes stale: the host renders the current status
     on every page load, so this writes a URL once and then has nothing left to do.
 
-    A project with no readable `origin` has not been pushed anywhere yet. That is not a stale
-    badge, so it reads as up to date and the placeholder stays.
+    It is also the only one that is not a function of the tree — it comes from `origin`, which is
+    the developer's local configuration. So there is no tree-level answer to "is it stale?", and
+    `write=False` reports nothing: verifying it would fail the gate for a contributor whose
+    remote is legitimately a fork, and demand a change that would point upstream's badge at that
+    fork. Written on `--write` by whoever runs it in the canonical clone, refreshed the same way
+    if the repository moves.
+
+    A project with no readable `origin` has not been pushed anywhere yet, which is likewise not
+    a stale badge, so the placeholder stays.
 
     Args:
         context: Invoke context, for reading `origin`.
@@ -74,6 +80,8 @@ def update_pipeline_badge(context: Context, *, write: bool = True) -> str | None
     Returns:
         None when the badge already points at the right place, else a one-line reason.
     """
+    if not write:
+        return None
     badge = pipeline_badge(context)
     if not badge:
         return None

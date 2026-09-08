@@ -14,13 +14,13 @@ from .configuration import OIDC_ENV_VARS, OWASP_DTRACK_SETTINGS, SBOM_FILE, UV_P
 {%- else %}
 from .configuration import OIDC_ENV_VARS, SBOM_FILE, UV_PUBLISH_SETTINGS
 {%- endif %}
+from .document import update_package_version_badge
 from .{{ git_hosting_service }} import create_release_pr, pr_create_url
 {%- if integrate_dependency_track %}
 from .secure import audit, sbom_upload
 {%- else %}
 from .secure import audit
 {%- endif %}
-from .document import update_package_version_badge
 from .shared import commit, execute, logged, note
 
 

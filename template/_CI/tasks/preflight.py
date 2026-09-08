@@ -36,7 +36,7 @@ from invoke import Collection, Context, Task, task
 
 from .build import build
 from .document import update_package_version_badge, update_pipeline_badge, update_python_badge
-from .lint import complexipy, format_check, pylint, ruff_lint, ty
+from .lint import commitizen, complexipy, format_check, pylint, ruff_lint, ty
 from .quality import pyscn_check, pyscn_json_report, update_pyscn_badge
 from .secure import audit
 from .shared import logged, run_steps
@@ -154,6 +154,11 @@ STEPS = (
     Step('pylint', PER_FILE, check=pylint, files=CODE_FILES),
     Step('complexipy', PER_FILE, check=complexipy, files=SRC_FILES),
     Step('ty', WHOLE_PROGRAM, check=ty),
+    # `cz bump` derives the version and the changelog from commit messages, so their format is
+    # a whole-program property of the history rather than of any file. The commit-msg hook
+    # catches a bad message as it is written; this catches one that arrived any other way — an
+    # unhooked clone, or `--no-verify`.
+    Step('commitizen', WHOLE_PROGRAM, check=commitizen),
     Step('pyscn', WHOLE_PROGRAM, check=pyscn),
     # The whole matrix, not one interpreter: the project promises every version in `env_list`,
     # and a single-interpreter gate would leave that the one thing CI knows and you cannot. It
@@ -214,20 +219,20 @@ def plan_scope(
 ) -> list[tuple[Callable[[Context], None], bool]]:
     """Return ``(runner, writes_derived_files)`` for every step in ``scope``, in registry order.
 
-    The second element is what lets ``run_scope`` refuse to write from a failing run: True for
-    a step whose callable in *this* mode writes a derived file.
+    The second element is what lets ``run_scope`` skip the derived-value steps after a failure,
+    in either mode: their inputs are reports the failed step should have produced.
     """
     planned: list[tuple[Callable[[Context], None], bool]] = []
     for step in steps_for(scope, network=network):
-        writes_derived = write and step.write is not None
+        derived = step.write is not None
         runner = step.runner(write=write)
         if step.scope == WHOLE_PROGRAM:
-            planned.append((runner, writes_derived))
+            planned.append((runner, derived))
             continue
         narrowed = scoped_paths(step, paths)
         if narrowed is None:
             continue
-        planned.append((partial(runner, paths=narrowed), writes_derived))
+        planned.append((partial(runner, paths=narrowed), derived))
     return planned
 
 
@@ -242,9 +247,10 @@ def run_scope(
     """Run every registry step in ``scope``, accumulating failures.
 
     Every step runs even after one fails, so a single run reports everything that is wrong —
-    except the steps that *write* derived files, which are skipped once anything before them
-    has failed. A badge computed from a tree whose checks just failed is a claim the tree does
-    not support.
+    except the derived-value steps, skipped once anything before them has failed, in either
+    mode. A badge computed from a tree whose checks just failed is a claim the tree does not
+    support, and comparing against one is worse: the reports it would read are the ones the
+    failed step never produced.
 
     Skipped rather than reordered, so a late failure cannot retroactively undo an earlier
     write. `secure.audit` being last and opt-in also means an advisory published this morning
@@ -267,8 +273,8 @@ def run_scope(
     # accumulate-and-report-at-the-end behaviour is the same.
     failed = False
     skipped = False
-    for runner, writes_derived in plan_scope(scope, write=write, paths=paths, network=network):
-        if failed and writes_derived:
+    for runner, derived in plan_scope(scope, write=write, paths=paths, network=network):
+        if failed and derived:
             skipped = True
             continue
         try:
@@ -276,7 +282,8 @@ def run_scope(
         except SystemExit:
             failed = True
     if skipped:
-        print(f'Derived files left alone: a check failed, so `{FIX_COMMAND}` has nothing trustworthy to write.')
+        print(f'Derived files skipped: a check failed, so there is nothing trustworthy for `{FIX_COMMAND}` to')
+        print('compare against or write — the reports they are computed from were not produced.')
     if failed:
         raise SystemExit(1)
 

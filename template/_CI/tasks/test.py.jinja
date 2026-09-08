@@ -79,7 +79,7 @@ def ratchet_fail_under(*, write: bool = True) -> str | None:
 
     Args:
         write: Update pyproject.toml. When False, report what would change and touch nothing,
-            which is how ``preflight --check`` gates a push on a bump nobody committed.
+            which is how ``preflight`` gates a push on a bump nobody committed.
 
     Returns:
         None when ``fail_under`` is already where it belongs, else a one-line reason it is not.
@@ -181,9 +181,11 @@ def coverage(context: Context) -> None:
     while this reports whatever is in the data file, so it cannot tell whether the badge is
     stale. `test.tox` is the command whose number *is* the badge's.
     """
-    execute(context, 'uv run coverage report')
-    execute(context, f'uv run coverage json -o {COVERAGE_REPORT}')
-    execute(context, 'uv run coverage html -d reports/coverage')
+    # `--fail-under=0` throughout: this reports, it does not gate. The floor is enforced once,
+    # by `combine_coverage`, against the combined data it was measured from.
+    execute(context, 'uv run coverage report --fail-under=0')
+    execute(context, f'uv run coverage json -o {COVERAGE_REPORT} --fail-under=0')
+    execute(context, 'uv run coverage html -d reports/coverage --fail-under=0')
 
 
 @task
@@ -250,6 +252,9 @@ def combine_coverage(context: Context) -> None:
     # lost by consuming them — the per-env *reports* under `reports/` are what anyone reads to
     # see one interpreter's numbers.
     execute(context, 'uv run coverage combine')
+    # The one place `fail_under` is enforced. Every other coverage command in this workflow
+    # passes `--fail-under=0`, and `addopts` does too, because they see one interpreter's data
+    # while the floor is set from the union — a floor from the union is unreachable per env.
     execute(context, f'uv run coverage json -o {COVERAGE_REPORT}')
 
 
