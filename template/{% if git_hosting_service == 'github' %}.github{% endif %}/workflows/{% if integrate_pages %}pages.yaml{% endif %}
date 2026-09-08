@@ -52,10 +52,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
-          # The release tag, so the site describes the version that was just released rather
-          # than whatever else has landed on main since. Empty on a manual run, which
-          # actions/checkout reads as the triggering ref.
-          ref: ${{ needs.detect.outputs.tag }}
+          # The commit the release tag points at, so the site describes the version that was
+          # just released rather than whatever else has landed on main since. Empty when a
+          # manual run found no tag, which actions/checkout reads as the triggering ref.
+          ref: ${{ needs.detect.outputs.sha }}
           fetch-depth: 0
           # Deliberately left persisted, unlike every other checkout here: gh-deploy
           # pushes with these credentials. This job builds no SBOM, so nothing reads the

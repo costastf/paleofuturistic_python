@@ -73,7 +73,8 @@ jobs:
         {#- Escape curly braces for Copier. -#}
         {%- raw %}
         with:
-          ref: ${{ needs.detect.outputs.tag }}
+          # The commit the release tag points at, not the tag name — see detect-release-tag.yaml.
+          ref: ${{ needs.detect.outputs.sha }}
           # Critical in this job specifically: it builds the SBOM, whose VCS reference is
           # read from `origin` and ships inside the wheel to PyPI. A credential left in
           # the git config is the one that becomes permanent and public.

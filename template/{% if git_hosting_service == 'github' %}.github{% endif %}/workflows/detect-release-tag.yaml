@@ -14,6 +14,9 @@ on:
       tag:
         description: The release tag on the incoming commits, or an empty string if there is none
         value: ${{ jobs.detect.outputs.tag }}
+      sha:
+        description: The commit the tag points at, for callers to check out instead of the tag name
+        value: ${{ jobs.detect.outputs.sha }}
 
 jobs:
   detect:
@@ -23,6 +26,7 @@ jobs:
       contents: read
     outputs:
       tag: ${{ steps.find.outputs.tag }}
+      sha: ${{ steps.find.outputs.sha }}
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -33,25 +37,39 @@ jobs:
 
       - id: find
         env:
+          EVENT: ${{ github.event_name }}
           BEFORE: ${{ github.event.before }}
           AFTER: ${{ github.sha }}
         run: |
-          if [ -z "${BEFORE}" ] || [ "${BEFORE}" = "0000000000000000000000000000000000000000" ]; then
-            range="${AFTER}"
+          # What counts as "incoming" depends on how we were triggered. Only a push has a
+          # previous tip to diff against; on anything else `github.event.before` is empty, and
+          # walking from the tip with no lower bound would sweep in every release the branch
+          # has ever carried and report the newest one as arriving now.
+          if [ "${EVENT}" != "push" ]; then
+            set -- --max-count=1 "${AFTER}"
+          elif [ "${BEFORE}" = "0000000000000000000000000000000000000000" ]; then
+            # A push that creates the branch: nothing was here before, so everything reachable
+            # is arriving with it.
+            set -- "${AFTER}"
           else
-            range="${BEFORE}..${AFTER}"
+            set -- "${BEFORE}..${AFTER}"
           fi
           tag=""
-          for sha in $(git log "${range}" --format='%H'); do
+          tag_sha=""
+          for sha in $(git log "$@" --format='%H'); do
             candidate=$(git tag --points-at "${sha}" | grep -E '^v[0-9]' | head -n1 || true)
             if [ -n "${candidate}" ]; then
               tag="${candidate}"
+              tag_sha="${sha}"
               break
             fi
           done
           if [ -n "${tag}" ]; then
-            echo "Release tag detected: ${tag}"
+            echo "Release tag detected: ${tag} (${tag_sha})"
             echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+            # Callers check out the commit, not the name: a tag is a mutable pointer, so a
+            # move between this job and theirs would build a different tree than was detected.
+            echo "sha=${tag_sha}" >> "${GITHUB_OUTPUT}"
           else
             echo "No v-prefixed tag on the incoming commits."
           fi
