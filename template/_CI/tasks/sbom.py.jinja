@@ -27,7 +27,6 @@ from cyclonedx.model.lifecycle import LifecyclePhase, LifecycleRepository, Prede
 from cyclonedx.model.tool import ToolRepository
 from cyclonedx.output.json import JsonV1Dot7
 from cyclonedx.schema import SchemaVersion
-from cyclonedx.validation.json import JsonStrictValidator
 from packageurl import PackageURL
 
 from .configuration import PROJECT_NAME, SBOM_FILE, UV_LOCK, VENDOR_DIR, VENDOR_TXT
@@ -552,6 +551,11 @@ def validate_sbom(target: Path = SBOM_FILE) -> list[str]:
     as a transitive dependency of the vendoring toolchain, which is no longer vendored. With
     it gone the import resolves to the venv and the subprocess has nothing left to isolate.
     """
+    # Imported here rather than at module scope: `cyclonedx.validation.json` reaches
+    # `jsonschema._format` and a lark grammar built at import time, 1.0s of the 1.2s this
+    # module costs to import. Only this function validates.
+    from cyclonedx.validation.json import JsonStrictValidator  # noqa: PLC0415
+
     validator = JsonStrictValidator(SchemaVersion.V1_7)
     error = validator.validate_str(target.read_text(encoding='utf-8'))
     return [str(error)] if error is not None else []

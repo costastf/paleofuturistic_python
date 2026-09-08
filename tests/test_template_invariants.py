@@ -1822,17 +1822,20 @@ def test_the_staged_bundle_defaults_to_what_is_staged(generated_project):
     """
     project, _ = generated_project
     source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
-    assert 'git diff --cached --name-only' in source, 'the staged bundle no longer reads the index'
     body = source.split("@logged('preflight.staged')", 1)[1].split('@task', 1)[0]
     assert 'paths or staged_files(context)' in body, 'an explicit --paths no longer wins'
     assert 'Nothing staged' in body, 'an empty index is not reported'
 
-    # A space in a staged path has to fail loudly. `--paths` is space-separated the whole way
-    # down, so such a path would otherwise split into fragments that match no step's filter and
-    # be dropped — leaving the hook to pass because it checked nothing at all.
-    reader = source.split('def staged_files', 1)[1].split('\n@', 1)[0]
+    # One reader, in `shared.py`, because `format --staged` asks the same question. A space in a
+    # staged path has to fail loudly: `--paths` is space-separated the whole way down, so such a
+    # path would otherwise split into fragments that match no step's filter and be dropped,
+    # leaving the hook to pass because it checked nothing at all.
+    shared = (project / '_CI' / 'tasks' / 'shared.py').read_text(encoding='utf-8')
+    reader = shared.split('def staged_files', 1)[1].split('\ndef ', 1)[0]
+    assert 'git diff --cached --name-only' in reader, 'the staged bundle no longer reads the index'
     assert 'splitlines()' in reader, 'the index is split on whitespace, so a path with a space breaks up'
     assert 'unsupported' in reader, 'a staged path containing a space is not refused'
+    assert '--diff-filter=ACMR' in reader, 'a staged deletion is handed to a tool as a path'
 
 
 def test_the_gate_renders_no_report_it_does_not_read(generated_project):
@@ -1987,6 +1990,105 @@ def test_a_failed_bump_leaves_no_badge_for_it(generated_project):
     assert 'raise' in restore, 'the failure is swallowed'
 
 
+def test_the_commit_message_check_is_bounded_to_this_push(generated_project):
+    """`lint.commitizen` reads the commits a push adds, not every commit ever made.
+
+    `cz check --rev-range HEAD` reads all reachable history, so one message that predates the
+    convention fails every run from then on — and the only way past it is `SKIP=preflight`,
+    which drops the whole gate. It is unfixable by design, too: rewriting published history is
+    worse than the lint it satisfies. A push answers for the commits it adds.
+
+    A shallow clone resolves neither the tracking branch nor `origin/HEAD` and lands on the
+    tip it was handed, which is why the fallback chain ends where it does.
+    """
+    project, _ = generated_project
+    lint = (project / '_CI' / 'tasks' / 'lint.py').read_text(encoding='utf-8')
+    scope = lint.split('def unpushed_range', 1)[1].split('\n@task', 1)[0]
+    for revision in ('@{upstream}', 'origin/HEAD', 'HEAD~1..HEAD'):
+        assert revision in scope, f'the range no longer falls back to {revision}'
+    body = lint.split("@logged('lint.commitizen')", 1)[1].split('\n@task', 1)[0]
+    # Past the docstring, which quotes the unbounded form to explain why it is gone.
+    code = body.split('"""', 2)[2]
+    assert "--rev-range HEAD'" not in code, 'the check reads all of history again'
+    assert 'unpushed_range(context)' in code, 'the check no longer bounds its range'
+
+
+def test_importing_a_task_module_does_not_cost_a_second(generated_project):
+    """The SBOM composer is imported by the tasks that compose one, not at module scope.
+
+    `cyclonedx.validation.json` reaches `jsonschema._format` and a lark grammar built at
+    import time: 1.0s, measured, of the 1.2s `_CI/tasks/sbom.py` costs to import. `build`
+    imports `secure` imports `sbom`, so every `./workflow.cmd` paid it — `format`, `lint`, the
+    commit hook, `--list`. Deferring it took `--list` from 1.37s to 0.15s.
+    """
+    project, _ = generated_project
+    tasks = project / '_CI' / 'tasks'
+    secure = (tasks / 'secure.py').read_text(encoding='utf-8')
+    module_scope = secure.split('\n@task', 1)[0]
+    assert 'from .sbom import' not in module_scope, 'importing secure.py pays for cyclonedx again'
+    sbom = (tasks / 'sbom.py').read_text(encoding='utf-8')
+    assert 'from cyclonedx.validation' not in sbom.split('\ndef ', 1)[0], (
+        'the JSON validator is imported before anything validates'
+    )
+
+
+def test_the_push_hook_names_every_check_it_runs(generated_project):
+    """The `name:` a developer reads on every push lists what the registry actually runs.
+
+    That string is the only description of the gate most people ever see, and it drifted twice
+    — `commitizen` and the docs build were both added to `STEPS` while it still said "ty,
+    pyscn, test matrix, wheel, derived files". Naming each step here means a new one cannot be
+    added without either updating the string or deciding, explicitly, that it needs no name.
+    """
+    project, _ = generated_project
+    # The phrase each step is called in prose. `audit` is deliberately absent: it is in the
+    # registry but off by default, being an answer about the advisory database rather than
+    # about this tree.
+    phrases = {
+        'ty': 'ty',
+        'commitizen': 'commitizen',
+        'docs': 'docs',
+        'pyscn': 'pyscn',
+        'tox': 'test matrix',
+        'build': 'wheel',
+        'artifacts': 'derived files',
+    }
+    gate = next(hook for hook in pre_commit_hooks(project) if invoked_task(hook) == 'preflight')
+    whole_program = [name for name, scope in registry_steps(project).items() if scope == 'WHOLE_PROGRAM']
+    unnamed = [name for name in whole_program if name != 'audit' and name not in phrases]
+    assert not unnamed, f'steps with no agreed phrase for the hook name: {unnamed}'
+    for name in whole_program:
+        if name == 'audit':
+            assert 'audit' not in gate['name'], 'the hook name promises an audit it does not run'
+            continue
+        assert phrases[name] in gate['name'], f'{name!r} runs on every push and the hook does not say so'
+
+
+def test_formatting_what_is_staged_needs_no_shell(generated_project):
+    """`format --staged` reads the index itself, and the how-to no longer builds a path list.
+
+    The recipe was `--paths="$(git diff --cached --name-only)"`, which had three failure modes:
+    an empty index reformatted the whole tree — the exact hazard the paragraph beneath it warns
+    about — staged Markdown failed on ruff's experimental-formatter error, and a staged
+    deletion failed on a missing file.
+    """
+    project, _ = generated_project
+    body = (project / '_CI' / 'tasks' / 'format_.py').read_text(encoding='utf-8')
+    task_body = body.split("@logged('format')", 1)[1]
+    assert 'staged: bool = False' in task_body, 'there is no way to format just what is staged'
+    assert "endswith('.py')" in task_body, 'a staged Markdown file is handed to ruff format'
+    assert 'No staged Python files' in task_body, 'an empty index falls back to the whole tree'
+    how_to = (project / 'docs' / 'developer' / 'how-to' / 'skip-a-check.md').read_text(encoding='utf-8')
+    assert 'format --staged' in how_to, 'the how-to does not name the flag'
+    assert 'git diff --cached --name-only' not in how_to, 'the how-to still assembles a path list'
+    # In the commands, not in the prose: the paragraph beneath them explains what `git add -A`
+    # would do, which is the reason the recipe does not use it.
+    commands = [
+        line.strip() for index, block in enumerate(how_to.split('```')) if index % 2 for line in block.splitlines()
+    ]
+    assert 'git add -A' not in commands, 'the how-to sweeps the whole tree into the commit again'
+
+
 def test_matrix_envs_do_not_share_report_paths(generated_project):
     """Every tox env writes its report to its own path, and a plain run renders nothing else.
 
@@ -2045,6 +2147,11 @@ def test_matrix_coverage_is_combined_before_anything_reads_it(generated_project)
     combine = test_py.split('def combine_coverage', 1)[1].split('\n@task', 1)[0]
     assert 'coverage combine' in combine, 'the per-env data is never merged'
     assert 'coverage json -o {COVERAGE_REPORT}' in combine, 'the union never reaches the report the badge reads'
+    # And it gates only when the data under it is the union the floor was measured from.
+    # `test.tox --env=py310` combines one env's data: enforcing there failed the command whose
+    # whole purpose is looking at one interpreter, on any project with an engaged ratchet.
+    assert 'enforce' in combine, 'the floor is enforced against whatever data happens to be there'
+    assert 'combine_coverage(context, enforce=not env)' in test_py, 'a single-env run is gated by the union floor'
 
 
 def test_only_what_measures_a_derived_value_may_write_it(generated_project):

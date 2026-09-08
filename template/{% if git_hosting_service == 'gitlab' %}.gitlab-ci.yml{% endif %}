@@ -106,9 +106,13 @@ secure:
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
     # `uv.lock` covers every real dependency change: the project runs `--frozen` throughout,
-    # so a `pyproject.toml` edit that changes what is installed changes the lockfile with it.
+    # so a `pyproject.toml` edit that changes what is installed changes the lockfile with it. A
+    # release audits too — `version_provider = "uv"` re-locks, so a bump touches this file.
+    # `vendor.txt` is the vendored CI tree, which pip-audit cannot see for want of `.dist-info`
+    # but which is still worth looking at when it moves.
     - changes:
         - uv.lock
+        - _CI/lib/vendor.txt
         - .security-overrides
   before_script:
     - git config --global --add safe.directory "$CI_PROJECT_DIR"

@@ -30,7 +30,6 @@ from .configuration import (
 {%- else -%}
 from .configuration import IGNORE_PATTERN, SBOM_FILE, SECURITY_OVERRIDE_ENV, SECURITY_OVERRIDES_FILE
 {%- endif %}
-from .sbom import render_sbom, validate_sbom, write_sbom
 from .shared import execute, logged
 
 
@@ -184,6 +183,12 @@ def sbom_extract(context: Context, write: bool = False) -> None:  # noqa: ARG001
         context: Invoke context.
         write: Write SBOM to ``src/<package>/sbom.cdx.json`` instead of printing to stdout.
     """
+    # Imported here, not at module scope. `.sbom` pulls in `cyclonedx`, whose JSON validator
+    # reaches `jsonschema._format` and a lark grammar built at import time — 1.2s, measured,
+    # paid by every `./workflow.cmd` because `build` imports this module. The three tasks that
+    # actually compose an SBOM are the ones that should pay for it.
+    from .sbom import render_sbom, write_sbom  # noqa: PLC0415
+
     if write:
         write_sbom()
         print(f'Wrote SBOM to {SBOM_FILE}.')
@@ -199,6 +204,8 @@ def sbom_validate(context: Context) -> None:
     Re-runs ``sbom-extract --write`` if the SBOM file is missing so the
     validation has something to check.
     """
+    from .sbom import validate_sbom  # noqa: PLC0415
+
     if not SBOM_FILE.exists():
         sbom_extract(context, write=True)
     errors = validate_sbom()

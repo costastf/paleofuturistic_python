@@ -38,7 +38,7 @@ Hook definitions, split across three git stages:
 | `commit-msg` | commitizen (conventional-commit format) | the message | ~2s |
 | `pre-commit` | `preflight.staged` — ruff format, ruff, pylint, complexipy | **staged files only** | ~2.9s |
 | `pre-commit` | `.security-overrides` validation | that file, when staged | ~1.5s |
-| `pre-push` | `preflight` — ty, pyscn, the tox matrix, the wheel, derived files | whole project | ~19s |
+| `pre-push` | `preflight` — ty, commitizen, the docs build, pyscn, the tox matrix, the wheel, derived files | whole project | ~19s |
 
 **The commit stage is one hook, one invocation.** `./workflow.cmd` spends about 1.3s on
 interpreter and imports before any tool runs, so one hook pays that once — ~2.9s for four
@@ -57,7 +57,7 @@ the task reads the whole index, applying each step's own filter from the registr
 containing a space is refused with an explanation, `--paths` being space-separated throughout.
 
 **What runs on pre-commit is what can be judged from the staged files alone.** That is a rule
-about correctness, not speed. ty, pyscn, the test matrix and the wheel are whole-program: a
+about correctness, not speed. ty, pyscn, the docs build, the test matrix and the wheel are whole-program: a
 changed signature surfaces as an error in its *callers*, a function only looks dead once you
 know nothing else calls it, a passing changed test says nothing about the ones it broke, and a
 package builds from the whole tree or not at all.

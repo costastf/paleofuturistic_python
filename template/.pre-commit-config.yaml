@@ -61,7 +61,7 @@ repos:
       # meant to prove it green, while CI still ran it in full. An invariant asserts the
       # absence.
       - id: preflight
-        name: Preflight checks (ty, pyscn, test matrix, wheel, derived files)
+        name: Preflight checks (ty, commitizen, docs, pyscn, test matrix, wheel, derived files)
         entry: ./workflow.cmd preflight
         language: system
         pass_filenames: false

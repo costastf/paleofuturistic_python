@@ -57,7 +57,7 @@ jobs:
           persist-credentials: false
 
       # The same command the pre-push hook runs, so anything failing here would have failed
-      # the push: format, lint, ty, pyscn, the tox matrix, the wheel, and the badges and
+      # the push: format, lint, ty, commitizen, the docs build, pyscn, the tox matrix, the wheel, and the badges and
       # coverage ratchet matching what the tools measure.
       #
       # No `--write`: `contents: read` and the credential-less checkout above mean this job

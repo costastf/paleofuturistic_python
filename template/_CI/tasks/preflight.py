@@ -41,7 +41,7 @@ from .document import update_package_version_badge, update_pipeline_badge, updat
 from .lint import commitizen, complexipy, format_check, pylint, ruff_lint, ty
 from .quality import pyscn_check, pyscn_json_report, update_pyscn_badge
 from .secure import audit
-from .shared import logged, run_steps
+from .shared import logged, run_steps, staged_files
 from .test import ratchet_fail_under, tox_matrix, update_coverage_badge
 
 PER_FILE = 'per-file'
@@ -162,8 +162,14 @@ STEPS = (
     # `cz bump` derives the version and the changelog from commit messages, so their format is
     # a whole-program property of the history rather than of any file. The commit-msg hook
     # catches a bad message as it is written; this catches one that arrived any other way — an
-    # unhooked clone, or `--no-verify`.
+    # unhooked clone, or `--no-verify`. Scoped to the commits this push adds, not to all of
+    # history, which no run can fix — see `lint.unpushed_range`.
     Step('commitizen', WHOLE_PROGRAM, check=commitizen),
+    # Early, being cheap: `properdocs build --strict` fails on a broken cross-reference or a
+    # page missing from the nav in well under a second, and publishing happens on a release
+    # tag, so without this step a bad link is first discovered by the release pipeline — after
+    # the tag is pushed, the one moment there is no cheap way back.
+    Step('docs', WHOLE_PROGRAM, check=document_build),
     Step('pyscn', WHOLE_PROGRAM, check=pyscn),
     # The whole matrix, not one interpreter: the project promises every version in `env_list`,
     # and a single-interpreter gate would leave that the one thing CI knows and you cannot. It
@@ -174,11 +180,6 @@ STEPS = (
     # write it — this step runs inside a hook and a pipeline, where nothing may.
     Step('tox', WHOLE_PROGRAM, check=tox_matrix),
     Step('build', WHOLE_PROGRAM, check=build),
-    # `properdocs build --strict` fails on a broken cross-reference or a page missing from the
-    # nav, which are whole-program properties of the docs tree. Publishing happens on release,
-    # so without this a bad link is first discovered by the release pipeline, after the tag is
-    # pushed — the one moment there is no cheap way back.
-    Step('docs', WHOLE_PROGRAM, check=document_build),
     # After pyscn and tox, which produce the reports it reads.
     Step(
         'artifacts',
@@ -296,36 +297,6 @@ def run_scope(
         print('compare against or write — the reports they are computed from were not produced.')
     if failed:
         raise SystemExit(1)
-
-
-def staged_files(context: Context) -> str:
-    """Return the files staged for commit, space-separated, or an empty string if none are.
-
-    Additions, copies, modifications and renames — not deletions, which have nothing left to
-    check. `git` failing at all (no repository, no index) also reads as "nothing staged": this
-    task is defined in terms of the index, so an absent one means there is no work, not an
-    error to raise.
-
-    Raises:
-        SystemExit: If a staged path contains a space. `--paths` is space-separated the whole
-            way down, so such a path cannot be forwarded; this refuses loudly rather than
-            letting it split into fragments that match no filter and are quietly skipped.
-    """
-    result = context.run('git diff --cached --name-only --diff-filter=ACMR', hide=True, warn=True)
-    if result is None or result.failed:
-        return ''
-    # Split on lines, not whitespace, so a path containing a space arrives intact and can be
-    # refused below rather than silently becoming two paths that match no filter and get
-    # dropped — a hook that passes because it checked nothing is worse than one that fails.
-    paths = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    unsupported = [path for path in paths if ' ' in path]
-    if unsupported:
-        print(f'Cannot check staged paths containing spaces: {", ".join(unsupported)}')
-        print('`--paths` is space-separated throughout this workflow, so such a path cannot be')
-        print('forwarded to the tools. Rename it, or check the whole project with')
-        print('`./workflow.cmd preflight`.')
-        raise SystemExit(1)
-    return ' '.join(paths)
 
 
 @task

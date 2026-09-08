@@ -279,13 +279,16 @@ disable = [
 addopts = [
     # A fixed worker count, not `-n auto`. Under `tox run-parallel` every env spawns its own
     # pool, so `auto` on a 16-core machine asks for five times sixteen workers and the run comes
-    # out slower than on four cores. Four is the measured sweet spot for a suite this size, and
-    # it leaves the machine usable while it runs.
+    # out slower than the same config on four cores. Four measured fastest on a 242-test suite
+    # at both 4 and 16 cores — 2.3x quicker than no xdist at all — and it leaves the machine
+    # usable while it runs. Raise it for a suite big enough to keep more workers busy.
     "-n", "4",
     "--strict-markers",
     # Terminal summary and the JSON the badge and the ratchet read. No HTML: nothing in a hook
-    # or a pipeline opens one, and rendering both reports is most of a scaffold's test run.
-    # `test.coverage` renders the coverage HTML on demand and `test.view` the test report.
+    # or a pipeline opens one, so the gate stops producing artefacts for an absent reader. The
+    # saving is real but small — about half a second per matrix run — and the reason is the rule
+    # rather than the clock. `test.coverage` renders the coverage HTML on demand and `test.view`
+    # the test report.
     "--cov", "--cov-report=term-missing",
     "--cov-report=json:reports/coverage.json",
     # pytest-cov enforces `[tool.coverage.report] fail_under` once per interpreter, and no single

@@ -221,7 +221,7 @@ def erase_coverage_data() -> None:
         data_file.unlink(missing_ok=True)
 
 
-def combine_coverage(context: Context) -> None:
+def combine_coverage(context: Context, *, enforce: bool = True) -> None:
     """Merge the matrix's per-env coverage data into one report.
 
     ``coverage combine`` takes the *union* of the lines each interpreter executed: a line counts
@@ -262,10 +262,14 @@ def combine_coverage(context: Context) -> None:
     # lost by consuming them — the per-env *reports* under `reports/` are what anyone reads to
     # see one interpreter's numbers.
     execute(context, 'uv run coverage combine')
-    # The one place `fail_under` is enforced. Every other coverage command in this workflow
-    # passes `--fail-under=0`, and `addopts` does too, because they see one interpreter's data
-    # while the floor is set from the union — a floor from the union is unreachable per env.
-    execute(context, f'uv run coverage json -o {COVERAGE_REPORT}')
+    # The one place `fail_under` is enforced, and only when the data under it is the union the
+    # floor was measured from. Every other coverage command in this workflow passes
+    # `--fail-under=0`, and `addopts` does too, because they see one interpreter — and a floor
+    # set from five is unreachable by one. `enforce=False` is that same case reaching here:
+    # `test.tox --env=py310` combines one env's data, and gating it would fail the command
+    # whose whole purpose is looking at one interpreter.
+    floor = '' if enforce else ' --fail-under=0'
+    execute(context, f'uv run coverage json -o {COVERAGE_REPORT}{floor}')
 
 
 @logged('test.matrix')
@@ -278,7 +282,9 @@ def tox_matrix(context: Context, env: str = '') -> None:
 
     Args:
         context: Invoke context.
-        env: A single tox environment to run, e.g. ``py313``. Empty runs the whole matrix.
+        env: A single tox environment to run, e.g. ``py313``. Empty runs the whole matrix, and
+            is the only case where the coverage floor is enforced: it is set from the union of
+            every interpreter, so no single one can clear it.
     """
     # By hand, because `coverage erase` leaves the per-env files alone — see the docstring.
     erase_coverage_data()
@@ -287,7 +293,7 @@ def tox_matrix(context: Context, env: str = '') -> None:
     # absent env is the one with the longest duration and it changes between runs.
     # `--parallel-no-spinner` does not help. The summary block below the list is complete.
     execute(context, f'uv run tox run -e {env}' if env else 'uv run tox run-parallel')
-    combine_coverage(context)
+    combine_coverage(context, enforce=not env)
 
 
 @task

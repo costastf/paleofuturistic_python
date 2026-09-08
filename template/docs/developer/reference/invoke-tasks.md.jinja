@@ -13,7 +13,7 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 | --- | --- | --- |
 | `bootstrap` | `develop.bootstrap` | First-run setup; idempotent. Pass `--force` to re-run. |
 | `preflight` | `preflight.all` | **Everything, then the derived files.** The one to run before opening a pull request. |
-| `format` | `format.ruff` | Ruff format + import sort. |
+| `format` | `format.ruff` | Ruff format + import sort. `--staged` limits it to the Python files you staged, `--paths="<paths>"` to files you name. |
 | `lint` | `lint.all` | Runs ruff, pylint, ty, complexipy, commitizen. |
 | `test` | `test.all` | pytest with coverage and xdist. |
 | `build` | `build.package` | SBOM compose + validate, then `uv build`. No dependency audit — see `secure` — and no README badge: the CI badge points at {% if git_hosting_service == 'github' %}GitHub's workflow-status endpoint{% else %}GitLab's pipeline-status endpoint{% endif %}, which is always current. |
@@ -27,14 +27,17 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 
 | Task | Args | What it does |
 | --- | --- | --- |
-| `preflight` | `--write`, `--audit-dependencies` | Verify formatting, lint, type-check, pyscn, the full tox matrix, the wheel, and the README badges plus the coverage ratchet against what the tools just measured — failing with everything out of date. This bare command is what the pre-push hook and the CI pipeline run. `--write` updates the badges and the ratchet instead of comparing them; it is opt-in because a command named for an inspection should not modify the tree. Never edits source either way — unformatted code fails and points at `format`. `--audit-dependencies` adds the pip-audit run, off by default because its answer depends on the advisory database rather than on your tree. |
+| `preflight` | `--write`, `--audit-dependencies` | Verify formatting, lint, type-check, the commit messages this push adds, the docs build, pyscn, the full tox matrix, the wheel, and the README badges plus the coverage ratchet against what the tools just measured — failing with everything out of date. This bare command is what the pre-push hook and the CI pipeline run. `--write` updates the badges and the ratchet instead of comparing them; it is opt-in because a command named for an inspection should not modify the tree. Never edits source either way — unformatted code fails and points at `format`. `--audit-dependencies` adds the pip-audit run, off by default because its answer depends on the advisory database rather than on your tree. |
 | `preflight.staged` | `--paths="<paths>"` | Only the checks that can be judged from the given files alone, and by default only the files you have staged. What the pre-commit hook runs. Reports rather than fixes, like every other entry point — unformatted code names `format`. |
 
-The badges it checks are the two written from reports — coverage and pyscn — plus version and
-Python range from `pyproject.toml`, and the CI badge, whose *URL* is derived from `origin` once
-and then never changes, because
-{% if git_hosting_service == 'github' %}GitHub{% else %}GitLab{% endif %} renders the current
-status itself. A project with no remote yet keeps the placeholder rather than failing the gate.
+It checks four badges: coverage and pyscn from the reports the run just produced, and version
+and Python range from `pyproject.toml`. The fifth, the CI badge, is *written* by `--write` and
+never checked — its URL comes from `git remote get-url origin`, which is a fact about your
+clone rather than about this tree, so a contributor whose remote is a fork would fail a gate
+they cannot satisfy.
+{% if git_hosting_service == 'github' %}GitHub{% else %}GitLab{% endif %} renders the status
+itself once the URL is right. A project with no remote keeps the placeholder, so run
+`preflight --write` again after `git remote add origin …` to fill it in.
 
 Both read one registry — `STEPS` in `_CI/tasks/preflight.py` — which declares every check
 once with its scope, its path filter and whether it writes. The two hooks and the CI job consume

@@ -24,9 +24,16 @@ on:
     paths:
       # `uv.lock` covers every real dependency change: the project runs `--frozen` throughout,
       # so a `pyproject.toml` edit that changes what is installed changes the lockfile with it.
-      # Watching `pyproject.toml` too meant every coverage-ratchet bump and every `cz bump`
-      # fired a full audit of a dependency set nobody had touched.
+      # Watching `pyproject.toml` too meant a coverage-ratchet bump — a number in a table —
+      # firing a full audit of a dependency set nobody had touched. A release still audits:
+      # `[tool.commitizen] version_provider = "uv"` re-locks, so the bump commit carries the
+      # root package's own version line in `uv.lock`. That one is worth auditing anyway, being
+      # the commit that publishes.
       - 'uv.lock'
+      # The vendored CI dependencies. pip-audit cannot see them — they ship without
+      # `.dist-info`, so no installed-distribution scan finds them — but a change here is still
+      # the moment to look, and `secure.audit` reports what it can.
+      - '_CI/lib/vendor.txt'
       - '.security-overrides'
   workflow_dispatch:
 

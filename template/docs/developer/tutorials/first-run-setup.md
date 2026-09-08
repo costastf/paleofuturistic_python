@@ -61,11 +61,21 @@ every interpreter in your range, the wheel, and the README badges against what t
 measured. The pre-push hook and the CI pipeline run it bare, where it compares and fails on
 anything out of date.
 
-`--write` is needed exactly once, here. A generated README ships `coverage-unknown` and
-`pyscn-not rated` because nothing has measured them yet, so the first bare run would fail on
-badges nobody could have filled in. Commit the result and the bare command is the one you want
-from then on — [Skip a check, once](../how-to/skip-a-check.md) covers what to do when it blocks
-you.
+`--write` is needed here because a generated README ships `coverage-unknown` and `pyscn-not
+rated` — nothing has measured them yet, so the first bare run would fail on badges nobody could
+have filled in. Commit the result and the bare command is the one you want from then on;
+[Skip a check, once](../how-to/skip-a-check.md) covers what to do when it blocks you.
+
+Run it once more after you add the remote:
+
+```bash
+git remote add origin <your-repository-url>
+./workflow.cmd preflight --write
+```
+
+The build badge's URL is derived from `origin`, so until there is one it stays
+`build-unknown`. Nothing fails over it — that badge is written and never checked, being a fact
+about your clone rather than about the code — but it also will not fill itself in later.
 
 ## You're ready
 
