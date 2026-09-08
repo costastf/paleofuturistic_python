@@ -22,12 +22,6 @@ IGNORE_PATTERNS = shutil.ignore_patterns('.git', '.venv', '__pycache__', '*.pyc'
 # so what is left to list is what it deliberately does not do: the dependency audit, whose
 # answer depends on the advisory database rather than on the generated tree, and the docs build.
 #
-# The audit runs last, for the same reason it is last in the generated project's own registry:
-# it reports on the world rather than on this tree, so it is the least interesting signal about
-# whether the template works, and the top of each cell's log should be about the thing under
-# test. It is still the step the `<PROJECT>_SECURITY_OVERRIDE` plumbing below exists to serve,
-# and the only automated run the `.security-overrides` expiry mechanism gates.
-#
 # Every step runs even after one fails — `run_combo` accumulates, as the matrix already does
 # across cells. The feedback loop here is the slowest in the system, eight cells at tens of
 # seconds each, so a fix-rerun cycle is what costs most and complete information is worth most.
@@ -35,7 +29,17 @@ IGNORE_PATTERNS = shutil.ignore_patterns('.git', '.venv', '__pycache__', '*.pyc'
 # `--write` because a freshly generated project's badges all read "unknown", and the matrix is
 # exercising the command that produces them. The pipeline the template ships runs the bare
 # `preflight`, which compares instead.
-QA_STEPS = ('preflight --write', 'document', 'secure.audit')
+QA_STEPS = ('preflight --write', 'document')
+# The dependency audit, run in one cell rather than all of them. Every cell resolves the same
+# lockfile and ships the same `vendor.txt`, so the audit's answer cannot differ between them —
+# what differed was the exposure: nine jobs each querying the advisory database for ~125
+# packages, where one transient service error fails a cell for a reason that has nothing to do
+# with the template. It still runs, so the `<PROJECT>_SECURITY_OVERRIDE` plumbing below and the
+# `.security-overrides` expiry mechanism are still exercised, and `test.test` runs it too.
+#
+# Last, as in the generated project's own registry: it reports on the world rather than on this
+# tree, so the top of a cell's log should be about the thing under test.
+AUDIT_STEP = 'secure.audit'
 # Run after the writers: a project whose derived files were just written has to satisfy the
 # read-only gate the pipeline runs. A failure here is the writer and the checker disagreeing
 # about a value, which is invisible to a run that only ever writes.
@@ -142,7 +146,7 @@ def qa_cells() -> list[dict]:
     origin, so those paths run too. It is one extra cell rather than a fourth axis because
     nothing it touches interacts with the knobs.
     """
-    cells = [{**cell, 'mature': False} for cell in matrix_combos()]
+    cells = [{**cell, 'mature': False, 'audit': False} for cell in matrix_combos()]
     cells.append(
         {
             'label': combo_label(
@@ -155,6 +159,9 @@ def qa_cells() -> list[dict]:
             'integrate_dependency_track': True,
             'integrate_pages': True,
             'mature': True,
+            # The audit rides along here rather than in every cell — see `AUDIT_STEP`. A day-two
+            # project is where a dependency audit belongs anyway.
+            'audit': True,
         }
     )
     return cells

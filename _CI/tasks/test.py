@@ -16,6 +16,7 @@ from _CI import (PROJECT_ROOT_DIRECTORY,
                  make_file_executable)
 from _CI.tasks.configuration import (IGNORE_PATTERNS,
                                      PROJECT_SLUG,
+                                     AUDIT_STEP,
                                      QA_SETTLE_STEP,
                                      QA_STEPS,
                                      TEMPLATE_SECURITY_OVERRIDE_ENV,
@@ -139,10 +140,11 @@ def untracked_after_qa(project_dir):
     return [line[3:] for line in result.stdout.splitlines() if line.startswith('??')]
 
 
-def run_combo(template_repo, output_root, extra_context, label, log_file=None, mature=False):
+def run_combo(template_repo, output_root, extra_context, label, log_file=None, mature=False, audit=True):
     """Generate the template with extra_context and run the QA steps. Return True on success.
 
-    `mature` makes the cell look like a project on day two — see `qa_cells`.
+    `mature` makes the cell look like a project on day two — see `qa_cells`. `audit` runs the
+    dependency audit, which one cell does rather than all of them — see `AUDIT_STEP`.
     """
     combo_root = output_root / label
     combo_root.mkdir(parents=True, exist_ok=True)
@@ -198,7 +200,8 @@ def run_combo(template_repo, output_root, extra_context, label, log_file=None, m
     # in the system — eight cells at tens of seconds each — so one run reporting everything is
     # worth the seconds it costs when something is already red. Stopping early also skipped the
     # litter check below in precisely the cells that were already unhappy.
-    failed = [step for step in (*QA_STEPS, QA_SETTLE_STEP)
+    steps = (*QA_STEPS, *((AUDIT_STEP,) if audit else ()), QA_SETTLE_STEP)
+    failed = [step for step in steps
               if not run_command(f'./workflow.cmd {step}', cwd=project_dir, env=step_env, log_file=log_file)]
 
     untracked = untracked_after_qa(project_dir)
@@ -238,10 +241,11 @@ def test(context):
         'integrate_dependency_track': 'Bool — opt the SBOM-upload code in (default true)',
         'integrate_pages': 'Bool — opt the Pages workflow + task in (default true)',
         'mature': 'Bool — drop the scaffolded smoke test and add an origin (default false)',
+        'audit': 'Bool — also run the dependency audit (default true; the matrix runs it once)',
     }
 )
 def combo(context, git_hosting_service='github', integrate_dependency_track=True, integrate_pages=True,
-          mature=False):
+          mature=False, audit=True):
     """Run the full QA cycle for one matrix cell across all three template knobs."""
     tmpdir = Path(tempfile.mkdtemp(prefix='paleofuturistic_combo_'))
     try:
@@ -264,6 +268,7 @@ def combo(context, git_hosting_service='github', integrate_dependency_track=True
             ),
             label=label,
             mature=mature,
+            audit=audit,
         )
         if not ok:
             print(emojize_message(f'Combo {label} failed', success=False))
@@ -312,6 +317,7 @@ def matrix(context, workers=1):
                     label=label,
                     log_file=log_path,
                     mature=cell['mature'],
+                    audit=cell['audit'],
                 )
             except Exception as exc:  # noqa: BLE001 — worker must not crash the pool
                 with log_path.open('a', encoding='utf-8') as handle:
@@ -349,14 +355,15 @@ def list_combos(context, as_json=False):
     if as_json:
         print(json.dumps(combos, separators=(',', ':')))
         return
-    print(f'{"label":<24} {"host":<7} {"dep_track":<10} {"pages":<6} {"mature":<6}')
+    print(f'{"label":<24} {"host":<7} {"dep_track":<10} {"pages":<6} {"mature":<7} {"audit":<6}')
     for cell in combos:
         print(
             f'{cell["label"]:<24} '
             f'{cell["git_hosting_service"]:<7} '
             f'{str(cell["integrate_dependency_track"]):<10} '
             f'{str(cell["integrate_pages"]):<6} '
-            f'{str(cell["mature"]):<6}'
+            f'{str(cell["mature"]):<7} '
+            f'{str(cell["audit"]):<6}'
         )
 
 

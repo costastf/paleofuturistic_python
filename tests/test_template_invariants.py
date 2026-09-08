@@ -754,24 +754,32 @@ def test_publishing_audits_before_it_builds(generated_project):
 
 
 def test_qa_steps_cover_what_preflight_does_not():
-    """QA_STEPS runs the generated project's own gate, plus the two things it leaves out.
+    """The matrix runs the generated project's own gate, plus the two things it leaves out.
 
-    `preflight` covers format, lint, ty, pyscn, the tox matrix, the wheel and the derived
-    files, so naming those separately would re-run them in a different shape and leave the
-    matrix with two lists of checks to keep in step — the same duplication the generated
-    project's pipeline shed. What has to be listed is what `preflight` deliberately omits:
-    the dependency audit, and the docs build.
+    `preflight` covers format, lint, ty, commit messages, the docs build, pyscn, the tox matrix,
+    the wheel and the derived files, so naming those separately would re-run them in a different
+    shape and leave the matrix with two lists of checks to keep in step — the same duplication
+    the generated project's pipeline shed. What has to be listed is what `preflight` deliberately
+    omits: the dependency audit, and the docs build for the project's own docs.
 
-    `secure.audit` in particular has to be here explicitly. The matrix runner exports
-    `<PROJECT>_SECURITY_OVERRIDE` for it, and that plumbing feeds nothing unless it runs.
+    The audit runs in one cell, not all nine. Every cell resolves the same lockfile and ships the
+    same `vendor.txt`, so its answer cannot differ between them, while its exposure does: nine
+    jobs querying an advisory database for ~125 packages each, where one transient service error
+    fails a cell for a reason that has nothing to do with the template. It still has to run
+    somewhere, because it is the step the `<PROJECT>_SECURITY_OVERRIDE` plumbing serves and the
+    only automated run the `.security-overrides` expiry mechanism gates.
     """
-    from _CI.tasks.configuration import QA_STEPS  # noqa: PLC0415
+    from _CI.tasks.configuration import AUDIT_STEP, QA_SETTLE_STEP, QA_STEPS, qa_cells  # noqa: PLC0415
 
-    assert 'secure.audit' in QA_STEPS
+    assert AUDIT_STEP == 'secure.audit', 'the matrix no longer audits dependencies anywhere'
+    assert AUDIT_STEP not in QA_STEPS, 'the audit is back in every cell'
     assert 'preflight --write' in QA_STEPS, 'the matrix no longer exercises the generated gate'
-    # The audit last, as in the generated project's own registry: it reports on the world
-    # rather than on this tree, so the top of each cell's log is about the thing under test.
-    assert QA_STEPS.index('secure.audit') > QA_STEPS.index('preflight --write')
+    assert 'document' in QA_STEPS, 'nothing builds the generated docs'
+
+    auditing = [cell['label'] for cell in qa_cells() if cell['audit']]
+    assert len(auditing) == 1, f'expected exactly one auditing cell, got {auditing}'
+    # And after the writers, so the top of a cell's log is about the thing under test.
+    assert QA_SETTLE_STEP not in QA_STEPS, 'the gate has to run after the writers, not among them'
 
 
 def test_the_matrix_verifies_what_it_wrote():
