@@ -1855,22 +1855,36 @@ def test_pyscn_never_opens_a_browser_by_itself(generated_project):
 
 
 def test_matrix_envs_do_not_share_report_paths(generated_project):
-    """Every tox env writes its reports to its own paths.
+    """Every tox env writes its report to its own path, and a plain run renders nothing else.
 
-    `addopts` sends each report to one fixed path, so under `run-parallel` all five envs wrote
-    `reports/coverage.json` and `reports/tests.html` simultaneously. It stayed invisible while
-    nothing read those files; the moment the coverage badge and the `fail_under` ratchet read
-    `coverage.json`, they would be reading whichever env finished last, possibly mid-write.
+    `addopts` sends the JSON report to one fixed path, so under `run-parallel` all five envs
+    wrote `reports/coverage.json` simultaneously. It stayed invisible while nothing read that
+    file; the moment the coverage badge and the `fail_under` ratchet read it, they would be
+    reading whichever env finished last, possibly mid-write.
+
+    No HTML from a plain run, per env or otherwise: nothing in a hook or a pipeline opens one,
+    and rendering them is most of a scaffold's test run. `test.coverage` and `test.view`
+    produce them on demand.
     """
     project, _ = generated_project
     data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
+    addopts = data['tool']['pytest']['ini_options']['addopts']
     commands = data['tool']['tox']['env_run_base']['commands']
     specs = [argument for command in commands for argument in command if isinstance(argument, str)]
-    for flag in ('--cov-report=json:', '--cov-report=html:', '--html='):
-        overrides = [spec for spec in specs if spec.startswith(flag)]
-        assert overrides, f'no per-env override for {flag}'
-        for spec in overrides:
-            assert '{envname}' in spec, f'{spec!r} is a fixed path, so parallel envs clobber each other'
+
+    overrides = [spec for spec in specs if spec.startswith('--cov-report=json:')]
+    assert overrides, 'no per-env override for --cov-report=json:'
+    for spec in overrides:
+        assert '{envname}' in spec, f'{spec!r} is fixed, so parallel envs clobber each other'
+
+    for flag in ('--cov-report=html:', '--html='):
+        rendered = [spec for spec in (*addopts, *specs) if spec.startswith(flag)]
+        assert not rendered, f'a plain run renders {flag} for nobody: {rendered}'
+
+    # `-n auto` under `run-parallel` asks for one pool per env, which measured slower on
+    # sixteen cores than the same config on four.
+    assert 'auto' not in addopts, 'every env spawns a pool sized for the whole machine'
+    assert '-n' in addopts, 'the worker count is no longer pinned'
 
 
 def test_matrix_coverage_is_combined_before_anything_reads_it(generated_project):

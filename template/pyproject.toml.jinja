@@ -277,12 +277,17 @@ disable = [
 
 [tool.pytest.ini_options]
 addopts = [
-    "-n", "auto",
+    # A fixed worker count, not `-n auto`. Under `tox run-parallel` every env spawns its own
+    # pool, so `auto` on a 16-core machine asks for five times sixteen workers and the run comes
+    # out slower than on four cores. Four is the measured sweet spot for a suite this size, and
+    # it leaves the machine usable while it runs.
+    "-n", "4",
     "--strict-markers",
+    # Terminal summary and the JSON the badge and the ratchet read. No HTML: nothing in a hook
+    # or a pipeline opens one, and rendering both reports is most of a scaffold's test run.
+    # `test.coverage` renders the coverage HTML on demand and `test.view` the test report.
     "--cov", "--cov-report=term-missing",
-    "--cov-report=html:reports/coverage",
     "--cov-report=json:reports/coverage.json",
-    "--html=reports/tests.html", "--self-contained-html",
     # pytest-cov enforces `[tool.coverage.report] fail_under` once per interpreter, and no single
     # interpreter can clear a floor the ratchet set from the union of the whole matrix — a line
     # only the newest version reaches is missing from every older run. The floor is enforced
@@ -375,22 +380,19 @@ dependency_groups = ["test"]
 # env scans the same project root and combines partially-written DBs from the
 # sibling env, producing intermittent `no such table: file` SQLite errors).
 set_env = { COVERAGE_FILE = ".coverage.{envname}" }
-# Per-env *report* paths for the same reason as the per-env data file above. `addopts` sends
-# every report to one fixed path, so under `run-parallel` all five envs were writing
-# `reports/coverage.json` and `reports/tests.html` at once. Nothing read those files
-# afterwards, so it stayed invisible — until the coverage badge and the `fail_under` ratchet
-# started reading `coverage.json`, at which point they would be reading whichever env
-# happened to finish last, possibly mid-write.
+# A per-env *report* path for the same reason as the per-env data file above. `addopts` sends
+# the JSON report to one fixed path, so under `run-parallel` all five envs were writing
+# `reports/coverage.json` at once. It stayed invisible while nothing read that file — until the
+# coverage badge and the `fail_under` ratchet started reading it, at which point they would be
+# reading whichever env happened to finish last, possibly mid-write.
 #
-# pytest-cov keys reports by type, so a `json:`/`html:` spec here replaces the one from
-# `addopts` rather than adding to it; `--html` is single-valued and behaves the same way.
-# `test.tox` combines the per-env data into one `reports/coverage.json` afterwards.
+# pytest-cov keys reports by type, so a `json:` spec here replaces the one from `addopts`
+# rather than adding to it. `test.tox` combines the per-env data into one
+# `reports/coverage.json` afterwards.
 commands = [
     [
         "pytest",
         "--cov-report=json:reports/coverage.{envname}.json",
-        "--cov-report=html:reports/coverage.{envname}",
-        "--html=reports/tests.{envname}.html",
         { replace = "posargs", default = [], extend = true },
     ],
 ]

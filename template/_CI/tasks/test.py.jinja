@@ -191,8 +191,13 @@ def coverage(context: Context) -> None:
 @task
 @logged('test.view')
 def view(context: Context) -> None:
-    """Run tests and open HTML test and coverage reports in browser."""
-    test(context)
+    """Run the tests and open the HTML test and coverage reports in a browser.
+
+    Both reports are produced here, by the command that opens them. A plain run writes only
+    the JSON the gate reads: rendering HTML nobody looks at is most of a scaffold's test run.
+    """
+    execute(context, 'uv run pytest --html=reports/tests.html --self-contained-html')
+    coverage(context)
     open_target(context, 'reports/tests.html')
     open_target(context, 'reports/coverage/index.html')
 

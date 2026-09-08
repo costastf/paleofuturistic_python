@@ -40,7 +40,7 @@ Coverage regressions still can't slip in silently — they just can't slip in *o
 
 tox + tox-uv runs the test suite against every Python version in the project's range. Configured in `pyproject.toml`'s `[tool.tox]`, generated from the Python version range chosen at generation time.
 
-**Coverage across the matrix is a union, not an average.** Each env writes its own coverage data (`.coverage.<envname>`, consumed by the combine) and its own reports (`reports/coverage.<envname>.json`, `reports/tests.<envname>.html`); `test.tox` then runs `coverage combine` to produce the single `reports/coverage.json` the badge and the ratchet read. A line counts as covered if *any* interpreter executed it.
+**Coverage across the matrix is a union, not an average.** Each env writes its own coverage data (`.coverage.<envname>`, consumed by the combine) and its own report (`reports/coverage.<envname>.json`); `test.tox` then runs `coverage combine` to produce the single `reports/coverage.json` the badge and the ratchet read. A line counts as covered if *any* interpreter executed it.
 
 The gate stops at that JSON: `preflight` produces what it consumes and nothing else, so it
 renders no browsable report — the same reason it asks pyscn for JSON only. `./workflow.cmd
@@ -77,7 +77,7 @@ The scaffold generated one smoke test — a `tests/test_<slug>.py` that exercise
 
 ## Parallel execution
 
-`pytest-xdist` runs tests across CPU cores by default (`-n auto` in the pytest config). Some tests don't play well with parallelism — anything touching the filesystem in a fixed location, or relying on shared global state.
+`pytest-xdist` runs tests across four cores by default (`-n 4` in the pytest config). Some tests don't play well with parallelism — anything touching the filesystem in a fixed location, or relying on shared global state.
 
 For those, add `@pytest.mark.serial` and a corresponding `-m "not serial"` / `-m serial` two-pass setup. The scaffold doesn't ship this scaffolding because most projects don't need it.
 
