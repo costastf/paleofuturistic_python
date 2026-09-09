@@ -62,7 +62,7 @@ literal follows from it and the badge is no different from the rest.
 
 `run_scope` runs every step and exits once at the end, so most of a *failing* run happens
 after the verdict is known — measured on a scaffold, 99% of a 12.8s run for a formatting
-failure, 88% of a 13.8s run for a broken docs link.
+failure, 86% of a 13.8s run for a broken docs link.
 
 **Why not.** One run reports everything you have to fix. A gate that stops early makes you
 re-run to discover the next problem. The steps are ordered cheapest-first within each scope, so

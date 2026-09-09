@@ -5,15 +5,29 @@ import base64
 import json
 import os
 import re
+import sys
 import urllib.error
 import urllib.request
 from datetime import date, timedelta
+from pathlib import Path
 from typing import NamedTuple, cast
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 {%- else -%}
 import os
 import re
+import sys
 from datetime import date, timedelta
+from pathlib import Path
 from typing import NamedTuple, cast
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 {%- endif %}
 
 from invoke import Collection, Context, Task, task
@@ -21,7 +35,8 @@ from invoke import Collection, Context, Task, task
 {% if integrate_dependency_track -%}
 from .configuration import (
     AUDIT_ATTEMPTS,
-    AUDIT_EXPORT,
+    AUDIT_REQUIREMENTS,
+    AUDIT_VERDICTS,
     IGNORE_PATTERN,
     MAX_SUPPRESSION_DAYS,
     OWASP_DTRACK_SETTINGS,
@@ -29,21 +44,24 @@ from .configuration import (
     SBOM_FILE,
     SECURITY_OVERRIDE_ENV,
     SECURITY_OVERRIDES_FILE,
+    UV_LOCK,
     VENDOR_TXT,
 )
 {%- else -%}
 from .configuration import (
     AUDIT_ATTEMPTS,
-    AUDIT_EXPORT,
+    AUDIT_REQUIREMENTS,
+    AUDIT_VERDICTS,
     IGNORE_PATTERN,
     MAX_SUPPRESSION_DAYS,
     SBOM_FILE,
     SECURITY_OVERRIDE_ENV,
     SECURITY_OVERRIDES_FILE,
+    UV_LOCK,
     VENDOR_TXT,
 )
 {%- endif %}
-from .shared import execute, execute_with_retries, logged
+from .shared import execute_with_retries, logged
 
 
 class Suppression(NamedTuple):
@@ -109,6 +127,51 @@ def validate_override_entry(entry: str, source: str, *, require_expiry: bool = F
         )
 
 
+def audit_requirement_files() -> list[Path]:
+    """Write every pin in `uv.lock` to requirement files, and return their paths.
+
+    The lockfile is the whole resolution: every package for every interpreter and platform the
+    project supports, with nothing to evaluate and no extras or groups to remember to ask for.
+
+    `uv export` cannot do this job. It produces a *universal* requirements file that keeps the
+    environment markers, and pip-audit evaluates them — so `waitress==2.1.0 ; sys_platform ==
+    "win32"` audits clean on Linux, and on the default render an export audited on a 3.10 runner
+    skips `rpds-py==2026.6.3`, which four of the five matrix interpreters install and the SBOM
+    lists. Reading the lock directly is also why this needs no `--all-groups`/`--all-extras`
+    pair to keep in step with the project's own: a locked package is in the lock.
+
+    One file per version slot. pip-audit refuses a file that names a package twice — exit 1,
+    "has duplicate requirements" — and a lockfile legitimately pins two versions of one package
+    behind different markers, which is exactly the case that has to be audited rather than
+    resolved away.
+
+    The project itself is skipped: it has no registry source to be audited against.
+    """
+    packages: list[tuple[str, str]] = []
+    locked = tomllib.loads(UV_LOCK.read_text(encoding='utf-8'))
+    for package in locked.get('package', []):
+        version = package.get('version')
+        if version and 'registry' in str(package.get('source', '')):
+            packages.append((package['name'], version))
+
+    slots: list[dict[str, str]] = []
+    for name, version in sorted(packages):
+        slot = next((candidate for candidate in slots if name not in candidate), None)
+        if slot is None:
+            slot = {}
+            slots.append(slot)
+        slot[name] = version
+
+    AUDIT_REQUIREMENTS.parent.mkdir(parents=True, exist_ok=True)
+    written = []
+    for index, slot in enumerate(slots):
+        target = AUDIT_REQUIREMENTS if index == 0 else AUDIT_REQUIREMENTS.with_suffix(f'.{index}.txt')
+        body = ''.join(f'{name}=={version}\n' for name, version in sorted(slot.items()))
+        target.write_text(body, encoding='utf-8')
+        written.append(target)
+    return written
+
+
 def parse_suppressions(raw: str, source: str, *, require_expiry: bool = False) -> list[Suppression]:
     """Validate every entry in a comma/whitespace-separated list and return them parsed.
 
@@ -164,13 +227,19 @@ def audit(context: Context, ignore: str | None = None) -> None:
     printed with its origin, so a suppression injected through CI configuration alone
     still shows up in the build log.
 
-    What is audited is the two requirement sets this project pins, not the environment it
-    happens to be running in. `pip-audit` with no `-r` enumerates *installed* distributions,
-    which on a Linux runner silently omits anything gated behind a platform marker, an extra,
-    or a group that was not synced — all of it pinned in `uv.lock` and listed in the SBOM — and
-    at the same time includes packages that are not dependencies at all. The vendored CI tree
-    is the other set: it ships as source with no `.dist-info`, so no installed-distribution
-    scan can see it, and it is code `./workflow.cmd` executes in every job.
+    What is audited is every version in `uv.lock`, plus the vendored CI manifest — not the
+    environment this happens to be running in, and not a rendering of the lock that depends on
+    it. Two forms were tried and both saw less than the lock: `pip-audit` with no `-r`
+    enumerates *installed* distributions, so a Linux runner omits whatever a platform marker,
+    an extra or an unsynced group kept out of the venv; `uv export` keeps the markers in the
+    file and pip-audit evaluates them, so the same pins are skipped a step later. See
+    `audit_requirement_files`. The vendored tree needs naming separately because it ships as
+    source with no `.dist-info` for any scan to find, and it is code `./workflow.cmd` runs in
+    every job.
+
+    What it still cannot see: a vendored file edited by hand, since `vendor.txt` describes the
+    packages that should be there; and anything in `[build-system] requires`, which no part of
+    this workflow audits.
 
     Args:
         context: Invoke context.
@@ -201,25 +270,22 @@ def audit(context: Context, ignore: str | None = None) -> None:
             print(f'  {suppression.vulnerability_id} ({expiry}) from {suppression.source}')
     ignore_args = ' '.join(f'--ignore-vuln {vulnerability_id}' for vulnerability_id in active)
     ignore_opts = f' {ignore_args}' if ignore_args else ''
-    # `--no-emit-project` because the project itself is not on PyPI to be audited; every group
-    # because the lint and test dependencies run in CI too; `--quiet` because otherwise the whole
-    # requirements file is echoed into the log next to the file it just wrote.
-    execute(context, f'uv run uv export --frozen --all-groups --no-emit-project --quiet -o {AUDIT_EXPORT}')
-    # `--disable-pip` in both: without it pip-audit builds a resolution environment for the
-    # requirements file, which needs a network it may not have.
+    # `--disable-pip`: without it pip-audit builds a resolution environment for the
+    # requirements file, which needs a network it may not have. `--strict` so a package the
+    # advisory service cannot resolve fails the audit instead of being listed in a skip table
+    # under exit 0 — a private index, a yanked release, a name pulled after a takedown.
     #
     # Retried, unlike every other command in this workflow: these ask a service on the internet
     # about 125 packages one request at a time, and a reset connection partway through has
-    # established nothing. A finding is not retried — see `execute_with_retries`.
-    #
-    # `--require-hashes` implies `--no-deps` and asserts that every pin carries a digest, which
-    # uv's export does. `vendor.txt` is copied verbatim from the upstream vendoring repository,
-    # hashes and all — and it has none, so requiring them there would fail on a file this
-    # project deliberately does not re-resolve.
-    export_audit = f'uv run pip-audit -r {AUDIT_EXPORT} --require-hashes --disable-pip{ignore_opts}'
-    vendor_audit = f'uv run pip-audit -r {VENDOR_TXT} --no-deps --disable-pip{ignore_opts}'
-    execute_with_retries(context, export_audit, attempts=AUDIT_ATTEMPTS)
-    execute_with_retries(context, vendor_audit, attempts=AUDIT_ATTEMPTS)
+    # established nothing. A finding is never retried, because pip-audit reported it — see
+    # `execute_with_retries` and `AUDIT_VERDICTS`.
+    for requirements in (*audit_requirement_files(), VENDOR_TXT):
+        execute_with_retries(
+            context,
+            f'uv run pip-audit -r {requirements} --no-deps --disable-pip --strict{ignore_opts}',
+            attempts=AUDIT_ATTEMPTS,
+            verdicts=AUDIT_VERDICTS,
+        )
 
 
 @task

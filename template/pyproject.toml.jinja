@@ -292,7 +292,12 @@ addopts = [
     # rather than the clock. `test.coverage` renders the coverage HTML on demand and `test.view`
     # the test report.
     "--cov", "--cov-report=term-missing",
-    "--cov-report=json:reports/coverage.json",
+    # `coverage.local.json`, not `coverage.json`. The plain name means the union across
+    # `env_list`, which the badge and the ratchet read; a bare `pytest` measures one
+    # interpreter, and under `run-parallel` tox overrides this line to a per-env path — so
+    # leaving the plain name here had `test.pytest` outside tox quietly overwrite the union's
+    # file with one interpreter's number. Nothing reads this one.
+    "--cov-report=json:reports/coverage.local.json",
     # pytest-cov enforces `[tool.coverage.report] fail_under` once per interpreter, and no single
     # interpreter can clear a floor the ratchet set from the union of the whole matrix — a line
     # only the newest version reaches is missing from every older run. The floor is enforced

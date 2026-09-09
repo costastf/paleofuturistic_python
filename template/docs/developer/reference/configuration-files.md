@@ -35,10 +35,14 @@ Hook definitions, split across three git stages:
 
 | Stage | Hooks | Scope | Cost on a fresh project |
 |---|---|---|---|
-| `commit-msg` | commitizen (conventional-commit format) | the message | ~2s |
-| `pre-commit` | `preflight.staged` — ruff format, ruff, pylint, complexipy | **staged files only** | ~2.9s |
-| `pre-commit` | `.security-overrides` validation | that file, when staged | ~1.5s |
-| `pre-push` | `preflight` — ty, commitizen, the docs build, pyscn, the tox matrix, the wheel, derived files | whole project | ~19s |
+| `commit-msg` | commitizen (conventional-commit format) | the message | ~0.4s |
+| `pre-commit` | `preflight.staged` — ruff format, ruff, complexipy, pylint | **staged files only** | ~0.7s |
+| `pre-commit` | `.security-overrides` validation | that file, when staged | ~0.1s |
+| `pre-push` | `preflight` — ty, commitizen, the docs build, pyscn, the tox matrix, the wheel, derived files | whole project | ~13s |
+
+Measured on a scaffold on an idle machine; the commit-stage figures are dominated by the tools
+themselves now that the launcher costs 0.12s, and the pre-push figure moves with how many
+interpreters `env_list` names and how loaded the machine is.
 
 **The commit stage is one hook, one invocation.** Four hooks would have pre-commit partition
 the staged files and run them concurrently, so a commit would get four verdicts about four

@@ -16,15 +16,13 @@ from _CI import (PROJECT_ROOT_DIRECTORY,
                  make_file_executable)
 from _CI.tasks.configuration import (IGNORE_PATTERNS,
                                      PROJECT_SLUG,
-                                     AUDIT_STEP,
-                                     QA_SETTLE_STEP,
-                                     QA_STEPS,
                                      TEMPLATE_SECURITY_OVERRIDE_ENV,
                                      base_context,
                                      combo_context,
                                      combo_label,
                                      generation_env,
                                      qa_cells,
+                                     qa_sequence,
                                      read_template_overrides)
 
 REPORTS_DIR = PROJECT_ROOT_DIRECTORY / 'reports' / 'matrix'
@@ -200,7 +198,7 @@ def run_combo(template_repo, output_root, extra_context, label, log_file=None, m
     # in the system — eight cells at tens of seconds each — so one run reporting everything is
     # worth the seconds it costs when something is already red. Stopping early also skipped the
     # litter check below in precisely the cells that were already unhappy.
-    steps = (*QA_STEPS, *((AUDIT_STEP,) if audit else ()), QA_SETTLE_STEP)
+    steps = qa_sequence(audit=audit)
     failed = [step for step in steps
               if not run_command(f'./workflow.cmd {step}', cwd=project_dir, env=step_env, log_file=log_file)]
 

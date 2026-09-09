@@ -368,21 +368,27 @@ def execute(context: Context, cmd: str) -> None:
         raise SystemExit(1)
 
 
-def execute_with_retries(context: Context, cmd: str, *, attempts: int) -> None:
-    """Execute a command, retrying only when it *crashed* rather than reported a verdict.
+def execute_with_retries(context: Context, cmd: str, *, attempts: int, verdicts: tuple[str, ...]) -> None:
+    """Execute a command, retrying only while it has not reported a verdict.
 
-    For a network-dependent tool the two failures are different things. A tool that ran and
+    For a network-dependent tool, "it failed" covers two different things. A tool that ran and
     found something has answered, and running it again will say the same. A tool that died
-    mid-request has answered nothing — `pip-audit` walks the advisory database one package at a
-    time with no retry of its own, so a single reset connection fails a whole run.
+    mid-request has answered nothing — `pip-audit` walks an advisory database one package at a
+    time with no retry of its own, so a single reset connection fails a run that established
+    nothing.
 
-    Both exit 1, so the exit code cannot tell them apart. An uncaught traceback can: a tool that
-    reached its conclusion prints a report, and one that crashed prints a Python stack. That is
-    a crude signal, and deliberately biased — an unrecognised failure is *not* retried, so the
-    worst this can do is fail as it would have anyway.
+    Both exit non-zero, so the exit code cannot separate them. What can is the tool's own
+    report: ``verdicts`` holds the phrases it prints when it reached a conclusion, either way,
+    and anything else is treated as not having got that far. Keying on the reporting contract
+    rather than on a traceback matters — the first version of this looked for a Python stack,
+    which caught a reset connection only because that exception happens to go uncaught, and
+    would have gone quietly inert the day pip-audit caught it and printed a message instead.
+
+    The bias is deliberate: a run whose output contains a verdict is never retried, so the worst
+    this can do to a genuine finding is nothing at all.
 
     Raises:
-        SystemExit: If the command reported a failure, or crashed on the last attempt.
+        SystemExit: If the command reported a verdict, or ran out of attempts.
     """
     shell = os.environ.get('INVOKE_SHELL')
     kwargs: dict[str, object] = {'shell': shell} if shell else {}
@@ -391,12 +397,12 @@ def execute_with_retries(context: Context, cmd: str, *, attempts: int) -> None:
         if result is not None and not result.failed:
             return
         output = '' if result is None else f'{result.stdout}{result.stderr}'
-        if 'Traceback (most recent call last)' not in output or attempt == attempts:
+        if any(verdict in output for verdict in verdicts) or attempt == attempts:
             raise SystemExit(1)
-        # Three seconds, then six: enough for a service to finish whatever it was doing,
-        # short enough that a service which is properly down fails the run inside a minute.
+        # Three seconds, then six: enough for a service to finish whatever it was doing, short
+        # enough that a service which is properly down fails the run inside a minute.
         delay = 3 * attempt
-        print(f'That was a crash rather than a finding — retrying in {delay}s ({attempt}/{attempts - 1} used).')
+        print(f'No verdict from that run, so it established nothing — retrying in {delay}s.')
         time.sleep(delay)
 
 

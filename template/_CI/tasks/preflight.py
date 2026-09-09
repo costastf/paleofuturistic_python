@@ -14,12 +14,15 @@ which keeps commit latency flat as the project grows. It is a rule about correct
 speed: a whole-program check narrowed to a diff does not run faster, it answers wrongly.
 
 *A name carries a scope.* ``reports/coverage.json`` means coverage across every interpreter in
-``env_list``; ``reports/coverage.py310.json`` means one of them. Whatever writes one of those
-names has to be running at that scope, because the readers cannot tell — the badge and the
-ratchet read a filename, not a provenance. The same rule put the per-env report paths in
-``[tool.tox]``, keeps ``test.tox --env=py310`` out of the union's filename, and is why the CI
-badge is written but never verified: its value is a fact about a clone rather than about this
-tree, so no run here is at the right scope to judge it.
+``env_list``; ``reports/coverage.py310.json`` means one of them, and ``coverage.local.json``
+means whichever one a bare ``pytest`` happened to use. Whatever writes one of those names has to
+be running at that scope, because the readers cannot tell — the badge and the ratchet read a
+filename, not a provenance. That rule took three passes to hold: the per-env paths in
+``[tool.tox]``, then ``test.tox --env=py310`` writing its env's name rather than the union's,
+then ``addopts`` and ``test.coverage`` — which had been overwriting the union's file with one
+interpreter's number every time anyone ran ``test.pytest`` outside tox. The CI badge is the same
+rule at the other end: its value is a fact about a clone rather than about this tree, so no run
+here is at the right scope to judge it, and it is written but never verified.
 
 *Verifying is the default; writing is a flag.* ``preflight`` compares the derived files against
 what the tools measured; ``preflight --write`` updates them. So the bare command is what the
@@ -59,6 +62,10 @@ PER_FILE = 'per-file'
 WHOLE_PROGRAM = 'whole-program'
 
 FIX_COMMAND = './workflow.cmd preflight --write'
+
+# Characters a staged path may not contain. A space cannot survive a space-separated `--paths`;
+# the others cannot appear in a command this workflow prints for the reader to paste.
+UNSAFE_IN_PATHS = frozenset(' \t"\'`$;&|<>()*?![]{}\\')
 
 
 class Step(NamedTuple):
@@ -323,9 +330,11 @@ def staged_files(context: Context) -> str:
     absent one means there is no work, not an error to raise.
 
     Raises:
-        SystemExit: If a staged path contains a space. `--paths` is space-separated the whole
-            way down, so such a path cannot be forwarded; this refuses loudly rather than
-            letting it split into fragments that match no filter and are quietly skipped.
+        SystemExit: If a staged path contains a space or a shell metacharacter. `--paths` is
+            space-separated the whole way down, so a space cannot be forwarded at all; the rest
+            are refused because these paths are printed back as a command to paste, and
+            `src/a";id;".py` is a valid filename. Refusing loudly beats letting a path split
+            into fragments that match no filter and are quietly skipped.
     """
     result = context.run('git diff --cached --name-only --diff-filter=ACMR', hide=True, warn=True)
     if result is None or result.failed:
@@ -334,12 +343,12 @@ def staged_files(context: Context) -> str:
     # refused below rather than silently becoming two paths that match no filter and get
     # dropped — a hook that passes because it checked nothing is worse than one that fails.
     entries = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    unsupported = [path for path in entries if ' ' in path]
+    unsupported = [path for path in entries if set(path) & UNSAFE_IN_PATHS]
     if unsupported:
-        print(f'Cannot check staged paths containing spaces: {", ".join(unsupported)}')
-        print('`--paths` is space-separated throughout this workflow, so such a path cannot be')
-        print('forwarded to the tools. Rename it, or check the whole project with')
-        print('`./workflow.cmd preflight`.')
+        print(f'Cannot check staged paths containing spaces or shell characters: {", ".join(unsupported)}')
+        print('`--paths` is space-separated throughout this workflow and the failing paths are')
+        print('printed back as a command to paste, so neither can be forwarded safely. Rename')
+        print('them, or check the whole project with `./workflow.cmd preflight`.')
         raise SystemExit(1)
     return ' '.join(path for path in entries if Path(path).exists())
 
@@ -373,9 +382,10 @@ def preflight(context: Context, write: bool = False, audit_dependencies: bool = 
     """Run every check this project has, and bring the derived files up to date.
 
     The bare command is what the pre-push hook and the CI pipeline run, so reproducing a
-    pipeline failure needs no flag. It verifies formatting, lints, type-checks, runs pyscn, runs
-    the test matrix, builds the wheel, and compares the badges and the coverage ratchet against
-    what the tools just measured, failing with everything out of date.
+    pipeline failure needs no flag. It verifies formatting, lints, type-checks, checks the
+    commit messages this push adds, builds the docs, runs pyscn, runs the test matrix, builds
+    the wheel, and compares the badges and the coverage ratchet against what the tools just
+    measured, failing with everything out of date.
 
     `--write` updates those derived values. Opt-in, because a command named for an inspection
     should not modify the tree; commands named for a mutation may, which is why `format` and

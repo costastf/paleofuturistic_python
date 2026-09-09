@@ -138,6 +138,16 @@ def matrix_combos() -> list[dict]:
     ]
 
 
+def qa_sequence(*, audit: bool) -> tuple[str, ...]:
+    """The steps one matrix cell runs, in order: the writers, the audit, then the gate.
+
+    A function rather than a tuple literal in `run_combo`, so what a cell runs is a thing this
+    suite can ask about. The guard it replaces asserted `secure.audit` was in `QA_STEPS`, which
+    stopped meaning anything when the audit moved out of that tuple.
+    """
+    return (*QA_STEPS, *((AUDIT_STEP,) if audit else ()), QA_SETTLE_STEP)
+
+
 def qa_cells() -> list[dict]:
     """Cells `test.matrix` runs: every generation shape, plus one matured project.
 

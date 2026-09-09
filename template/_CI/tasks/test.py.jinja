@@ -17,6 +17,10 @@ from invoke import Collection, Context, Task, task
 from .shared import apply_badge, execute, logged, note, open_target, run_steps
 
 COVERAGE_REPORT = Path('reports/coverage.json')
+# What a single-interpreter run writes instead. `COVERAGE_REPORT` means the union across
+# `env_list` — the badge and the ratchet read it by name — so nothing measuring one interpreter
+# may write it. See the scope paragraph in `preflight.py`.
+LOCAL_COVERAGE_REPORT = Path('reports/coverage.local.json')
 PYPROJECT = Path('pyproject.toml')
 SCAFFOLD_TEST_FILE = Path('tests/test_{{ project_slug }}.py')
 SCAFFOLD_MARKER = 'def test_sanity'
@@ -86,7 +90,7 @@ def ratchet_fail_under(*, write: bool = True) -> str | None:
     """
     pct = read_coverage_pct()
     if pct is None:
-        return f'no usable coverage report at {COVERAGE_REPORT} — run ./workflow.cmd test'
+        return f'no usable coverage report at {COVERAGE_REPORT} — run ./workflow.cmd test.tox'
 
     # No pyproject.toml, or no `fail_under` in it, means there is no ratchet to move — not a
     # staleness anyone can act on, so both read as up to date.
@@ -138,12 +142,12 @@ def update_coverage_badge(*, write: bool = True) -> str | None:
         None when the badge is already right, else a one-line reason it is not.
     """
     if not COVERAGE_REPORT.exists():
-        return f'no coverage report at {COVERAGE_REPORT} — run ./workflow.cmd test'
+        return f'no coverage report at {COVERAGE_REPORT} — run ./workflow.cmd test.tox'
     try:
         report = json.loads(COVERAGE_REPORT.read_text(encoding='utf-8'))
         pct = round(report['totals']['percent_covered'])
     except (ValueError, KeyError):
-        return f'{COVERAGE_REPORT} holds no total coverage — run ./workflow.cmd test'
+        return f'{COVERAGE_REPORT} holds no total coverage — run ./workflow.cmd test.tox'
     color = coverage_color(pct)
     return apply_badge(
         Path('README.md'),
@@ -175,7 +179,9 @@ def coverage(context: Context) -> None:
 
     Whatever the last run measured: one interpreter after `test.pytest`, the union across the
     matrix after `test.tox`. The HTML report comes from here; `preflight` produces only the
-    JSON it reads, nothing in a gate opening a report.
+    JSON it reads, nothing in a gate opening a report. The JSON written here goes to
+    `reports/coverage.local.json`, because what this measured depends on what ran last and the
+    plain name means the union.
 
     No badge is written or commented on. The badge means coverage across the whole matrix,
     while this reports whatever is in the data file, so it cannot tell whether the badge is
@@ -184,7 +190,7 @@ def coverage(context: Context) -> None:
     # `--fail-under=0` throughout: this reports, it does not gate. The floor is enforced once,
     # by `combine_coverage`, against the combined data it was measured from.
     execute(context, 'uv run coverage report --fail-under=0')
-    execute(context, f'uv run coverage json -o {COVERAGE_REPORT} --fail-under=0')
+    execute(context, f'uv run coverage json -o {LOCAL_COVERAGE_REPORT} --fail-under=0')
     execute(context, 'uv run coverage html -d reports/coverage --fail-under=0')
 
 
@@ -218,7 +224,14 @@ def erase_coverage_data() -> None:
 
     `.coverage.*` cannot match `.coveragerc`, there being no dot before `rc`.
     """
-    stale = (Path('.coverage'), *Path().glob('.coverage.*'), *Path('reports').glob('coverage.*.json'))
+    # `coverage.*.json` matches the per-env reports and `coverage.local.json`; the union's own
+    # `coverage.json` has no dot before `json`, so it is named explicitly.
+    stale = (
+        Path('.coverage'),
+        COVERAGE_REPORT,
+        *Path().glob('.coverage.*'),
+        *Path('reports').glob('coverage.*.json'),
+    )
     for data_file in stale:
         data_file.unlink(missing_ok=True)
 

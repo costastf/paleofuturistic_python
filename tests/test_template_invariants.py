@@ -2273,34 +2273,227 @@ def test_the_commit_message_check_sees_the_tip_in_every_checkout_shape(generated
     assert resolve(empty) is None, 'an empty repository resolves a range'
 
 
-def test_the_audit_retries_a_crash_and_not_a_finding(generated_project):
-    """`secure.audit` re-runs a pip-audit that died mid-request, but never one that reported.
+def test_the_audit_routes_every_query_through_the_retry(generated_project):
+    """Every pip-audit invocation in `secure.audit` is retried, and reads the lockfile.
 
-    It is the one network-dependent step in the workflow, and it asks a service about ~125
-    packages one request at a time with no retry of its own — a single reset connection fails a
-    run that established nothing. Observed in CI: `ConnectionResetError(104)` out of
-    `pip_audit/_service/pypi.py`, on a cell whose dependencies were identical to eight others
-    that passed.
-
-    A finding is the opposite case: the tool reached its conclusion, and running it again says
-    the same thing more slowly. Both exit 1, so the discriminator is the uncaught traceback a
-    crash leaves behind — biased so that an unrecognised failure is not retried at all.
+    The runner's behaviour is asserted by `test_the_retry_reports_a_verdict_and_retries_anything_else`;
+    this is the other half — that the audit uses it, passes it the verdict phrases, and gets its
+    input from `uv.lock` rather than from `uv export`. The export keeps environment markers and
+    pip-audit evaluates them, so an export audited on a 3.10 runner silently skips every pin that
+    only applies to 3.11+ — pinned, installed by four of five matrix interpreters, and in the SBOM.
     """
     project, _ = generated_project
-    shared = (project / '_CI' / 'tasks' / 'shared.py').read_text(encoding='utf-8')
-    runner = shared.split('def execute_with_retries', 1)[1].split('\ndef ', 1)[0]
-    assert 'Traceback (most recent call last)' in runner, 'a crash is indistinguishable from a verdict'
-    assert 'while True' not in runner, 'the retries are unbounded'
-    assert re.search(r'for\s+\w+\s+in\s+range\(', runner), 'the retries are not counted'
-    body = runner.split('"""', 2)[2]
-    assert body.index('not in output') < body.index('time.sleep'), 'a reported failure is retried too'
-
     secure = (project / '_CI' / 'tasks' / 'secure.py').read_text(encoding='utf-8')
-    audit = secure.split("@logged('secure.audit')", 1)[1].split('\n@task', 1)[0]
-    invocations = [line for line in audit.splitlines() if 'pip-audit' in line and 'uv run' in line]
-    assert invocations, 'the audit no longer runs pip-audit'
-    assert 'execute_with_retries(' in audit, 'the audit gave up its retries'
-    assert "execute(context, f'uv run pip-audit" not in audit, 'a pip-audit invocation bypasses the retries'
+    task = function_named(secure, 'audit')
+    assert task, 'secure.py declares no audit task'
+    called = calls_in(task)
+    assert 'execute_with_retries' in called, 'the audit does not retry a run that reported nothing'
+    assert 'execute' not in called, 'a pip-audit invocation bypasses the retries'
+    assert 'audit_requirement_files' in called, 'the audit no longer derives its input from the lock'
+
+    # Command literals, not the docstring, which discusses pip-audit at length.
+    commands = [text for text in command_strings(task) if text.startswith('uv run pip-audit')]
+    assert commands, 'the audit runs no pip-audit'
+    for command in commands:
+        assert '--strict' in command, f'{command!r} lets an unresolvable package pass under exit 0'
+        assert '--disable-pip' in command, f'{command!r} builds a resolution environment it may have no network for'
+
+    # In the commands, not the prose: both docstrings explain why `uv export` cannot do this.
+    assert not [command for command in command_strings(task) if command.startswith('uv run uv export')], (
+        'the audit reads a marker-carrying export again'
+    )
+    reader = function_named(secure, 'audit_requirement_files')
+    assert reader, 'secure.py declares no requirement-file writer'
+    assert 'UV_LOCK' in ast.dump(reader), 'the writer does not read uv.lock'
+
+
+def function_named(source, name):
+    """Return the top-level `ast.FunctionDef` called `name`, or None."""
+    return next(
+        (node for node in ast.parse(source).body if isinstance(node, ast.FunctionDef) and node.name == name),
+        None,
+    )
+
+
+def command_strings(node):
+    """Yield every string literal in `node`, with f-string pieces stitched back together.
+
+    An f-string is a `JoinedStr` of constants and substitutions, so asking for `ast.Constant`
+    alone sees `'uv run pip-audit -r '` and loses every flag after the first placeholder.
+    """
+    # `ast.walk` also descends *into* an f-string, so its pieces are collected and skipped
+    # rather than yielded next to the whole they belong to.
+    pieces = set()
+    joined = []
+    for inner in ast.walk(node):
+        if isinstance(inner, ast.JoinedStr):
+            parts = [part for part in inner.values if isinstance(part, ast.Constant)]
+            pieces.update(id(part) for part in parts)
+            joined.append(''.join(part.value for part in parts))
+    yield from joined
+    for inner in ast.walk(node):
+        if isinstance(inner, ast.Constant) and isinstance(inner.value, str) and id(inner) not in pieces:
+            yield inner.value
+
+
+def calls_in(node):
+    """Return the names of every function called anywhere inside `node`."""
+    called = set()
+    for inner in ast.walk(node):
+        if isinstance(inner, ast.Call):
+            func = inner.func
+            called.add(getattr(func, 'id', None) or getattr(func, 'attr', None))
+    return called
+
+
+def test_the_commit_message_task_uses_the_bounded_range(generated_project):
+    """`lint.commitizen` reaches `cz check` through `unpushed_range`, not with a literal range.
+
+    `test_the_commit_message_check_sees_the_tip_in_every_checkout_shape` proves the resolver
+    answers correctly in five clone shapes; it says nothing about whether the task asks it.
+    Both halves are needed, and for one commit only the first existed: replacing the task body
+    with `cz check --rev-range HEAD` — the unbounded form this whole scoping exists to avoid —
+    left the suite green.
+    """
+    project, _ = generated_project
+    lint = (project / '_CI' / 'tasks' / 'lint.py').read_text(encoding='utf-8')
+    task = function_named(lint, 'commitizen')
+    assert task, 'lint.py declares no commitizen task'
+    assert 'unpushed_range' in calls_in(task), 'the task does not ask for a bounded range'
+    commands = [text for text in command_strings(task) if 'cz check' in text]
+    assert commands, 'the task no longer runs cz check'
+    for command in commands:
+        assert '--rev-range HEAD' not in command, f'{command!r} reads every reachable commit'
+
+
+def test_the_retry_reports_a_verdict_and_retries_anything_else(generated_project):
+    """`execute_with_retries` raises on a reported verdict and retries a run that gave none.
+
+    Executed rather than read. Two one-token edits used to leave the suite green while
+    disabling the whole mechanism: `raise SystemExit(1)` → `return` made every failure —
+    including a genuine finding — exit 0, and dropping `result.stderr` from the inspected
+    output stopped it seeing anything, since the tool writes there.
+    """
+    project, _ = generated_project
+    source = (project / '_CI' / 'tasks' / 'shared.py').read_text(encoding='utf-8')
+    runner = function_named(source, 'execute_with_retries')
+    assert runner, 'shared.py declares no execute_with_retries'
+
+    slept = []
+    namespace = {
+        'os': os,
+        'time': SimpleNamespace(sleep=slept.append),
+        'Context': object,
+        'SystemExit': SystemExit,
+    }
+    exec(compile(ast.Module(body=[runner], type_ignores=[]), '<shared.py>', 'exec'), namespace)  # noqa: S102
+    retry = namespace['execute_with_retries']
+
+    class Runs:
+        """A context whose `run` replays prepared results and counts the calls."""
+
+        def __init__(self, *results: SimpleNamespace) -> None:
+            self.results = list(results)
+            self.commands = []
+
+        def run(self, command, **_: object):
+            self.commands.append(command)
+            return self.results.pop(0) if self.results else self.results[-1]
+
+    def result(*, failed, stdout='', stderr=''):
+        return SimpleNamespace(failed=failed, stdout=stdout, stderr=stderr)
+
+    verdicts = ('known vulnerabilit',)
+
+    # A reported finding: raised on the first attempt, never repeated.
+    reported = Runs(result(failed=True, stdout='Found 4 known vulnerabilities in 1 package'))
+    with pytest.raises(SystemExit):
+        retry(reported, 'audit', attempts=3, verdicts=verdicts)
+    assert len(reported.commands) == 1, 'a reported finding was retried'
+    assert not slept, 'a reported finding cost a delay'
+
+    # A verdict on stderr counts as a verdict: whether a tool reports there is its business,
+    # and dropping either stream would make this one retry three times instead of failing.
+    on_stderr = Runs(*[result(failed=True, stderr='No known vulnerabilities found')] * 3)
+    with pytest.raises(SystemExit):
+        retry(on_stderr, 'audit', attempts=3, verdicts=verdicts)
+    assert len(on_stderr.commands) == 1, 'a verdict on stderr was treated as no verdict at all'
+
+    # No verdict at all: retried to exhaustion, then raised.
+    crashed = Runs(*[result(failed=True, stderr='ConnectionResetError(104)')] * 3)
+    with pytest.raises(SystemExit):
+        retry(crashed, 'audit', attempts=3, verdicts=verdicts)
+    assert len(crashed.commands) == 3, f'a run with no verdict was not retried: {crashed.commands}'
+    assert slept, 'the retries did not wait'
+
+    # And a run that succeeds on the second attempt returns rather than raising.
+    recovered = Runs(result(failed=True, stderr='ConnectionResetError(104)'), result(failed=False))
+    retry(recovered, 'audit', attempts=3, verdicts=verdicts)
+    assert len(recovered.commands) == 2, 'the retry did not stop at the first success'
+
+
+def test_every_matrix_cell_runs_the_writers_the_audit_and_then_the_gate():
+    """`qa_sequence` puts the audit in an auditing cell and the gate last, and `run_combo` uses it.
+
+    The guard this replaces asserted `secure.audit` was in `QA_STEPS`, which implied execution
+    until the audit moved out of that tuple; after that, reducing `run_combo`'s step list so no
+    cell audited at all left the suite green.
+    """
+    from _CI.tasks.configuration import AUDIT_STEP, QA_SETTLE_STEP, QA_STEPS, qa_sequence  # noqa: PLC0415
+
+    audited = qa_sequence(audit=True)
+    assert AUDIT_STEP in audited, 'an auditing cell does not audit'
+    assert audited[-1] == QA_SETTLE_STEP, 'the read-only gate does not run last'
+    assert audited.index(AUDIT_STEP) > audited.index(QA_STEPS[0]), 'the audit precedes the writers'
+    assert AUDIT_STEP not in qa_sequence(audit=False), 'every cell audits again'
+    assert all(step in audited for step in QA_STEPS), 'a writer stopped running'
+
+    runner = (REPO_ROOT / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
+    run_combo = function_named(runner, 'run_combo')
+    assert run_combo, 'test.py declares no run_combo'
+    assert 'qa_sequence' in calls_in(run_combo), 'run_combo assembles its own step list again'
+
+
+def test_formatting_takes_paths_and_nothing_else(generated_project):
+    """`format` has no `--staged`, by signature rather than by the absence of a string.
+
+    invoke derives a flag from the parameter name, so `'--staged' not in source` passed with
+    `staged: bool = False` right there in the signature. The gate prints the scoped command;
+    the formatter takes the paths.
+    """
+    project, _ = generated_project
+    formatter = (project / '_CI' / 'tasks' / 'format_.py').read_text(encoding='utf-8')
+    task = function_named(formatter, 'format_')
+    assert task, 'format_.py declares no format task'
+    parameters = [argument.arg for argument in task.args.args]
+    assert parameters == ['context', 'paths'], f'the formatter takes more than paths: {parameters}'
+
+
+def test_only_the_matrix_writes_the_unions_filename(generated_project):
+    """`reports/coverage.json` is written by the combine and by nothing else.
+
+    The badge and the ratchet read that path by name, so its name is a claim: coverage across
+    every interpreter in `env_list`. Three things used to write it. Two were fixed a commit
+    apart — the per-env paths in `[tool.tox]`, then `test.tox --env=py310` — and the third was
+    `addopts`, whose `--cov-report=json:` tox overrides *inside* the matrix but which applies to
+    every bare `pytest` outside it: measured, `test.pytest` left one interpreter's 78.571% in the
+    file where the union's 92.857% had been, and `erase_coverage_data`'s glob did not match the
+    plain name either, so it stayed until the next full matrix run.
+    """
+    project, _ = generated_project
+    data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
+    addopts = ' '.join(data['tool']['pytest']['ini_options']['addopts'])
+    assert 'json:reports/coverage.json' not in addopts, 'a bare pytest overwrites the union report'
+
+    test_py = (project / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
+    writers = [line.strip() for line in test_py.splitlines() if 'coverage json -o' in line]
+    union = [line for line in writers if 'coverage json -o {COVERAGE_REPORT}' in line]
+    assert len(union) == 1, f'{len(union)} commands write the union report, not one: {union}'
+    combine = test_py.split('def combine_coverage', 1)[1].split('\n@', 1)[0]
+    assert union[0] in combine, 'the union report is written outside the combine'
+
+    erase = test_py.split('def erase_coverage_data', 1)[1].split('\ndef ', 1)[0]
+    assert 'COVERAGE_REPORT' in erase, 'a stale union report survives the next matrix run'
 
 
 def test_matrix_envs_do_not_share_report_paths(generated_project):

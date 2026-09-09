@@ -16,15 +16,19 @@ The pipeline answers those questions before the questions are asked.
 
 ## Layer 1 — pip-audit
 
-`./workflow.cmd secure.audit` runs [pip-audit](https://github.com/pypa/pip-audit) over the two requirement sets this project pins — `uv.lock`, exported with every dependency group, and `_CI/lib/vendor.txt` — comparing each pinned package against the [PyPI advisory database](https://github.com/pypa/advisory-database).
+`./workflow.cmd secure.audit` runs [pip-audit](https://github.com/pypa/pip-audit) over every package version in your `uv.lock`, plus `_CI/lib/vendor.txt`, comparing each against the [PyPI advisory database](https://github.com/pypa/advisory-database). `--strict`, so a package the service cannot resolve fails the audit rather than being listed in a skip table under exit 0.
 
-Requirement files rather than the installed environment, which is what `pip-audit` reads by default. An installed-distribution scan sees whatever the current interpreter and platform happen to have synced: it silently omits a package gated behind a platform marker, an extra, or a group that was not installed — all of it pinned in the lockfile and listed in the SBOM — while including packages that are not dependencies at all. The vendored CI tree needs naming for a different reason: it ships as committed source with no `.dist-info`, so nothing that enumerates installed distributions can see it, and it is code `./workflow.cmd` executes in every job.
+Every version in the lockfile, not a rendering of it. Two narrower forms were tried and both saw less: `pip-audit` with no `-r` enumerates *installed* distributions, so a Linux runner omits whatever a platform marker, an extra or an unsynced group kept out of the venv; `uv export` keeps those markers in the file and pip-audit evaluates them, so the same pins are skipped one step later — on this scaffold an export audited on 3.10 skips `rpds-py==2026.6.3`, which four of the five matrix interpreters install and the SBOM lists. Reading `[[package]]` entries straight out of `uv.lock` has no markers to evaluate and no extras or groups to remember to ask for. One requirement file per version slot, because pip-audit refuses a file that names a package twice and a lockfile legitimately pins two versions behind different markers.
 
-What it catches: a vulnerability with a known CVE/PYSEC ID affecting a version in either file.
+The vendored CI tree needs naming for a different reason: it ships as committed source with no `.dist-info`, so nothing that enumerates installed distributions can see it, and it is code `./workflow.cmd` executes in every job.
+
+What it catches: a vulnerability with a known CVE/PYSEC ID affecting any locked version, or any vendored one.
 
 What it doesn't catch:
 
 - Zero-days (no advisory exists yet).
+- A vendored file edited by hand — `vendor.txt` describes the packages that *should* be there.
+- Anything in `[build-system] requires`, which nothing in this workflow audits.
 - Vulnerabilities in the project's *own* code.
 - Misuse of a safe dependency.
 
