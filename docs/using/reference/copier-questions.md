@@ -13,10 +13,12 @@ Human-readable name. Appears in `pyproject.toml`'s `name` field, the README titl
 
 ### `project_slug`
 
-- **Type**: derived
-- **Default**: `project_name` lowercased with spaces and hyphens replaced by underscores.
+- **Type**: string (prompted, pre-filled with a derived default you can accept or edit)
+- **Default**: `project_name` lowercased, with every run of non-identifier characters replaced by a single underscore and leading/trailing underscores stripped — e.g. `Username's Toolkit` → `username_s_toolkit`.
 
-Python package name and source-tree directory name. Must be a valid Python identifier — the lowercase/replace transformation guarantees that for typical inputs.
+Python package name: both the `import` name / source-tree directory (`src/<slug>/`) and the `pyproject.toml` distribution name. It must therefore be a valid Python identifier **and** a valid [PyPI project name](https://packaging.python.org/en/latest/specifications/name-normalization/): lowercase ASCII letters, digits, and underscores, starting with a letter and ending with a letter or digit. A `validator` on this question enforces exactly that — it re-prompts (or, in non-interactive runs, aborts) on an empty value, a leading digit, or leftover punctuation such as an apostrophe.
+
+Because PyPI [normalizes names](https://packaging.python.org/en/latest/specifications/name-normalization/) — lowercasing and collapsing runs of `.`, `-`, or `_` to a single `-` — the distribution name and the import name legitimately differ: `username_s_toolkit` is published and installed as `username-s-toolkit` (`pip install username-s-toolkit`) but imported as `import username_s_toolkit`.
 
 ### `project_description`
 
@@ -90,7 +92,8 @@ Controls whether documentation-publishing scaffolding (the Pages workflow file a
 Validation is split between copier's built-in mechanisms and the `tasks_render.py` copy-time script:
 
 1. **Python version range** — a `validator` on the `max_python_version` question in `copier.yml` checks that `max >= min`, that both values share the same major version, and that both appear in the choices list. Any failure aborts generation immediately before any files are written.
-2. **License installation** — `tasks_render.py` installs the chosen `LICENSE` file (substituting author/year tokens) and removes the `licenses/` staging directory. It runs only on `copier copy`, not on `copier update`.
+2. **Project slug** — a `validator` on the `project_slug` question checks the value is a valid Python identifier and PyPI project name (`^[a-z]([a-z0-9_]*[a-z0-9])?$`), rejecting empty values, leading digits, and punctuation such as apostrophes. Generation aborts before any files are written on failure.
+3. **License installation** — `tasks_render.py` installs the chosen `LICENSE` file (substituting author/year tokens) and removes the `licenses/` staging directory. It runs only on `copier copy`, not on `copier update`.
 
 ## See also
 
