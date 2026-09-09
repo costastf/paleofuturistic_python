@@ -2496,6 +2496,163 @@ def test_only_the_matrix_writes_the_unions_filename(generated_project):
     assert 'COVERAGE_REPORT' in erase, 'a stale union report survives the next matrix run'
 
 
+def test_the_audit_input_covers_every_locked_version(generated_project, tmp_path, capsys):
+    """`audit_requirement_files` writes every registry version, one file per slot.
+
+    Executed against a fixture lock rather than read, because this function is what closed the
+    marker gap: `uv export` keeps environment markers and pip-audit evaluates them, so a pin
+    that applies only to 3.11+ went unaudited on a 3.10 runner while being installed by four of
+    five matrix interpreters and listed in the SBOM.
+
+    Three properties, and a text assertion can reach none of them: every registry version
+    appears exactly once across the files, no file names a package twice — pip-audit exits 1 on
+    that, so a packing bug would fail every run — and a dependency with no published release is
+    named on stdout rather than dropped in silence.
+    """
+    project, _ = generated_project
+    source = (project / '_CI' / 'tasks' / 'secure.py').read_text(encoding='utf-8')
+    writer = function_named(source, 'audit_requirement_files')
+    assert writer, 'secure.py declares no requirement-file writer'
+
+    lock = tmp_path / 'uv.lock'
+    lock.write_text(
+        """
+version = 1
+
+[[package]]
+name = "three-ways"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+
+[[package]]
+name = "three-ways"
+version = "2.0.0"
+source = { registry = "https://pypi.org/simple" }
+
+[[package]]
+name = "three-ways"
+version = "3.0.0"
+source = { registry = "https://pypi.org/simple" }
+
+[[package]]
+name = "plain"
+version = "0.1.0"
+source = { registry = "https://pypi.org/simple" }
+
+[[package]]
+name = "from-a-url"
+version = "9.9.9"
+source = { url = "https://registry.example.com/from_a_url-9.9.9-py3-none-any.whl" }
+
+[[package]]
+name = "from-git"
+version = "1.0.0"
+source = { git = "https://github.com/acme/thing?rev=deadbeef" }
+
+[[package]]
+name = "the-project"
+version = "0.0.0"
+source = { editable = "." }
+""",
+        encoding='utf-8',
+    )
+    requirements = tmp_path / 'reports' / 'audit-requirements.txt'
+    namespace = {
+        'tomllib': tomllib,
+        'Path': Path,
+        'UV_LOCK': lock,
+        'AUDIT_REQUIREMENTS': requirements,
+    }
+    exec(compile(ast.Module(body=[writer], type_ignores=[]), '<secure.py>', 'exec'), namespace)  # noqa: S102
+    written = namespace['audit_requirement_files']()
+
+    pins = [line for path in written for line in path.read_text(encoding='utf-8').splitlines() if line]
+    assert sorted(pins) == ['plain==0.1.0', 'three-ways==1.0.0', 'three-ways==2.0.0', 'three-ways==3.0.0'], pins
+    assert len(written) == 3, f'three versions of one package need three files, got {len(written)}'
+    for path in written:
+        names = [line.split('==')[0] for line in path.read_text(encoding='utf-8').splitlines() if line]
+        assert len(names) == len(set(names)), f'{path.name} names a package twice, which pip-audit refuses'
+
+    # A URL whose *text* contains "registry" is not a registry source, and used to be audited as
+    # though a PyPI release of that name and version were the artefact in use.
+    assert not [pin for pin in pins if pin.startswith(('from-a-url', 'from-git', 'the-project'))], pins
+    reported = capsys.readouterr().out
+    for unauditable in ('from-a-url', 'from-git'):
+        assert unauditable in reported, f'{unauditable} passes unmentioned: {reported}'
+    assert 'the-project' not in reported, 'the project itself is reported as an unaudited dependency'
+
+
+def test_exactly_one_matrix_cell_audits_its_dependencies(tmp_path):
+    """Driving `run_combo` over every cell, `secure.audit` is run once across the whole matrix.
+
+    Executed rather than read. The guard this replaces asserted `secure.audit` was in
+    `QA_STEPS`, which implied execution until the audit moved out of that tuple; after that,
+    reducing the step list so no cell audited at all left the suite green. Asserting
+    `qa_sequence` in isolation is closer but still one refactor from `run_combo` ignoring it.
+
+    Every cell resolves the same lockfile and ships the same `vendor.txt`, so the audit's answer
+    cannot differ between them — what differs is the exposure, nine concurrent jobs querying an
+    advisory service about ~125 packages each.
+    """
+    runner_source = (REPO_ROOT / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
+    run_combo = function_named(runner_source, 'run_combo')
+    assert run_combo, 'test.py declares no run_combo'
+
+    from _CI.tasks.configuration import PROJECT_SLUG, qa_sequence  # noqa: PLC0415
+
+    workflow_commands: list[tuple[str, str]] = []
+    current_label = {'value': ''}
+
+    def record(command, cwd=None, env=None, log_file=None):  # noqa: ARG001
+        if command.startswith('./workflow.cmd '):
+            workflow_commands.append((current_label['value'], command.removeprefix('./workflow.cmd ')))
+        return True
+
+    namespace = {
+        'json': json,
+        'os': os,
+        'run_command': record,
+        'make_file_executable': lambda _path: None,
+        'untracked_after_qa': lambda _project: [],
+        'report_failure': lambda *_: None,
+        'generation_env': dict,
+        'read_template_overrides': lambda: '',
+        'base_context': lambda: {'min_python_version': '3.10'},
+        'qa_sequence': qa_sequence,
+        'PROJECT_SLUG': PROJECT_SLUG,
+        'TEMPLATE_SECURITY_OVERRIDE_ENV': 'TEMPLATE_SECURITY_OVERRIDE',
+        'MATURE_ORIGIN': 'git@example.invalid:acme/widget.git',
+        'MATURE_TEST_MODULE': '"""{slug}."""\n',
+        'MATURE_GATED_MODULE': '"""{slug} {boundary}."""\n',
+    }
+    exec(compile(ast.Module(body=[run_combo], type_ignores=[]), '<test.py>', 'exec'), namespace)  # noqa: S102
+
+    from _CI.tasks.configuration import qa_cells  # noqa: PLC0415
+
+    for cell in qa_cells():
+        current_label['value'] = cell['label']
+        project = tmp_path / cell['label'] / 'generated' / PROJECT_SLUG
+        for directory in ('tests', f'src/{PROJECT_SLUG}'):
+            (project / directory).mkdir(parents=True, exist_ok=True)
+        assert namespace['run_combo'](
+            tmp_path / 'template',
+            tmp_path,
+            {'min_python_version': '3.10'},
+            cell['label'],
+            mature=cell['mature'],
+        ), f'{cell["label"]} failed with every command stubbed as successful'
+
+    audited = [label for label, command in workflow_commands if command == 'secure.audit']
+    assert len(audited) == 1, f'{len(audited)} cells audit their dependencies, not one: {audited}'
+    matured = [cell['label'] for cell in qa_cells() if cell['mature']]
+    assert audited == matured, f'the audit rides with {audited} rather than the matured cell {matured}'
+
+    # And every cell still writes, documents and then re-checks itself.
+    for cell in qa_cells():
+        ran = [command for label, command in workflow_commands if label == cell['label']]
+        assert ran == list(qa_sequence(audit=cell['mature'])), f'{cell["label"]} ran {ran}'
+
+
 def test_matrix_envs_do_not_share_report_paths(generated_project):
     """Every tox env writes its report to its own path, and a plain run renders nothing else.
 

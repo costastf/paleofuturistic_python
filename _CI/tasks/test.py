@@ -138,11 +138,14 @@ def untracked_after_qa(project_dir):
     return [line[3:] for line in result.stdout.splitlines() if line.startswith('??')]
 
 
-def run_combo(template_repo, output_root, extra_context, label, log_file=None, mature=False, audit=True):
+def run_combo(template_repo, output_root, extra_context, label, log_file=None, mature=False):
     """Generate the template with extra_context and run the QA steps. Return True on success.
 
     `mature` makes the cell look like a project on day two — see `qa_cells` — and carries the
     dependency audit with it, which one cell runs rather than all of them; see `AUDIT_STEP`.
+    There is no separate switch for that: a caller who could pass `audit` separately from
+    `mature` could also pass it for every cell, or for none, and neither is visible from the
+    matrix summary.
     """
     combo_root = output_root / label
     combo_root.mkdir(parents=True, exist_ok=True)
@@ -198,7 +201,7 @@ def run_combo(template_repo, output_root, extra_context, label, log_file=None, m
     # in the system — eight cells at tens of seconds each — so one run reporting everything is
     # worth the seconds it costs when something is already red. Stopping early also skipped the
     # litter check below in precisely the cells that were already unhappy.
-    steps = qa_sequence(audit=audit)
+    steps = qa_sequence(audit=mature)
     failed = [step for step in steps
               if not run_command(f'./workflow.cmd {step}', cwd=project_dir, env=step_env, log_file=log_file)]
 
@@ -265,8 +268,6 @@ def combo(context, git_hosting_service='github', integrate_dependency_track=True
             ),
             label=label,
             mature=mature,
-            # With the matured cell, as in the matrix: one audit per run of the whole thing.
-            audit=mature,
         )
         if not ok:
             print(emojize_message(f'Combo {label} failed', success=False))
@@ -315,7 +316,6 @@ def matrix(context, workers=1):
                     label=label,
                     log_file=log_path,
                     mature=cell['mature'],
-                    audit=cell['mature'],
                 )
             except Exception as exc:  # noqa: BLE001 — worker must not crash the pool
                 with log_path.open('a', encoding='utf-8') as handle:

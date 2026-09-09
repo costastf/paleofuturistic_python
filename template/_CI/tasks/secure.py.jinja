@@ -145,14 +145,34 @@ def audit_requirement_files() -> list[Path]:
     behind different markers, which is exactly the case that has to be audited rather than
     resolved away.
 
-    The project itself is skipped: it has no registry source to be audited against.
+    Only packages with a registry source: a git, URL or path dependency has no published
+    release to compare a name and version against. Those are named on stdout rather than
+    dropped in silence, since everything written about this audit claims every locked version.
+    The project and any workspace members are skipped without comment — they are what is being
+    audited, not dependencies of it.
     """
     packages: list[tuple[str, str]] = []
+    unauditable: list[str] = []
     locked = tomllib.loads(UV_LOCK.read_text(encoding='utf-8'))
     for package in locked.get('package', []):
+        # A key of the source table, not a substring of it: a `url` source pointing at
+        # `https://registry.example.com/thing.whl` matched the string form and was then audited
+        # as though a PyPI release of that name and version were the artefact in use.
+        source = package.get('source', {})
         version = package.get('version')
-        if version and 'registry' in str(package.get('source', '')):
+        if 'registry' in source and version:
             packages.append((package['name'], version))
+            continue
+        # The project and its workspace members are what is being audited, not dependencies.
+        if not source.keys() & {'editable', 'virtual'}:
+            kind = ', '.join(sorted(source)) or 'no source'
+            unauditable.append(f'{package["name"]} ({kind})')
+
+    if unauditable:
+        # Said out loud, because everything written about this audit claims every locked
+        # version: a git or URL dependency has no registry release to compare against, so
+        # nothing here can speak for it.
+        print(f'Not audited, having no registry release to compare against: {", ".join(unauditable)}')
 
     slots: list[dict[str, str]] = []
     for name, version in sorted(packages):
