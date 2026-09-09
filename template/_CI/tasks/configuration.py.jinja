@@ -34,8 +34,10 @@ SBOM_FILE = Path('src') / PROJECT_NAME / 'sbom.cdx.json'
 # that a service which is properly down still fails the run inside a minute.
 AUDIT_ATTEMPTS = 3
 
-# How far out a suppression's expiry may be set. The date is there to force a re-review, so a
-# distant one defeats the mechanism while looking like it honours it.
+# How far out an expiry can be before `secure.audit` points out that it is not really an
+# expiry. A remark, not a limit: the date is there to force a re-review, and a distant one
+# defeats that while looking like it honours it — but how long an acceptance is worth carrying
+# belongs to the project.
 MAX_SUPPRESSION_DAYS = 365
 
 # Where `secure.audit` exports the lockfile for pip-audit to read. Gitignored with the rest

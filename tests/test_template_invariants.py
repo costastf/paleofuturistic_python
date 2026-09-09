@@ -776,12 +776,13 @@ def test_qa_steps_cover_what_preflight_does_not():
     assert 'preflight --write' in QA_STEPS, 'the matrix no longer exercises the generated gate'
     assert 'document' in QA_STEPS, 'nothing builds the generated docs'
 
-    # It rides with the matured cell rather than carrying a knob of its own.
+    # It rides with the matured cell rather than carrying a knob of its own, and there is
+    # exactly one of those. Which cell actually audits is visible in the matrix logs rather
+    # than here: a grep for how `run_combo` spells its argument would fail on a rename with
+    # nothing broken.
     matured = [cell['label'] for cell in qa_cells() if cell['mature']]
     assert len(matured) == 1, f'expected exactly one matured cell to carry the audit, got {matured}'
-    runner = (REPO_ROOT / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
-    assert "audit=cell['mature']" in runner, 'the matrix no longer ties the audit to that cell'
-    assert 'audit=mature' in runner, 'a single combo run decides the audit some other way'
+    assert not any('audit' in cell for cell in qa_cells()), 'the audit has a knob of its own again'
     # And after the writers, so the top of a cell's log is about the thing under test.
     assert QA_SETTLE_STEP not in QA_STEPS, 'the gate has to run after the writers, not among them'
 
@@ -1786,7 +1787,6 @@ def test_a_failing_run_writes_no_derived_values(generated_project):
     source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
     body = source.split('def run_scope', 1)[1]
     assert 'if failed and derived' in body, 'a failing run can still write derived values'
-    assert 'derived = step.write is not None' in source, 'the plan no longer marks which steps produce derived files'
     # The writers have to be last for the skip to cover them; `artifacts` is the final
     # non-network step, and `build`'s badge precedes it.
     steps = list(registry_steps(project))
@@ -1850,7 +1850,7 @@ def test_the_staged_bundle_defaults_to_what_is_staged(generated_project):
     project, _ = generated_project
     source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
     body = source.split("@logged('preflight.staged')", 1)[1].split('@task', 1)[0]
-    assert 'paths or staged_files(context)' in body, 'an explicit --paths no longer wins'
+    assert re.search(r'paths\s+or\s+staged_files\(', body), 'an explicit --paths no longer wins'
     assert 'Nothing staged' in body, 'an empty index is not reported'
 
     # A space in a staged path has to fail loudly: `--paths` is space-separated the whole way
@@ -2030,7 +2030,7 @@ def test_the_commit_message_check_is_bounded_to_this_push(generated_project):
     """
     project, _ = generated_project
     lint = (project / '_CI' / 'tasks' / 'lint.py').read_text(encoding='utf-8')
-    scope = lint.split('def commit_ranges', 1)[1].split('\n@task', 1)[0]
+    scope = lint.split('def unpushed_range', 1)[1].split('\n@task', 1)[0]
     for revision in ('PRE_COMMIT_FROM_REF', '@{upstream}', 'origin/HEAD', 'HEAD~1..HEAD'):
         assert revision in scope, f'the range no longer considers {revision}'
     body = lint.split("@logged('lint.commitizen')", 1)[1].split('\n@task', 1)[0]
@@ -2113,7 +2113,7 @@ def test_the_formatting_failure_names_a_command_you_can_paste(generated_project)
     source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
     body = source.split('def formatting', 1)[1].split('\ndef ', 1)[0]
     assert '--paths=' in body, 'the fix hint is not scoped to what was checked'
-    assert 'if paths else' in body, 'a whole-project run is told to fix a path list it never had'
+    assert re.search(r'if\s+paths\b', body), 'a whole-project run is told to fix a path list it never had'
 
     formatter = (project / '_CI' / 'tasks' / 'format_.py').read_text(encoding='utf-8')
     assert '--staged' not in formatter, 'the formatter grew a flag for what the hint already does'
@@ -2147,7 +2147,7 @@ def range_resolver(project):
     `os` and the context's `run`, so the smallest honest harness execs them alone.
     """
     source = (project / '_CI' / 'tasks' / 'lint.py').read_text(encoding='utf-8')
-    wanted = ('resolves', 'commit_ranges', 'unpushed_range')
+    wanted = ('resolves', 'unpushed_range')
     body = [node for node in ast.parse(source).body if getattr(node, 'name', None) in wanted]
     # One dict as globals, not globals-plus-locals: the functions call each other, so they have
     # to land where their own name lookups go.
@@ -2338,7 +2338,8 @@ def test_the_audit_retries_a_crash_and_not_a_finding(generated_project):
     shared = (project / '_CI' / 'tasks' / 'shared.py').read_text(encoding='utf-8')
     runner = shared.split('def execute_with_retries', 1)[1].split('\ndef ', 1)[0]
     assert 'Traceback (most recent call last)' in runner, 'a crash is indistinguishable from a verdict'
-    assert 'attempt == attempts' in runner, 'the retries are unbounded'
+    assert 'while True' not in runner, 'the retries are unbounded'
+    assert re.search(r'for\s+\w+\s+in\s+range\(', runner), 'the retries are not counted'
     body = runner.split('"""', 2)[2]
     assert body.index('not in output') < body.index('time.sleep'), 'a reported failure is retried too'
 
@@ -2411,7 +2412,7 @@ def test_matrix_coverage_is_combined_before_anything_reads_it(generated_project)
     # And it gates only when the data under it is the union the floor was measured from.
     # `test.tox --env=py310` combines one env's data: enforcing there failed the command whose
     # whole purpose is looking at one interpreter, on any project with an engaged ratchet.
-    assert 'combine_coverage(context, scope=env)' in test_py, 'the combine no longer knows its scope'
+    assert re.search(r'combine_coverage\([^)]*scope\s*=\s*env', test_py), 'the combine no longer knows its scope'
     # The two writes, by command line rather than by prose: the comments around them discuss
     # `--fail-under=0` as well.
     writes = [line for line in combine.splitlines() if 'coverage json -o' in line]

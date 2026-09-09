@@ -368,7 +368,7 @@ def execute(context: Context, cmd: str) -> None:
         raise SystemExit(1)
 
 
-def execute_with_retries(context: Context, cmd: str, *, attempts: int, backoff: int = 3) -> None:
+def execute_with_retries(context: Context, cmd: str, *, attempts: int) -> None:
     """Execute a command, retrying only when it *crashed* rather than reported a verdict.
 
     For a network-dependent tool the two failures are different things. A tool that ran and
@@ -393,7 +393,9 @@ def execute_with_retries(context: Context, cmd: str, *, attempts: int, backoff: 
         output = '' if result is None else f'{result.stdout}{result.stderr}'
         if 'Traceback (most recent call last)' not in output or attempt == attempts:
             raise SystemExit(1)
-        delay = backoff * attempt
+        # Three seconds, then six: enough for a service to finish whatever it was doing,
+        # short enough that a service which is properly down fails the run inside a minute.
+        delay = 3 * attempt
         print(f'That was a crash rather than a finding — retrying in {delay}s ({attempt}/{attempts - 1} used).')
         time.sleep(delay)
 

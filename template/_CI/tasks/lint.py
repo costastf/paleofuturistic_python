@@ -1,7 +1,6 @@
 """Linting task definitions."""
 
 import os
-from collections.abc import Iterator
 from typing import cast
 
 from invoke import Collection, Context, Task, task
@@ -87,22 +86,6 @@ def resolves(context: Context, revision: str) -> bool:
     return bool(result and not result.failed)
 
 
-def commit_ranges(context: Context) -> Iterator[str]:
-    """Yield candidate ranges for "the commits this push adds", widest-trust first.
-
-    pre-commit exports `PRE_COMMIT_FROM_REF`/`PRE_COMMIT_TO_REF` to pre-push hooks, straight
-    from what git handed it: that is the push itself rather than an inference about it, so it
-    comes first and it is right even when the branch tracks nothing or pushes somewhere other
-    than its upstream. Then the tracking branch, then the remote's default branch.
-    """
-    from_ref, to_ref = os.environ.get('PRE_COMMIT_FROM_REF', ''), os.environ.get('PRE_COMMIT_TO_REF', '')
-    if from_ref and to_ref and resolves(context, from_ref) and resolves(context, to_ref):
-        yield f'{from_ref}..{to_ref}'
-    for base in ('@{upstream}', 'origin/HEAD'):
-        if resolves(context, base):
-            yield f'{base}..HEAD'
-
-
 def unpushed_range(context: Context) -> str | None:
     """Return a commit range to check, or None when the repository holds no commit at all.
 
@@ -112,8 +95,14 @@ def unpushed_range(context: Context) -> str | None:
     `SKIP=preflight`, which drops the whole gate. And it is unfixable by design: rewriting
     published history is worse than the lint it satisfies.
 
-    An empty candidate range falls through to the next one rather than ending the search, and
-    the last resort is the tip commit. That matters because of where the empty case comes from:
+    Candidates in order of how much they know. pre-commit exports
+    `PRE_COMMIT_FROM_REF`/`PRE_COMMIT_TO_REF` to pre-push hooks straight from what git handed
+    it, which is the push itself rather than an inference about it — right even when the branch
+    tracks nothing or pushes somewhere other than its upstream. Then the tracking branch, then
+    the remote's default branch.
+
+    An empty candidate falls through to the next rather than ending the search, and the last
+    resort is the tip commit. That matters because of where the empty case comes from:
     `actions/checkout` fetches one commit and runs `checkout -B main refs/remotes/origin/main`,
     so in CI the branch *does* track `origin/main` and `origin/main` *is* `HEAD` — the range is
     empty on every push. Returning None there would have the pipeline validate nothing at all,
@@ -127,7 +116,12 @@ def unpushed_range(context: Context) -> str | None:
     """
     if not resolves(context, 'HEAD'):
         return None
-    for candidate in commit_ranges(context):
+    from_ref, to_ref = os.environ.get('PRE_COMMIT_FROM_REF', ''), os.environ.get('PRE_COMMIT_TO_REF', '')
+    candidates = []
+    if from_ref and to_ref and resolves(context, from_ref) and resolves(context, to_ref):
+        candidates.append(f'{from_ref}..{to_ref}')
+    candidates.extend(f'{base}..HEAD' for base in ('@{upstream}', 'origin/HEAD') if resolves(context, base))
+    for candidate in candidates:
         counted = context.run(f'git rev-list --count {candidate}', hide=True, warn=True)
         if counted is not None and not counted.failed and counted.stdout.strip() not in ('', '0'):
             return candidate

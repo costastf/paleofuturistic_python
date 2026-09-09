@@ -66,10 +66,10 @@ def validate_override_entry(entry: str, source: str, *, require_expiry: bool = F
     suppressions arriving from outside the repository, where a permanent entry would
     leave no reviewable trace.
 
-    An expiry further out than ``MAX_SUPPRESSION_DAYS`` is an error too. The date exists to
-    force a re-review, and ``CVE-2024-1234::2999-12-31`` is a permanent suppression wearing
-    the costume of a bounded one — worse than the plain permanent form, which at least reads as
-    what it is and is refused outright from the two sources that leave no trace.
+    An expiry further out than ``MAX_SUPPRESSION_DAYS`` is said out loud but allowed. The date
+    exists to force a re-review, so ``CVE-2024-1234::2999-12-31`` is a permanent suppression in
+    the costume of a bounded one — but how long an acceptance is worth carrying is the project's
+    call, not this workflow's, and refusing a well-formed entry at audit time helps nobody.
 
     Raises:
         SystemExit: with exit code 1 if the entry is malformed.
@@ -103,11 +103,10 @@ def validate_override_entry(entry: str, source: str, *, require_expiry: bool = F
     horizon = date.today() + timedelta(days=MAX_SUPPRESSION_DAYS)  # noqa: DTZ011
     if expires > horizon:
         print(
-            f'{source}: expiry {expiry} is more than {MAX_SUPPRESSION_DAYS} days out, so it is not '
-            f'really an expiry. Pick a date by {horizon}, or say plainly that the suppression is '
-            f'permanent by omitting the date in {SECURITY_OVERRIDES_FILE}.'
+            f'{source}: expiry {expiry} is further out than {horizon}, so it will not force a '
+            f'review any time soon. That is allowed; an omitted date says the same thing more '
+            f'plainly in {SECURITY_OVERRIDES_FILE}.'
         )
-        raise SystemExit(1)
 
 
 def parse_suppressions(raw: str, source: str, *, require_expiry: bool = False) -> list[Suppression]:
@@ -207,20 +206,20 @@ def audit(context: Context, ignore: str | None = None) -> None:
     # requirements file is echoed into the log next to the file it just wrote.
     execute(context, f'uv run uv export --frozen --all-groups --no-emit-project --quiet -o {AUDIT_EXPORT}')
     # `--disable-pip` in both: without it pip-audit builds a resolution environment for the
-    # requirements file, which needs a network it may not have. `--require-hashes` for the
-    # export, which uv writes fully hashed — it implies `--no-deps` and asserts that every pin
-    # carries a digest. `vendor.txt` comes from `uv pip compile` without hashes, so it gets the
-    # weaker pair rather than a hash requirement it cannot satisfy.
+    # requirements file, which needs a network it may not have.
     #
-    # Retried, unlike every other command in this workflow: this one asks a service on the
-    # internet about 125 packages one request at a time, and a reset connection partway through
-    # has established nothing. A finding is not retried — see `execute_with_retries`.
-    for requirements, mode in ((AUDIT_EXPORT, '--require-hashes'), (VENDOR_TXT, '--no-deps')):
-        execute_with_retries(
-            context,
-            f'uv run pip-audit -r {requirements} {mode} --disable-pip{ignore_opts}',
-            attempts=AUDIT_ATTEMPTS,
-        )
+    # Retried, unlike every other command in this workflow: these ask a service on the internet
+    # about 125 packages one request at a time, and a reset connection partway through has
+    # established nothing. A finding is not retried — see `execute_with_retries`.
+    #
+    # `--require-hashes` implies `--no-deps` and asserts that every pin carries a digest, which
+    # uv's export does. `vendor.txt` is copied verbatim from the upstream vendoring repository,
+    # hashes and all — and it has none, so requiring them there would fail on a file this
+    # project deliberately does not re-resolve.
+    export_audit = f'uv run pip-audit -r {AUDIT_EXPORT} --require-hashes --disable-pip{ignore_opts}'
+    vendor_audit = f'uv run pip-audit -r {VENDOR_TXT} --no-deps --disable-pip{ignore_opts}'
+    execute_with_retries(context, export_audit, attempts=AUDIT_ATTEMPTS)
+    execute_with_retries(context, vendor_audit, attempts=AUDIT_ATTEMPTS)
 
 
 @task
