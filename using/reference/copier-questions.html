@@ -470,10 +470,11 @@
 <p>Human-readable name. Appears in <code>pyproject.toml</code>'s <code>name</code> field, the README title, and the docs <code>site_name</code>.</p>
 <h3 id="project_slug"><code>project_slug</code></h3>
 <ul>
-<li><strong>Type</strong>: derived</li>
-<li><strong>Default</strong>: <code>project_name</code> lowercased with spaces and hyphens replaced by underscores.</li>
+<li><strong>Type</strong>: string (prompted, pre-filled with a derived default you can accept or edit)</li>
+<li><strong>Default</strong>: <code>project_name</code> lowercased, with every run of non-identifier characters replaced by a single underscore and leading/trailing underscores stripped — e.g. <code>Username's Toolkit</code> → <code>username_s_toolkit</code>.</li>
 </ul>
-<p>Python package name and source-tree directory name. Must be a valid Python identifier — the lowercase/replace transformation guarantees that for typical inputs.</p>
+<p>Python package name: both the <code>import</code> name / source-tree directory (<code>src/&lt;slug&gt;/</code>) and the <code>pyproject.toml</code> distribution name. It must therefore be a valid Python identifier <strong>and</strong> a valid <a href="https://packaging.python.org/en/latest/specifications/name-normalization/">PyPI project name</a>: lowercase ASCII letters, digits, and underscores, starting with a letter and ending with a letter or digit. A <code>validator</code> on this question enforces exactly that — it re-prompts (or, in non-interactive runs, aborts) on an empty value, a leading digit, or leftover punctuation such as an apostrophe.</p>
+<p>Because PyPI <a href="https://packaging.python.org/en/latest/specifications/name-normalization/">normalizes names</a> — lowercasing and collapsing runs of <code>.</code>, <code>-</code>, or <code>_</code> to a single <code>-</code> — the distribution name and the import name legitimately differ: <code>username_s_toolkit</code> is published and installed as <code>username-s-toolkit</code> (<code>pip install username-s-toolkit</code>) but imported as <code>import username_s_toolkit</code>.</p>
 <h3 id="project_description"><code>project_description</code></h3>
 <ul>
 <li><strong>Type</strong>: string</li>
@@ -536,6 +537,7 @@
 <p>Validation is split between copier's built-in mechanisms and the <code>tasks_render.py</code> copy-time script:</p>
 <ol>
 <li><strong>Python version range</strong> — a <code>validator</code> on the <code>max_python_version</code> question in <code>copier.yml</code> checks that <code>max &gt;= min</code>, that both values share the same major version, and that both appear in the choices list. Any failure aborts generation immediately before any files are written.</li>
+<li><strong>Project slug</strong> — a <code>validator</code> on the <code>project_slug</code> question checks the value is a valid Python identifier and PyPI project name (<code>^[a-z]([a-z0-9_]*[a-z0-9])?$</code>), rejecting empty values, leading digits, and punctuation such as apostrophes. Generation aborts before any files are written on failure.</li>
 <li><strong>License installation</strong> — <code>tasks_render.py</code> installs the chosen <code>LICENSE</code> file (substituting author/year tokens) and removes the <code>licenses/</code> staging directory. It runs only on <code>copier copy</code>, not on <code>copier update</code>.</li>
 </ol>
 <h2 id="see-also">See also</h2>
