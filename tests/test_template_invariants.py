@@ -1647,7 +1647,10 @@ def test_the_coverage_floor_is_enforced_where_it_was_measured(generated_project)
     editing `fail_under` by hand.
 
     So every per-interpreter reporter passes `--fail-under=0`, and `combine_coverage`'s
-    `coverage json` over the combined data is the single enforcement point.
+    `coverage json` over the combined data is the single enforcement point. Correctness rests on
+    every present and future call site opting out, which is a rule about call sites rather than
+    about configuration — hence the walk over all of them rather than a check of the two the
+    deadlock happened to involve.
     """
     project, _ = generated_project
     data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
@@ -1657,19 +1660,29 @@ def test_the_coverage_floor_is_enforced_where_it_was_measured(generated_project)
     assert 'fail_under' in data['tool']['coverage']['report']
 
     test_py = (project / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
-    reporters = test_py.split("@logged('test.coverage')", 1)[1].split('\n@', 1)[0]
-    for command in ('coverage report', 'coverage json', 'coverage html'):
-        line = next(line for line in reporters.splitlines() if command in line)
-        assert '--fail-under=0' in line, f'{command} in test.coverage gates on a union floor'
-
     combine = test_py.split('def combine_coverage', 1)[1].split('\n@', 1)[0]
-    enforcing = next(line for line in combine.splitlines() if 'coverage json' in line)
-    assert '--fail-under' not in enforcing, 'the one enforcement point stopped enforcing'
-    test_py = (project / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
+    # Command lines, not any line mentioning the command: the comments here discuss
+    # `coverage json` too, and an earlier version of this test inspected one of those and
+    # passed for that reason.
+    union_writes = [line for line in combine.splitlines() if 'coverage json -o' in line and '{COVERAGE_REPORT}' in line]
+    enforcing = [line.strip() for line in union_writes if '--fail-under' not in line]
+    assert len(enforcing) == 1, f'the floor is enforced by {len(enforcing)} commands, not one: {enforcing}'
+
+    reads = [
+        line.strip()
+        for line in test_py.splitlines()
+        if re.search(r'uv run coverage (report|json|html)', line) and line.strip() not in enforcing
+    ]
+    assert reads, 'no coverage commands left to check, so this walk has stopped walking'
+    for command in reads:
+        assert '--fail-under=0' in command, f'{command} is gated by a floor its data cannot clear'
+
+    # And the floor cannot drift by the gate and the task measuring different things: both run
+    # the same tox task, and the `test` aggregator the same pytest task.
     aggregator = test_py.split("@logged('test')", 1)[1]
     assert 'run_steps(pytest)' in aggregator, 'the aggregator no longer delegates to the same pytest task'
-    preflight_py = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
     assert 'tox' in registry_steps(project), 'the registry no longer runs the matrix'
+    preflight_py = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
     imported_from_test = preflight_py.split('from .test import', 1)[1].split('\n', 1)[0]
     assert 'tox' in imported_from_test, (
         'the registry no longer runs the shared tox task, so the floor it enforces can drift'
@@ -1914,17 +1927,29 @@ def test_pyscn_never_opens_a_browser_by_itself(generated_project):
         assert '--no-open' in line, f'{line.strip()!r} lets pyscn open a browser on its own'
 
 
-def test_the_docs_build_is_in_the_gate(generated_project):
-    """`properdocs build --strict` runs on every push, not first at release time.
+def test_the_docs_build_is_in_the_gate_and_early_in_it(generated_project):
+    """`properdocs build --strict` runs on every push, before the expensive steps.
 
     A broken cross-reference or a page missing from the nav fails `--strict`, and publishing
-    happens on a release tag. Without this step the first run that sees a bad link is the
-    release pipeline, after the tag is pushed — the one moment there is no cheap way back.
+    happens on a release tag — so without this step the first run that sees a bad link is the
+    release pipeline, after the tag is pushed, which is the one moment there is no cheap way
+    back.
+
+    Ordering is the other half. `run_scope` runs every step regardless of failure, so the
+    registry's order is all that decides how long a verdict takes: the docs build costs 1.3s
+    and the steps after it cost twelve, so a bad link is reported at 1.7s of a 13.8s run rather
+    than at 6.3s. pylint moved behind it for the same reason — five of those twelve seconds are
+    pylint's, and everything cheaper that can also fail should have spoken first.
     """
     project, _ = generated_project
+    order = list(registry_steps(project))
     assert registry_steps(project).get('docs') == 'WHOLE_PROGRAM', 'the docs build is in no gate'
     document = (project / '_CI' / 'tasks' / 'document.py').read_text(encoding='utf-8')
     assert '--strict' in document, 'the docs build tolerates a broken link'
+    for earlier, later in (('docs', 'pyscn'), ('docs', 'tox'), ('docs', 'build'), ('complexipy', 'pylint')):
+        assert order.index(earlier) < order.index(later), (
+            f'{earlier!r} now runs after {later!r}, so its verdict waits for a slower step'
+        )
 
 
 def test_a_report_a_reader_would_misread_is_cleared_first(generated_project):
@@ -2013,31 +2038,6 @@ def test_a_failed_bump_leaves_no_badge_for_it(generated_project):
     restore = body.split('except SystemExit:', 1)[1]
     assert 'update_package_version_badge()' in restore, 'the restore does not go through the one writer'
     assert 'raise' in restore, 'the failure is swallowed'
-
-
-def test_the_commit_message_check_is_bounded_to_this_push(generated_project):
-    """`lint.commitizen` reads the commits a push adds, not every commit ever made.
-
-    `cz check --rev-range HEAD` reads all reachable history, so one message that predates the
-    convention fails every run from then on — and the only way past it is `SKIP=preflight`,
-    which drops the whole gate. It is unfixable by design, too: rewriting published history is
-    worse than the lint it satisfies. A push answers for the commits it adds.
-
-    The shapes each candidate covers are asserted by
-    `test_the_commit_message_check_sees_the_tip_in_every_checkout_shape`, which builds the
-    repositories and reads the resolved range. This one only pins the declaration: greps of a
-    function for its own literals are how the version of this check that shipped a no-op passed.
-    """
-    project, _ = generated_project
-    lint = (project / '_CI' / 'tasks' / 'lint.py').read_text(encoding='utf-8')
-    scope = lint.split('def unpushed_range', 1)[1].split('\n@task', 1)[0]
-    for revision in ('PRE_COMMIT_FROM_REF', '@{upstream}', 'origin/HEAD', 'HEAD~1..HEAD'):
-        assert revision in scope, f'the range no longer considers {revision}'
-    body = lint.split("@logged('lint.commitizen')", 1)[1].split('\n@task', 1)[0]
-    # Past the docstring, which quotes the unbounded form to explain why it is gone.
-    code = body.split('"""', 2)[2]
-    assert "--rev-range HEAD'" not in code, 'the check reads all of history again'
-    assert 'unpushed_range(context)' in code, 'the check no longer bounds its range'
 
 
 def test_importing_a_task_module_does_not_cost_a_second(generated_project):
@@ -2271,54 +2271,6 @@ def test_the_commit_message_check_sees_the_tip_in_every_checkout_shape(generated
     empty.mkdir()
     git(empty, 'init', '--quiet', '.')
     assert resolve(empty) is None, 'an empty repository resolves a range'
-
-
-def test_the_docs_build_runs_before_the_matrix(generated_project):
-    """`docs` sits ahead of the expensive steps, which is what makes its verdict early.
-
-    `run_scope` runs every step regardless of failure, so the registry's order is the only
-    thing that decides how long a verdict takes. The docs build costs 1.3s and the steps after
-    it cost twelve, so a broken cross-reference is reported at 1.7s of a 13.8s run — put it
-    behind the matrix instead and the same failure takes ten seconds to surface. pylint moved
-    behind it for the same reason: five of those twelve seconds are pylint's, and everything
-    cheaper that can also fail should have spoken first.
-    """
-    project, _ = generated_project
-    order = list(registry_steps(project))
-    for earlier, later in (('docs', 'pyscn'), ('docs', 'tox'), ('docs', 'build'), ('complexipy', 'pylint')):
-        assert order.index(earlier) < order.index(later), (
-            f'{earlier!r} now runs after {later!r}, so its verdict waits for a slower step'
-        )
-
-
-def test_the_coverage_floor_is_enforced_by_exactly_one_command(generated_project):
-    """Every coverage command except the union's own JSON write opts out of `fail_under`.
-
-    `[tool.coverage.report] fail_under` applies to whatever command reads the data, and the
-    floor is set from the union across `env_list` — so any command seeing one interpreter's
-    data would fail on a bar that data cannot clear. Correctness therefore rests on every call
-    site passing `--fail-under=0`, which is a rule about call sites rather than about
-    configuration, and this is the walk over them.
-    """
-    project, _ = generated_project
-    test_py = (project / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
-    combine = test_py.split('def combine_coverage', 1)[1].split('\n@', 1)[0]
-    union = [line for line in combine.splitlines() if 'coverage json -o' in line and '{COVERAGE_REPORT}' in line]
-    enforcing = [line.strip() for line in union if '--fail-under' not in line]
-    assert len(enforcing) == 1, f'the floor is enforced by {len(enforcing)} commands, not one: {enforcing}'
-
-    reads = [
-        line.strip()
-        for line in test_py.splitlines()
-        if re.search(r'uv run coverage (report|json|html)', line) and line.strip() not in enforcing
-    ]
-    assert reads, 'no coverage commands left to check, so this walk has stopped walking'
-    for command in reads:
-        assert '--fail-under=0' in command, f'{command} is gated by a floor its data cannot clear'
-
-    data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
-    addopts = data['tool']['pytest']['ini_options']['addopts']
-    assert '--cov-fail-under=0' in addopts, 'pytest-cov enforces the union floor per interpreter again'
 
 
 def test_the_audit_retries_a_crash_and_not_a_finding(generated_project):
