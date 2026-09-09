@@ -15,7 +15,7 @@ import os
 import re
 import subprocess
 import tomllib
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -2651,6 +2651,195 @@ def test_exactly_one_matrix_cell_audits_its_dependencies(tmp_path):
     for cell in qa_cells():
         ran = [command for label, command in workflow_commands if label == cell['label']]
         assert ran == list(qa_sequence(audit=cell['mature'])), f'{cell["label"]} ran {ran}'
+
+
+def exec_from(source, *names: str, **namespace: object):
+    """Exec the named top-level functions and assignments from `source`, and return the namespace.
+
+    One dict as globals, so the extracted definitions can see each other and the stubs. Reading
+    the generated source and running a slice of it is how this suite tests behaviour without
+    importing `_CI.tasks.*`, which pulls invoke and every sibling module behind it.
+    """
+    wanted = set(names)
+    body = [
+        node
+        for node in ast.parse(source).body
+        if (isinstance(node, ast.FunctionDef) and node.name in wanted)
+        or (isinstance(node, ast.Assign) and any(getattr(t, 'id', None) in wanted for t in node.targets))
+    ]
+    found = {
+        node.name if isinstance(node, ast.FunctionDef) else node.targets[0].id  # type: ignore[union-attr]
+        for node in body
+    }
+    assert wanted <= found, f'missing from the source: {sorted(wanted - found)}'
+    exec(compile(ast.Module(body=body, type_ignores=[]), '<generated>', 'exec'), namespace)  # noqa: S102
+    return namespace
+
+
+def failing(*, failed: bool = True):
+    """A context whose `run` reports `failed`, recording the keyword arguments it was given."""
+
+    class Context:
+        def __init__(self) -> None:
+            self.calls = []
+
+        def run(self, command, **kwargs: object):
+            self.calls.append((command, kwargs))
+            return SimpleNamespace(failed=failed, stdout='', stderr='')
+
+    return Context()
+
+
+def test_a_tool_that_fails_ends_the_run(generated_project, monkeypatch):
+    """`execute` raises `SystemExit` when the command it ran failed.
+
+    Every task in the workflow runs every tool through this one function, so without the raise
+    ruff, pylint, ty, the matrix and the wheel build all pass unconditionally. Two tokens —
+    this and `run_scope`'s exit — make the whole gate decorative: a mutation sweep found both
+    surviving, and on a rendered project the mutated gate printed
+    "❌ preflight.artifacts failed" and then exited 0.
+
+    Guarded by execution because that is what the identical mutation in
+    `execute_with_retries` is guarded by; the same edit on the function every other failure
+    passes through was invisible.
+    """
+    project, _ = generated_project
+    source = (project / '_CI' / 'tasks' / 'shared.py').read_text(encoding='utf-8')
+    execute = exec_from(source, 'execute', os=os, Context=object)['execute']
+
+    monkeypatch.delenv('INVOKE_SHELL', raising=False)
+    with pytest.raises(SystemExit):
+        execute(failing(), 'ruff check')
+    execute(failing(failed=False), 'ruff check')
+
+    # And the documented `INVOKE_SHELL` override reaches invoke, for images with no bash.
+    monkeypatch.setenv('INVOKE_SHELL', '/bin/sh')
+    context = failing(failed=False)
+    execute(context, 'ruff check')
+    assert context.calls[0][1].get('shell') == '/bin/sh', context.calls
+
+
+def test_the_gate_exits_non_zero_when_any_step_failed(generated_project):
+    """`run_scope` accumulates failures, skips the writers after one, and exits non-zero.
+
+    The three properties are one function's behaviour and were asserted by reading it. The exit
+    is the load-bearing one: `preflight` prints every failure and then, without this, reports
+    success — which is worse than not running at all, because the log says both things.
+    """
+    project, _ = generated_project
+    source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
+
+    ran: list[str] = []
+
+    def step(name, *, fails=False, derived=False):
+        def runner(_context):
+            ran.append(name)
+            if fails:
+                raise SystemExit(1)
+
+        return runner, derived
+
+    def plan(steps):
+        return lambda *_args, **_kwargs: steps
+
+    namespace = exec_from(source, 'run_scope', Context=object, FIX_COMMAND='./workflow.cmd preflight --write')
+
+    def run(steps):
+        ran.clear()
+        namespace['plan_scope'] = plan(steps)
+        namespace['run_scope'](object(), 'whole-program', write=False)
+
+    # Nothing failing: no exit, every step run.
+    run([step('format'), step('artifacts', derived=True)])
+    assert ran == ['format', 'artifacts']
+
+    # One failing check: the later steps still run, and the run ends non-zero.
+    with pytest.raises(SystemExit):
+        run([step('format', fails=True), step('ruff'), step('ty')])
+    assert ran == ['format', 'ruff', 'ty'], 'a failure stopped the run early'
+
+    # A failure before a derived step: that step is skipped, and the exit still happens.
+    with pytest.raises(SystemExit):
+        run([step('format', fails=True), step('artifacts', derived=True)])
+    assert ran == ['format'], 'a derived value was written after a failure'
+
+
+def test_a_staged_path_that_cannot_be_forwarded_is_refused(generated_project, tmp_path, monkeypatch):
+    """`staged_files` refuses a path with a space or a shell character, and drops what is gone.
+
+    `--paths` is space-separated the whole way down, and the list is printed back as a command
+    to paste — so `src/a";id;".py`, a valid filename, has to be refused rather than forwarded.
+    Without the raise the hook checks a subset of what was staged and passes.
+    """
+    project, _ = generated_project
+    source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
+    namespace = exec_from(source, 'staged_files', 'UNSAFE_IN_PATHS', Context=object, Path=Path)
+    staged_files = namespace['staged_files']
+
+    def index(*paths: str):
+        class Context:
+            def run(self, _command, **_kwargs: object):
+                return SimpleNamespace(failed=False, stdout=''.join(f'{path}\n' for path in paths))
+
+        return Context()
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / 'src').mkdir()
+    for name in ('kept.py', 'gone.py', 'has space.py', 'quoted";id;".py'):
+        (tmp_path / 'src' / name).touch()
+
+    assert staged_files(index('src/kept.py')) == 'src/kept.py'
+    # Staged, then removed from the worktree: nothing left for a tool to read.
+    assert staged_files(index('src/kept.py', 'src/missing.py')) == 'src/kept.py'
+    for unforwardable in ('src/has space.py', 'src/quoted";id;".py'):
+        with pytest.raises(SystemExit):
+            staged_files(index('src/kept.py', unforwardable))
+
+    class Broken:
+        def run(self, _command, **_kwargs: object):
+            return SimpleNamespace(failed=True, stdout='')
+
+    assert staged_files(Broken()) == '', 'no index reads as an error rather than as no work'
+
+
+def test_a_suppression_that_cannot_be_reviewed_is_refused(generated_project):
+    """`validate_override_entry` refuses a malformed entry, and a permanent one from outside.
+
+    Both raises survived a mutation sweep, and both are what the docstring promises: an entry
+    the audit cannot parse must not become a silent permanent suppression, and `--ignore` or the
+    environment variable — neither of which leaves a trace in the repository — must carry an
+    expiry.
+    """
+    project, _ = generated_project
+    secure = (project / '_CI' / 'tasks' / 'secure.py').read_text(encoding='utf-8')
+    configuration = (project / '_CI' / 'tasks' / 'configuration.py').read_text(encoding='utf-8')
+    constants = exec_from(configuration, 'IGNORE_PATTERN', 'MAX_SUPPRESSION_DAYS', re=re, Path=Path)
+    validate = exec_from(
+        secure,
+        'validate_override_entry',
+        re=re,
+        date=date,
+        timedelta=timedelta,
+        IGNORE_PATTERN=constants['IGNORE_PATTERN'],
+        MAX_SUPPRESSION_DAYS=constants['MAX_SUPPRESSION_DAYS'],
+        SECURITY_OVERRIDES_FILE=Path('.security-overrides'),
+    )['validate_override_entry']
+
+    horizon = date.today() + timedelta(days=constants['MAX_SUPPRESSION_DAYS'] - 30)  # noqa: DTZ011
+    validate(f'CVE-2024-1234::{horizon}', '--ignore', require_expiry=True)
+    validate('CVE-2024-1234', '.security-overrides:1')
+
+    # A mistyped expiry must not read as a permanent suppression with date fragments attached.
+    with pytest.raises(SystemExit):
+        validate('CVE-2024-1234::2026-1-1', '.security-overrides:1')
+    with pytest.raises(SystemExit):
+        validate('not a vulnerability id', '.security-overrides:1')
+    with pytest.raises(SystemExit):
+        validate('CVE-2024-1234', '--ignore', require_expiry=True)
+
+    # Beyond the horizon is remarked on, not refused: how long an acceptance is worth carrying
+    # belongs to the project.
+    validate('CVE-2024-1234::2999-12-31', '--ignore', require_expiry=True)
 
 
 def test_matrix_envs_do_not_share_report_paths(generated_project):
