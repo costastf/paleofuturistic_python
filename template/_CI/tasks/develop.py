@@ -33,9 +33,28 @@ def pre_commit_install(context: Context) -> None:
 
 @task
 @logged('develop.pre-commit')
-@run('uv run pre-commit run --all-files')
 def pre_commit(context: Context) -> None:
-    """Run all pre-commit hooks on the entire codebase."""
+    """Run the commit-stage hooks exactly as git will run them.
+
+    A dry run of your next commit: pre-commit's own view of the staged files, through the
+    installed configuration. So it exercises what `preflight.staged` alone does not — that the
+    `files:` filters select what you think, that `SKIP` is honoured, and that the other
+    commit-stage hooks run.
+
+    Nothing here writes; the hooks report, and `./workflow.cmd format` applies formatting. Nor
+    is it the full check: ty, commitizen, the docs build, pyscn, the matrix and the derived
+    files are on pre-push, and `./workflow.cmd preflight` runs everything.
+
+    There is no whole-tree flag. The staged bundle passes no filenames — it reads the index,
+    so it is the same command whether pre-commit or you invoke it — and `pre-commit run
+    --all-files` therefore had nothing to widen. `./workflow.cmd preflight` checks every file
+    in the project, which is what the whole backlog after installing hooks or a `copier update`
+    calls for.
+
+    Args:
+        context: Invoke context.
+    """
+    execute(context, 'uv run pre-commit run')
 
 
 @task

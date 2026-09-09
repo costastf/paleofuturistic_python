@@ -5,33 +5,63 @@ import base64
 import json
 import os
 import re
+import sys
 import urllib.error
 import urllib.request
-from datetime import date
+from datetime import date, timedelta
+from pathlib import Path
 from typing import NamedTuple, cast
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 {%- else -%}
 import os
 import re
-from datetime import date
+import sys
+from datetime import date, timedelta
+from pathlib import Path
 from typing import NamedTuple, cast
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 {%- endif %}
 
 from invoke import Collection, Context, Task, task
 
 {% if integrate_dependency_track -%}
 from .configuration import (
+    AUDIT_ATTEMPTS,
+    AUDIT_REQUIREMENTS,
+    AUDIT_VERDICTS,
     IGNORE_PATTERN,
+    MAX_SUPPRESSION_DAYS,
     OWASP_DTRACK_SETTINGS,
     PROJECT_NAME,
     SBOM_FILE,
     SECURITY_OVERRIDE_ENV,
     SECURITY_OVERRIDES_FILE,
+    UV_LOCK,
+    VENDOR_TXT,
 )
 {%- else -%}
-from .configuration import IGNORE_PATTERN, SBOM_FILE, SECURITY_OVERRIDE_ENV, SECURITY_OVERRIDES_FILE
+from .configuration import (
+    AUDIT_ATTEMPTS,
+    AUDIT_REQUIREMENTS,
+    AUDIT_VERDICTS,
+    IGNORE_PATTERN,
+    MAX_SUPPRESSION_DAYS,
+    SBOM_FILE,
+    SECURITY_OVERRIDE_ENV,
+    SECURITY_OVERRIDES_FILE,
+    UV_LOCK,
+    VENDOR_TXT,
+)
 {%- endif %}
-from .sbom import render_sbom, validate_sbom, write_sbom
-from .shared import execute, logged
+from .shared import execute_with_retries, logged
 
 
 class Suppression(NamedTuple):
@@ -53,6 +83,11 @@ def validate_override_entry(entry: str, source: str, *, require_expiry: bool = F
     With ``require_expiry``, a missing expiry is also an error. That is applied to
     suppressions arriving from outside the repository, where a permanent entry would
     leave no reviewable trace.
+
+    An expiry further out than ``MAX_SUPPRESSION_DAYS`` is said out loud but allowed. The date
+    exists to force a re-review, so ``CVE-2024-1234::2999-12-31`` is a permanent suppression in
+    the costume of a bounded one — but how long an acceptance is worth carrying is the project's
+    call, not this workflow's, and refusing a well-formed entry at audit time helps nobody.
 
     Raises:
         SystemExit: with exit code 1 if the entry is malformed.
@@ -79,10 +114,82 @@ def validate_override_entry(entry: str, source: str, *, require_expiry: bool = F
             raise SystemExit(1)
         return
     try:
-        date.fromisoformat(expiry)
+        expires = date.fromisoformat(expiry)
     except ValueError as exc:
         print(f'{source}: invalid expiry {expiry!r}: {exc}; expected YYYY-MM-DD (or omit for a permanent suppression)')
         raise SystemExit(1) from None
+    horizon = date.today() + timedelta(days=MAX_SUPPRESSION_DAYS)  # noqa: DTZ011
+    if expires > horizon:
+        print(
+            f'{source}: expiry {expiry} is further out than {horizon}, so it will not force a '
+            f'review any time soon. That is allowed; an omitted date says the same thing more '
+            f'plainly in {SECURITY_OVERRIDES_FILE}.'
+        )
+
+
+def audit_requirement_files() -> list[Path]:
+    """Write every pin in `uv.lock` to requirement files, and return their paths.
+
+    The lockfile is the whole resolution: every package for every interpreter and platform the
+    project supports, with nothing to evaluate and no extras or groups to remember to ask for.
+
+    `uv export` cannot do this job. It produces a *universal* requirements file that keeps the
+    environment markers, and pip-audit evaluates them — so `waitress==2.1.0 ; sys_platform ==
+    "win32"` audits clean on Linux, and on the default render an export audited on a 3.10 runner
+    skips `rpds-py==2026.6.3`, which four of the five matrix interpreters install and the SBOM
+    lists. Reading the lock directly is also why this needs no `--all-groups`/`--all-extras`
+    pair to keep in step with the project's own: a locked package is in the lock.
+
+    One file per version slot. pip-audit refuses a file that names a package twice — exit 1,
+    "has duplicate requirements" — and a lockfile legitimately pins two versions of one package
+    behind different markers, which is exactly the case that has to be audited rather than
+    resolved away.
+
+    Only packages with a registry source: a git, URL or path dependency has no published
+    release to compare a name and version against. Those are named on stdout rather than
+    dropped in silence, since everything written about this audit claims every locked version.
+    The project and any workspace members are skipped without comment — they are what is being
+    audited, not dependencies of it.
+    """
+    packages: list[tuple[str, str]] = []
+    unauditable: list[str] = []
+    locked = tomllib.loads(UV_LOCK.read_text(encoding='utf-8'))
+    for package in locked.get('package', []):
+        # A key of the source table, not a substring of it: a `url` source pointing at
+        # `https://registry.example.com/thing.whl` matched the string form and was then audited
+        # as though a PyPI release of that name and version were the artefact in use.
+        source = package.get('source', {})
+        version = package.get('version')
+        if 'registry' in source and version:
+            packages.append((package['name'], version))
+            continue
+        # The project and its workspace members are what is being audited, not dependencies.
+        if not source.keys() & {'editable', 'virtual'}:
+            kind = ', '.join(sorted(source)) or 'no source'
+            unauditable.append(f'{package["name"]} ({kind})')
+
+    if unauditable:
+        # Said out loud, because everything written about this audit claims every locked
+        # version: a git or URL dependency has no registry release to compare against, so
+        # nothing here can speak for it.
+        print(f'Not audited, having no registry release to compare against: {", ".join(unauditable)}')
+
+    slots: list[dict[str, str]] = []
+    for name, version in sorted(packages):
+        slot = next((candidate for candidate in slots if name not in candidate), None)
+        if slot is None:
+            slot = {}
+            slots.append(slot)
+        slot[name] = version
+
+    AUDIT_REQUIREMENTS.parent.mkdir(parents=True, exist_ok=True)
+    written = []
+    for index, slot in enumerate(slots):
+        target = AUDIT_REQUIREMENTS if index == 0 else AUDIT_REQUIREMENTS.with_suffix(f'.{index}.txt')
+        body = ''.join(f'{name}=={version}\n' for name, version in sorted(slot.items()))
+        target.write_text(body, encoding='utf-8')
+        written.append(target)
+    return written
 
 
 def parse_suppressions(raw: str, source: str, *, require_expiry: bool = False) -> list[Suppression]:
@@ -140,6 +247,20 @@ def audit(context: Context, ignore: str | None = None) -> None:
     printed with its origin, so a suppression injected through CI configuration alone
     still shows up in the build log.
 
+    What is audited is every version in `uv.lock`, plus the vendored CI manifest — not the
+    environment this happens to be running in, and not a rendering of the lock that depends on
+    it. Two forms were tried and both saw less than the lock: `pip-audit` with no `-r`
+    enumerates *installed* distributions, so a Linux runner omits whatever a platform marker,
+    an extra or an unsynced group kept out of the venv; `uv export` keeps the markers in the
+    file and pip-audit evaluates them, so the same pins are skipped a step later. See
+    `audit_requirement_files`. The vendored tree needs naming separately because it ships as
+    source with no `.dist-info` for any scan to find, and it is code `./workflow.cmd` runs in
+    every job.
+
+    What it still cannot see: a vendored file edited by hand, since `vendor.txt` describes the
+    packages that should be there; and anything in `[build-system] requires`, which no part of
+    this workflow audits.
+
     Args:
         context: Invoke context.
         ignore: Comma-separated vulnerability IDs to ignore.
@@ -169,7 +290,22 @@ def audit(context: Context, ignore: str | None = None) -> None:
             print(f'  {suppression.vulnerability_id} ({expiry}) from {suppression.source}')
     ignore_args = ' '.join(f'--ignore-vuln {vulnerability_id}' for vulnerability_id in active)
     ignore_opts = f' {ignore_args}' if ignore_args else ''
-    execute(context, f'uv run pip-audit{ignore_opts}')
+    # `--disable-pip`: without it pip-audit builds a resolution environment for the
+    # requirements file, which needs a network it may not have. `--strict` so a package the
+    # advisory service cannot resolve fails the audit instead of being listed in a skip table
+    # under exit 0 — a private index, a yanked release, a name pulled after a takedown.
+    #
+    # Retried, unlike every other command in this workflow: these ask a service on the internet
+    # about 125 packages one request at a time, and a reset connection partway through has
+    # established nothing. A finding is never retried, because pip-audit reported it — see
+    # `execute_with_retries` and `AUDIT_VERDICTS`.
+    for requirements in (*audit_requirement_files(), VENDOR_TXT):
+        execute_with_retries(
+            context,
+            f'uv run pip-audit -r {requirements} --no-deps --disable-pip --strict{ignore_opts}',
+            attempts=AUDIT_ATTEMPTS,
+            verdicts=AUDIT_VERDICTS,
+        )
 
 
 @task
@@ -184,6 +320,12 @@ def sbom_extract(context: Context, write: bool = False) -> None:  # noqa: ARG001
         context: Invoke context.
         write: Write SBOM to ``src/<package>/sbom.cdx.json`` instead of printing to stdout.
     """
+    # Imported here, not at module scope. `.sbom` pulls in `cyclonedx`, whose JSON validator
+    # reaches `jsonschema._format` and a lark grammar built at import time — 1.2s, measured,
+    # paid by every `./workflow.cmd` because `build` imports this module. The three tasks that
+    # actually compose an SBOM are the ones that should pay for it.
+    from .sbom import render_sbom, write_sbom  # noqa: PLC0415
+
     if write:
         write_sbom()
         print(f'Wrote SBOM to {SBOM_FILE}.')
@@ -199,6 +341,8 @@ def sbom_validate(context: Context) -> None:
     Re-runs ``sbom-extract --write`` if the SBOM file is missing so the
     validation has something to check.
     """
+    from .sbom import validate_sbom  # noqa: PLC0415
+
     if not SBOM_FILE.exists():
         sbom_extract(context, write=True)
     errors = validate_sbom()
@@ -281,14 +425,21 @@ def validate_overrides(context: Context) -> None:  # noqa: ARG001
 
 
 @task
-@logged('secure')
-def secure(context: Context) -> None:
-    """Run all security checks; reports all failures before exiting."""
+@logged('secure.sbom')
+def sbom(context: Context) -> None:
+    """Compose the SBOM and validate it; reports all failures before exiting.
+
+    The half of this module `build` depends on. `uv build` ships
+    ``src/<package>/sbom.cdx.json`` inside the wheel, so composing it is a build *input*: a
+    description of what the artifact contains, derived from the lockfile and the tree.
+
+    Separate from `audit`, which `build` does not run. An audit's answer depends on the advisory
+    database on the day it runs, so bundling the two would mean a newly published CVE making it
+    impossible to build a wheel from code that built yesterday — a hotfix blocked by an
+    unrelated advisory. The audit gates *publishing*, where the outside world is exposed, and
+    runs from `release.dist`, on a schedule, and on any change to the dependency surface.
+    """
     failed = False
-    try:
-        audit(context)
-    except SystemExit:
-        failed = True
     try:
         sbom_extract(context, write=True)
     except SystemExit:
@@ -301,9 +452,31 @@ def secure(context: Context) -> None:
         raise SystemExit(1)
 
 
+@task
+@logged('secure')
+def secure(context: Context) -> None:
+    """Run every security task — audit and SBOM; reports all failures before exiting.
+
+    The human-facing "all of it". Nothing automated calls it: `build` takes `sbom` alone, and
+    the audit runs from `release.dist`, the daily schedule, and the dependency-change job.
+    """
+    failed = False
+    try:
+        audit(context)
+    except SystemExit:
+        failed = True
+    try:
+        sbom(context)
+    except SystemExit:
+        failed = True
+    if failed:
+        raise SystemExit(1)
+
+
 namespace = Collection('secure')
 namespace.add_task(cast(Task, secure), default=True, name='all')
 namespace.add_task(cast(Task, audit))
+namespace.add_task(cast(Task, sbom))
 namespace.add_task(cast(Task, sbom_extract))
 namespace.add_task(cast(Task, sbom_validate))
 namespace.add_task(cast(Task, validate_overrides))

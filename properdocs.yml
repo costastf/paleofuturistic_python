@@ -51,5 +51,6 @@ nav:
       - Why copier: maintaining/explanation/why-copier.md
       - The CI tasks architecture: maintaining/explanation/the-ci-tasks-architecture.md
       - History and lineage: maintaining/explanation/history-and-lineage.md
+      - Decisions not taken: maintaining/explanation/decisions-not-taken.md
 
 copyright: Copyright &copy; 2024 <a href="https://schubergphilis.com/">Schuberg Philis</a>

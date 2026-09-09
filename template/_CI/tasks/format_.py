@@ -28,6 +28,11 @@ def ruff_format(context: Context, paths: str = '') -> None:
 def format_(context: Context, paths: str = '') -> None:
     """Run all formatting steps; reports all failures before exiting.
 
+    Formatting is idempotent and the gate refuses unformatted code, so on a project whose
+    pushes have passed that gate this rewrites your unformatted files and nothing else. When
+    something narrower is wanted, `--paths` takes the list — and the commit hook prints that
+    exact command, already scoped to the files it checked.
+
     Args:
         context: Invoke context.
         paths: Space-separated paths to format. Defaults to the project's standard paths.

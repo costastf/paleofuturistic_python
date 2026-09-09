@@ -6,10 +6,12 @@ import platform
 import re
 import shutil
 import sys
+import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager, suppress
 from contextvars import ContextVar
 from functools import wraps
+from pathlib import Path
 from typing import IO, Any, NamedTuple
 from urllib.parse import urlsplit, urlunsplit
 
@@ -31,10 +33,16 @@ class RemoteRef(NamedTuple):
     path: str
 
 
+# `line_buffering` keeps a redirected log readable, which is to say every CI log. CPython
+# block-buffers stdout when it is not a terminal, while invoke re-emits a subprocess's output as
+# it arrives — so without it our own lines (the echoed command, a task's prints) surface in
+# chunks *after* the output of the command they introduce, and a pure-Python task's output reads
+# as though the previous command produced it. A flush per line fixes it. `IndentingStream` does
+# the same for the same reason: it is what `sys.stdout` is for the whole of a logged task.
 for _stream in (sys.stdout, sys.stderr):
     reconfigure = getattr(_stream, 'reconfigure', None)
     if reconfigure is not None:
-        reconfigure(encoding='utf-8', errors='replace')
+        reconfigure(encoding='utf-8', errors='replace', line_buffering=True)
 
 
 INDENT = '    '
@@ -91,7 +99,13 @@ class IndentingStream:
             chunks.append(ch)
             if ch == '\n':
                 self.at_line_start = True
-        return self.inner.write(''.join(chunks))
+        written = self.inner.write(''.join(chunks))
+        # Line-buffered by construction rather than by inheritance: this stands in for
+        # `sys.stdout` for the duration of a logged task, and the ordering the module-level
+        # `reconfigure` above buys is only kept if the substitute keeps it.
+        if '\n' in data:
+            self.inner.flush()
+        return written
 
     def flush(self) -> None:
         """Flush the wrapped stream."""
@@ -282,6 +296,65 @@ def image_digest_reference(context: Context, engine: str, image: str) -> str:
     return image
 
 
+def apply_badge(
+    path: Path,
+    pattern: str,
+    replacement: str,
+    *,
+    label: str,
+    detail: str,
+    write: bool,
+    flags: int = 0,
+    announce: bool = True,
+) -> str | None:
+    """Bring a derived value in ``path`` up to date, or report that it is not.
+
+    Every derived value committed to the repository — the README badges and the coverage
+    ratchet's ``fail_under`` — is written through here in one of two modes. ``write=True``
+    updates the file; ``write=False`` leaves it alone and reports what it would have changed.
+    The two cannot disagree about what "up to date" means, being the same substitution against
+    the same file; a second implementation for the verifying side is how a check drifts from the
+    generator it guards.
+
+    ``announce=False`` suppresses the success line for callers that print their own, such as the
+    coverage ratchet's single ``[ratchet]`` line.
+
+    Returns None when the file already holds the right value, else a one-line reason. Callers
+    decide what a stale value costs. A missing file is not a staleness — nothing can be
+    concluded from it — so it reads as up to date here, and the caller diagnoses it, being the
+    only one that knows whether the input should have existed.
+
+    A value the pattern does not find is not a staleness either: a badge removed from the
+    README is the reader's decision, and this workflow does not put it back. It says so, out
+    loud, because the alternative is a check that quietly stops existing.
+    """
+    if not path.exists():
+        return None
+    content = path.read_text(encoding='utf-8')
+    if not re.search(pattern, content, flags=flags):
+        print(f'No {label} in {path}, so nothing to keep current.')
+        return None
+    updated = re.sub(pattern, replacement, content, flags=flags)
+    if updated == content:
+        return None
+    if write:
+        path.write_text(updated, encoding='utf-8')
+        if announce:
+            print(f'Updated {label} to {detail}.')
+        return None
+    return f'{label} in {path} is stale — {detail} was measured'
+
+
+def note(reason: str | None) -> None:
+    """Print a staleness reason from ``apply_badge``, if there is one.
+
+    A derived value that could not be brought up to date is worth saying out loud without
+    failing the task that noticed. Only ``preflight`` treats the same reason as a failure.
+    """
+    if reason:
+        print(reason)
+
+
 def execute(context: Context, cmd: str) -> None:
     """Execute a shell command, raising SystemExit(1) on failure.
 
@@ -293,6 +366,44 @@ def execute(context: Context, cmd: str) -> None:
     result = context.run(cmd, echo=True, warn=True, **kwargs)
     if result is None or result.failed:
         raise SystemExit(1)
+
+
+def execute_with_retries(context: Context, cmd: str, *, attempts: int, verdicts: tuple[str, ...]) -> None:
+    """Execute a command, retrying only while it has not reported a verdict.
+
+    For a network-dependent tool, "it failed" covers two different things. A tool that ran and
+    found something has answered, and running it again will say the same. A tool that died
+    mid-request has answered nothing — `pip-audit` walks an advisory database one package at a
+    time with no retry of its own, so a single reset connection fails a run that established
+    nothing.
+
+    Both exit non-zero, so the exit code cannot separate them. What can is the tool's own
+    report: ``verdicts`` holds the phrases it prints when it reached a conclusion, either way,
+    and anything else is treated as not having got that far. Keying on the reporting contract
+    rather than on a traceback matters — the first version of this looked for a Python stack,
+    which caught a reset connection only because that exception happens to go uncaught, and
+    would have gone quietly inert the day pip-audit caught it and printed a message instead.
+
+    The bias is deliberate: a run whose output contains a verdict is never retried, so the worst
+    this can do to a genuine finding is nothing at all.
+
+    Raises:
+        SystemExit: If the command reported a verdict, or ran out of attempts.
+    """
+    shell = os.environ.get('INVOKE_SHELL')
+    kwargs: dict[str, object] = {'shell': shell} if shell else {}
+    for attempt in range(1, attempts + 1):
+        result = context.run(cmd, echo=True, warn=True, **kwargs)
+        if result is not None and not result.failed:
+            return
+        output = '' if result is None else f'{result.stdout}{result.stderr}'
+        if any(verdict in output for verdict in verdicts) or attempt == attempts:
+            raise SystemExit(1)
+        # Three seconds, then six: enough for a service to finish whatever it was doing, short
+        # enough that a service which is properly down fails the run inside a minute.
+        delay = 3 * attempt
+        print(f'No verdict from that run, so it established nothing — retrying in {delay}s.')
+        time.sleep(delay)
 
 
 def signing_requested(context: Context) -> bool:

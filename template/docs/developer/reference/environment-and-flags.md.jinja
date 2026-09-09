@@ -1,0 +1,74 @@
+# Environment variables and flags
+
+Which knob is which, every variable this workflow reads, and how to get past a hook when you
+have to.
+
+## Which kind of knob to expect where
+
+Three mechanisms, and they are not interchangeable:
+
+| Mechanism | Means | Example |
+| --- | --- | --- |
+| **Sub-task** | a unit of work you might want to run *alone* | `lint.pylint`, `test.tox` |
+| **Flag** | a modifier *you* choose for one invocation | `--paths`, `--write`, `--env` |
+| **Environment variable** | something the *environment* supplies, not the operator | `CI`, `INVOKE_SHELL` |
+
+So: a tool or step you might run on its own is a sub-task; something a person decides at the
+prompt is a flag; a secret, a detection, or a knob owned by a tool this workflow calls is an
+environment variable.
+
+Two conventions hold on top of that:
+
+- **Flags add; they do not subtract.** The bare command is the narrow, read-only one:
+  `--write` updates derived files and `--audit-dependencies` adds a step. No flag makes a gate check *less*, a gate you can quietly weaken being one that stops
+  meaning anything. `env_list` in `pyproject.toml` is what shortens the test matrix, and it
+  shortens CI with it.
+- **`--write` always means "update the derived files".** `preflight --write`, `test.tox --write`,
+  `quality.pyscn-analyze --write`, `secure.sbom-extract --write`, `release.changelog --write`.
+  Without it they report what they would change, so no automated run modifies anything you did
+  not ask for. The [task catalog](invoke-tasks.md) says which commands write what.
+
+One deliberate exception: `{{ project_slug | upper }}_SECURITY_OVERRIDE` exists as an
+environment variable *and* as `secure.audit --ignore` *and* as the `.security-overrides` file.
+Three doors to the same room, because a pipeline needs to suppress a finding without committing
+it and a person wants the reverse. [Triage a security
+finding](../how-to/triage-a-security-finding.md) documents the precedence.
+
+## Variables this workflow reads
+
+Nothing here needs setting for local work. Every one has a default or a reason to be absent.
+
+| Variable | Read by | What it does |
+| --- | --- | --- |
+| `CI` | `shared.is_ci()` | When `true`, suppresses anything that wants a human: the bootstrap's prompts, and opening a report in a browser. Set by GitHub Actions and GitLab CI themselves. |
+| `INVOKE_SHELL` | `shared.execute()` | Overrides the shell Invoke spawns. Needed on minimal images that ship `busybox sh` but no bash — the kaniko job is why it exists. |
+| `{{ project_slug | upper }}_SECURITY_OVERRIDE` | `secure.audit` | Comma-separated pip-audit suppressions, each `<VULN_ID>::<YYYY-MM-DD>`. An expiry is **required** here, unlike in the file: a suppression that leaves no trace in the repository must not be able to last forever. |
+| `COVERAGE_FILE` | tox, per env | Set to `.coverage.{envname}` by `[tool.tox.env_run_base]` so the matrix's envs do not race one data file. Not yours to set. |
+{%- if git_hosting_service == 'github' %}
+| `GITHUB_REPOSITORY`, `GITHUB_ACTOR` | `container.deps-image`, in CI | Where to push the dependency image and who is pushing it, both injected by GitHub Actions. The image path is lowercased on the way through, ghcr.io rejecting uppercase while these preserve the repository's case. |
+| `GITHUB_TOKEN` | `release`, `document.deploy-github` | Opens the release pull request and pushes the docs to `gh-pages`. CI injects it; locally you need a PAT only if you run those tasks by hand. |
+{%- else %}
+| `GITLAB_TOKEN` | `release` | Opens the release merge request through the API. CI injects a job token; locally you need a PAT only if you run `release` by hand. |
+| `CI_REGISTRY`, `CI_REGISTRY_USER`, `CI_REGISTRY_PASSWORD`, `CI_REGISTRY_IMAGE` | `container.deps-image`, in CI | Where to push the dependency image and the job-token credentials to do it with, all four injected by GitLab. The shipped pipeline builds that image in a kaniko job with the Deploy Token below instead, so these are read when the task runs the push itself. |
+| `DEPS_IMAGE_USERNAME`, `DEPS_IMAGE_PASSWORD` | the deps-image job | A project Deploy Token with `read_registry` + `write_registry`. Mark both Protected and Masked, and scope them to the `deps` environment — an unscoped variable is readable by every job in every pipeline, including one added by a fork's merge request. |
+| `UV_LINK_MODE` | every job | Set to `copy` in `.gitlab-ci.yml`: hardlinks cannot span GitLab's mount boundaries, so `uv run` needs copies. |
+{%- endif %}
+| `ACTIONS_ID_TOKEN_REQUEST_URL`, `ACTIONS_ID_TOKEN_REQUEST_TOKEN` | `release.publish` | Checked, not set by you. Their presence is how PyPI Trusted Publishing is detected, at which point the legacy credentials below are dropped. {% if git_hosting_service == 'github' %}GitHub Actions injects both when a job has `id-token: write`.{% else %}Only GitHub Actions injects them, so on GitLab this detection never fires and publishing uses the credentials below.{% endif %} |
+| `UV_PUBLISH_URL`, `UV_PUBLISH_USERNAME`, `UV_PUBLISH_PASSWORD` | `release.publish` | Publishing credentials, needed wherever Trusted Publishing is unavailable{% if git_hosting_service == 'gitlab' %} — which, per the row above, is this project{% endif %}. `release.publish` drops them when it detects OIDC, because `uv publish` treats an empty `UV_PUBLISH_URL` as an explicit "no base URL" rather than falling back to PyPI. |
+{%- if integrate_dependency_track %}
+| `OWASP_DTRACK_URL`, `OWASP_DTRACK_API_KEY` | `secure.sbom-upload` | Where to upload the SBOM, and the key to do it with. Both must be present or the task refuses rather than half-uploading. |
+{%- endif %}
+| `PRE_COMMIT_FROM_REF`, `PRE_COMMIT_TO_REF` | `lint.commitizen` | The commit range a push would add, which pre-commit hands to pre-push hooks straight from git. It is the authoritative answer to "which messages are mine to fix", so it wins over anything the task can infer from the branch. Absent outside a pre-push hook, where the tracking branch stands in. |
+| `SKIP` | pre-commit, not this workflow | The escape hatch below. |
+
+`pytest` also loads a `.env` file if you keep one (`[tool.pytest.ini_options] env_files`), which
+is for your tests' own configuration and is read by nothing in this workflow.
+
+## Getting past a hook
+
+`SKIP` takes hook `id`s from `.pre-commit-config.yaml` and suspends those hooks for one
+command, which is the option to reach for first — `--no-verify` switches off every hook at that
+stage and tells you nothing afterwards about what it skipped. CI runs `./workflow.cmd preflight`
+on the push regardless, so either way a skipped check is deferred rather than avoided.
+
+[Skip a check, once](../how-to/skip-a-check.md) has the commands and the order to try them in.

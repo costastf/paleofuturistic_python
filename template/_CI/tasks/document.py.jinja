@@ -6,61 +6,122 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-{% if integrate_pages and git_hosting_service == 'github' -%}
-from .github import request_pages_build
-{% endif -%}
-from .quality import update_pyscn_badge
-{% if integrate_pages and git_hosting_service == 'github' -%}
-from .shared import execute, is_ci, logged, open_target, run, run_steps
+{% if git_hosting_service == 'github' -%}
+from .github import pipeline_badge{% if integrate_pages %}, request_pages_build{% endif %}
 {%- else -%}
-from .shared import is_ci, logged, open_target, run, run_steps
+from .gitlab import pipeline_badge
 {%- endif %}
-from .test import update_coverage_badge
+{% if integrate_pages and git_hosting_service == 'github' -%}
+from .shared import apply_badge, execute, is_ci, logged, open_target, run, run_steps
+{%- else -%}
+from .shared import apply_badge, is_ci, logged, open_target, run, run_steps
+{%- endif %}
+
+VERSION_BADGE = r'(\[!\[Version\]\(https://img\.shields\.io/badge/version-)[^)]+(\))'
 
 
-def update_package_version_badge() -> None:
-    """Update the package version badge in README.md from pyproject.toml."""
-    readme = Path('README.md')
+def update_package_version_badge(*, version: str = '', write: bool = True) -> str | None:
+    """Bring the README's version badge in line with the version in pyproject.toml.
+
+    Args:
+        version: Use this version instead of the one in pyproject.toml. `release.bump` passes
+            the version it is about to write, so the badge can be refreshed *before* `cz bump`
+            runs and be swept into the same commit the release tag points at.
+        write: Update README.md. When False, report what would change and touch nothing.
+
+    Returns:
+        None when the badge is already right, else a one-line reason it is not.
+    """
+    if version:
+        return apply_badge(
+            Path('README.md'),
+            VERSION_BADGE,
+            rf'\g<1>{version}-blue\2',
+            label='version badge',
+            detail=version,
+            write=write,
+        )
     pyproject = Path('pyproject.toml')
-    if not readme.exists() or not pyproject.exists():
-        return
+    if not pyproject.exists():
+        return None
     match = re.search(r'^version\s*=\s*"([^"]+)"', pyproject.read_text(encoding='utf-8'), re.MULTILINE)
     if not match:
-        return
-    version = match.group(1)
-    content = readme.read_text(encoding='utf-8')
-    updated = re.sub(
-        r'(\[!\[Version\]\(https://img\.shields\.io/badge/version-)[^)]+(\))',
-        rf'\g<1>{version}-blue\2',
-        content,
+        return None
+    return apply_badge(
+        Path('README.md'),
+        VERSION_BADGE,
+        rf'\g<1>{match.group(1)}-blue\2',
+        label='version badge',
+        detail=match.group(1),
+        write=write,
     )
-    if updated != content:
-        readme.write_text(updated, encoding='utf-8')
-        print(f'Updated version badge to {version}.')
 
 
-def update_python_badge() -> None:
-    """Update the Python version badge in README.md from pyproject.toml classifiers."""
-    readme = Path('README.md')
+def update_pipeline_badge(context: Context, *, write: bool = True) -> str | None:
+    """Point the CI badge at the host's own status endpoint, derived from `origin`.
+
+    The one derived value whose *content* never goes stale: the host renders the current status
+    on every page load, so this writes a URL once and then has nothing left to do.
+
+    It is also the only one that is not a function of the tree — it comes from `origin`, which is
+    the developer's local configuration. So there is no tree-level answer to "is it stale?", and
+    `write=False` reports nothing: verifying it would fail the gate for a contributor whose
+    remote is legitimately a fork, and demand a change that would point upstream's badge at that
+    fork. Written on `--write` by whoever runs it in the canonical clone, refreshed the same way
+    if the repository moves.
+
+    A project with no readable `origin` has not been pushed anywhere yet, which is likewise not
+    a stale badge, so the placeholder stays.
+
+    Args:
+        context: Invoke context, for reading `origin`.
+        write: Update README.md. When False, report what would change and touch nothing.
+
+    Returns:
+        None when the badge already points at the right place, else a one-line reason.
+    """
+    if not write:
+        return None
+    badge = pipeline_badge(context)
+    if not badge:
+        return None
+    return apply_badge(
+        Path('README.md'),
+        r'\[!\[(?:Build|Pipeline)\]\([^)]+\)\]\([^)]+\)',
+        badge.replace('\\', '\\\\'),
+        label='CI badge',
+        detail="the host's live status endpoint",
+        write=write,
+    )
+
+
+def update_python_badge(*, write: bool = True) -> str | None:
+    """Bring the README's Python badge in line with the classifiers in pyproject.toml.
+
+    Args:
+        write: Update README.md. When False, report what would change and touch nothing.
+
+    Returns:
+        None when the badge is already right, else a one-line reason it is not.
+    """
     pyproject = Path('pyproject.toml')
-    if not readme.exists() or not pyproject.exists():
-        return
+    if not pyproject.exists():
+        return None
     versions = re.findall(
         r'"Programming Language :: Python :: (\d+\.\d+)"',
         pyproject.read_text(encoding='utf-8'),
     )
     if not versions:
-        return
+        return None
     label = '%20%7C%20'.join(versions)
-    content = readme.read_text(encoding='utf-8')
-    updated = re.sub(
+    return apply_badge(
+        Path('README.md'),
         r'(\[!\[Python\]\(https://img\.shields\.io/badge/python-)[^)]+(\))',
         rf'\g<1>{label}-blue?logo=python&logoColor=white\2',
-        content,
+        label='Python badge',
+        detail=' | '.join(versions),
+        write=write,
     )
-    if updated != content:
-        readme.write_text(updated, encoding='utf-8')
-        print(f'Updated Python badge to {" | ".join(versions)}.')
 
 
 @task
@@ -100,10 +161,8 @@ def deploy_github(context: Context) -> None:
 @logged('document')
 def document(context: Context) -> None:
     """Build and open the documentation; reports all failures before exiting."""
-    update_package_version_badge()
-    update_python_badge()
-    update_coverage_badge()
-    update_pyscn_badge()
+    # No badge is written here: "document" is not a command named for changing your README.
+    # `preflight --write` refreshes all five, and the gate names it when one is stale.
     run_steps(build, view)(context)
 
 

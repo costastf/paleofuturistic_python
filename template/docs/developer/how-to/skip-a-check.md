@@ -1,0 +1,69 @@
+# Skip a check, once
+
+You are mid-thought and the commit hook will not let you save, or the push is blocked by
+something you will fix in the next commit anyway. In the order to reach for them:
+
+## Skip one hook by name
+
+```bash
+SKIP=staged git commit -m "wip: half a thought"
+SKIP=preflight git push
+```
+
+`SKIP` is pre-commit's own variable and takes hook `id`s from `.pre-commit-config.yaml`; the
+ones this template ships are `lint-commit`, `staged`, `preflight` and `security-overrides`. It
+takes a list:
+
+```bash
+SKIP=staged,security-overrides git commit -m "…"
+```
+
+Every hook you did not name still runs, and pre-commit prints `Skipped` next to the one you
+did, so the log records what you suspended.
+
+## Fix it instead, if it is quick
+
+The commit hook only ever complains about the files you staged, and formatting is one command:
+
+```bash
+./workflow.cmd format
+git add -u
+```
+
+`format` only rewrites files that are not already formatted, and nothing unformatted reaches
+the default branch — the gate refuses it — so on a project past its first push this touches
+your work and leaves the rest alone. `git add -u` restages tracked changes only, so build
+output stays out of the commit; check `git status` if you had unrelated edits in flight.
+
+The hook prints a narrower command when it is the one complaining:
+`./workflow.cmd format --paths="<the files it checked>"`, which is scoped to your staged Python
+files and safe to paste.
+
+For a blocked push, run the gate directly — it says everything that is wrong in one pass and
+names the fix for each:
+
+```bash
+./workflow.cmd preflight
+```
+
+A stale badge, for instance, is `./workflow.cmd preflight --write` and a commit.
+
+## `--no-verify`, and what it costs
+
+```bash
+git commit --no-verify -m "…"
+git push --no-verify
+```
+
+This switches off *every* hook at that stage, including the commit-message check and, on push,
+the entire gate — and nothing afterwards tells you what was skipped. `SKIP` with a list is
+almost always what you wanted.
+
+## What skipping does not do
+
+CI runs `./workflow.cmd preflight` on every push — the same command the pre-push hook runs — so
+a skipped check is deferred rather than avoided. You hear about it from the pipeline instead, a
+few minutes later and in front of everyone on the pull request.
+
+That is the design: the hooks tell you sooner, and they are not the only thing between a mistake
+and the main branch, which is what makes it safe to skip one when you need to.

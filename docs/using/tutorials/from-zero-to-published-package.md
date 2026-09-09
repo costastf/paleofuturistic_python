@@ -41,7 +41,7 @@ Update the smoke test under `tests/` to match if needed.
 Run the dev cycle once to confirm it's still green:
 
 ```bash
-./workflow.cmd develop.pre-commit
+./workflow.cmd preflight
 ```
 
 Commit:

@@ -16,17 +16,49 @@ The pipeline answers those questions before the questions are asked.
 
 ## Layer 1 — pip-audit
 
-`./workflow.cmd secure.audit` runs [pip-audit](https://github.com/pypa/pip-audit) against `uv.lock`, comparing every pinned package against the [PyPI advisory database](https://github.com/pypa/advisory-database).
+`./workflow.cmd secure.audit` runs [pip-audit](https://github.com/pypa/pip-audit) over every package version in your `uv.lock`, plus `_CI/lib/vendor.txt`, comparing each against the [PyPI advisory database](https://github.com/pypa/advisory-database). `--strict`, so a package the service cannot resolve fails the audit rather than being listed in a skip table under exit 0.
 
-What it catches: a vulnerability with a known CVE/PYSEC ID affecting a version in the lockfile.
+Every version in the lockfile, not a rendering of it. Two narrower forms were tried and both saw less: `pip-audit` with no `-r` enumerates *installed* distributions, so a Linux runner omits whatever a platform marker, an extra or an unsynced group kept out of the venv; `uv export` keeps those markers in the file and pip-audit evaluates them, so the same pins are skipped one step later — on this scaffold an export audited on 3.10 skips `rpds-py==2026.6.3`, which four of the five matrix interpreters install and the SBOM lists. Reading `[[package]]` entries straight out of `uv.lock` has no markers to evaluate and no extras or groups to remember to ask for. One requirement file per version slot, because pip-audit refuses a file that names a package twice and a lockfile legitimately pins two versions behind different markers.
+
+The vendored CI tree needs naming for a different reason: it ships as committed source with no `.dist-info`, so nothing that enumerates installed distributions can see it, and it is code `./workflow.cmd` executes in every job.
+
+What it catches: a vulnerability with a known CVE/PYSEC ID affecting any locked version, or any vendored one.
 
 What it doesn't catch:
 
 - Zero-days (no advisory exists yet).
+- A vendored file edited by hand — `vendor.txt` describes the packages that *should* be there.
+- Anything in `[build-system] requires`, which nothing in this workflow audits.
 - Vulnerabilities in the project's *own* code.
 - Misuse of a safe dependency.
 
-Runs on every CI pipeline.
+**When it runs, and why not on every push.** The audit's answer depends on the advisory
+database at the moment it runs rather than on your branch, so a pull request touching a
+docstring can go red for a CVE published overnight that its author neither introduced nor can
+fix — and a pipeline failing for reasons outside the author's control is one people learn to
+ignore. It is triggered on the axes it varies along instead:
+
+- **On a schedule** (daily), which is what makes the expiry dates in `.security-overrides`
+  load-bearing — a dependency can turn out to be vulnerable, and an override can come due,
+  without anyone pushing anything.
+- **On pushes that change the dependency surface** — `uv.lock`, `_CI/lib/vendor.txt`, the
+  vendored tree and its patches, and `.security-overrides`. Change what you depend on and you
+  own the result. A release lands here too: `version_provider = "uv"` re-locks, so the bump
+  commit carries `uv.lock`, and the commit that publishes is worth auditing anyway. Pushes
+  only: a pull request from a fork triggers nothing here, so the audit that covers a fork's
+  dependencies is the scheduled one, after the merge.
+- **A hand-edited vendored file is watched, not audited.** A push touching `_CI/lib/vendor/`
+  fires the job so the diff reaches a human. No scanner can say anything about a patched
+  vendored source: `vendor.txt` is what pip-audit reads, and it describes the packages that
+  *should* be there.
+- **Before publishing.** `release.dist` audits before it builds. That is the moment the outside
+  world is exposed to these dependencies, and the one place where refusing to proceed protects
+  somebody.
+
+It is deliberately *not* part of `build`. The SBOM is (see Layer 2 — `uv build` ships it inside
+the wheel); the audit is not, because coupling them would mean a newly published CVE making it
+impossible to build a wheel from code that built yesterday. `./workflow.cmd preflight
+--audit-dependencies` runs it locally alongside everything else.
 
 ## Layer 2 — CycloneDX SBOM
 

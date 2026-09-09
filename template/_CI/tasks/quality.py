@@ -1,17 +1,41 @@
 """Quality task definitions."""
 
 import json
-import re
+from functools import partial
 from pathlib import Path
 from typing import cast
 
 from invoke import Collection, Context, Task, task
 
 from .configuration import PYSCN_REPORTS_DIR
-from .shared import execute, is_ci, logged, open_target, run, run_steps
+from .shared import apply_badge, execute, is_ci, logged, note, open_target, run, run_steps
 
 GRADE_COLORS = {'A': 'brightgreen', 'B': 'green', 'C': 'yellow', 'D': 'orange', 'F': 'red'}
-BADGE_PATTERN = re.compile(r'(!\[pyscn quality\]\(https://img\.shields\.io/badge/pyscn-)[^)]+(\)\[)')
+# `--no-open` because pyscn opens the HTML report in a browser itself as soon as it writes one,
+# which would mean two windows from `pyscn-analyze` and one from `pyscn_analyze_only`, whose
+# point is not to. Whether a report is worth opening is this module's decision — `is_ci()` is
+# part of it, and a tool reaching for a browser on a CI runner is not.
+ANALYZE_HTML = 'uv run pyscn analyze --html --no-open src/'
+ANALYZE_JSON = 'uv run pyscn analyze --json src/'
+# Not `--quiet`, despite its help promising "Suppress output unless issues found": it
+# suppresses the issues too. With it a failure reports only "Found 1 quality issue(s)"; without
+# it the same run names the finding — `src/pkg/mod.py:21:1: tangled is too complex (16 > 15)`.
+# Two lines on a passing run buy that one line on a failing one.
+CHECK = 'uv run pyscn check src/'
+BADGE_PATTERN = r'(\[!\[pyscn quality\]\(https://img\.shields\.io/badge/pyscn-)[^)]+(\))'
+
+
+def clear_pyscn_reports() -> None:
+    """Delete every pyscn report, which each caller is about to replace.
+
+    pyscn timestamps its reports, so nothing overwrites anything and `reports/` grows for as
+    long as the project runs its gate. Clearing also decides what happens when an analysis
+    fails: with the directory empty, the badge reports that it has no grade to read instead of
+    certifying one measured against a tree that has since changed.
+    """
+    for suffix in ('html', 'json'):
+        for report in PYSCN_REPORTS_DIR.glob(f'analyze_*.{suffix}'):
+            report.unlink(missing_ok=True)
 
 
 def latest_pyscn_report() -> Path:
@@ -24,66 +48,121 @@ def latest_pyscn_json() -> Path:
     return max(PYSCN_REPORTS_DIR.glob('analyze_*.json'), key=lambda p: p.stat().st_mtime)
 
 
-def update_pyscn_badge() -> None:
-    """Update the pyscn badge in README.md with the grade from the latest report."""
-    readme = Path('README.md')
-    if not readme.exists():
-        return
+def update_pyscn_badge(*, write: bool = True) -> str | None:
+    """Bring the README's pyscn badge in line with the grade in the latest report.
+
+    The grade comes from ``pyscn analyze --json``: ``pyscn check`` reports pass or fail and
+    writes no report, so it has no grade to offer. Anything wanting this badge current runs the
+    analysis first, and a missing report is reported rather than passed over.
+
+    Args:
+        write: Update README.md. When False, report what would change and touch nothing.
+
+    Returns:
+        None when the badge is already right, else a one-line reason it is not.
+    """
     try:
         report = json.loads(latest_pyscn_json().read_text(encoding='utf-8'))
         grade = report['summary']['grade']
     except (ValueError, KeyError, FileNotFoundError):
-        return
+        return f'no pyscn report in {PYSCN_REPORTS_DIR}/ — run ./workflow.cmd quality.pyscn-analyze'
     color = GRADE_COLORS.get(grade, 'lightgrey')
-    content = readme.read_text(encoding='utf-8')
-    updated = re.sub(
-        r'(\[!\[pyscn quality\]\(https://img\.shields\.io/badge/pyscn-)[^)]+(\))',
+    return apply_badge(
+        Path('README.md'),
+        BADGE_PATTERN,
         rf'\g<1>{grade}-{color}\2',
-        content,
+        label='pyscn badge',
+        detail=f'grade {grade}',
+        write=write,
     )
-    if updated != content:
-        readme.write_text(updated, encoding='utf-8')
-        print(f'Updated pyscn badge to grade {grade}.')
 
 
 @task
 @logged('quality.pyscn-analyze')
-def pyscn_analyze(context: Context) -> None:
-    """Run pyscn comprehensive analysis with HTML report."""
-    execute(context, 'uv run pyscn analyze src/')
-    execute(context, 'uv run pyscn analyze --json src/')
-    update_pyscn_badge()
+def pyscn_analyze(context: Context, write: bool = False) -> None:
+    """Run pyscn comprehensive analysis with HTML report, and open it.
+
+    Reports whether the badge still matches the grade it just measured; `--write` updates it.
+    Opt-in because "analyze" names an inspection, and an inspection should not modify the tree
+    unasked. It may write when asked because it produced the grade the badge shows.
+
+    Args:
+        context: Invoke context.
+        write: Update the README's pyscn badge from this analysis.
+    """
+    clear_pyscn_reports()
+    execute(context, ANALYZE_HTML)
+    execute(context, ANALYZE_JSON)
+    note(update_pyscn_badge(write=write))
     if not is_ci():
         open_target(context, str(latest_pyscn_report()))
 
 
 @task
 @logged('quality.pyscn-check')
-@run('uv run pyscn check src/')
+@run(CHECK)
 def pyscn_check(context: Context) -> None:
-    """Run pyscn CI-friendly quality gate."""
+    """Run pyscn's CI-friendly quality gate.
+
+    Not the same judgment as the badge. This applies hard per-dimension thresholds — a function
+    over the complexity limit, critical dead code, a dependency cycle — and fails. `analyze`
+    computes a lenient aggregate and never fails: a module with a 16-branch function grades A
+    while this rejects it. So the two invocations in `preflight` are not a duplicate — one
+    produces the grade the badge shows, the other decides whether the tree passes.
+    """
 
 
 @logged('quality.pyscn-analyze')
-def pyscn_analyze_only(context: Context) -> None:
-    """Run pyscn analyze without opening the report."""
-    execute(context, 'uv run pyscn analyze src/')
-    execute(context, 'uv run pyscn analyze --json src/')
-    update_pyscn_badge()
+def pyscn_analyze_only(context: Context, *, write: bool = False) -> None:
+    """Run pyscn analyze without opening the report.
+
+    Two analyses: pyscn refuses more than one output format per run — ``--html --json`` fails
+    with "only one output format flag can be specified" — so each format costs a full analysis
+    and prints its own summary table. ``pyscn_json_report`` is the path for callers needing one.
+    """
+    clear_pyscn_reports()
+    execute(context, ANALYZE_HTML)
+    execute(context, ANALYZE_JSON)
+    note(update_pyscn_badge(write=write))
+
+
+@logged('quality.pyscn-analyze')
+def pyscn_json_report(context: Context) -> None:
+    """Produce just the JSON report, which is all the badge is derived from.
+
+    The gate's path. An HTML report exists to be looked at, and nothing in `preflight` or a hook
+    looks at one, so a second full analysis and a second summary table would buy nothing.
+    `quality.pyscn-analyze` opens what it produces, which is where that is worth paying for.
+
+    The badge is not written here: `preflight` owns every write to a tracked file, so verifying
+    can compare all of them together.
+    """
+    clear_pyscn_reports()
+    execute(context, ANALYZE_JSON)
 
 
 @task
 @logged('quality.pyscn')
-def pyscn(context: Context) -> None:
-    """Run all pyscn steps; reports all failures before exiting."""
-    run_steps(pyscn_analyze_only, pyscn_check)(context)
+def pyscn(context: Context, write: bool = False) -> None:
+    """Run all pyscn steps; reports all failures before exiting.
+
+    Args:
+        context: Invoke context.
+        write: Update the README's pyscn badge from this analysis.
+    """
+    run_steps(partial(pyscn_analyze_only, write=write), pyscn_check)(context)
 
 
 @task
 @logged('quality')
-def quality(context: Context) -> None:
-    """Run all quality steps; reports all failures before exiting."""
-    run_steps(pyscn)(context)
+def quality(context: Context, write: bool = False) -> None:
+    """Run all quality steps; reports all failures before exiting.
+
+    Args:
+        context: Invoke context.
+        write: Update the README's pyscn badge from this analysis.
+    """
+    run_steps(partial(pyscn, write=write))(context)
 
 
 namespace = Collection('quality')

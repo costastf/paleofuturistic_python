@@ -16,9 +16,15 @@ The scaffold ships pytest + a small set of plugins (coverage, xdist, html, env, 
 
 ## Layer 2 — Coverage
 
-`pytest-cov` runs alongside pytest. The scaffold tracks branch coverage (not just line coverage) and writes HTML + JSON reports under `reports/`.
+`pytest-cov` runs alongside pytest. The scaffold tracks branch coverage (not just line coverage) and writes the JSON report the badge and the ratchet read to `reports/`. `./workflow.cmd test.coverage` renders the browsable HTML when you want it.
 
 `pyproject.toml`'s `[tool.coverage.report]` has `fail_under` set, and the test task **ratchets** this value upward after each green run: if the latest coverage run was 87% and `fail_under` was 80%, the task bumps `fail_under` to 87%. Once engaged, the bar only goes up — lowering `fail_under` is a deliberate, reviewable change that shows up in the diff.
+
+**What a raised bar looks like when it stops you.** The floor is a property of the tree, so
+`preflight` fails a push whose coverage sits below it — including a push that only moved code
+around, or one that added a module faster than its tests. The run names the number it measured
+and the floor it missed. Two honest ways out: cover the new code, or lower `fail_under` in the
+same commit, where a reviewer sees the bar move. Nothing in the workflow lowers it for you.
 
 ### Dormant during scaffold
 
@@ -40,6 +46,28 @@ Coverage regressions still can't slip in silently — they just can't slip in *o
 
 tox + tox-uv runs the test suite against every Python version in the project's range. Configured in `pyproject.toml`'s `[tool.tox]`, generated from the Python version range chosen at generation time.
 
+**Coverage across the matrix is a union, not an average.** Each env writes its own coverage data (`.coverage.<envname>`, consumed by the combine) and its own report (`reports/coverage.<envname>.json`); `test.tox` then runs `coverage combine` to produce the single `reports/coverage.json` the badge and the ratchet read. A line counts as covered if *any* interpreter executed it.
+
+The gate stops at that JSON: `preflight` produces what it consumes and nothing else, so it
+renders no browsable report — the same reason it asks pyscn for JSON only. `./workflow.cmd
+test.coverage` renders the combined HTML from whatever the last run measured, and
+`./workflow.cmd test.view` runs the tests and opens it.
+
+A union is the only correct reading of a version matrix, and version-gated code shows why:
+
+```python
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
+```
+
+Under the oldest interpreter the `else` runs; under the newer ones the `if` does. No single env covers both, so each reports a miss on code the matrix as a whole exercises completely: on a scaffold with one such branch, each env reports 84.6% with one missing line and one missing branch, while the combined report is 100% with none. Averaging the percentages would give 84.6% for code that is fully exercised.
+
+The union does not tell you that a line reached only under the newest interpreter also works under the oldest. Coverage measures reach, not correctness; the tests check the latter on every interpreter.
+
+One consequence: because the ratchet bumps `fail_under` against the union, trimming `env_list` later can genuinely lower measured coverage and fail the next run. That is the ratchet working, and lowering the bar is a deliberate, reviewable change as it is everywhere else.
+
 `./workflow.cmd test` runs only one Python version (whichever the active uv venv resolved to). The full matrix runs in CI per shipped workflow, or locally via `./workflow.cmd test.tox` — see [Run tests for one Python version](../how-to/run-tests-for-one-python-version.md) for slicing it.
 
 ## What we don't ship
@@ -55,7 +83,7 @@ The scaffold generated one smoke test — a `tests/test_<slug>.py` that exercise
 
 ## Parallel execution
 
-`pytest-xdist` runs tests across CPU cores by default (`-n auto` in the pytest config). Some tests don't play well with parallelism — anything touching the filesystem in a fixed location, or relying on shared global state.
+`pytest-xdist` runs tests across four cores by default (`-n 4` in the pytest config). Some tests don't play well with parallelism — anything touching the filesystem in a fixed location, or relying on shared global state.
 
 For those, add `@pytest.mark.serial` and a corresponding `-m "not serial"` / `-m serial` two-pass setup. The scaffold doesn't ship this scaffolding because most projects don't need it.
 

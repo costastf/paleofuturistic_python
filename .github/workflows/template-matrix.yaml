@@ -74,4 +74,5 @@ jobs:
           ./workflow.cmd test.combo \
             --git-hosting-service ${{ matrix.combo.git_hosting_service }} \
             ${{ matrix.combo.integrate_dependency_track && '' || '--no-integrate-dependency-track' }} \
-            ${{ matrix.combo.integrate_pages && '' || '--no-integrate-pages' }}
+            ${{ matrix.combo.integrate_pages && '' || '--no-integrate-pages' }} \
+            ${{ matrix.combo.mature && '--mature' || '' }}

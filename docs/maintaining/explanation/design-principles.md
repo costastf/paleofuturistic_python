@@ -76,3 +76,4 @@ The four sections — Tutorials, How-to, Reference, Explanation — exist becaus
 
 - [Why copier?](why-copier.md) — why we picked the template format we did.
 - [History and lineage](history-and-lineage.md) — what this template was forked from and why.
+- [Decisions not taken](decisions-not-taken.md) — proposals the template declines, and what would change the answer.

@@ -14,11 +14,14 @@ from .configuration import OIDC_ENV_VARS, OWASP_DTRACK_SETTINGS, SBOM_FILE, UV_P
 {%- else %}
 from .configuration import OIDC_ENV_VARS, SBOM_FILE, UV_PUBLISH_SETTINGS
 {%- endif %}
+from .document import update_package_version_badge
 from .{{ git_hosting_service }} import create_release_pr, pr_create_url
 {%- if integrate_dependency_track %}
-from .secure import sbom_upload
+from .secure import audit, sbom_upload
+{%- else %}
+from .secure import audit
 {%- endif %}
-from .shared import commit, execute, logged
+from .shared import commit, execute, logged, note
 
 
 @task
@@ -76,7 +79,18 @@ def validate(context: Context) -> None:
 @task
 @logged('release.bump')
 def bump(context: Context, increment: str = '') -> None:
-    """Bump the version and create a git tag.
+    """Bump the version, refresh the version badge, and create a git tag.
+
+    The badge is refreshed *before* `cz bump`, so it lands in the commit the release tag points
+    at: `cz bump` commits every modified tracked file — verified, a README edited beforehand is
+    swept into its commit — which is also why `release` runs `validate` first to insist on a
+    clean tree. Otherwise the release would land a README contradicting the version it
+    released, and the next `preflight` on main would fail on the stale badge.
+
+    Writing before the step that can fail means putting the badge back when it does. `cz bump`
+    refuses on a dirty tree, an unparseable history or a hook it cannot satisfy, and a badge
+    announcing a version nobody released is worse than the failure that caused it. The restore
+    reads the version from pyproject.toml, which a failed bump has not touched.
 
     Args:
         context: Invoke context.
@@ -89,10 +103,19 @@ def bump(context: Context, increment: str = '') -> None:
         print('Usage: ./workflow.cmd release -i <increment>')
         print(f'  increment: {", ".join(valid)}')
         raise SystemExit(1)
-    if increment in prerelease_types:
-        execute(context, f'uv run cz bump --increment patch --prerelease {increment} --allow-no-commit --yes')
-    else:
-        execute(context, f'uv run cz bump --increment {increment} --allow-no-commit --yes')
+    note(update_package_version_badge(version=resolve_next_version(context, increment)))
+    try:
+        if increment in prerelease_types:
+            execute(context, f'uv run cz bump --increment patch --prerelease {increment} --allow-no-commit --yes')
+        else:
+            execute(context, f'uv run cz bump --increment {increment} --allow-no-commit --yes')
+    except SystemExit:
+        # A failed bump leaves the version in pyproject.toml alone, so writing the badge from
+        # pyproject.toml puts back exactly what was there — through the same substitution that
+        # changed it, so there is still one writer.
+        note(update_package_version_badge())
+        print('Version badge restored: the bump it announced did not happen.')
+        raise
 
 
 @task
@@ -143,8 +166,14 @@ def dist(context: Context) -> None:
     building and uploading them — CI attests their provenance there. Anything that inspects
     ``dist/`` must run against the exact files that get published, which is why ``publish
     --prebuilt`` exists rather than simply building a second time.
+
+    The dependency audit runs here rather than inside ``build``. Publishing is the moment the
+    outside world is exposed to what these dependencies contain, so it is the moment worth
+    blocking on a live advisory; merely building a wheel locally is not, and coupling the two
+    meant a new CVE could stop a hotfix from being built at all.
     """
     clean(context)
+    audit(context)
     build(context)
 
 
