@@ -1853,12 +1853,10 @@ def test_the_staged_bundle_defaults_to_what_is_staged(generated_project):
     assert 'paths or staged_files(context)' in body, 'an explicit --paths no longer wins'
     assert 'Nothing staged' in body, 'an empty index is not reported'
 
-    # One reader, in `shared.py`, because `format --staged` asks the same question. A space in a
-    # staged path has to fail loudly: `--paths` is space-separated the whole way down, so such a
-    # path would otherwise split into fragments that match no step's filter and be dropped,
-    # leaving the hook to pass because it checked nothing at all.
-    shared = (project / '_CI' / 'tasks' / 'shared.py').read_text(encoding='utf-8')
-    reader = shared.split('def staged_files', 1)[1].split('\ndef ', 1)[0]
+    # A space in a staged path has to fail loudly: `--paths` is space-separated the whole way
+    # down, so such a path would otherwise split into fragments that match no step's filter and
+    # be dropped, leaving the hook to pass because it checked nothing at all.
+    reader = source.split('def staged_files', 1)[1].split('\ndef ', 1)[0]
     assert 'git diff --cached --name-only' in reader, 'the staged bundle no longer reads the index'
     assert 'splitlines()' in reader, 'the index is split on whitespace, so a path with a space breaks up'
     assert 'unsupported' in reader, 'a staged path containing a space is not refused'
@@ -2101,31 +2099,32 @@ def test_the_push_hook_names_every_check_it_runs(generated_project):
         assert phrases[name] in gate['name'], f'{name!r} runs on every push and the hook does not say so'
 
 
-def test_formatting_what_is_staged_needs_no_shell(generated_project):
-    """`format --staged` reads the index itself, and the how-to no longer builds a path list.
+def test_the_formatting_failure_names_a_command_you_can_paste(generated_project):
+    """The gate's fix hint is scoped to the files it checked, and needs no shell of its own.
 
-    The recipe was `--paths="$(git diff --cached --name-only)"`, which had three failure modes:
-    an empty index reformatted the whole tree — the exact hazard the paragraph beneath it warns
-    about — staged Markdown failed on ruff's experimental-formatter error, and a staged
-    deletion failed on a missing file.
+    A how-to once told readers to assemble the list themselves —
+    `format --paths="$(git diff --cached --name-only)"` — which broke three ways: an empty index
+    reformatted the whole tree, staged Markdown hit ruff's experimental-formatter error, and a
+    staged deletion hit a missing file. The step that reports the failure already holds a list
+    with none of those problems, having been through `CODE_FILES` and the index reader, so it
+    prints the command instead of describing it. No flag was needed for that.
     """
     project, _ = generated_project
-    body = (project / '_CI' / 'tasks' / 'format_.py').read_text(encoding='utf-8')
-    task_body = body.split("@logged('format')", 1)[1]
-    assert 'staged: bool = False' in task_body, 'there is no way to format just what is staged'
-    assert 'CODE_FILES.match(path)' in task_body, (
-        "the formatter has its own idea of which files are the project's, so the two can drift"
-    )
-    assert 'No staged Python files' in task_body, 'an empty index falls back to the whole tree'
+    source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
+    body = source.split('def formatting', 1)[1].split('\ndef ', 1)[0]
+    assert '--paths=' in body, 'the fix hint is not scoped to what was checked'
+    assert 'if paths else' in body, 'a whole-project run is told to fix a path list it never had'
+
+    formatter = (project / '_CI' / 'tasks' / 'format_.py').read_text(encoding='utf-8')
+    assert '--staged' not in formatter, 'the formatter grew a flag for what the hint already does'
+    assert 'staged_files' not in formatter, 'the formatter reads the index itself again'
+
     how_to = (project / 'docs' / 'developer' / 'how-to' / 'skip-a-check.md').read_text(encoding='utf-8')
-    assert 'format --staged' in how_to, 'the how-to does not name the flag'
-    assert 'git diff --cached --name-only' not in how_to, 'the how-to still assembles a path list'
-    # In the commands, not in the prose: the paragraph beneath them explains what `git add -A`
-    # would do, which is the reason the recipe does not use it.
     commands = [
         line.strip() for index, block in enumerate(how_to.split('```')) if index % 2 for line in block.splitlines()
     ]
     assert 'git add -A' not in commands, 'the how-to sweeps the whole tree into the commit again'
+    assert not any('$(' in command for command in commands), 'the how-to assembles a path list in the shell again'
 
 
 def git(repository, *arguments: str, check: bool = True):

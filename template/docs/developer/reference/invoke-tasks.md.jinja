@@ -13,7 +13,7 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 | --- | --- | --- |
 | `bootstrap` | `develop.bootstrap` | First-run setup; idempotent. Pass `--force` to re-run. |
 | `preflight` | `preflight.all` | **Everything, then the derived files.** The one to run before opening a pull request. |
-| `format` | `format.ruff` | Ruff format + import sort. `--staged` limits it to the Python files you staged, `--paths="<paths>"` to files you name. |
+| `format` | `format.ruff` | Ruff format + import sort. `--paths="<paths>"` limits it to files you name; the commit hook prints that command scoped to whatever it just checked. |
 | `lint` | `lint.all` | Runs ruff, pylint, ty, complexipy, commitizen. |
 | `test` | `test.all` | pytest with coverage and xdist. |
 | `build` | `build.package` | SBOM compose + validate, then `uv build`. No dependency audit — see `secure` — and no README badge: the CI badge points at {% if git_hosting_service == 'github' %}GitHub's workflow-status endpoint{% else %}GitLab's pipeline-status endpoint{% endif %}, which is always current. |

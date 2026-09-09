@@ -5,8 +5,8 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .configuration import CODE_FILES, PATHS
-from .shared import execute, logged, run_steps, staged_files
+from .configuration import PATHS
+from .shared import execute, logged, run_steps
 
 
 @task
@@ -25,29 +25,18 @@ def ruff_format(context: Context, paths: str = '') -> None:
 
 @task
 @logged('format')
-def format_(context: Context, paths: str = '', staged: bool = False) -> None:
+def format_(context: Context, paths: str = '') -> None:
     """Run all formatting steps; reports all failures before exiting.
+
+    Formatting is idempotent and the gate refuses unformatted code, so on a project whose
+    pushes have passed that gate this rewrites your unformatted files and nothing else. When
+    something narrower is wanted, `--paths` takes the list — and the commit hook prints that
+    exact command, already scoped to the files it checked.
 
     Args:
         context: Invoke context.
         paths: Space-separated paths to format. Defaults to the project's standard paths.
-        staged: Format the Python files staged for commit. For fixing what the commit hook just
-            complained about without reformatting files you never opened — the whole-tree
-            default would sweep those into the same commit.
     """
-    if staged and paths:
-        print('--staged and --paths both say what to format. Pass one.')
-        raise SystemExit(1)
-    if staged:
-        # `CODE_FILES`, the same pattern the gate's per-file steps use, so the formatter's
-        # domain and the checks' domain cannot drift: a staged `docs/generate.py` is not
-        # something bare `format` touches either. That also excludes Markdown, which ruff
-        # refuses outright ("Markdown formatting is experimental"). `staged_files` has already
-        # dropped what git no longer has a file for.
-        paths = ' '.join(path for path in staged_files(context).split() if CODE_FILES.match(path))
-        if not paths:
-            print('No staged Python files, so nothing to format.')
-            return
     run_steps(partial(ruff_format, paths=paths))(context)
 
 

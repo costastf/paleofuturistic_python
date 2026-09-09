@@ -40,6 +40,7 @@ never touches is a tracked file.
 import re
 from collections.abc import Callable, Iterator
 from functools import partial
+from pathlib import Path
 from typing import NamedTuple, cast
 
 from invoke import Collection, Context, Task, task
@@ -51,7 +52,7 @@ from .document import update_package_version_badge, update_pipeline_badge, updat
 from .lint import commitizen, complexipy, format_check, pylint, ruff_lint, ty
 from .quality import pyscn_check, pyscn_json_report, update_pyscn_badge
 from .secure import audit
-from .shared import logged, run_steps, staged_files
+from .shared import logged, run_steps
 from .test import ratchet_fail_under, tox_matrix, update_coverage_badge
 
 PER_FILE = 'per-file'
@@ -90,7 +91,10 @@ class Step(NamedTuple):
 def formatting(context: Context, paths: str = '') -> None:
     """Verify formatting, and name the command that fixes it.
 
-    The gate reports rather than reformats, so it owes the reader the way out.
+    The gate reports rather than reformats, so it owes the reader the way out — and when it was
+    given paths, the way out is scoped to them. Those paths have already been through
+    ``CODE_FILES`` and the index reader, so they are Python files that exist: the command below
+    is safe to paste, which a path list a reader assembles in the shell is not.
 
     Raises:
         SystemExit: If anything is not formatted.
@@ -98,7 +102,8 @@ def formatting(context: Context, paths: str = '') -> None:
     try:
         format_check(context, paths=paths)
     except SystemExit:
-        print('Run `./workflow.cmd format` to fix the formatting reported above.')
+        fix = f'./workflow.cmd format --paths="{paths}"' if paths else './workflow.cmd format'
+        print(f'Run `{fix}` to fix the formatting reported above.')
         raise
 
 
@@ -305,6 +310,38 @@ def run_scope(
         print('write that would be true of this tree. Fix what failed above and run it again.')
     if failed:
         raise SystemExit(1)
+
+
+def staged_files(context: Context) -> str:
+    """Return the files staged for commit, space-separated, or an empty string if none are.
+
+    Additions, copies, modifications and renames — not deletions, which have nothing left to
+    check. Nor a path staged as an addition and then deleted from the worktree, which git
+    reports as `AD` and no filter on the status letters can exclude: the file has to exist for
+    a tool to read it, so existence is what is checked. `git` failing at all (no repository, no
+    index) also reads as "nothing staged": this task is defined in terms of the index, so an
+    absent one means there is no work, not an error to raise.
+
+    Raises:
+        SystemExit: If a staged path contains a space. `--paths` is space-separated the whole
+            way down, so such a path cannot be forwarded; this refuses loudly rather than
+            letting it split into fragments that match no filter and are quietly skipped.
+    """
+    result = context.run('git diff --cached --name-only --diff-filter=ACMR', hide=True, warn=True)
+    if result is None or result.failed:
+        return ''
+    # Split on lines, not whitespace, so a path containing a space arrives intact and can be
+    # refused below rather than silently becoming two paths that match no filter and get
+    # dropped — a hook that passes because it checked nothing is worse than one that fails.
+    entries = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    unsupported = [path for path in entries if ' ' in path]
+    if unsupported:
+        print(f'Cannot check staged paths containing spaces: {", ".join(unsupported)}')
+        print('`--paths` is space-separated throughout this workflow, so such a path cannot be')
+        print('forwarded to the tools. Rename it, or check the whole project with')
+        print('`./workflow.cmd preflight`.')
+        raise SystemExit(1)
+    return ' '.join(path for path in entries if Path(path).exists())
 
 
 @task

@@ -127,38 +127,6 @@ def indented_streams(prefix: str) -> Iterator[None]:
         sys.stdout, sys.stderr = original_out, original_err
 
 
-def staged_files(context: Context) -> str:
-    """Return the files staged for commit, space-separated, or an empty string if none are.
-
-    Additions, copies, modifications and renames — not deletions, which have nothing left to
-    check. Nor a path staged as an addition and then deleted from the worktree, which git
-    reports as `AD` and no filter on the status letters can exclude: the file has to exist for
-    a tool to read it, so existence is what is checked. `git` failing at all (no repository, no
-    index) also reads as "nothing staged": this task is defined in terms of the index, so an
-    absent one means there is no work, not an error to raise.
-
-    Raises:
-        SystemExit: If a staged path contains a space. `--paths` is space-separated the whole
-            way down, so such a path cannot be forwarded; this refuses loudly rather than
-            letting it split into fragments that match no filter and are quietly skipped.
-    """
-    result = context.run('git diff --cached --name-only --diff-filter=ACMR', hide=True, warn=True)
-    if result is None or result.failed:
-        return ''
-    # Split on lines, not whitespace, so a path containing a space arrives intact and can be
-    # refused below rather than silently becoming two paths that match no filter and get
-    # dropped — a hook that passes because it checked nothing is worse than one that fails.
-    staged = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    unsupported = [path for path in staged if ' ' in path]
-    if unsupported:
-        print(f'Cannot check staged paths containing spaces: {", ".join(unsupported)}')
-        print('`--paths` is space-separated throughout this workflow, so such a path cannot be')
-        print('forwarded to the tools. Rename it, or check the whole project with')
-        print('`./workflow.cmd preflight`.')
-        raise SystemExit(1)
-    return ' '.join(path for path in staged if Path(path).exists())
-
-
 def is_ci() -> bool:
     """Detect CI environment (GitHub Actions, GitLab CI, etc.)."""
     return os.environ.get('CI', '').lower() == 'true'

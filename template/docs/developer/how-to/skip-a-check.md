@@ -26,12 +26,18 @@ did, so the log records what you suspended.
 The commit hook only ever complains about the files you staged, and formatting is one command:
 
 ```bash
-./workflow.cmd format --staged
+./workflow.cmd format
 git add -u
 ```
 
-`--staged` reads the index and formats the Python files in it, because `format` over the whole
-tree reformats files you never opened and `git add -A` would then fold them into this commit.
+`format` only rewrites files that are not already formatted, and nothing unformatted reaches
+the default branch — the gate refuses it — so on a project past its first push this touches
+your work and leaves the rest alone. `git add -u` restages tracked changes only, so build
+output stays out of the commit; check `git status` if you had unrelated edits in flight.
+
+The hook prints a narrower command when it is the one complaining:
+`./workflow.cmd format --paths="<the files it checked>"`, which is scoped to your staged Python
+files and safe to paste.
 
 For a blocked push, run the gate directly — it says everything that is wrong in one pass and
 names the fix for each:
