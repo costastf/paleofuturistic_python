@@ -35,10 +35,9 @@ When the command finishes you'll have a complete Python project inside `<destina
 
 ```bash
 cd <your-project-slug>
-git init
+git init -b main
 git add --all
 git commit -m "chore: initial commit"
-git branch -M main
 ./workflow.cmd bootstrap
 ```
 
@@ -57,7 +56,7 @@ These commands are the heartbeat of every project this template generates:
 ./workflow.cmd test      # test with pytest (in parallel with xdist using the active Python interpreter)
 ./workflow.cmd quality   # scan code quality with pyscn
 ./workflow.cmd build     # produce a wheel + sdist in dist/ and export an SBOM
-./workflow.cmd secure    # alert on vulnerable dependencies with pip-audit (also produce an SBOM and validate pip-audit security overrides)
+./workflow.cmd secure    # alert on vulnerable dependencies with pip-audit (also produce an SBOM and lint pip-audit security overrides)
 ```
 
 You should see a passing test for the example `hello()` function and a wheel appear under `dist/`.
@@ -79,8 +78,12 @@ It will perform all checks above, except for the pip-audit from `secure`, becaus
 (Today's green might be red tomorrow for pip-audit.)
 If you want those checks as well, then add the flag `--audit-dependencies`.
 
-The `--write` flag makes the command update the badges in the documentation based on the state of your project.
-Without the flag the command will fail if it detects stale badges.
+The `--write` flag makes the command update the badges in the README.md based on the state of your project.
+(The README is synched to your docs' index by default.)
+A fresh project needs the `--write` on first run to set the badges to a correct value.
+The default use is without that flag.
+Then it will fail on stale badges.
+
 Next to that, preflight runs pytest over all Python interpreters (with tox) and checks if the documentation renders correctly.
 Preflight is also the command that executes before making a git push; more on that later.
 

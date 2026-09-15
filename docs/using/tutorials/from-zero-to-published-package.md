@@ -55,8 +55,10 @@ This might fail if you did some more exotic edits than the example above.
 Don't worry.
 Preflight will tell you what to fix, do that commit and then try to push again.
 
-Go to you git remote.
-The pipelines should have started running that will culminate in running all preflight checks again, but now for the whole world to see it go green.
+Go to your git remote.
+A couple of pipelines will start running.
+For now only Continuous Integration is the interesting one.
+It runs the same preflight as before, this time where everyone can see its outcome.
 
 ## Step 3 — Cut the release
 
@@ -68,9 +70,9 @@ The `-i minor` is your explicit choice. Valid values: `major`, `minor`, `patch`,
 
 This task:
 
-1. Validates the working tree is clean and synced with origin.
+1. Validates the working tree is clean and synched with origin.
 2. Creates a `release/<version>` branch off `main`.
-3. Bumps the version, writes the changelog, updates the docs badge, commits all.
+3. Bumps the version, writes the changelog, updates the version badge, commits all.
 4. Pushes the branch and the new `vX.Y.Z` tag.
 5. Opens a release pull request on your git host (GitHub: via API if `GITHUB_TOKEN` is set, otherwise prints a manual URL; GitLab: prints a manual URL).
 
@@ -102,4 +104,4 @@ Where to go next:
 - Look at the (developer) docs in your templated project. It will guide you on practical things, like adding dependencies.
 - [Update an existing project with copier](../how-to/update-existing-project-with-copier.md) — bring future template improvements into this project.
 - [Design principles](../../maintaining/explanation/design-principles.md) — why the template made the choices it did.
-- When you feel comfortable developing in a project molded by this template [activate the test coverage ratchet](../../using/explanation/testing-strategy.md).
+- When you feel comfortable developing in a project molded by this template [activate the test coverage ratchet](../explanation/testing-strategy.md).
