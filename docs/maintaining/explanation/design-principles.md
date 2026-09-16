@@ -12,6 +12,76 @@ Two side-effects of this rule earn the rule a section of its own:
 
 **And those commands lean on tracked dependencies.** When a `properdocs` / `uv` / `pytest` invocation can do a CI step, we prefer it over a GitHub Action, because every Python dependency is pinned in `uv.lock` and surfaces in the project SBOM. Action dependencies are hidden inside `uses:` references and never appear in the supply-chain picture. Concretely: `properdocs gh-deploy` over `actions/upload-pages-artifact` + `actions/deploy-pages`; `./workflow.cmd test` over inline `pytest` invocations; and so on. Two scaffolding actions are unavoidable (`actions/checkout` to fetch the repo, `astral-sh/setup-uv` to bootstrap the toolchain itself when the deps image isn't used) — beyond that, prefer commands.
 
+## The QA gate
+
+The **QA gate** is not a command; it is the role a command plays. `preflight` with no flags is the gate: it
+runs every check, compares every derived value against what the tools just measured, writes nothing,
+and exits non-zero if anything is wrong or out of date. "The gate" is the short form used from here
+on; the individual tools it runs — `format`, `lint`, `test`, `quality`, `build` — are the QA checks. That is what the pre-push hook runs and what
+the CI pipeline runs, character for character. The commit hook runs the part of the same declaration
+that can be judged from the files you staged.
+
+Give `preflight` the `--write` flag and it stops being a gate: the same steps run, but the derived
+files are updated instead of compared.
+
+Eight rules hold this together, and they fall into two kinds. The first kind is about how the checks
+run. The second is about who may write the values the checks later compare — which belongs here
+because it is what makes comparing meaningful: a gate can only hold a badge to a measurement if
+exactly one thing ever writes that badge, and only from a run that measured it.
+
+### How the checks run
+
+**One registry, three consumers.** `STEPS` in `_CI/tasks/preflight.py` declares every check once,
+with its scope, its path filter and whether it writes. The commit hook, the pre-push hook and the CI
+job read that declaration rather than keeping their own lists, so a check added there reaches all
+three without editing three files — and two lists of checks can never disagree about what "green"
+means.
+
+**Scope decides the tier.** A check that answers correctly from the staged files alone runs on every
+commit; one that needs the whole program runs on push. ty needs the callers of a changed signature,
+pyscn needs every file to know what is dead or duplicated, the matrix needs the suite on every
+interpreter, and a wheel builds from the whole tree or not at all. This is a rule about correctness
+rather than speed: a whole-program check narrowed to a diff does not run faster, it answers wrongly.
+
+**One run reports everything you must fix.** Steps keep running after one fails, and the run exits
+non-zero at the end. A gate that stops at the first failure makes you re-run to discover the second,
+and the steps are ordered cheapest-first so the verdict itself is early even when the run is not.
+
+**The gate produces what the gate consumes.** Every report a gate run writes has a reader inside that
+run — the coverage JSON the badge reads, the pyscn JSON the grade comes from. Nothing renders a
+browsable HTML report that no hook and no pipeline opens; `test.coverage` and `quality.pyscn-analyze`
+produce those on demand, for a human who asked.
+
+### Who may write what the checks measure
+
+**Verifying is the default; writing is a flag.** The bare command compares; `--write` updates. So the
+gate needs no flag, and reproducing a pipeline failure means typing what you see in the log. The
+general form is about names: a command named for an inspection may not modify the tree, and one named
+for a mutation may — which is why `format` and `release.bump` write without being asked and nothing
+else does.
+
+**A derived value is written by whatever measured it.** The coverage badge is written by the command
+that ran the matrix, the pyscn badge by the command that produced the grade, the version badge by the
+command that bumps the version. No task refreshes a value it did not compute, because a value copied
+from a report nobody just produced is a claim about a tree that may no longer exist.
+
+**A name carries a scope.** `reports/coverage.json` means coverage across every interpreter in
+`env_list`; `reports/coverage.py310.json` means one of them; `coverage.local.json` means whichever one
+a bare `pytest` happened to use. Whatever writes one of those names has to be running at that scope,
+because the readers cannot tell — the badge and the ratchet read a filename, not a provenance.
+
+**Flags add; they never subtract.** The bare command is the narrow, read-only one: `--write` updates
+derived files, `--audit-dependencies` adds a step. No flag makes a gate check less, a gate you can
+quietly weaken being one that stops meaning anything. `env_list` in `pyproject.toml` is what shortens
+the test matrix, and it shortens CI with it.
+
+One consequence of the two kinds meeting: the derived-value steps are skipped once anything has
+failed, in either mode. A badge computed from a tree that just failed its checks asserts something
+untrue about it, so there is nothing for `--write` to write and nothing for the gate to compare.
+
+Together these are what make one command mean the same thing in three places. The proposals this
+shape declines are in [Decisions not taken](decisions-not-taken.md).
+
 ## uv is the only tool you install
 
 Earlier revisions asked users to install Python, then `pipx`, then `tox`, then `pre-commit`, then `commitizen`. Today, every one of those is a uv-managed dependency group inside the generated project. You install uv; uv installs the rest.

@@ -4,9 +4,12 @@ Things a reviewer has proposed more than once, that the template deliberately do
 entry says what would change the answer, so the question can be reopened with evidence rather
 than re-argued from scratch.
 
+Several entries concern the [QA gate](design-principles.md#the-qa-gate) — `preflight` run read-only,
+which is what the pre-push hook and the CI pipeline run. "The gate" below is that.
+
 ## Fork pull requests run no pipeline
 
-The gate workflow triggers on `push` only. A pull request from a fork therefore runs nothing:
+The QA gate's workflow triggers on `push` only. A pull request from a fork therefore runs nothing:
 no `preflight`, no dependency audit. The scheduled audit covers the dependencies after a merge,
 and a maintainer pushing the branch runs the full gate.
 

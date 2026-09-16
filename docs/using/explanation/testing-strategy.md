@@ -41,7 +41,8 @@ tox + tox-uv runs the test suite against every Python version in the project's r
 
 **Coverage across the matrix is a union, not an average.** Each env writes its own coverage data (`.coverage.<envname>`, consumed by the combine) and its own reports (`reports/coverage.<envname>.json`, `reports/tests.<envname>.html`); `test.tox` then runs `coverage combine` to produce the single `reports/coverage.json` the badge and the ratchet read. A line counts as covered if *any* interpreter executed it.
 
-The gate stops at that JSON: `preflight` produces what it consumes and nothing else, so it
+The [QA gate](../../maintaining/explanation/design-principles.md#the-qa-gate) stops at that JSON:
+`preflight` produces what it consumes and nothing else, so it
 renders no browsable report — the same reason it asks pyscn for JSON only. `./workflow.cmd
 test.coverage` renders the combined HTML from whatever the last run measured, and
 `./workflow.cmd test.view` runs the tests and opens it.

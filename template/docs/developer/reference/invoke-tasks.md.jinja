@@ -33,7 +33,7 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 It checks four badges: coverage and pyscn from the reports the run just produced, and version
 and Python range from `pyproject.toml`. The fifth, the CI badge, is *written* by `--write` and
 never checked — its URL comes from `git remote get-url origin`, which is a fact about your
-clone rather than about this tree, so a contributor whose remote is a fork would fail a gate
+clone rather than about this tree, so a contributor whose remote is a fork would fail a gate run
 they cannot satisfy.
 {% if git_hosting_service == 'github' %}GitHub{% else %}GitLab{% endif %} renders the status
 itself once the URL is right. A project with no remote keeps the placeholder, so run

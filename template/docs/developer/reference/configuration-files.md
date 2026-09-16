@@ -44,6 +44,9 @@ Measured on a scaffold on an idle machine; the commit-stage figures are dominate
 themselves now that the launcher costs 0.12s, and the pre-push figure moves with how many
 interpreters `env_list` names and how loaded the machine is.
 
+The [QA gate](../explanation/design-principles.md#the-qa-gate) — `preflight` run read-only — is
+what the hooks and the pipeline below invoke; "the gate" here means that.
+
 **The commit stage is one hook, one invocation.** Four hooks would have pre-commit partition
 the staged files and run them concurrently, so a commit would get four verdicts about four
 subsets of itself. One hook is one verdict about one file list, in the order the registry
