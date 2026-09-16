@@ -2842,6 +2842,67 @@ def test_a_suppression_that_cannot_be_reviewed_is_refused(generated_project):
     validate('CVE-2024-1234::2999-12-31', '--ignore', require_expiry=True)
 
 
+def test_the_ci_badge_is_verified_only_where_the_tree_can_answer(generated_project, monkeypatch):
+    """The gate asks whether the placeholder survived a remote — never which URL the badge holds.
+
+    Three states, and only one of them is wrong. A fresh project keeps the placeholder because it
+    has been pushed nowhere; a fork contributor's README names upstream while their `origin` names
+    the fork, and demanding they match would have them repoint upstream's badge at their fork; the
+    owner who generated, committed and pushed without running `--write` leaves `build-unknown` in
+    place, and nothing used to ask — verified end to end, the badge stayed that way through both
+    tutorials.
+
+    So verifying stops at the one tree-level question: is this still the shipped placeholder while
+    `origin` resolves? Executed here rather than read, because the distinction is the whole point
+    and a grep cannot tell the three states apart.
+    """
+    project, cell = generated_project
+    # `update_pipeline_badge` reads `Path('README.md')`, so the project has to be the cwd.
+    monkeypatch.chdir(project)
+    document = (project / '_CI' / 'tasks' / 'document.py').read_text(encoding='utf-8')
+    updater = exec_from(
+        document,
+        'update_pipeline_badge',
+        'PIPELINE_PLACEHOLDER',
+        re=re,
+        Path=Path,
+        Context=object,
+        apply_badge=lambda *_args, **_kwargs: None,
+        pipeline_badge=lambda context: context.badge,
+    )['update_pipeline_badge']
+
+    placeholder = 'build' if cell['git_hosting_service'] == 'github' else 'pipeline'
+    readme = project / 'README.md'
+    original = readme.read_text(encoding='utf-8')
+    assert f'img.shields.io/badge/{placeholder}-unknown' in original, 'the shipped README has no placeholder'
+
+    # No remote: nothing to say. `pipeline_badge` returns '' when `origin` is unreadable.
+    assert updater(SimpleNamespace(badge=''), write=False) is None, 'an unpushed project is reported stale'
+
+    # A remote, and the placeholder still there: the owner forgot, and the gate says so.
+    pushed = SimpleNamespace(badge='[![Build](https://example.invalid/b)](https://example.invalid)')
+    reason = updater(pushed, write=False)
+    assert reason is not None, 'a forgotten badge passes the gate'
+    assert 'placeholder' in reason, f'the reason does not name the placeholder: {reason!r}'
+
+    # A real URL, whatever it names: the fork contributor is left alone.
+    try:
+        readme.write_text(
+            original.replace(
+                f'https://img.shields.io/badge/{placeholder}-unknown-lightgrey',
+                'https://github.com/upstream/project/actions/workflows/continuous-integration.yaml/badge.svg',
+                1,
+            ),
+            encoding='utf-8',
+        )
+        forked = updater(
+            SimpleNamespace(badge='[![Build](https://github.com/contributor/fork)](https://x)'), write=False
+        )
+        assert forked is None, f'a fork is asked to repoint upstream badge: {forked!r}'
+    finally:
+        readme.write_text(original, encoding='utf-8')
+
+
 def test_matrix_envs_do_not_share_report_paths(generated_project):
     """Every tox env writes its report to its own path, and a plain run renders nothing else.
 
@@ -3003,14 +3064,10 @@ def test_the_ci_badge_is_the_hosts_own(generated_project):
     updater = document.split('def update_pipeline_badge', 1)[1].split('\ndef ', 1)[0]
     unknown_remote = updater.split('pipeline_badge(context)', 1)[1].split('return apply_badge', 1)[0]
     assert 'return None' in unknown_remote, 'a project without a remote is reported stale, not left alone'
-    # And not verified at all: the value comes from `origin`, the developer's own configuration,
-    # so "is it stale?" has no tree-level answer. Verifying it would fail the gate for a
-    # contributor whose remote is legitimately a fork, and the fix it named would point
-    # upstream's badge at that fork.
-    body = updater.split('"""', 2)[2]
-    assert body.index('if not write:') < body.index('pipeline_badge(context)'), (
-        'the CI badge is compared against a remote the reader may not share'
-    )
+    # What the gate may ask about it is narrow, because the value comes from `origin` rather than
+    # from the tree: only whether the shipped placeholder survived a remote being set.
+    # `test_the_ci_badge_is_verified_only_where_the_tree_can_answer` runs the function against
+    # all three states and is where that lives.
 
 
 def test_readme_has_exactly_one_writer(generated_project):

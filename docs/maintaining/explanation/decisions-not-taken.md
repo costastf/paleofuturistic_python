@@ -55,10 +55,11 @@ Four of the five README badges are measured from the project, so `preflight --wr
 current. The fifth — build on GitHub, pipeline on GitLab — has a URL built from
 `git remote get-url origin`, which means it cannot be written before a remote exists. A project
 generated, checked and committed before `git remote add` therefore ships `build-unknown`, and
-nothing later fixes it: the gate deliberately never verifies that badge, because its value
-describes a clone rather than a tree and a fork contributor would otherwise fail a check they must
-not satisfy. So the owner runs `preflight --write` once more after adding the remote, which both
-tutorials and `first-run-setup.md` now say.
+nothing used to fix it. The gate still does not judge *which* URL the badge holds — that describes
+a clone rather than a tree, and a fork contributor would otherwise fail a check they must not
+satisfy — but it now fails on the one question the tree can answer: the placeholder surviving while
+`origin` resolves. So the owner is told once, by the gate, to run `preflight --write`; both tutorials
+and `first-run-setup.md` say the same thing.
 
 **Why not derive it at generation.** copier could ask for the repository slug and render the URL
 directly, which would remove the manual step for every future project. It is a new question in

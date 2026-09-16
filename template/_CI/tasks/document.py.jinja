@@ -19,6 +19,10 @@ from .shared import apply_badge, is_ci, logged, open_target, run, run_steps
 
 VERSION_BADGE = r'(\[!\[Version\]\(https://img\.shields\.io/badge/version-)[^)]+(\))'
 
+# The shipped CI badge, before anyone has run `preflight --write` in a clone with a remote. The
+# only thing the gate can say about that badge without knowing which clone is canonical.
+PIPELINE_PLACEHOLDER = re.compile(r'img\.shields\.io/badge/(build|pipeline)-unknown')
+
 
 def update_package_version_badge(*, version: str = '', write: bool = True) -> str | None:
     """Bring the README's version badge in line with the version in pyproject.toml.
@@ -63,15 +67,18 @@ def update_pipeline_badge(context: Context, *, write: bool = True) -> str | None
     The one derived value whose *content* never goes stale: the host renders the current status
     on every page load, so this writes a URL once and then has nothing left to do.
 
-    It is also the only one that is not a function of the tree — it comes from `origin`, which is
-    the developer's local configuration. So there is no tree-level answer to "is it stale?", and
-    `write=False` reports nothing: verifying it would fail the gate for a contributor whose
-    remote is legitimately a fork, and demand a change that would point upstream's badge at that
-    fork. Written on `--write` by whoever runs it in the canonical clone, refreshed the same way
-    if the repository moves.
+    Its *URL* comes from `origin`, which is the developer's local configuration rather than a
+    property of the tree — so the gate must not ask whether the badge matches this clone. A
+    contributor whose remote is a fork would fail a check whose only fix points upstream's badge
+    at their fork. Written on `--write` by whoever runs it in the canonical clone, refreshed the
+    same way if the repository moves.
 
-    A project with no readable `origin` has not been pushed anywhere yet, which is likewise not
-    a stale badge, so the placeholder stays.
+    One thing *is* answerable from the tree, and verifying stops there: the README still holding
+    the shipped placeholder while a remote exists. That is nobody's legitimate state — it is the
+    owner having generated, committed and pushed without filling the badge in, which used to
+    leave `build-unknown` in place permanently because nothing ever asked. A real URL passes
+    whatever it names, so the fork case is untouched, and a project with no readable `origin` has
+    not been pushed anywhere yet, so its placeholder passes too.
 
     Args:
         context: Invoke context, for reading `origin`.
@@ -80,9 +87,15 @@ def update_pipeline_badge(context: Context, *, write: bool = True) -> str | None
     Returns:
         None when the badge already points at the right place, else a one-line reason.
     """
-    if not write:
-        return None
+    readme = Path('README.md')
     badge = pipeline_badge(context)
+    if not write:
+        if not badge or not readme.exists():
+            return None
+        placeholder = PIPELINE_PLACEHOLDER.search(readme.read_text(encoding='utf-8'))
+        if placeholder:
+            return f'{placeholder.group(1)} badge in README.md is still the placeholder, and origin is set'
+        return None
     if not badge:
         return None
     return apply_badge(

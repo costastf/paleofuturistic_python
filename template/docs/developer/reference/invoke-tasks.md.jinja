@@ -30,14 +30,16 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 | `preflight` | `--write`, `--audit-dependencies` | Verify formatting, lint, type-check, the commit messages this push adds, the docs build, pyscn, the full tox matrix, the wheel, and the README badges plus the coverage ratchet against what the tools just measured — failing with everything out of date. This bare command is what the pre-push hook and the CI pipeline run. `--write` updates the badges and the ratchet instead of comparing them; it is opt-in because a command named for an inspection should not modify the tree. Never edits source either way — unformatted code fails and points at `format`. `--audit-dependencies` adds the pip-audit run, off by default because its answer depends on the advisory database rather than on your tree. |
 | `preflight.staged` | `--paths="<paths>"` | Only the checks that can be judged from the given files alone, and by default only the files you have staged. What the pre-commit hook runs. Reports rather than fixes, like every other entry point — unformatted code names `format`. |
 
-It checks four badges: coverage and pyscn from the reports the run just produced, and version
-and Python range from `pyproject.toml`. The fifth, the CI badge, is *written* by `--write` and
-never checked — its URL comes from `git remote get-url origin`, which is a fact about your
-clone rather than about this tree, so a contributor whose remote is a fork would fail a gate run
-they cannot satisfy.
+It checks four badges fully: coverage and pyscn from the reports the run just produced, and
+version and Python range from `pyproject.toml`. The fifth, the CI badge, is *written* by
+`--write` and only half checked. Its URL comes from `git remote get-url origin`, which is a fact
+about your clone rather than about this tree, so comparing it would fail a gate run for a
+contributor whose remote is a fork — their fix would point your badge at their fork. What the
+gate does ask is narrower and answerable from the tree: whether the shipped placeholder is still
+there once `origin` resolves, which means nobody has written it yet.
 {% if git_hosting_service == 'github' %}GitHub{% else %}GitLab{% endif %} renders the status
-itself once the URL is right. A project with no remote keeps the placeholder, so run
-`preflight --write` again after `git remote add origin …` to fill it in.
+itself once the URL is right, so run `preflight --write` after `git remote add origin …` and
+commit the README.
 
 Both read one registry — `STEPS` in `_CI/tasks/preflight.py` — which declares every check
 once with its scope, its path filter and whether it writes. The two hooks and the CI job consume

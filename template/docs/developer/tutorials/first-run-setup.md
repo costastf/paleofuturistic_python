@@ -74,8 +74,9 @@ git remote add origin <your-repository-url>
 ```
 
 The build badge's URL is derived from `origin`, so until there is one it stays
-`build-unknown`. Nothing fails over it — that badge is written and never checked, being a fact
-about your clone rather than about the code — but it also will not fill itself in later.
+`build-unknown`. The gate does not judge *which* URL that badge holds — that is a fact about your
+clone, and a contributor working from a fork must not be told to repoint it — but it does fail on the
+placeholder surviving once `origin` is set, which is this exact situation.
 
 ## You're ready
 
