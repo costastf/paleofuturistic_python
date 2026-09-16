@@ -49,6 +49,27 @@ pipeline has to judge anyway, since the pipeline is what catches a message the h
 The first version of this scoping returned "nothing to check" there instead, and validated no
 message at all on GitHub for as long as it shipped.
 
+## The build badge is filled in by hand, once
+
+Four of the five README badges are measured from the project, so `preflight --write` keeps them
+current. The fifth — build on GitHub, pipeline on GitLab — has a URL built from
+`git remote get-url origin`, which means it cannot be written before a remote exists. A project
+generated, checked and committed before `git remote add` therefore ships `build-unknown`, and
+nothing later fixes it: the gate deliberately never verifies that badge, because its value
+describes a clone rather than a tree and a fork contributor would otherwise fail a check they must
+not satisfy. So the owner runs `preflight --write` once more after adding the remote, which both
+tutorials and `first-run-setup.md` now say.
+
+**Why not derive it at generation.** copier could ask for the repository slug and render the URL
+directly, which would remove the manual step for every future project. It is a new question in
+`copier.yml`, so it is a change to the generation contract rather than to a task — and it overlaps
+with the entry below: the same question would let the badge name the project's default branch
+instead of a literal `main`. Both are worth doing together or not at all.
+
+**What would change it.** Enough users hitting `build-unknown` that a docs line is not the answer,
+or the default-branch question being asked for its own sake — at which point the slug comes almost
+free and this entry and the next both close.
+
 ## Badge URLs name the default branch
 
 The build/pipeline badge URL contains `main` and the workflow filename, written once from

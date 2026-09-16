@@ -60,6 +60,22 @@ A couple of pipelines will start running.
 For now only Continuous Integration is the interesting one.
 It runs the same preflight as before, this time where everyone can see its outcome.
 
+Now that `origin` exists, fill in the build badge:
+
+```bash
+./workflow.cmd preflight --write
+git add README.md
+git commit -m "docs: point the build badge at the repository"
+git push
+```
+
+That badge's URL is built from `git remote get-url origin`, so it could not be written in the
+previous tutorial — there was no remote yet, and it still reads `build-unknown`. The gate does not
+complain about it either, deliberately: its value describes your clone rather than your code, so a
+contributor working from a fork would otherwise fail a check they must not fix. It is the one badge
+you fill in by hand, once. The four others — version, Python, coverage and pyscn — are measured from
+your project, so `preflight --write` has been keeping them current since the first tutorial.
+
 ## Step 3 — Cut the release
 
 ```bash
