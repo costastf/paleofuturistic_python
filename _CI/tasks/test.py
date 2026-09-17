@@ -221,7 +221,13 @@ def run_combo(template_repo, output_root, extra_context, label, log_file=None, m
 
 @task
 def test(context):
-    """Generate the template with default context and run the full QA cycle."""
+    """Generate the template with default context and run the QA cycle on it.
+
+    Not the dependency audit: that rides with `mature`, and this generates a pristine
+    default-answers project — see `qa_sequence`. So this command needs no network, and the
+    audit's own path is exercised by the matured cell in `test.matrix` rather than here. Run
+    `test.combo --mature` to exercise both against one project.
+    """
     tmpdir = Path(tempfile.mkdtemp(prefix='paleofuturistic_test_'))
     try:
         template_repo = prepare_snapshot(tmpdir)

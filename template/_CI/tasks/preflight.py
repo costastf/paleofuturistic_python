@@ -379,13 +379,19 @@ def staged(context: Context, paths: str = '') -> None:
 @task
 @logged('preflight')
 def preflight(context: Context, write: bool = False, audit_dependencies: bool = False) -> None:
-    """Run every check this project has, and bring the derived files up to date.
+    """Run every check that answers from this tree, and bring the derived files up to date.
 
     The bare command is what the pre-push hook and the CI pipeline run, so reproducing a
     pipeline failure needs no flag. It verifies formatting, lints, type-checks, checks the
     commit messages this push adds, builds the docs, runs pyscn, runs the test matrix, builds
     the wheel, and compares the badges and the coverage ratchet against what the tools just
     measured, failing with everything out of date.
+
+    Two checks are not here, both because their answer is not a property of the tree: the
+    dependency audit, whose verdict comes from the advisory database on the day it runs
+    (`--audit-dependencies` adds it), and `secure.validate-overrides`, which the commit hook
+    runs when you stage the file it reads. A malformed entry there fails the audit wherever it
+    next runs, so it cannot quietly mute a finding.
 
     `--write` updates those derived values. Opt-in, because a command named for an inspection
     should not modify the tree; commands named for a mutation may, which is why `format` and

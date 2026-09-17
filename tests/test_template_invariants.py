@@ -2903,6 +2903,36 @@ def test_the_ci_badge_is_verified_only_where_the_tree_can_answer(generated_proje
         readme.write_text(original, encoding='utf-8')
 
 
+def test_the_audits_retry_settings_still_mean_something(generated_project):
+    """`AUDIT_ATTEMPTS` allows a retry, and `AUDIT_VERDICTS` matches what pip-audit prints.
+
+    The retry runner is asserted behaviourally, but it takes both values from its caller — so it
+    proves the runner honours them, not that the audit supplies sane ones. Both degrade silently:
+    `AUDIT_ATTEMPTS = 1` leaves the machinery in place and retries nothing, which is the reset
+    connection that failed a CI cell before any of this existed; emptying `AUDIT_VERDICTS` makes
+    every failure look like "no verdict", so a genuine finding is retried instead — measured, three
+    attempts over 18s printing the same four advisories six times.
+
+    The verdict phrases are pip-audit's own wording, so they are asserted against the two
+    sentences it prints rather than against themselves.
+    """
+    project, _ = generated_project
+    configuration = (project / '_CI' / 'tasks' / 'configuration.py').read_text(encoding='utf-8')
+    values = exec_from(configuration, 'AUDIT_ATTEMPTS', 'AUDIT_VERDICTS', re=re, Path=Path)
+
+    assert values['AUDIT_ATTEMPTS'] > 1, 'the audit retries nothing, so the machinery is decoration'
+    verdicts = values['AUDIT_VERDICTS']
+    assert verdicts, 'with no verdict phrases every failure is retried, findings included'
+
+    # What pip-audit 2.10 prints on each outcome. A phrase that matches neither would retry a
+    # reported finding; one that matches some other line would stop retrying a crash.
+    reported = ('No known vulnerabilities found', 'Found 4 known vulnerabilities in 1 package')
+    for outcome in reported:
+        assert any(verdict in outcome for verdict in verdicts), f'no verdict phrase matches {outcome!r}'
+    crashed = 'requests.exceptions.ConnectionError: Connection aborted, ConnectionResetError(104)'
+    assert not any(verdict in crashed for verdict in verdicts), 'a crash reads as a verdict, so it is not retried'
+
+
 def test_matrix_envs_do_not_share_report_paths(generated_project):
     """Every tox env writes its report to its own path, and a plain run renders nothing else.
 
