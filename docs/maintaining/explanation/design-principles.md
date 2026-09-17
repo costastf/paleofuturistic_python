@@ -79,8 +79,7 @@ One consequence of the two kinds meeting: the derived-value steps are skipped on
 failed, in either mode. A badge computed from a tree that just failed its checks asserts something
 untrue about it, so there is nothing for `--write` to write and nothing for the gate to compare.
 
-Together these are what make one command mean the same thing in three places. The proposals this
-shape declines are in [Decisions not taken](decisions-not-taken.md).
+Together these are what make one command mean the same thing in three places.
 
 ## uv is the only tool you install
 
@@ -146,4 +145,3 @@ The four sections — Tutorials, How-to, Reference, Explanation — exist becaus
 
 - [Why copier?](why-copier.md) — why we picked the template format we did.
 - [History and lineage](history-and-lineage.md) — what this template was forked from and why.
-- [Decisions not taken](decisions-not-taken.md) — proposals the template declines, and what would change the answer.

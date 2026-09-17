@@ -6,7 +6,7 @@ After generating with `git_hosting_service=github`, you have six workflow files 
 
 These are non-negotiable for any repository connected to CI/CD:
 
-- **Branch protection on `main`.** Require pull requests, require status checks, require a linear history. Block force pushes and deletions. Require only checks that run on every pull request — and today that is none of the shipped ones. **Do not require `Preflight`**: the workflows trigger on `push`, so a pull request from a fork runs nothing in this repository and a required check would sit pending forever, leaving the repository unable to merge an external contribution. `security-audit` is filtered by `on.push.paths` on top of that. Require them once the workflows gain a `pull_request` trigger, which is a decision the template has not taken — see [Decisions not taken](https://github.com/costastf/paleofuturistic_python/blob/main/docs/maintaining/explanation/decisions-not-taken.md).
+- **Branch protection on `main`.** Require pull requests, require status checks, require a linear history. Block force pushes and deletions. Require only checks that run on every pull request — and today that is none of the shipped ones. **Do not require `Preflight`**: the workflows trigger on `push`, so a pull request from a fork runs nothing in this repository and a required check would sit pending forever, leaving the repository unable to merge an external contribution. `security-audit` is filtered by `on.push.paths` on top of that. Require them once the workflows gain a `pull_request` trigger, which is a decision the template has not taken yet.
 - **Tag protection for `v*`.** Forbid deleting and editing release tags.
 - **Required approvals.** At least one reviewer per PR.
 

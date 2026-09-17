@@ -47,34 +47,26 @@ Run the following commands in your project directory to connect to the remote
 
 ```bash
 git remote add origin git@github.com:your_handle/test_260708.git
-git push -u origin main
-```
-
-This will run all the checks from preflight before actually pushing.
-This might fail if you did some more exotic edits than the example above.
-Don't worry.
-Preflight will tell you what to fix, do that commit and then try to push again.
-
-Go to your git remote.
-A couple of pipelines will start running.
-For now only Continuous Integration is the interesting one.
-It runs the same preflight as before, this time where everyone can see its outcome.
-
-Now that `origin` exists, fill in the build badge:
-
-```bash
 ./workflow.cmd preflight --write
 git add README.md
 git commit -m "docs: point the build badge at the repository"
-git push
+git push -u origin main
 ```
 
-That badge's URL is built from `git remote get-url origin`, so it could not be written in the
-previous tutorial — there was no remote yet, and it still reads `build-unknown`. The gate does not
-complain about it either, deliberately: its value describes your clone rather than your code, so a
-contributor working from a fork would otherwise fail a check they must not fix. It is the one badge
-you fill in by hand, once. The four others — version, Python, coverage and pyscn — are measured from
-your project, so `preflight --write` has been keeping them current since the first tutorial.
+Preflight might fail if you did some more exotic edits than the example above.
+Don't worry.
+It will tell you what to fix; do that, commit and then try to push all.
+Note that preflight also runs as a QA gate before actually pushing.
+
+The first preflight wrote the build badge to your README.
+It could not be written before now, because it's built from `git remote get-url origin`.
+This is the one badge you fill in 'by hand', once.
+The four others — version, Python, coverage and pyscn — are measured from your project, so `preflight --write` has been keeping them current since the first tutorial.
+
+Go to your git remote.
+A couple of pipelines will have started running.
+For now only Continuous Integration is the interesting one.
+It runs the same preflight as before, this time where everyone can see its outcome.
 
 ## Step 3 — Cut the release
 

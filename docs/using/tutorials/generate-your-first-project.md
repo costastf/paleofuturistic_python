@@ -97,6 +97,7 @@ Run the following command:
 
 A browser tab opens with the generated project's documentation — its own Diátaxis-structured site, ready to extend.
 The badges should reflect the state of your project if you just ran `preflight`.
+(The build badge should still be grey for now, because it will point to the state of your CI/CD system configured later.)
 
 ## Step 5 — Commit using Conventional Commits
 
