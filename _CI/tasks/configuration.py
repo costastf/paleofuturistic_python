@@ -159,18 +159,11 @@ def qa_cells() -> list[dict]:
     nothing it touches interacts with the knobs.
     """
     cells = [{**cell, 'mature': False} for cell in matrix_combos()]
-    cells.append(
-        {
-            'label': combo_label(
-                git_hosting_service='github',
-                integrate_dependency_track=True,
-                integrate_pages=True,
-                mature=True,
-            ),
-            'git_hosting_service': 'github',
-            'integrate_dependency_track': True,
-            'integrate_pages': True,
-            'mature': True,
-        }
-    )
+    mature_config = {
+        'git_hosting_service': 'github',
+        'integrate_dependency_track': True,
+        'integrate_pages': True,
+        'mature': True,
+    }
+    cells.append({'label': combo_label(**mature_config), **mature_config})
     return cells
