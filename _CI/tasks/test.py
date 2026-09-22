@@ -162,9 +162,6 @@ def write_mature_project(project_dir: Path, extra_context: dict | None) -> None:
     Replaces the scaffolded smoke test with one that leaves an import uncalled, and adds a
     version-gated helper module, so the ratchet has something between 0 and 100 to engage on.
     See `qa_cells` and docs/maintaining/how-to/test-the-template.md#why-a-matured-cell.
-
-    Pulled out of `run_combo`: this is the one step that only applies when `mature` is set,
-    and inlining it there was most of what made that function too complex to read in one pass.
     """
     oldest = (extra_context or {}).get('min_python_version') or base_context()['min_python_version']
     major, minor = (int(part) for part in oldest.split('.'))
@@ -203,12 +200,8 @@ def run_combo(
 ) -> bool:
     """Generate the template with extra_context and run the QA steps. Return True on success.
 
-    `mature` makes the cell look like a project on day two — see `qa_cells` and
-    docs/maintaining/how-to/test-the-template.md#why-a-matured-cell — and carries the
-    dependency audit with it, which one cell runs rather than all of them; see `AUDIT_STEP`.
-    There is no separate switch for that: a caller who could pass `audit` separately from
-    `mature` could also pass it for every cell, or for none, and neither is visible from the
-    matrix summary.
+    `mature` makes the cell look like a project on day two, dependency audit included — see
+    `qa_cells`, `AUDIT_STEP` and docs/maintaining/how-to/test-the-template.md#why-a-matured-cell.
     """
     combo_root = workspace.output_root / label
     combo_root.mkdir(parents=True, exist_ok=True)

@@ -227,11 +227,11 @@ docstring-quotes = "double"
 extra-paths = ["_CI/lib/vendor"]
 
 # py-serializable annotates its class decorator as returning
-# `Intersection[Type[_T], Type[_JsonSerializable], Type[_XmlSerializable]]`, but PEP
-# intersection types do not exist, so it does `from typing import Union as Intersection`
-# — its own documented stopgap. The annotation therefore declares a *union*, and calling a
-# union whose members include two argument-less mixins is genuinely unsound. ty reports
-# exactly what is written; the annotation is what is wrong, not the checker.
+# `Intersection[Type[_T], Type[_JsonSerializable], Type[_XmlSerializable]]`. PEP intersection
+# types do not exist, so its own documented stopgap is `from typing import Union as
+# Intersection`. The annotation therefore declares a *union*, and calling a union whose
+# members include two argument-less mixins is genuinely unsound. ty reports exactly what is
+# written; the annotation is what is wrong, not the checker.
 #
 # Older ty resolved those mixins as `@Todo` and checked nothing here, which is why this
 # surfaced as a "regression" when ty gained the ability to model them. Silencing these four

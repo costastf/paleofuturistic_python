@@ -266,10 +266,9 @@ def abort_if_ref_exists(
 ) -> None:
     """Print where `name` already exists and abort, naming the commands that remove it.
 
-    The two calls in `ensure_refs_are_free` are this same shape twice — check local, check
-    origin, report both, name the fix — differing only in the ref kind and the exact delete
-    commands. `has` and `delete` are each `(local, remote)`, mirroring the two-sided check the
-    body makes of them.
+    The two calls in `ensure_refs_are_free` share this exact shape (check local, check origin,
+    report both, name the fix) and differ only in the ref kind and the delete commands. `has`
+    and `delete` are each `(local, remote)`, mirroring the two-sided check the body makes.
     """
     local_has, remote_has = has
     if not (local_has or remote_has):

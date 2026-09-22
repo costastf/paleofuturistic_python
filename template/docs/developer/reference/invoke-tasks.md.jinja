@@ -66,7 +66,7 @@ gitignored. What it never touches is a tracked file.
 | --- | --- | --- |
 | `develop.bootstrap` | `--force` | Run all bootstrap steps. Idempotent. |
 | `develop.pre-commit-install` | — | Install the hooks into `.git/hooks/` (all three stages at once). |
-| `develop.pre-commit` | — | A dry run of your next commit: the commit-stage hooks over the files you staged, through pre-commit itself — so it exercises the hook wiring (`files:` filters, `SKIP`, the entry itself) as well as the checks. Read-only, as the hooks are; not the full check either — `preflight` is what runs everything, including every file rather than the staged ones. |
+| `develop.pre-commit` | — | A dry run of your next commit: the commit-stage hooks over the files you staged, run through pre-commit itself so it exercises the hook wiring (`files:` filters, `SKIP`, the entry itself), not just the checks. Read-only, like the hooks it runs. Not the full check either; `preflight` is what runs everything, including every file rather than the staged ones. |
 | `develop.bump-uv` | `--version=<v>` | Move every uv pin to the newest release at least 7 days old: the four version literals, the base image's tag *and* its re-resolved digest, and `uv.lock`. Warns when the bump crosses a minor version. `--version` takes a specific release, ignoring the cool-down. See [Dependency groups](dependency-groups.md#the-uv-pin-and-the-one-command-that-moves-it). |
 
 ## `format`, `lint`, `test`, `quality`

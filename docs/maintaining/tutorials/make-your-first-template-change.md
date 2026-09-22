@@ -23,7 +23,7 @@ Pick something harmless: open `template/README.md.jinja` and adjust a sentence, 
 ./workflow.cmd test.invariants
 ```
 
-This generates a project for each of the nine matrix cells — the eight-way cartesian product of git host × Dependency Track × Pages, plus one "matured" day-two cell — once each, and asserts structural invariants over the results: the right files exist, conditional content matches the chosen knobs, nothing forbidden ships. It's the best signal-per-second check and should be your default while iterating.
+This generates a project for each of the nine matrix cells once: the eight-way cartesian product of git host × Dependency Track × Pages, plus one "matured" day-two cell. It then asserts structural invariants over the results — the right files exist, conditional content matches the chosen knobs, nothing forbidden ships. It's the best signal-per-second check and should be your default while iterating.
 
 ## Step 4. Run one full cell
 
