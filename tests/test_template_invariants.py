@@ -18,6 +18,7 @@ import tomllib
 from datetime import date, timedelta
 from pathlib import Path
 from types import SimpleNamespace
+from typing import NamedTuple
 
 import pytest
 import yaml
@@ -2006,19 +2007,30 @@ def test_a_badge_the_reader_removed_is_reported_not_assumed(generated_project):
 
 
 def test_the_gate_verifies_the_import_order_format_writes(generated_project):
-    """Ruff `I` is selected wherever `format` fixes it, including under `_CI/`.
+    """`_CI/` is held to the same ruff selection as `src/`, with only a small, named delta.
 
-    `format` runs `ruff check --select I --fix` over `src/`, `_CI/tasks/` and `tests/`, while
-    the gate only ran `ruff format --check`. Under `_CI/` ruff resolves `_CI/pyproject.toml`,
-    which selected the defaults — so import order drifted there unwatched and `format` swept
-    the correction into whatever commit came next, on files a `copier update` owns.
+    `format` runs `ruff check --fix` over `src/`, `_CI/tasks/` and `tests/`, while the gate
+    used to only run `ruff format --check` under `_CI/` — so import order (and everything else
+    `select = ["ALL"]` catches elsewhere) drifted there unwatched, and `format` swept the
+    correction into whatever commit came next, on files a `copier update` owns. `_CI/` now
+    selects `ALL` too, matching the root config, so nothing `format` can fix goes unchecked by
+    `lint`. The two ignore lists are otherwise required to match exactly: a rule ignored under
+    `_CI/` but not the root (or vice versa) has to be a deliberate, named exception — not a
+    silent drift between the two files this test is here to catch.
     """
     project, _ = generated_project
     ci_config = tomllib.loads((project / '_CI' / 'pyproject.toml').read_text(encoding='utf-8'))
-    assert 'I' in ci_config['tool']['ruff']['lint']['select'], 'nothing checks the import order under _CI/'
     root = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
-    selected = root['tool']['ruff']['lint']['select']
-    assert 'ALL' in selected or 'I' in selected, 'nothing checks the import order under src/'
+    ci_lint = ci_config['tool']['ruff']['lint']
+    root_lint = root['tool']['ruff']['lint']
+    assert ci_lint['select'] == ['ALL'], 'the _CI/ tree is not held to the same selection as src/'
+    assert root_lint['select'] == ['ALL'], 'nothing checks the import order under src/'
+    known_delta = {'T201', 'N999', 'FBT001', 'FBT002', 'TC006'}
+    ci_ignore = set(ci_lint['ignore'])
+    root_ignore = set(root_lint['ignore'])
+    assert root_ignore <= ci_ignore, 'a rule the root config ignores must also be ignored under _CI/'
+    extra = ci_ignore - root_ignore
+    assert extra == known_delta, f'_CI/ ignores {extra} beyond the root config; update the delta if this is deliberate'
 
 
 def test_a_failed_bump_leaves_no_badge_for_it(generated_project):
@@ -2597,6 +2609,15 @@ def test_exactly_one_matrix_cell_audits_its_dependencies(tmp_path):
     runner_source = (REPO_ROOT / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
     run_combo = function_named(runner_source, 'run_combo')
     assert run_combo, 'test.py declares no run_combo'
+    # `run_combo` was split so it reads in one pass; the two extracted helpers are exec'd
+    # alongside it rather than stubbed, since `write_mature_project` is exactly the branch this
+    # test does not otherwise exercise the content of, and `security_override_env` needs to
+    # observe the same `os.environ`/`read_template_overrides` stubs the rest of this namespace
+    # sets up, not new ones of its own.
+    write_mature_project = function_named(runner_source, 'write_mature_project')
+    security_override_env = function_named(runner_source, 'security_override_env')
+    assert write_mature_project, 'test.py declares no write_mature_project'
+    assert security_override_env, 'test.py declares no security_override_env'
 
     from _CI.tasks.configuration import PROJECT_SLUG, qa_sequence  # noqa: PLC0415
 
@@ -2608,9 +2629,16 @@ def test_exactly_one_matrix_cell_audits_its_dependencies(tmp_path):
             workflow_commands.append((current_label['value'], command.removeprefix('./workflow.cmd ')))
         return True
 
+    class ComboWorkspace(NamedTuple):
+        """Mirrors `_CI.tasks.test.ComboWorkspace`'s shape for this exec'd slice."""
+
+        template_repo: Path
+        output_root: Path
+
     namespace = {
         'json': json,
         'os': os,
+        'Path': Path,
         'run_command': record,
         'make_file_executable': lambda _path: None,
         'untracked_after_qa': lambda _project: [],
@@ -2624,8 +2652,10 @@ def test_exactly_one_matrix_cell_audits_its_dependencies(tmp_path):
         'MATURE_ORIGIN': 'git@example.invalid:acme/widget.git',
         'MATURE_TEST_MODULE': '"""{slug}."""\n',
         'MATURE_GATED_MODULE': '"""{slug} {boundary}."""\n',
+        'ComboWorkspace': ComboWorkspace,
     }
-    exec(compile(ast.Module(body=[run_combo], type_ignores=[]), '<test.py>', 'exec'), namespace)  # noqa: S102
+    module = ast.Module(body=[write_mature_project, security_override_env, run_combo], type_ignores=[])
+    exec(compile(module, '<test.py>', 'exec'), namespace)  # noqa: S102
 
     from _CI.tasks.configuration import qa_cells  # noqa: PLC0415
 
@@ -2635,8 +2665,7 @@ def test_exactly_one_matrix_cell_audits_its_dependencies(tmp_path):
         for directory in ('tests', f'src/{PROJECT_SLUG}'):
             (project / directory).mkdir(parents=True, exist_ok=True)
         assert namespace['run_combo'](
-            tmp_path / 'template',
-            tmp_path,
+            namespace['ComboWorkspace'](tmp_path / 'template', tmp_path),
             {'min_python_version': '3.10'},
             cell['label'],
             mature=cell['mature'],
