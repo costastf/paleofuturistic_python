@@ -35,6 +35,7 @@ def update_package_version_badge(*, version: str = '', write: bool = True) -> st
 
     Returns:
         None when the badge is already right, else a one-line reason it is not.
+
     """
     if version:
         return apply_badge(
@@ -86,6 +87,7 @@ def update_pipeline_badge(context: Context, *, write: bool = True) -> str | None
 
     Returns:
         None when the badge already points at the right place, else a one-line reason.
+
     """
     readme = Path('README.md')
     badge = pipeline_badge(context)
@@ -116,6 +118,7 @@ def update_python_badge(*, write: bool = True) -> str | None:
 
     Returns:
         None when the badge is already right, else a one-line reason it is not.
+
     """
     pyproject = Path('pyproject.toml')
     if not pyproject.exists():

@@ -26,15 +26,22 @@ SCAFFOLD_TEST_FILE = Path('tests/test_{{ project_slug }}.py')
 SCAFFOLD_MARKER = 'def test_sanity'
 
 
+# shields.io badge colors by coverage band, brightest first.
+COVERAGE_BRIGHTGREEN_FLOOR = 90
+COVERAGE_GREEN_FLOOR = 80
+COVERAGE_YELLOW_FLOOR = 70
+COVERAGE_ORANGE_FLOOR = 60
+
+
 def coverage_color(pct: float) -> str:
     """Return a badge color for a coverage percentage."""
-    if pct >= 90:
+    if pct >= COVERAGE_BRIGHTGREEN_FLOOR:
         return 'brightgreen'
-    if pct >= 80:
+    if pct >= COVERAGE_GREEN_FLOOR:
         return 'green'
-    if pct >= 70:
+    if pct >= COVERAGE_YELLOW_FLOOR:
         return 'yellow'
-    if pct >= 60:
+    if pct >= COVERAGE_ORANGE_FLOOR:
         return 'orange'
     return 'red'
 
@@ -87,6 +94,7 @@ def ratchet_fail_under(*, write: bool = True) -> str | None:
 
     Returns:
         None when ``fail_under`` is already where it belongs, else a one-line reason it is not.
+
     """
     pct = read_coverage_pct()
     if pct is None:
@@ -140,6 +148,7 @@ def update_coverage_badge(*, write: bool = True) -> str | None:
 
     Returns:
         None when the badge is already right, else a one-line reason it is not.
+
     """
     if not COVERAGE_REPORT.exists():
         return f'no coverage report at {COVERAGE_REPORT} — run ./workflow.cmd test.tox'
@@ -168,6 +177,7 @@ def pytest(context: Context, args: str = '') -> None:
         context: Invoke context.
         args: Extra arguments forwarded verbatim to pytest, e.g.
             ``--args="-k test_hello"`` or ``--args="-m 'not slow'"``.
+
     """
     execute(context, f'uv run pytest {args}'.rstrip())
 
@@ -305,6 +315,7 @@ def tox_matrix(context: Context, env: str = '') -> None:
             which is the only run that produces `reports/coverage.json` and the only one the
             coverage floor is enforced against: the floor is set from the union of every
             interpreter, so no single one can clear it.
+
     """
     # By hand, because `coverage erase` leaves the per-env files alone — see the docstring.
     erase_coverage_data()
@@ -335,6 +346,7 @@ def tox(context: Context, env: str = '', write: bool = False) -> None:
             matrix runs in parallel.
         write: Update the coverage badge and the ratchet from this run. Refused with `--env`,
             since one interpreter's coverage is not what the badge means.
+
     """
     if env and write:
         print('--write needs the full matrix: the coverage badge means coverage across every')

@@ -91,6 +91,7 @@ def validate_override_entry(entry: str, source: str, *, require_expiry: bool = F
 
     Raises:
         SystemExit: with exit code 1 if the entry is malformed.
+
     """
     expected = (
         '<VULN_ID>[::YYYY-MM-DD] — e.g. CVE-2024-1234::2026-12-31 (expires, '
@@ -264,6 +265,7 @@ def audit(context: Context, ignore: str | None = None) -> None:
     Args:
         context: Invoke context.
         ignore: Comma-separated vulnerability IDs to ignore.
+
     """
     today = date.today()  # noqa: DTZ011
     suppressions = [
@@ -319,6 +321,7 @@ def sbom_extract(context: Context, write: bool = False) -> None:  # noqa: ARG001
     Args:
         context: Invoke context.
         write: Write SBOM to ``src/<package>/sbom.cdx.json`` instead of printing to stdout.
+
     """
     # Imported here, not at module scope. `.sbom` pulls in `cyclonedx`, whose JSON validator
     # reaches `jsonschema._format` and a lark grammar built at import time — 1.2s, measured,
@@ -369,6 +372,7 @@ def sbom_upload(context: Context) -> None:
     Raises:
         SystemExit: if the required environment variables are unset, the project
             version cannot be determined, or Dependency Track rejects the upload.
+
     """
     missing = [v for v in OWASP_DTRACK_SETTINGS if not os.environ.get(v)]
     if missing:

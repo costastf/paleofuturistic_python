@@ -20,6 +20,7 @@ class BootstrapStep:
         action: Callable that performs the step.
         prompt: Question to ask locally. If empty, the step always runs.
         ci_behavior: What to do in CI — 'run' (auto-execute) or 'skip' (silently skip).
+
     """
 
     name: str
@@ -46,7 +47,7 @@ def install_pre_commit(context: Context) -> None:
 STEPS: list[BootstrapStep] = [
     BootstrapStep(
         name='pre-commit hooks',
-        action=cast(Callable[[Context], None], install_pre_commit),
+        action=cast('Callable[[Context], None]', install_pre_commit),
         prompt='Install pre-commit hooks? [y/N] ',
         ci_behavior='skip',
     ),
@@ -85,6 +86,7 @@ def bootstrap(context: Context, force: bool = False) -> None:
     Args:
         context: Invoke context.
         force: Force re-bootstrap even if already done.
+
     """
     if SENTINEL.exists() and not force:
         return

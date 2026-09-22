@@ -111,7 +111,7 @@ class IndentingStream:
         """Flush the wrapped stream."""
         self.inner.flush()
 
-    def __getattr__(self, name: str) -> Any:
+    def __getattr__(self, name: str) -> Any:  # noqa: ANN401 — a proxy, so the type is whatever the wrapped stream has
         return getattr(self.inner, name)
 
 
@@ -185,11 +185,12 @@ def get_operating_system() -> str:
 
     Raises:
         SystemExit: If the operating system is not recognized.
+
     """
     system = platform.system()
 
     if system == 'Linux':
-        with suppress(OSError), open('/proc/version', encoding='utf-8') as proc_version:
+        with suppress(OSError), Path('/proc/version').open(encoding='utf-8') as proc_version:
             if any(marker in proc_version.read().lower() for marker in ('microsoft', 'wsl')):
                 return 'wsl'
         return 'linux'
@@ -206,7 +207,7 @@ def get_operating_system() -> str:
 
 def wsl_interop_available() -> bool:
     """Return True when WSL can execute Windows binaries."""
-    return any(os.path.exists(marker) for marker in WSL_INTEROP_MARKERS)
+    return any(Path(marker).exists() for marker in WSL_INTEROP_MARKERS)
 
 
 def open_on_wsl(context: Context, target: str) -> None:
@@ -259,6 +260,7 @@ def container_engine() -> str:
 
     Raises:
         SystemExit: If neither docker nor podman is found.
+
     """
     for engine in ('docker', 'podman'):
         if shutil.which(engine):
@@ -296,7 +298,7 @@ def image_digest_reference(context: Context, engine: str, image: str) -> str:
     return image
 
 
-def apply_badge(
+def apply_badge(  # noqa: PLR0913 — one general-purpose writer for every badge, each parameter orthogonal
     path: Path,
     pattern: str,
     replacement: str,
@@ -389,6 +391,7 @@ def execute_with_retries(context: Context, cmd: str, *, attempts: int, verdicts:
 
     Raises:
         SystemExit: If the command reported a verdict, or ran out of attempts.
+
     """
     shell = os.environ.get('INVOKE_SHELL')
     kwargs: dict[str, object] = {'shell': shell} if shell else {}
@@ -433,6 +436,7 @@ def commit(context: Context, message: str) -> None:
     Raises:
         SystemExit: with exit code 1 if the commit fails for any reason other than an
             unavailable signing key, or if the unsigned retry also fails.
+
     """
     result = context.run(f'git commit -m "{message}"', echo=True, warn=True)
     if result is not None and result.ok:
@@ -448,7 +452,7 @@ def commit(context: Context, message: str) -> None:
 
 
 def run(cmd: str) -> Callable[[Callable[[Context], None]], Callable[[Context], None]]:
-    """Decorator: replace the function body with a shell-command invocation."""
+    """Decorate a task to replace its body with a shell-command invocation."""
 
     def decorator(fn: Callable[[Context], None]) -> Callable[[Context], None]:
         @wraps(fn)
@@ -461,7 +465,7 @@ def run(cmd: str) -> Callable[[Callable[[Context], None]], Callable[[Context], N
 
 
 def logged(name: str) -> Callable[[Callable[..., None]], Callable[..., None]]:
-    """Decorator: print ✅ on success or ❌ on SystemExit failure.
+    """Decorate a task to print ✅ on success or ❌ on SystemExit failure.
 
     The outermost ``@logged`` call wraps ``sys.stdout``/``sys.stderr`` so every
     line of body output — shell echoes, bare prints, nested subcommand banners
@@ -508,7 +512,7 @@ def run_steps(*steps: Callable[[Context], None]) -> Callable[[Context], None]:
         for step in steps:
             try:
                 step(context)
-            except SystemExit:
+            except SystemExit:  # noqa: PERF203 — the loop's whole purpose is to keep going after a failure
                 failed = True
         if failed:
             raise SystemExit(1)

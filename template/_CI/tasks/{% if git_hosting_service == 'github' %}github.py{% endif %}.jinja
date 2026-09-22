@@ -35,7 +35,7 @@ def registry_settings() -> RegistrySettings:
     return RegistrySettings(
         url='ghcr.io',
         user=os.environ['GITHUB_ACTOR'],
-        password_env='GITHUB_TOKEN',
+        password_env='GITHUB_TOKEN',  # noqa: S106 — the name of an env var to read, not a credential
         image_prefix=f'ghcr.io/{repo}',
     )
 

@@ -60,6 +60,7 @@ def update_pyscn_badge(*, write: bool = True) -> str | None:
 
     Returns:
         None when the badge is already right, else a one-line reason it is not.
+
     """
     try:
         report = json.loads(latest_pyscn_json().read_text(encoding='utf-8'))
@@ -89,6 +90,7 @@ def pyscn_analyze(context: Context, write: bool = False) -> None:
     Args:
         context: Invoke context.
         write: Update the README's pyscn badge from this analysis.
+
     """
     clear_pyscn_reports()
     execute(context, ANALYZE_HTML)
@@ -149,6 +151,7 @@ def pyscn(context: Context, write: bool = False) -> None:
     Args:
         context: Invoke context.
         write: Update the README's pyscn badge from this analysis.
+
     """
     run_steps(partial(pyscn_analyze_only, write=write), pyscn_check)(context)
 
@@ -161,6 +164,7 @@ def quality(context: Context, write: bool = False) -> None:
     Args:
         context: Invoke context.
         write: Update the README's pyscn badge from this analysis.
+
     """
     run_steps(partial(pyscn, write=write))(context)
 

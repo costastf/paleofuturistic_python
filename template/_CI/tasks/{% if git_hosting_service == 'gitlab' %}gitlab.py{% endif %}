@@ -38,7 +38,7 @@ def registry_settings() -> RegistrySettings:
     return RegistrySettings(
         url=os.environ['CI_REGISTRY'],
         user=os.environ['CI_REGISTRY_USER'],
-        password_env='CI_REGISTRY_PASSWORD',
+        password_env='CI_REGISTRY_PASSWORD',  # noqa: S106 — the name of an env var to read, not a credential
         image_prefix=os.environ['CI_REGISTRY_IMAGE'],
     )
 

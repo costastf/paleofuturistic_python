@@ -17,6 +17,7 @@ def ruff_lint(context: Context, paths: str = '') -> None:
     Args:
         context: Invoke context.
         paths: Space-separated paths to check. Defaults to the project's standard paths.
+
     """
     execute(context, f'uv run ruff check {paths or PATHS}')
 
@@ -29,6 +30,7 @@ def format_check(context: Context, paths: str = '') -> None:
     Args:
         context: Invoke context.
         paths: Space-separated paths to check. Defaults to the project's standard paths.
+
     """
     execute(context, f'uv run ruff format --check {paths or PATHS}')
 
@@ -47,6 +49,7 @@ def pylint(context: Context, paths: str = '') -> None:
     Args:
         context: Invoke context.
         paths: Space-separated paths to check. Defaults to the project's standard paths.
+
     """
     execute(context, f'uv run pylint -j 4 {paths or PATHS}')
 
@@ -64,6 +67,7 @@ def ty(context: Context, paths: str = '') -> None:
     Args:
         context: Invoke context.
         paths: Space-separated paths to check. Defaults to the project's standard paths.
+
     """
     execute(context, f'uv run ty check {paths or PATHS}')
 
@@ -76,6 +80,7 @@ def complexipy(context: Context, paths: str = '') -> None:
     Args:
         context: Invoke context.
         paths: Space-separated paths to check. Defaults to ``src/``.
+
     """
     execute(context, f'uv run complexipy {paths or "src/"}')
 
@@ -144,6 +149,7 @@ def commitizen(context: Context, commit_msg_file: str | None = None) -> None:
         context: Invoke context.
         commit_msg_file: Path to a commit message file (used by commit-msg hooks).
             When omitted, checks the commits this push would add — see `unpushed_range`.
+
     """
     if commit_msg_file:
         execute(context, f'uv run cz check --commit-msg-file {commit_msg_file}')

@@ -234,9 +234,12 @@ extra-paths = ["_CI/lib/vendor"]
 # exactly what is written; the annotation is what is wrong, not the checker.
 #
 # Older ty resolved those mixins as `@Todo` and checked nothing here, which is why this
-# surfaced as a "regression" when ty gained the ability to model them. Silencing the four
+# surfaced as a "regression" when ty gained the ability to model them. Silencing the five
 # affected rules costs less than the alternative of freezing ty, which left every
-# cyclonedx constructor call in this module unchecked instead.
+# cyclonedx constructor call in this module unchecked instead. `invalid-type-form` is the
+# same union leaking into a *return* annotation: writing `-> Component` names a class whose
+# own decorator resolves to that same unsound union, so any function returning one of these
+# models trips it, not just the constructor calls the other four rules cover.
 #
 # Scoped to the one module that touches those classes. Every other rule still applies
 # there — an `invalid-assignment` in this file is still an error.
@@ -249,6 +252,7 @@ unknown-argument = "ignore"
 unresolved-attribute = "ignore"
 too-many-positional-arguments = "ignore"
 invalid-argument-type = "ignore"
+invalid-type-form = "ignore"
 
 [tool.pylint.MASTER]
 init-hook = "import sys; sys.path.append('src/'); sys.path.append('_CI/lib/vendor/')"

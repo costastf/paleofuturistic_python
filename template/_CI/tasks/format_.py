@@ -17,6 +17,7 @@ def ruff_format(context: Context, paths: str = '') -> None:
     Args:
         context: Invoke context.
         paths: Space-separated paths to format. Defaults to the project's standard paths.
+
     """
     targets = paths or PATHS
     execute(context, f'uv run ruff check --select I --fix {targets}')
@@ -36,6 +37,7 @@ def format_(context: Context, paths: str = '') -> None:
     Args:
         context: Invoke context.
         paths: Space-separated paths to format. Defaults to the project's standard paths.
+
     """
     run_steps(partial(ruff_format, paths=paths))(context)
 

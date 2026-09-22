@@ -81,6 +81,7 @@ class Step(NamedTuple):
         files: Which paths the step accepts, for per-file steps handed a staged subset.
         network: True for steps that reach the network, which are opt-in — a push should not
             fail because a train went into a tunnel.
+
     """
 
     name: str
@@ -105,6 +106,7 @@ def formatting(context: Context, paths: str = '') -> None:
 
     Raises:
         SystemExit: If anything is not formatted.
+
     """
     try:
         format_check(context, paths=paths)
@@ -143,6 +145,7 @@ def artifacts(context: Context, *, write: bool) -> None:
 
     Raises:
         SystemExit: In check mode, if any derived value is stale or its input is missing.
+
     """
     reasons = [
         reason
@@ -217,6 +220,7 @@ def steps_for(scope: str | None = None, *, network: bool = False) -> Iterator[St
     Args:
         scope: Keep only steps of this scope. None keeps every scope.
         network: Include steps that reach the network. They are excluded by default.
+
     """
     for step in STEPS:
         if scope is not None and step.scope != scope:
@@ -299,6 +303,7 @@ def run_scope(
 
     Raises:
         SystemExit: If any step failed, after every step that could still run has run.
+
     """
     # Not `run_steps`, which cannot express the skip — it runs everything it is given. The
     # accumulate-and-report-at-the-end behaviour is the same.
@@ -335,6 +340,7 @@ def staged_files(context: Context) -> str:
             are refused because these paths are printed back as a command to paste, and
             `src/a";id;".py` is a valid filename. Refusing loudly beats letting a path split
             into fragments that match no filter and are quietly skipped.
+
     """
     result = context.run('git diff --cached --name-only --diff-filter=ACMR', hide=True, warn=True)
     if result is None or result.failed:
@@ -368,6 +374,7 @@ def staged(context: Context, paths: str = '') -> None:
     Args:
         context: Invoke context.
         paths: Space-separated paths to check. Defaults to the files staged for commit.
+
     """
     targets = paths or staged_files(context)
     if not targets:
@@ -415,6 +422,7 @@ def preflight(context: Context, write: bool = False, audit_dependencies: bool = 
             cannot have the property that makes the rest worth gating a push on. Its homes are
             a daily schedule, the dependency-change job, and `release.dist` before publishing;
             this flag runs it here as well.
+
     """
     run_scope(context, None, write=write, network=audit_dependencies)
 

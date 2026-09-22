@@ -53,6 +53,7 @@ def pre_commit(context: Context) -> None:
 
     Args:
         context: Invoke context.
+
     """
     execute(context, 'uv run pre-commit run')
 
@@ -74,6 +75,7 @@ def bump_uv(context: Context, version: str = '') -> None:
         context: Invoke context.
         version: Pin this version instead of resolving one. Skips the cool-down, so it is also
             how to take a release newer than the window allows.
+
     """
     try:
         pinned = current_pin(PYPROJECT.read_text(encoding='utf-8'))
