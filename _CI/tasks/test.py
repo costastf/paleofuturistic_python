@@ -8,22 +8,23 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
+from typing import NamedTuple
 
-from invoke import task
+from invoke import Context, task
 
-from _CI import (PROJECT_ROOT_DIRECTORY,
-                 emojize_message,
-                 make_file_executable)
-from _CI.tasks.configuration import (IGNORE_PATTERNS,
-                                     PROJECT_SLUG,
-                                     TEMPLATE_SECURITY_OVERRIDE_ENV,
-                                     base_context,
-                                     combo_context,
-                                     combo_label,
-                                     generation_env,
-                                     qa_cells,
-                                     qa_sequence,
-                                     read_template_overrides)
+from _CI import PROJECT_ROOT_DIRECTORY, emojize_message, make_file_executable
+from _CI.tasks.configuration import (
+    IGNORE_PATTERNS,
+    PROJECT_SLUG,
+    TEMPLATE_SECURITY_OVERRIDE_ENV,
+    base_context,
+    combo_context,
+    combo_label,
+    generation_env,
+    qa_cells,
+    qa_sequence,
+    read_template_overrides,
+)
 
 REPORTS_DIR = PROJECT_ROOT_DIRECTORY / 'reports' / 'matrix'
 MATURE_ORIGIN = 'git@github.com:acme/widget.git'
@@ -68,7 +69,9 @@ def label() -> str:
 '''
 
 
-def run_command(cmd, cwd=None, env=None, log_file=None):
+def run_command(
+    cmd: str, cwd: Path | None = None, env: dict[str, str] | None = None, log_file: Path | None = None
+) -> bool:
     """Run a shell command. Return True on exit 0. Stream to log_file if given, else stdout.
 
     `VIRTUAL_ENV` is stripped from the inherited environment so each combo's
@@ -82,15 +85,18 @@ def run_command(cmd, cwd=None, env=None, log_file=None):
         with log_file.open('a', encoding='utf-8') as handle:
             handle.write(f'\n$ {cmd}\n')
             handle.flush()
-            result = subprocess.run(cmd, shell=True, cwd=cwd_str, env=proc_env,
-                                    stdout=handle, stderr=subprocess.STDOUT)
+            result = subprocess.run(  # noqa: S602 — cmd is a caller-built literal, never external input
+                cmd, shell=True, cwd=cwd_str, env=proc_env, stdout=handle, stderr=subprocess.STDOUT, check=False
+            )
     else:
         print(f'\n$ {cmd}')
-        result = subprocess.run(cmd, shell=True, cwd=cwd_str, env=proc_env)
+        result = subprocess.run(  # noqa: S602 — cmd is a caller-built literal, never external input
+            cmd, shell=True, cwd=cwd_str, env=proc_env, check=False
+        )
     return result.returncode == 0
 
 
-def prepare_snapshot(tmpdir):
+def prepare_snapshot(tmpdir: Path) -> Path:
     """Copy the template into a plain temp dir so copier sees all current files.
 
     Copier copies happily from a non-git local directory, so no git snapshot is needed.
@@ -100,7 +106,7 @@ def prepare_snapshot(tmpdir):
     return template_repo
 
 
-def report_failure(message, log_file):
+def report_failure(message: str, log_file: Path | None) -> None:
     """Record a QA failure in the cell's log, or on stdout when running a single combo."""
     if log_file is not None:
         with log_file.open('a', encoding='utf-8') as handle:
@@ -109,7 +115,7 @@ def report_failure(message, log_file):
         print(emojize_message(message, success=False))
 
 
-def untracked_after_qa(project_dir):
+def untracked_after_qa(project_dir: Path) -> list[str]:
     """Return paths the QA run left untracked, which should be none.
 
     The template promises that running its workflow does not litter: everything the tasks write
@@ -127,7 +133,7 @@ def untracked_after_qa(project_dir):
     workflow output, so a shipped check would fail half the time and police the owner besides.
     """
     result = subprocess.run(
-        ['git', 'status', '--porcelain', '--untracked-files=all'],
+        ['git', 'status', '--porcelain', '--untracked-files=all'],  # noqa: S607 — argv is a fixed literal, resolved via PATH deliberately
         cwd=str(project_dir),
         capture_output=True,
         text=True,
@@ -138,7 +144,59 @@ def untracked_after_qa(project_dir):
     return [line[3:] for line in result.stdout.splitlines() if line.startswith('??')]
 
 
-def run_combo(template_repo, output_root, extra_context, label, log_file=None, mature=False):
+class ComboWorkspace(NamedTuple):
+    """Where a combo reads its template from, and where it generates into.
+
+    Bundled because every caller of `run_combo` passes the two together — they come from the
+    same `tmpdir` — and separating them would only grow the argument list `run_combo` already
+    has enough of.
+    """
+
+    template_repo: Path
+    output_root: Path
+
+
+def write_mature_project(project_dir: Path, extra_context: dict | None) -> None:
+    """Rewrite a freshly generated project to look like it is on day two, not day one.
+
+    Pulled out of `run_combo`: this is the one step that only applies when `mature` is set,
+    and inlining it there was most of what made that function too complex to read in one pass.
+    """
+    oldest = (extra_context or {}).get('min_python_version') or base_context()['min_python_version']
+    major, minor = (int(part) for part in oldest.split('.'))
+    test_module = project_dir / 'tests' / f'test_{PROJECT_SLUG}.py'
+    test_module.write_text(MATURE_TEST_MODULE.format(slug=PROJECT_SLUG), encoding='utf-8')
+    gated = project_dir / 'src' / PROJECT_SLUG / 'generation.py'
+    gated.write_text(MATURE_GATED_MODULE.format(slug=PROJECT_SLUG, boundary=(major, minor + 1)), encoding='utf-8')
+
+
+def security_override_env() -> dict[str, str]:
+    """Return the env additions carrying a combo's security-audit overrides, if any.
+
+    Merges the parent's own `.security-overrides` file with whatever the caller set in
+    `TEMPLATE_SECURITY_OVERRIDE_ENV`, so a locally-set override never has to duplicate what
+    the file already lists.
+    """
+    override_parts = []
+    file_overrides = read_template_overrides()
+    if file_overrides:
+        override_parts.append(file_overrides)
+    env_override = os.environ.get(TEMPLATE_SECURITY_OVERRIDE_ENV, '').strip()
+    if env_override:
+        override_parts.append(env_override)
+    if not override_parts:
+        return {}
+    return {f'{PROJECT_SLUG.upper()}_SECURITY_OVERRIDE': ','.join(override_parts)}
+
+
+def run_combo(
+    workspace: ComboWorkspace,
+    extra_context: dict | None,
+    label: str,
+    log_file: Path | None = None,
+    *,
+    mature: bool = False,
+) -> bool:
     """Generate the template with extra_context and run the QA steps. Return True on success.
 
     `mature` makes the cell look like a project on day two — see `qa_cells` — and carries the
@@ -147,16 +205,13 @@ def run_combo(template_repo, output_root, extra_context, label, log_file=None, m
     `mature` could also pass it for every cell, or for none, and neither is visible from the
     matrix summary.
     """
-    combo_root = output_root / label
+    combo_root = workspace.output_root / label
     combo_root.mkdir(parents=True, exist_ok=True)
 
     data_file = combo_root / 'data.json'
     data_file.write_text(json.dumps(extra_context or {}), encoding='utf-8')
     project_dir = combo_root / 'generated' / PROJECT_SLUG
-    copier_cmd = (
-        f'uvx copier copy --defaults --trust '
-        f'--data-file {data_file} {template_repo} {project_dir}'
-    )
+    copier_cmd = f'uvx copier copy --defaults --trust --data-file {data_file} {workspace.template_repo} {project_dir}'
     # Pin what generation stamps, so the generated `required-version` matches the uv this run
     # is using — otherwise every `uv sync` below fails on a version mismatch.
     if not run_command(copier_cmd, env=generation_env(), log_file=log_file):
@@ -165,36 +220,24 @@ def run_combo(template_repo, output_root, extra_context, label, log_file=None, m
     make_file_executable(project_dir / 'workflow.cmd')
 
     if mature:
-        oldest = (extra_context or {}).get('min_python_version') or base_context()['min_python_version']
-        major, minor = (int(part) for part in oldest.split('.'))
-        test_module = project_dir / 'tests' / f'test_{PROJECT_SLUG}.py'
-        test_module.write_text(MATURE_TEST_MODULE.format(slug=PROJECT_SLUG), encoding='utf-8')
-        gated = project_dir / 'src' / PROJECT_SLUG / 'generation.py'
-        gated.write_text(MATURE_GATED_MODULE.format(slug=PROJECT_SLUG, boundary=(major, minor + 1)), encoding='utf-8')
+        write_mature_project(project_dir, extra_context)
 
     init_steps = (
         'git init -b main',
         *((f'git remote add origin {MATURE_ORIGIN}',) if mature else ()),
         'git add -A',
-        ('git -c commit.gpgsign=false -c user.name=ci -c user.email=ci@localhost '
-         'commit -m "feat: initial project from template" '
-         '--author "ci <ci@localhost>"'),
+        (
+            'git -c commit.gpgsign=false -c user.name=ci -c user.email=ci@localhost '
+            'commit -m "feat: initial project from template" '
+            '--author "ci <ci@localhost>"'
+        ),
         'uv sync --all-extras --dev',
     )
     for step in init_steps:
         if not run_command(step, cwd=project_dir, log_file=log_file):
             return False
 
-    step_env = {'CI': 'true'}
-    override_parts = []
-    file_overrides = read_template_overrides()
-    if file_overrides:
-        override_parts.append(file_overrides)
-    env_override = os.environ.get(TEMPLATE_SECURITY_OVERRIDE_ENV, '').strip()
-    if env_override:
-        override_parts.append(env_override)
-    if override_parts:
-        step_env[f'{PROJECT_SLUG.upper()}_SECURITY_OVERRIDE'] = ','.join(override_parts)
+    step_env = {'CI': 'true', **security_override_env()}
 
     # Accumulate rather than stop at the first failure, matching what the matrix already does
     # across cells and what `run_scope` does across steps. This loop is the slowest feedback
@@ -202,14 +245,16 @@ def run_combo(template_repo, output_root, extra_context, label, log_file=None, m
     # worth the seconds it costs when something is already red. Stopping early also skipped the
     # litter check below in precisely the cells that were already unhappy.
     steps = qa_sequence(audit=mature)
-    failed = [step for step in steps
-              if not run_command(f'./workflow.cmd {step}', cwd=project_dir, env=step_env, log_file=log_file)]
+    failed = [
+        step
+        for step in steps
+        if not run_command(f'./workflow.cmd {step}', cwd=project_dir, env=step_env, log_file=log_file)
+    ]
 
     untracked = untracked_after_qa(project_dir)
     if untracked:
         report_failure(
-            f'[{label}] the workflow left untracked files, so .gitignore has a hole: '
-            f'{", ".join(untracked)}',
+            f'[{label}] the workflow left untracked files, so .gitignore has a hole: {", ".join(untracked)}',
             log_file,
         )
     if failed or untracked:
@@ -220,7 +265,7 @@ def run_combo(template_repo, output_root, extra_context, label, log_file=None, m
 
 
 @task
-def test(context):
+def test(context: Context) -> None:  # noqa: ARG001 — invoke always passes a Context to a @task
     """Generate the template with default context and run the QA cycle on it.
 
     Not the dependency audit: that rides with `mature`, and this generates a pristine
@@ -233,7 +278,7 @@ def test(context):
         template_repo = prepare_snapshot(tmpdir)
         output_root = tmpdir / 'generated'
         output_root.mkdir()
-        ok = run_combo(template_repo, output_root, extra_context={}, label='default')
+        ok = run_combo(ComboWorkspace(template_repo, output_root), extra_context={}, label='default')
         if not ok:
             print(emojize_message('Template QA failed', success=False))
             raise SystemExit(1)
@@ -250,8 +295,13 @@ def test(context):
         'mature': 'Bool — day-two project: no smoke test, an origin, and the dependency audit',
     }
 )
-def combo(context, git_hosting_service='github', integrate_dependency_track=True, integrate_pages=True,
-          mature=False):
+def combo(
+    context: Context,  # noqa: ARG001 — invoke always passes a Context to a @task
+    git_hosting_service: str = 'github',
+    integrate_dependency_track: bool = True,
+    integrate_pages: bool = True,
+    mature: bool = False,
+) -> None:
     """Run the full QA cycle for one matrix cell across all three template knobs."""
     tmpdir = Path(tempfile.mkdtemp(prefix='paleofuturistic_combo_'))
     try:
@@ -265,8 +315,7 @@ def combo(context, git_hosting_service='github', integrate_dependency_track=True
             mature=mature,
         )
         ok = run_combo(
-            template_repo,
-            output_root,
+            ComboWorkspace(template_repo, output_root),
             extra_context=combo_context(
                 git_hosting_service=git_hosting_service,
                 integrate_dependency_track=integrate_dependency_track,
@@ -284,7 +333,7 @@ def combo(context, git_hosting_service='github', integrate_dependency_track=True
 
 
 @task(help={'workers': 'Parallel combos; default 1 (sequential) to avoid pytest-xdist races'})
-def matrix(context, workers=1):
+def matrix(context: Context, workers: int = 1) -> None:  # noqa: ARG001 — invoke always passes a Context to a @task
     """Run every matrix cell; summarize and exit non-zero on any failure.
 
     Defaults to sequential (workers=1) because each combo internally runs tox
@@ -303,8 +352,9 @@ def matrix(context, workers=1):
         template_repo = prepare_snapshot(tmpdir)
         output_root = tmpdir / 'generated'
         output_root.mkdir()
+        workspace = ComboWorkspace(template_repo, output_root)
 
-        def worker(cell):
+        def worker(cell: dict) -> tuple[str, bool, float]:
             label = cell['label']
             log_path = REPORTS_DIR / f'{label}.log'
             if log_path.exists():
@@ -312,8 +362,7 @@ def matrix(context, workers=1):
             start = time.monotonic()
             try:
                 ok = run_combo(
-                    template_repo,
-                    output_root,
+                    workspace,
                     extra_context=combo_context(
                         git_hosting_service=cell['git_hosting_service'],
                         integrate_dependency_track=cell['integrate_dependency_track'],
@@ -329,10 +378,8 @@ def matrix(context, workers=1):
                 ok = False
             return label, ok, time.monotonic() - start
 
-        results = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=effective_workers) as pool:
-            for outcome in pool.map(worker, combos):
-                results.append(outcome)
+            results = list(pool.map(worker, combos))
 
         print()
         print(f'{"combo":<8} {"result":<7} duration')
@@ -353,7 +400,7 @@ def matrix(context, workers=1):
 
 
 @task(help={'as_json': 'Emit the matrix as JSON (for GH Actions consumption)'})
-def list_combos(context, as_json=False):
+def list_combos(context: Context, as_json: bool = False) -> None:  # noqa: ARG001 — invoke always passes a Context to a @task
     """Print the matrix — table by default, JSON array with --as-json."""
     combos = qa_cells()
     if as_json:
@@ -364,14 +411,14 @@ def list_combos(context, as_json=False):
         print(
             f'{cell["label"]:<24} '
             f'{cell["git_hosting_service"]:<7} '
-            f'{str(cell["integrate_dependency_track"]):<10} '
-            f'{str(cell["integrate_pages"]):<6} '
-            f'{str(cell["mature"]):<6}'
+            f'{cell["integrate_dependency_track"]!s:<10} '
+            f'{cell["integrate_pages"]!s:<6} '
+            f'{cell["mature"]!s:<6}'
         )
 
 
 @task
-def invariants(context):
+def invariants(context: Context) -> None:  # noqa: ARG001 — invoke always passes a Context to a @task
     """Run the fast pytest invariants against the cartesian-product matrix."""
     if not run_command('uv run --group test pytest tests/ -v', cwd=PROJECT_ROOT_DIRECTORY):
         print(emojize_message('Template invariants failed', success=False))

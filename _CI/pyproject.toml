@@ -58,5 +58,31 @@ drop = [
 # the real lint gate rejects.
 line-length = 120
 
+[tool.ruff.lint]
+# This repo's own maintainer scripts under `_CI/tasks/` are held to the same bar this repo
+# asks templated projects to hold their own `_CI/tasks/` to — see `template/_CI/pyproject.toml`,
+# which this section mirrors line for line. Ruff resolves *this* file for anything under `_CI/`,
+# independently of the root config, so `select` has to be repeated here rather than inherited.
+select = ["ALL"]
+ignore = [
+    # Same as the root config, and for the same reasons.
+    "D203",    # one-blank-line-before-class (conflicts with D211)
+    "D213",    # multi-line-summary-second-line (conflicts with D212)
+    "CPY001",  # missing-copyright-notice
+    "COM812",  # missing-trailing-comma (conflicts with the formatter)
+    "Q000",    # bad-quotes-inline-string (conflicts with format.quote-style)
+    "Q003",
+    # Specific to this tree, where the root config's reasoning does not carry over.
+    "T201",    # print — this tree is the CLI's own output; print is the point, not a smell
+    "N999",    # invalid-module-name — `_CI` is a project-wide convention, not a per-file choice
+    "FBT001",  # boolean-type-hint-positional-argument — every `@task` option is `name: bool = False`
+    "FBT002",  # boolean-default-value-positional-argument — same shape, same reason
+    "TC006",   # runtime-cast-value — `cast(Task, …)` sites never defer `Task` to TYPE_CHECKING;
+               # quoting satisfies ruff but reads as an unused import to pylint
+]
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+
 [tool.ruff.format]
 quote-style = "single"

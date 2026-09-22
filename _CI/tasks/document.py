@@ -5,7 +5,7 @@ import tomllib
 import urllib.error
 import urllib.request
 
-from invoke import task
+from invoke import Context, task
 
 from _CI import PROJECT_ROOT_DIRECTORY, emojize_message, open_in_default_application
 
@@ -23,9 +23,7 @@ def properdocs_command(args: str) -> str:
     """Compose a `uvx properdocs …` invocation using the pinned versions."""
     properdocs_version, theme_version = docs_versions()
     return (
-        f'uvx --from properdocs=={properdocs_version} '
-        f'--with properdocs-theme-mkdocs=={theme_version} '
-        f'properdocs {args}'
+        f'uvx --from properdocs=={properdocs_version} --with properdocs-theme-mkdocs=={theme_version} properdocs {args}'
     )
 
 
@@ -34,7 +32,7 @@ def is_ci() -> bool:
     return bool(os.environ.get('CI'))
 
 
-def run_properdocs(context, args: str, label: str) -> None:
+def run_properdocs(context: Context, args: str, label: str) -> None:
     """Run a properdocs subcommand and emit a pass/fail status line."""
     result = context.run(properdocs_command(args), warn=True)
     if result is None or result.failed:
@@ -44,13 +42,13 @@ def run_properdocs(context, args: str, label: str) -> None:
 
 
 @task
-def build(context):
+def build(context: Context) -> None:
     """Build the parent template's documentation site via ProperDocs."""
     run_properdocs(context, 'build --strict', 'Document build')
 
 
 @task
-def view(context):  # noqa: ARG001
+def view(context: Context) -> None:  # noqa: ARG001
     """Open the built parent docs in the default browser. Skipped in CI."""
     if is_ci():
         return
@@ -96,14 +94,14 @@ def request_pages_build() -> None:
 
 
 @task
-def deploy_github(context):
+def deploy_github(context: Context) -> None:
     """Build the docs, push them to the gh-pages branch, and request the Pages build."""
     run_properdocs(context, 'gh-deploy --force', 'Document gh-deploy')
     request_pages_build()
 
 
 @task
-def document(context):
+def document(context: Context) -> None:
     """Build the parent docs and open them in the default browser."""
     build(context)
     view(context)

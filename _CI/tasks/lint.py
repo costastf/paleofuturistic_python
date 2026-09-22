@@ -9,7 +9,7 @@ Only ruff runs so far. pylint, ty and complexipy are part of a generated project
 are not wired up here yet.
 """
 
-from invoke import task
+from invoke import Context, task
 
 from _CI import emojize_message
 
@@ -20,7 +20,7 @@ PATHS = 'tasks_render.py tests/'
 RUFF = 'uv run --group lint ruff'
 
 
-def run_ruff(context, args: str, label: str) -> bool:
+def run_ruff(context: Context, args: str, label: str) -> bool:
     """Run one ruff invocation, print a status line, and return whether it passed."""
     result = context.run(f'{RUFF} {args}', warn=True)
     passed = result is not None and not result.failed
@@ -29,21 +29,21 @@ def run_ruff(context, args: str, label: str) -> bool:
 
 
 @task(name='ruff')
-def ruff(context):
+def ruff(context: Context) -> None:
     """Check the parent repository against the same rule set generated projects use."""
     if not run_ruff(context, f'check {PATHS}', 'lint.ruff'):
         raise SystemExit(1)
 
 
 @task(name='format')
-def format_(context):
+def format_(context: Context) -> None:
     """Verify formatting without rewriting anything, as the gate does."""
     if not run_ruff(context, f'format --check {PATHS}', 'lint.format'):
         raise SystemExit(1)
 
 
 @task(default=True, name='all')
-def lint(context):
+def lint(context: Context) -> None:
     """Run every parent lint check, reporting all failures before exiting."""
     # Both run even when the first fails: a single pass should surface every problem rather
     # than making the caller re-run to discover the next one.

@@ -50,7 +50,7 @@ TEMPLATE_SECURITY_OVERRIDE_ENV = 'TEMPLATE_SECURITY_OVERRIDE'
 SECURITY_OVERRIDES_FILE = PROJECT_ROOT_DIRECTORY / '.security-overrides'
 
 
-def read_template_overrides():
+def read_template_overrides() -> str:
     """Return comma-joined entries from the parent `.security-overrides` file.
 
     Entries are validated and parsed by the inner template's `secure.audit`
@@ -75,10 +75,9 @@ def template_uv_version() -> str:
 
     Raises:
         RuntimeError: If the template has no exact `required-version` to read.
+
     """
-    match = re.search(
-        r'^required-version = "==([^"]+)"$', TEMPLATE_PYPROJECT.read_text(encoding='utf-8'), re.MULTILINE
-    )
+    match = re.search(r'^required-version = "==([^"]+)"$', TEMPLATE_PYPROJECT.read_text(encoding='utf-8'), re.MULTILINE)
     if not match:
         msg = f'no exact [tool.uv] required-version found in {TEMPLATE_PYPROJECT}'
         raise RuntimeError(msg)
@@ -112,7 +111,9 @@ def combo_context(*, git_hosting_service: str, integrate_dependency_track: bool,
     }
 
 
-def combo_label(*, git_hosting_service: str, integrate_dependency_track: bool, integrate_pages: bool, mature: bool = False) -> str:
+def combo_label(
+    *, git_hosting_service: str, integrate_dependency_track: bool, integrate_pages: bool, mature: bool = False
+) -> str:
     """Stable short label for log files and CI job names: e.g. ``gh-dep1-pages0``."""
     host_short = 'gh' if git_hosting_service == 'github' else 'gl'
     suffix = '-mature' if mature else ''
@@ -139,7 +140,7 @@ def matrix_combos() -> list[dict]:
 
 
 def qa_sequence(*, audit: bool) -> tuple[str, ...]:
-    """The steps one matrix cell runs, in order: the writers, the audit, then the gate.
+    """Return the steps one matrix cell runs, in order: the writers, the audit, then the gate.
 
     A function rather than a tuple literal in `run_combo`, so what a cell runs is a thing this
     suite can ask about. The guard it replaces asserted `secure.audit` was in `QA_STEPS`, which
