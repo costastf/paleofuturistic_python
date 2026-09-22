@@ -172,7 +172,11 @@ def test_ty_suppressions_stay_scoped_to_one_module(generated_project):
 
     Moving these four rules to `[tool.ty.rules]` would silence them everywhere and look
     like a tidy-up in review, while quietly removing the checks most likely to catch a real
-    call-signature bug across the whole project.
+    call-signature bug across the whole project. `invalid-type-form` — the same union leaking
+    into a *return* annotation — briefly rode along as a fifth rule in this same override; it
+    is deliberately not one of `UNION_WORKAROUND_RULES`, because that rule is instead tagged
+    per line in `sbom.py` (see below), so a config-level rule set that grows beyond this exact
+    four means the fifth one has drifted back into the override rather than staying per line.
     """
     project, _ = generated_project
     ty_config = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))['tool']['ty']
@@ -180,8 +184,32 @@ def test_ty_suppressions_stay_scoped_to_one_module(generated_project):
     assert not disabled_globally, f'ty rules disabled project-wide: {sorted(disabled_globally)}'
     overrides = ty_config.get('overrides', [])
     assert overrides, 'no scoped ty override; the sbom.py workaround has gone missing'
+    sbom_overrides = [override for override in overrides if 'sbom.py' in ','.join(override.get('include', []))]
+    assert sbom_overrides, 'no ty override includes sbom.py; the workaround has gone missing'
     for override in overrides:
         assert override.get('include'), 'a ty override applies to every file, defeating the scoping'
+    for override in sbom_overrides:
+        rules = set(override.get('rules', {}))
+        assert rules == UNION_WORKAROUND_RULES, (
+            f'the sbom.py ty override covers {sorted(rules)}, not exactly the four union-workaround '
+            f'rules — invalid-type-form belongs per line in sbom.py, not in this config'
+        )
+
+
+def test_ty_ignores_in_sbom_are_scoped_to_one_rule(generated_project):
+    """Every `# ty: ignore` in `sbom.py` names `invalid-type-form`, not a bare blanket ignore.
+
+    A bare `# ty: ignore` on one of these lines would also silence `unknown-argument`,
+    `unresolved-attribute`, `too-many-positional-arguments` and `invalid-argument-type` on
+    that exact line — the four rules the config-level override exists to keep live everywhere
+    outside constructor calls this module makes. Naming the rule keeps that promise per line.
+    """
+    project, _ = generated_project
+    sbom_source = (project / '_CI' / 'tasks' / 'sbom.py').read_text(encoding='utf-8')
+    ignore_lines = [line for line in sbom_source.splitlines() if '# ty: ignore' in line]
+    assert ignore_lines, 'no ty: ignore tags found in sbom.py; did the workaround move elsewhere?'
+    for line in ignore_lines:
+        assert 'ty: ignore[invalid-type-form]' in line, f'a ty: ignore tag is not scoped to one rule: {line!r}'
 
 
 def python_floor(pyproject):

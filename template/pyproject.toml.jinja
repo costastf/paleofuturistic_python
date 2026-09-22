@@ -234,12 +234,17 @@ extra-paths = ["_CI/lib/vendor"]
 # exactly what is written; the annotation is what is wrong, not the checker.
 #
 # Older ty resolved those mixins as `@Todo` and checked nothing here, which is why this
-# surfaced as a "regression" when ty gained the ability to model them. Silencing the five
-# affected rules costs less than the alternative of freezing ty, which left every
-# cyclonedx constructor call in this module unchecked instead. `invalid-type-form` is the
-# same union leaking into a *return* annotation: writing `-> Component` names a class whose
-# own decorator resolves to that same unsound union, so any function returning one of these
-# models trips it, not just the constructor calls the other four rules cover.
+# surfaced as a "regression" when ty gained the ability to model them. Silencing these four
+# rules costs less than the alternative of freezing ty, which left every cyclonedx
+# constructor call in this module unchecked instead.
+#
+# The same union also leaks into a *return* annotation: writing `-> Component` names a class
+# whose own decorator resolves to that unsound union, and `invalid-type-form` reports it.
+# That one is not in this list — it lands on eleven identifiable `def` lines in `sbom.py`
+# rather than on every constructor call, so it is tagged there with
+# `# ty: ignore[invalid-type-form]` instead of ignored for the whole file. A per-line tag is
+# also the one ty itself will flag as unused the day py-serializable's annotation is fixed;
+# a file-wide ignore here would give no such signal.
 #
 # Scoped to the one module that touches those classes. Every other rule still applies
 # there — an `invalid-assignment` in this file is still an error.
@@ -252,7 +257,6 @@ unknown-argument = "ignore"
 unresolved-attribute = "ignore"
 too-many-positional-arguments = "ignore"
 invalid-argument-type = "ignore"
-invalid-type-form = "ignore"
 
 [tool.pylint.MASTER]
 init-hook = "import sys; sys.path.append('src/'); sys.path.append('_CI/lib/vendor/')"

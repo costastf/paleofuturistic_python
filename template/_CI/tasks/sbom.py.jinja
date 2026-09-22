@@ -309,7 +309,12 @@ def lookup_vendored_license(name: str) -> LicenseRepository | None:
     return lookup_pypi_license(name)
 
 
-def lookup_pypi_hash(name: str, ver: str) -> HashType | None:
+# invalid-type-form justification, for every ty-ignore tag below: each return annotation
+# here names a cyclonedx model class, and that class's own decorator resolves to
+# `Union[Type[_T], Type[_JsonSerializable], Type[_XmlSerializable]]` under py-serializable's
+# `from typing import Union as Intersection` stopgap — the annotation is unsound, not the
+# value returned. See the override comment in pyproject.toml.jinja.
+def lookup_pypi_hash(name: str, ver: str) -> HashType | None:  # ty: ignore[invalid-type-form]
     """SHA-256 hash from `uv.lock` for the matching name+version."""
     entry = UV_LOCK_INDEX.get(name)
     if not entry or entry.get('version') != ver:
@@ -326,7 +331,7 @@ def lookup_pypi_hash(name: str, ver: str) -> HashType | None:
     return None
 
 
-def pypi_website_reference(name: str, ver: str) -> ExternalReference:
+def pypi_website_reference(name: str, ver: str) -> ExternalReference:  # ty: ignore[invalid-type-form]
     """`type=website` external reference pointing at the PyPI project page."""
     return ExternalReference(
         type=ExternalReferenceType.WEBSITE,
@@ -334,7 +339,12 @@ def pypi_website_reference(name: str, ver: str) -> ExternalReference:
     )
 
 
-def pypi_component(req: PinnedRequirement, scope: ComponentScope, *, license_source: str) -> Component:
+def pypi_component(
+    req: PinnedRequirement,
+    scope: ComponentScope,
+    *,
+    license_source: str,
+) -> Component:  # ty: ignore[invalid-type-form]
     """Build a PyPI-typed CycloneDX component with license, hash, and external_ref.
 
     license_source: 'pypi' (uses importlib.metadata) or 'vendored' (uses LICENSE-text detection).
@@ -357,7 +367,7 @@ def pypi_component(req: PinnedRequirement, scope: ComponentScope, *, license_sou
     )
 
 
-def pipeline_external_reference(spec: PipelineComponent) -> ExternalReference | None:
+def pipeline_external_reference(spec: PipelineComponent) -> ExternalReference | None:  # ty: ignore[invalid-type-form]
     """Return a CycloneDX external_reference pointing at the pipeline component's host page."""
     if spec.purl.startswith('pkg:github/'):
         return ExternalReference(type=ExternalReferenceType.VCS, url=XsUri(f'https://github.com/{spec.name}'))
@@ -366,7 +376,7 @@ def pipeline_external_reference(spec: PipelineComponent) -> ExternalReference | 
     return None
 
 
-def pipeline_to_component(spec: PipelineComponent) -> Component:
+def pipeline_to_component(spec: PipelineComponent) -> Component:  # ty: ignore[invalid-type-form]
     """Build a CycloneDX component from a host-supplied pipeline-component spec."""
     references = [ref for ref in (pipeline_external_reference(spec),) if ref is not None]
     return Component(
@@ -379,7 +389,7 @@ def pipeline_to_component(spec: PipelineComponent) -> Component:
     )
 
 
-def project_authors(project_meta: dict) -> list[OrganizationalContact]:
+def project_authors(project_meta: dict) -> list[OrganizationalContact]:  # ty: ignore[invalid-type-form]
     """Map `pyproject.toml [project.authors]` into OrganizationalContact objects."""
     return [
         OrganizationalContact(name=author.get('name'), email=author.get('email'))
@@ -388,7 +398,7 @@ def project_authors(project_meta: dict) -> list[OrganizationalContact]:
     ]
 
 
-def project_supplier(project_meta: dict) -> OrganizationalEntity | None:
+def project_supplier(project_meta: dict) -> OrganizationalEntity | None:  # ty: ignore[invalid-type-form]
     """Derive a supplier OrganizationalEntity from the first author entry."""
     authors = project_meta.get('authors') or []
     if not authors:
@@ -400,7 +410,7 @@ def project_supplier(project_meta: dict) -> OrganizationalEntity | None:
     return OrganizationalEntity(name=name, contacts=project_authors(project_meta))
 
 
-def root_external_references() -> list[ExternalReference]:
+def root_external_references() -> list[ExternalReference]:  # ty: ignore[invalid-type-form]
     """Return a vcs external_reference pointing at the project's git remote, when reachable."""
     url = origin_repo_url()
     if not url:
@@ -408,7 +418,7 @@ def root_external_references() -> list[ExternalReference]:
     return [ExternalReference(type=ExternalReferenceType.VCS, url=XsUri(url))]
 
 
-def build_root_component(project_meta: dict) -> Component:
+def build_root_component(project_meta: dict) -> Component:  # ty: ignore[invalid-type-form]
     """Build the project's own component, with bom-ref, vcs external_ref, and license."""
     name = project_meta['name']
     ver = project_meta['version']
@@ -427,7 +437,7 @@ def build_root_component(project_meta: dict) -> Component:
     )
 
 
-def build_build_environment_component() -> Component:
+def build_build_environment_component() -> Component:  # ty: ignore[invalid-type-form]
     """Synthetic component representing the build environment (vendored + pipeline)."""
     return Component(
         name=f'{PROJECT_NAME}-build-environment',
@@ -481,7 +491,7 @@ def build_lifecycles() -> LifecycleRepository:
     return LifecycleRepository([PredefinedLifecycle(phase=LifecyclePhase.BUILD)])
 
 
-def build_bom() -> Bom:
+def build_bom() -> Bom:  # ty: ignore[invalid-type-form]
     """Assemble the CycloneDX 1.7 Bom with metadata, components, and a two-level dependency graph."""
     project_meta = read_project_metadata()
     root = build_root_component(project_meta)
