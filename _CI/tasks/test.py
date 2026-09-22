@@ -159,6 +159,10 @@ class ComboWorkspace(NamedTuple):
 def write_mature_project(project_dir: Path, extra_context: dict | None) -> None:
     """Rewrite a freshly generated project to look like it is on day two, not day one.
 
+    Replaces the scaffolded smoke test with one that leaves an import uncalled, and adds a
+    version-gated helper module, so the ratchet has something between 0 and 100 to engage on.
+    See `qa_cells` and docs/maintaining/how-to/test-the-template.md#why-a-matured-cell.
+
     Pulled out of `run_combo`: this is the one step that only applies when `mature` is set,
     and inlining it there was most of what made that function too complex to read in one pass.
     """
@@ -199,7 +203,8 @@ def run_combo(
 ) -> bool:
     """Generate the template with extra_context and run the QA steps. Return True on success.
 
-    `mature` makes the cell look like a project on day two — see `qa_cells` — and carries the
+    `mature` makes the cell look like a project on day two — see `qa_cells` and
+    docs/maintaining/how-to/test-the-template.md#why-a-matured-cell — and carries the
     dependency audit with it, which one cell runs rather than all of them; see `AUDIT_STEP`.
     There is no separate switch for that: a caller who could pass `audit` separately from
     `mature` could also pass it for every cell, or for none, and neither is visible from the

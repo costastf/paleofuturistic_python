@@ -158,6 +158,9 @@ def qa_cells() -> list[dict]:
     differ only in what copier renders. The matured cell removes the smoke test and adds an
     origin, so those paths run too. It is one extra cell rather than a fourth axis because
     nothing it touches interacts with the knobs.
+
+    See docs/maintaining/how-to/test-the-template.md#why-a-matured-cell for the maintainer-facing
+    write-up of the same reasoning.
     """
     cells = [{**cell, 'mature': False} for cell in matrix_combos()]
     mature_config = {
