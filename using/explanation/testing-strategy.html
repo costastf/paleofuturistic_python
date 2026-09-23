@@ -504,6 +504,21 @@
 <p>Coverage regressions still can't slip in silently — they just can't slip in <em>or out</em> during the scaffold phase.</p>
 <h2 id="layer-3-tox">Layer 3 — tox</h2>
 <p>tox + tox-uv runs the test suite against every Python version in the project's range. Configured in <code>pyproject.toml</code>'s <code>[tool.tox]</code>, generated from <code>min_python_version</code> / <code>max_python_version</code> at template-render time.</p>
+<p><strong>Coverage across the matrix is a union, not an average.</strong> Each env writes its own coverage data (<code>.coverage.&lt;envname&gt;</code>, consumed by the combine) and its own reports (<code>reports/coverage.&lt;envname&gt;.json</code>, <code>reports/tests.&lt;envname&gt;.html</code>); <code>test.tox</code> then runs <code>coverage combine</code> to produce the single <code>reports/coverage.json</code> the badge and the ratchet read. A line counts as covered if <em>any</em> interpreter executed it.</p>
+<p>The <a href="../../maintaining/explanation/design-principles.html#the-qa-gate">QA gate</a> stops at that JSON:
+<code>preflight</code> produces what it consumes and nothing else, so it
+renders no browsable report — the same reason it asks pyscn for JSON only. <code>./workflow.cmd
+test.coverage</code> renders the combined HTML from whatever the last run measured, and
+<code>./workflow.cmd test.view</code> runs the tests and opens it.</p>
+<p>A union is the only correct reading of a version matrix, and version-gated code shows why:</p>
+<pre><code class="language-python">if sys.version_info &gt;= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
+</code></pre>
+<p>Under py310 the <code>else</code> runs; under py311+ the <code>if</code> does. No single env covers both, so each reports a miss on code the matrix as a whole exercises completely: on a scaffold with one such branch, each env reports 84.6% with one missing line and one missing branch, while the combined report is 100% with none. Averaging the percentages would give 84.6% for code that is fully exercised.</p>
+<p>The union does not tell you that a line reached only under py314 also works under py310. Coverage measures reach, not correctness; the tests check the latter on every interpreter.</p>
+<p>One consequence: because the ratchet bumps <code>fail_under</code> against the union, trimming <code>env_list</code> later can genuinely lower measured coverage and fail the next run. That is the ratchet working, and lowering the bar is a deliberate, reviewable change as it is everywhere else.</p>
 <p><code>./workflow.cmd test</code> runs only one Python version (whichever the active uv venv resolved to). The full matrix runs in CI per shipped workflow, or locally via <code>./workflow.cmd test.tox</code> (add <code>--env=py310</code> to run a single version). See <a href="../how-to/choose-python-version-range.html">Choose the Python version range</a> for how the matrix is derived.</p>
 <h2 id="what-we-dont-ship">What we don't ship</h2>
 <ul>

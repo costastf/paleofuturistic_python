@@ -484,7 +484,7 @@ cd paleofuturistic_python
 <h2 id="step-3-run-the-fast-check">Step 3. Run the fast check</h2>
 <pre><code class="language-bash">./workflow.cmd test.invariants
 </code></pre>
-<p>This generates a project for each matrix cell (git host × Dependency Track × Pages) once and asserts structural invariants over the results — the right files exist, conditional content matches the chosen knobs, nothing forbidden ships. It's the best signal-per-second check and should be your default while iterating.</p>
+<p>This generates a project for each of the nine matrix cells once: the eight-way cartesian product of git host × Dependency Track × Pages, plus one "matured" day-two cell. It then asserts structural invariants over the results — the right files exist, conditional content matches the chosen knobs, nothing forbidden ships. It's the best signal-per-second check and should be your default while iterating.</p>
 <h2 id="step-4-run-one-full-cell">Step 4. Run one full cell</h2>
 <pre><code class="language-bash">./workflow.cmd test
 </code></pre>
@@ -492,13 +492,14 @@ cd paleofuturistic_python
 <p>To reproduce a specific CI matrix cell instead, use <code>test.combo</code>:</p>
 <pre><code class="language-bash">./workflow.cmd test.combo --git-hosting-service gitlab --no-integrate-pages
 </code></pre>
+<p>If your change touches the coverage ratchet, the CI badge, or the dependency audit, add <code>--mature</code> instead — the ordinary cells generate a pristine day-one project and never exercise any of the three. See <a href="../how-to/test-the-template.html#why-a-matured-cell">Why a matured cell</a>.</p>
 <h2 id="step-5-commit-and-open-a-pull-request">Step 5. Commit and open a pull request</h2>
 <p>Commit messages must follow <a href="https://www.conventionalcommits.org/">Conventional Commits</a> — <code>feat(template): …</code>, <code>fix(ci): …</code> — the lint step rejects anything else.</p>
 <pre><code class="language-bash">git checkout -b feat/my-first-change
 git commit -am &quot;feat(template): clarify the generated README wording&quot;
 git push -u origin feat/my-first-change
 </code></pre>
-<p>CI runs <code>test.invariants</code> plus a fanned-out <code>test.combo</code> per matrix cell on every pull request, so a green local run of steps 3–4 is a good predictor of a green PR.</p>
+<p>CI runs <code>test.invariants</code> plus a fanned-out <code>test.combo</code> per matrix cell, matured cell included, on every pull request, so a green local run of steps 3–4 is a good predictor of a green PR.</p>
 <h2 id="where-to-go-next">Where to go next</h2>
 <ul>
 <li><a href="../how-to/test-the-template.html">Test the template</a> — all four test entry points and when to use each.</li>

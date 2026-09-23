@@ -440,11 +440,11 @@
             
             <li class="nav-item" data-bs-level="1"><a href="#from-zero-to-a-published-package" class="nav-link">From zero to a published package</a>
               <ul class="nav flex-column">
-            <li class="nav-item" data-bs-level="2"><a href="#step-1-connect-to-github" class="nav-link">Step 1 — Connect to GitHub</a>
+            <li class="nav-item" data-bs-level="2"><a href="#step-1-write-a-feature" class="nav-link">Step 1 — Write a feature</a>
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-bs-level="2"><a href="#step-2-write-a-feature" class="nav-link">Step 2 — Write a feature</a>
+            <li class="nav-item" data-bs-level="2"><a href="#step-2-integrate" class="nav-link">Step 2 — Integrate</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -474,17 +474,7 @@
 <h1 id="from-zero-to-a-published-package">From zero to a published package</h1>
 <p>This tutorial picks up where <a href="generate-your-first-project.html">Generate your first project</a> left off: a freshly generated project with a green dev cycle. We'll make a real change, cut a release, and publish to PyPI.</p>
 <p>You'll need a <a href="https://pypi.org/account/register/">PyPI account</a> and a public <a href="https://docs.github.com/en/get-started/git-basics/about-remote-repositories#creating-remote-repositories">git remote</a> before the publish step.</p>
-<h2 id="step-1-connect-to-github">Step 1 — Connect to GitHub</h2>
-<p>For this tutorial we will assume you use GitHub as your git remote.
-Create a repository on GitHub.
-It must be public if you want to publish public GH pages, as we do at the end of this tutorial.
-Do not add any files like README, LICENSE etc.</p>
-<p>Run te following commands in your project directory to connect to the remote:</p>
-<pre><code class="language-bash">git remote add origin git@github.com:your_handle/test_260708.git
-git branch -M main
-git push -u origin main
-</code></pre>
-<h2 id="step-2-write-a-feature">Step 2 — Write a feature</h2>
+<h2 id="step-1-write-a-feature">Step 1 — Write a feature</h2>
 <p>Open <code>src/&lt;your_project_slug&gt;/&lt;your_project_slug&gt;.py</code> and replace the body of <code>hello()</code> with something more interesting, for example:</p>
 <pre><code class="language-python">def hello(greeting: str = 'Hello', someone: str = 'you') -&gt; str:
     &quot;&quot;&quot;Greet someone.
@@ -499,40 +489,72 @@ git push -u origin main
     return f'{greeting} {someone} from test_260708!'
 </code></pre>
 <p>Update the smoke test under <code>tests/</code> to match if needed.
-Run the dev cycle once to confirm it's still green:</p>
-<pre><code class="language-bash">./workflow.cmd develop.pre-commit
-</code></pre>
-<p>Commit:</p>
+Commit:</p>
 <pre><code class="language-bash">git add -A
 git commit -m &quot;feat: greet someone with a specific word&quot;
-git push
 </code></pre>
-<p>(Reminder: conventional commit messages are required, the messages drive the release notes, not the version bump.)</p>
+<p>Reminders:</p>
+<ul>
+<li>All relevant checks for pre-commit run on staged files (Ruff format/check, pylint, complexipy, conventional commit messages).</li>
+<li>Commit messages drive the release notes, not the version bump.</li>
+</ul>
+<h2 id="step-2-integrate">Step 2 — Integrate</h2>
+<p>For this tutorial we will assume you use GitHub as your git remote.
+Create a repository on GitHub.
+It must be public if you want to publish public GH pages, as we do at the end of this tutorial.
+Do not add any files like README, LICENSE etc.</p>
+<p>Run the following commands in your project directory to connect to the remote
+(replace your_handle / test_260708 with your git remote handle / project name here and in the following examples):</p>
+<pre><code class="language-bash">git remote add origin git@github.com:your_handle/test_260708.git
+./workflow.cmd preflight --write
+git add README.md
+git commit -m &quot;docs: point the build badge at the repository&quot;
+git push -u origin main
+</code></pre>
+<p>Preflight might fail if you did some more exotic edits than the example above.
+Don't worry.
+It will tell you what to fix; do that, commit and then try to push all.
+Note that preflight also runs as a QA gate before actually pushing.</p>
+<p>The first preflight wrote the build badge to your README.
+It could not be written before now, because it's built from <code>git remote get-url origin</code>.
+This is the one badge you fill in 'by hand', once.
+The four others — version, Python, coverage and pyscn — are measured from your project, so <code>preflight --write</code> has been keeping them current since the first tutorial.</p>
+<p>Go to your git remote.
+A couple of pipelines will have started running.
+For now only Continuous Integration is the interesting one.
+It runs the same preflight as before, this time where everyone can see its outcome.</p>
 <h2 id="step-3-cut-the-release">Step 3 — Cut the release</h2>
 <pre><code class="language-bash">./workflow.cmd release -i minor
 </code></pre>
 <p>The <code>-i minor</code> is your explicit choice. Valid values: <code>major</code>, <code>minor</code>, <code>patch</code>, <code>alpha</code>, <code>beta</code>, <code>rc</code>.</p>
 <p>This task:</p>
 <ol>
-<li>Validates the working tree is clean and synced with origin.</li>
+<li>Validates the working tree is clean and synched with origin.</li>
 <li>Creates a <code>release/&lt;version&gt;</code> branch off <code>main</code>.</li>
-<li>Bumps the version, writes the changelog, commits both.</li>
+<li>Bumps the version, writes the changelog, updates the version badge, commits all.</li>
 <li>Pushes the branch and the new <code>vX.Y.Z</code> tag.</li>
 <li>Opens a release pull request on your git host (GitHub: via API if <code>GITHUB_TOKEN</code> is set, otherwise prints a manual URL; GitLab: prints a manual URL).</li>
 </ol>
+<p>Note that the security audit pipeline now does run.
+That is because a commit edited <code>uv.lock</code>.
+This is a desired side-effect during release.
+You would not want to release a package with known vulnerabilities (that have not been suppressed in <code>.security-overrides</code>).</p>
 <h2 id="step-4-publish-to-pypi">Step 4 — Publish to PyPI</h2>
 <p>The <code>release.publish</code> task pushes the wheel and SBOM to PyPI. The recommended path is CI-driven <a href="https://docs.pypi.org/trusted-publishers/">PyPI trusted publishing</a> — no long-lived tokens. Wire it up once for the project (see <a href="../how-to/harden-github-repository.html">Harden the GitHub repository</a> for the GitHub Actions side), then:</p>
 <p>Approve and merge the resulting PR.
 The tag and bump land on <code>main</code>.</p>
+<p>After all the pipelines ran you should see your project published on PyPI.</p>
 <h2 id="step-5-publish-the-docs">Step 5 — Publish the docs</h2>
 <p>For GitHub-hosted projects, see <a href="../how-to/publish-docs-to-github-pages.html">Publish docs to GitHub Pages</a> for the workflow file and Pages setup.</p>
 <h2 id="youre-done">You're done</h2>
 <p>A tagged release exists, a wheel is on PyPI, and your docs are live.</p>
 <p>Where to go next:</p>
 <ul>
+<li>Run <code>./workflow.cmd --list</code> to see all available workflow commands and experiment to create your ideal dev cycle.</li>
+<li>Look at the (developer) docs in your templated project. It will guide you on practical things, like adding dependencies.</li>
 <li><a href="../how-to/update-existing-project-with-copier.html">Update an existing project with copier</a> — bring future template improvements into this project.</li>
 <li><a href="../../maintaining/explanation/design-principles.html">Design principles</a> — why the template made the choices it did.</li>
-<li>Run <code>./workflow.cmd --list</code> to see all available workflow commands and experiment to create your ideal dev cycle.</li>
+<li>When you feel comfortable developing in a project molded by this template <a href="../explanation/testing-strategy.html">activate the test coverage ratchet</a>.</li>
 </ul></div>
             </div>
         </div>

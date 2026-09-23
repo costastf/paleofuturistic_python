@@ -452,6 +452,10 @@
               <ul class="nav flex-column">
               </ul>
             </li>
+            <li class="nav-item" data-bs-level="2"><a href="#why-a-matured-cell" class="nav-link">Why a matured cell</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
             <li class="nav-item" data-bs-level="2"><a href="#skipping-a-known-cve" class="nav-link">Skipping a known CVE</a>
               <ul class="nav flex-column">
               </ul>
@@ -491,12 +495,12 @@
 <td>Generate the template with default context and run the full inner QA cycle (<code>format</code>, <code>lint</code>, <code>test.tox</code>, <code>build</code>, <code>document</code>).</td>
 </tr>
 <tr>
-<td><code>./workflow.cmd test.combo --git-hosting-service &lt;github\|gitlab&gt; [--no-integrate-dependency-track] [--no-integrate-pages]</code></td>
-<td>Same as <code>test</code>, but for one explicit matrix cell. Use to reproduce a single CI failure locally.</td>
+<td><code>./workflow.cmd test.combo --git-hosting-service &lt;github\|gitlab&gt; [--no-integrate-dependency-track] [--no-integrate-pages] [--mature]</code></td>
+<td>Same as <code>test</code>, but for one explicit matrix cell. Use to reproduce a single CI failure locally, or add <code>--mature</code> to exercise a day-two project — see <a href="#why-a-matured-cell">Why a matured cell</a> below.</td>
 </tr>
 <tr>
 <td><code>./workflow.cmd test.matrix</code></td>
-<td>Run every cell of the cartesian product; per-cell logs land in <code>reports/matrix/</code>. Defaults to sequential — CI parallelizes by fanning out across runners instead.</td>
+<td>Run every cell <code>_CI/tasks/configuration.py</code>'s <code>qa_cells()</code> defines: the eight-cell cartesian product plus one matured cell. Per-cell logs land in <code>reports/matrix/</code>. Defaults to sequential — CI parallelizes by fanning out across runners instead.</td>
 </tr>
 </tbody>
 </table>
@@ -505,10 +509,20 @@
 <li><strong>While iterating</strong>, run <code>test.invariants</code>. It finishes in a fraction of the time of a full cell and catches structural mistakes (missing conditional files, nav entries pointing nowhere, forbidden content shipping).</li>
 <li><strong>Before pushing</strong>, run <code>test</code> once to prove the default-answers project passes its own QA cycle end to end.</li>
 <li><strong>When CI fails on one cell</strong>, copy that cell's knobs into <code>test.combo</code> and reproduce it locally.</li>
+<li><strong>When touching the ratchet, the badge, or the dependency audit</strong>, run <code>test.combo --mature</code> — the eight ordinary cells never engage any of the three; see <a href="#why-a-matured-cell">Why a matured cell</a>.</li>
 <li><strong>Before a release or a risky refactor</strong>, run <code>test.matrix</code> and check <code>reports/matrix/</code> for per-cell logs.</li>
 </ul>
 <h2 id="what-ci-runs">What CI runs</h2>
-<p><code>.github/workflows/template-matrix.yaml</code> runs <code>test.invariants</code> plus a fanned-out <code>test.combo</code> per matrix cell on every push to <code>main</code> and every pull request. Each cell runs the generated project's full QA cycle, so the generated docs build (including nav/link integrity) is verified for every knob combination.</p>
+<p><code>.github/workflows/template-matrix.yaml</code> runs <code>test.invariants</code> plus a fanned-out <code>test.combo</code> per cell of <code>test.list-combos --as-json</code> (the same nine cells <code>test.matrix</code> runs, matured one included) on every push to <code>main</code> and every pull request. Each cell runs the generated project's full QA cycle, so the generated docs build (including nav/link integrity) is verified for every knob combination.</p>
+<h2 id="why-a-matured-cell">Why a matured cell</h2>
+<p>A freshly generated project is a day-one project: the scaffolded smoke test keeps coverage at 100% and the ratchet dormant, and there is no git remote for the CI badge to name. The eight cartesian cells all generate that same day-one shape — they differ only in what copier renders — so none of them ever exercises:</p>
+<ul>
+<li>the coverage ratchet leaving dormancy and engaging for real,</li>
+<li>the deadlock the coverage union exists to prevent (see <a href="../../using/explanation/testing-strategy.html">Testing strategy</a>), since a dormant or 100%-coverage ratchet can't reach it,</li>
+<li>the CI badge's origin-carrying slug, and</li>
+<li>the dependency audit (<code>secure.audit</code>), which rides with this one cell rather than every cell, so a transient advisory-service error fails one job instead of nine.</li>
+</ul>
+<p><code>test.matrix</code> runs this cell alongside the eight ordinary ones; <code>test.combo --mature</code> reproduces it alone. See <code>qa_cells()</code> in <code>_CI/tasks/configuration.py</code> for the authoritative reasoning on why it's one extra cell rather than a fourth combo axis.</p>
 <h2 id="skipping-a-known-cve">Skipping a known CVE</h2>
 <p>The inner <code>build</code> step runs a security audit that can fail on a freshly published CVE unrelated to your change. To skip known CVEs during template testing:</p>
 <pre><code class="language-bash">TEMPLATE_SECURITY_OVERRIDE=&quot;CVE-2025-71176&quot; ./workflow.cmd test

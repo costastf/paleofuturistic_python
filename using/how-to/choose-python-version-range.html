@@ -473,7 +473,7 @@
 <ul>
 <li><strong><code>requires-python</code></strong> in <code>pyproject.toml</code> is set to <code>&gt;=&lt;min&gt;,&lt;&lt;next-major&gt;</code>.</li>
 <li><strong><code>tool.tox</code> envs</strong> are generated for each minor version from <code>&lt;min&gt;</code> to <code>&lt;max&gt;</code> inclusive.</li>
-<li><strong>CI matrix</strong> in <code>.github/workflows/</code> or <code>.gitlab-ci.yml</code> runs lint/test/build across the same range.</li>
+<li><strong>CI</strong> in <code>.github/workflows/</code> or <code>.gitlab-ci.yml</code> runs <code>preflight</code>, whose tox step covers the same range. Trimming <code>env_list</code> shortens it locally and in CI together.</li>
 <li><strong>PyPI classifiers</strong> (<code>Programming Language :: Python :: 3.X</code>) match the range.</li>
 </ul>
 <h2 id="constraints-enforced-at-generation-time">Constraints enforced at generation time</h2>

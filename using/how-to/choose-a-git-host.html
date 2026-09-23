@@ -528,7 +528,7 @@
 <ul>
 <li><strong>Releasing needs <code>GITLAB_TOKEN</code>.</strong> <code>create_release_pr</code> opens the MR through the GitLab API using a personal, project, or group access token with the <code>api</code> scope. Without one it says so and <code>release</code> falls back to printing the manual <code>pr_create_url</code>, which is also what happens if the API call fails — a release never stops because the MR could not be opened.</li>
 <li><strong>Self-hosted instances work.</strong> The instance host is read from your <code>origin</code> remote rather than assumed to be gitlab.com, for both the API call and the manual URL. Nested groups are handled too; the project path is URL-encoded as the API requires.</li>
-<li>The shipped <code>.gitlab-ci.yml</code> covers lint/test/build/publish for <code>gitlab.com</code> runners; self-hosted runners with kaniko may need adjustments.</li>
+<li>The shipped <code>.gitlab-ci.yml</code> covers the <code>preflight</code> gate, the dependency audit and publish for <code>gitlab.com</code> runners; self-hosted runners with kaniko may need adjustments.</li>
 </ul>
 <h2 id="see-also">See also</h2>
 <ul>
