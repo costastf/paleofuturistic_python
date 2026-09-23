@@ -6,10 +6,12 @@ import shutil
 import tarfile
 import tempfile
 import tomllib
+import types
 import urllib.request
 from pathlib import Path
 
-from invoke import task
+import yaml
+from invoke import Context, task
 
 from _CI import PROJECT_ROOT_DIRECTORY, emojize_message
 
@@ -22,7 +24,7 @@ COPIER_YML = PROJECT_ROOT_DIRECTORY / 'copier.yml'
 UV_RELEASE_MODULE = PROJECT_ROOT_DIRECTORY / 'template' / '_CI' / 'uv_release.py'
 
 
-def load_uv_release():
+def load_uv_release() -> types.ModuleType:
     """Import `template/_CI/uv_release.py` by path.
 
     It is stdlib-only by design, so importing it outside a generated project is safe.
@@ -39,8 +41,6 @@ def supported_python_versions() -> list[str]:
     Read rather than hardcoded so adding a Python version to `copier.yml` automatically
     extends the set of image digests this bumps.
     """
-    import yaml
-
     data = yaml.safe_load(COPIER_YML.read_text(encoding='utf-8'))
     return list(data['min_python_version']['choices'])
 
@@ -54,6 +54,7 @@ def rewrite_template(text: str, version: str, digests: dict[str, str]) -> str:
 
     Raises:
         RuntimeError: If any substitution matches nothing, rather than writing a half-bumped file.
+
     """
     substitutions = [
         ('test-group pin', r'"uv==[^"]+"', f'"uv=={version}"'),
@@ -91,6 +92,7 @@ def rewrite_repo_pin(text: str, version: str) -> str:
 
     Raises:
         RuntimeError: If the pin is not found.
+
     """
     updated, count = re.subn(
         r'^required-version = "==[^"]+"$', f'required-version = "=={version}"', text, flags=re.MULTILINE
@@ -102,7 +104,7 @@ def rewrite_repo_pin(text: str, version: str) -> str:
 
 
 @task(name='bump-uv')
-def bump_uv(context, version=''):  # noqa: ARG001
+def bump_uv(context: Context, version: str = '') -> None:  # noqa: ARG001
     """Move every uv pin in the template and this repo to the newest week-old release.
 
     Ten values change together: four version literals plus the base image tag in the template,
@@ -113,6 +115,7 @@ def bump_uv(context, version=''):  # noqa: ARG001
     Args:
         context: Invoke context.
         version: Pin this version instead of resolving one, skipping the cool-down.
+
     """
     uv_release = load_uv_release()
     template_text = TEMPLATE_PYPROJECT.read_text(encoding='utf-8')
@@ -128,7 +131,11 @@ def bump_uv(context, version=''):  # noqa: ARG001
             print(emojize_message(f'uv {pinned} is already at or ahead of {target} ({age}); nothing to do.'))
             return
         if not uv_release.has_uv_build(target):
-            print(emojize_message(f'uv-build {target} does not exist; refusing a version that cannot build.', success=False))
+            print(
+                emojize_message(
+                    f'uv-build {target} does not exist; refusing a version that cannot build.', success=False
+                )
+            )
             raise SystemExit(1)
         digests = {python: uv_release.image_digest(target, python) for python in supported_python_versions()}
     except uv_release.UvReleaseError as exc:
@@ -226,7 +233,7 @@ def retarget_manifest(destination: Path, upstream_name: str) -> None:
 
 
 @task(name='sync-vendor')
-def sync_vendor(context):
+def sync_vendor(context: Context) -> None:
     """Refresh both vendored invoke trees from the pinned upstream commit.
 
     The tree is built by schubergphilis/vendored_invoke and copied in verbatim — editing it

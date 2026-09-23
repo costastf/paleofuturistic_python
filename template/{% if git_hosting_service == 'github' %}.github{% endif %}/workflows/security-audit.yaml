@@ -1,14 +1,43 @@
 name: Security audit
 
-# A dependency can turn out to be vulnerable, and a `.security-overrides` entry can
-# expire, without anyone pushing a commit. Tied to `push` alone the audit only fires on
-# activity, so a quiet repository quietly stops being checked — and the expiry dates in
-# `.security-overrides` would never come due. This run is what makes them load-bearing.
+# Every trigger the audit has, and none of them is "every push".
+#
+# A dependency can turn out to be vulnerable, and a `.security-overrides` entry can expire,
+# without anyone pushing a commit. The schedule is what makes those expiry dates load-bearing:
+# tied to `push` alone, a quiet repository quietly stops being checked.
+#
+# The reverse matters as much. An audit on *every* push fails pull requests for something the
+# author did not do and cannot fix in their branch, and a docstring change going red because a
+# CVE was published overnight is the kind of noise that teaches people to ignore a red pipeline.
+# So the push trigger is narrowed to the files that can introduce a vulnerable dependency:
+# change the dependency surface and you own the result, touch anything else and the schedule
+# handles it.
+#
+# Publishing is gated separately by `release.dist`, which audits before it builds — the moment
+# the outside world is exposed, and the one place refusing to proceed protects somebody.
 on:
   schedule:
     # Daily. The minute is deliberately not :00 — GitHub sheds on-the-hour scheduled
     # jobs when the queue is busy. Adjust the cadence to taste.
     - cron: '17 3 * * *'
+  push:
+    paths:
+      # `uv.lock` covers every real dependency change: the project runs `--frozen` throughout,
+      # so a `pyproject.toml` edit that changes what is installed changes the lockfile with it.
+      # Watching `pyproject.toml` too meant a coverage-ratchet bump — a number in a table —
+      # firing a full audit of a dependency set nobody had touched. A release still audits:
+      # `[tool.commitizen] version_provider = "uv"` re-locks, so the bump commit carries the
+      # root package's own version line in `uv.lock`. That one is worth auditing anyway, being
+      # the commit that publishes.
+      - 'uv.lock'
+      # The vendored CI dependencies: `secure.audit` audits `vendor.txt` by name, since the
+      # trees ship as source with no `.dist-info` for any installed-distribution scan to find.
+      # The tree and its patches are watched too — nothing audits a hand-edited vendored file,
+      # but a push that touches one is worth a human reading the diff.
+      - '_CI/lib/vendor.txt'
+      - '_CI/lib/vendor/**'
+      - '_CI/lib/patches/**'
+      - '.security-overrides'
   workflow_dispatch:
 
 permissions:

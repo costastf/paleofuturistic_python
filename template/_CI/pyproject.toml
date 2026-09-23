@@ -67,5 +67,46 @@ drop = [
 # 121-character line duly passed every ruff run and failed the real gate.
 line-length = 120
 
+[tool.ruff.lint]
+# Everything the root config selects, for two reasons at once. `./workflow.cmd format` runs
+# over `_CI/tasks/` too, and a fix nothing checks is a rewrite nobody sees coming — import
+# order drifted here silently under the old narrower selection until `format` swept the
+# correction into whatever commit came next. And this is the code a templated project's own
+# `src/` is held to the same bar as; a narrower selection here would be a standard this repo
+# does not itself meet. Ruff resolves this file for anything under `_CI/`, so it has to be
+# selected here as well as in the root config — the two lists are kept in step by
+# `test_the_gate_verifies_the_import_order_format_writes`.
+select = ["ALL"]
+ignore = [
+    # Same as the root config, and for the same reasons.
+    "D203",    # one-blank-line-before-class (conflicts with D211)
+    "D213",    # multi-line-summary-second-line (conflicts with D212)
+    "CPY001",  # missing-copyright-notice
+    "COM812",  # missing-trailing-comma (conflicts with the formatter)
+    "Q000",    # bad-quotes-inline-string (conflicts with format.quote-style)
+    "Q003",
+    # Specific to this tree, where the root config's reasoning does not carry over.
+    "T201",    # print — this tree is the CLI's own output; print is the point, not a smell
+    "N999",    # invalid-module-name — `_CI` is a project-wide convention, not a per-file choice
+    # Every `@task` here takes its options as `name: bool = False`, which is what invoke turns
+    # into a `--name` flag — there is no other way to write an optional CLI switch. The root
+    # config leaves these two commented out because they are a case-by-case call in library
+    # code; here every hit is this one systemic shape, not a call site worth a per-line noqa.
+    "FBT001",  # boolean-type-hint-positional-argument
+    "FBT002",  # boolean-default-value-positional-argument
+    # Every namespace registration ends in `cast(Task, some_task)`, and `Task` is imported
+    # unconditionally at module scope in every file — never deferred to a `TYPE_CHECKING`
+    # block, so there is no forward reference for the quoting this rule wants to protect.
+    # Tried it: ruff's own checker treats the quoted form as a use of the name, but pylint's
+    # unused-import check does not, so quoting `cast('Task', …)` made every such import read
+    # as unused to the other tool this gate also runs. Cast targets that genuinely are
+    # TYPE_CHECKING-only (`cast('Message', …)` in `sbom.py`) are quoted regardless — this
+    # rule just cannot tell the two cases apart, so it is off rather than wrong half the time.
+    "TC006",   # runtime-cast-value
+]
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+
 [tool.ruff.format]
 quote-style = "single"

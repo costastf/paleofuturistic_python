@@ -38,7 +38,7 @@ def registry_settings() -> RegistrySettings:
     return RegistrySettings(
         url=os.environ['CI_REGISTRY'],
         user=os.environ['CI_REGISTRY_USER'],
-        password_env='CI_REGISTRY_PASSWORD',
+        password_env='CI_REGISTRY_PASSWORD',  # noqa: S106 — the name of an env var to read, not a credential
         image_prefix=os.environ['CI_REGISTRY_IMAGE'],
     )
 
@@ -98,6 +98,26 @@ def origin_ref(context: Context) -> RemoteRef:
 def origin_slug(context: Context) -> str:
     """Return the project path (group/.../project) of the origin remote, or '' if unparseable."""
     return origin_ref(context).path
+
+
+def pipeline_badge(context: Context) -> str:
+    """Return the README markdown for GitLab's own pipeline-status badge, or '' if unknown.
+
+    GitLab serves a badge that always reflects the latest pipeline on the default branch, so the
+    status needs no writer here. Only the *URL* is derived, from `origin`, and it stops changing
+    once written.
+
+    The host comes from `origin` rather than being assumed to be gitlab.com, for the same reason
+    as `origin_ref`. An empty string means `origin` is not readable yet, which is not the same
+    as a wrong badge.
+    """
+    origin = origin_ref(context)
+    if not origin.host or not origin.path:
+        return ''
+    return (
+        f'[![Pipeline](https://{origin.host}/{origin.path}/badges/main/pipeline.svg)]'
+        f'(https://{origin.host}/{origin.path}/-/pipelines)'
+    )
 
 
 def pr_create_url(context: Context, release_branch: str) -> str:

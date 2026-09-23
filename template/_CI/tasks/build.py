@@ -1,32 +1,11 @@
 """Build task definitions."""
 
-import re
-from pathlib import Path
 from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .secure import secure
+from .secure import sbom
 from .shared import logged, run, run_steps
-
-STATUS_COLORS = {'passing': 'brightgreen', 'failing': 'red'}
-
-
-def update_build_badge(status: str) -> None:
-    """Update the build badge in README.md."""
-    readme = Path('README.md')
-    if not readme.exists():
-        return
-    color = STATUS_COLORS.get(status, 'lightgrey')
-    content = readme.read_text(encoding='utf-8')
-    updated = re.sub(
-        r'(\[!\[Build\]\(https://img\.shields\.io/badge/build-)[^)]+(\))',
-        rf'\g<1>{status}-{color}\2',
-        content,
-    )
-    if updated != content:
-        readme.write_text(updated, encoding='utf-8')
-        print(f'Updated build badge to {status}.')
 
 
 @task
@@ -39,13 +18,17 @@ def package(context: Context) -> None:
 @task
 @logged('build')
 def build(context: Context) -> None:
-    """Run security checks and build the package; reports all failures before exiting."""
-    try:
-        run_steps(secure, package)(context)
-    except SystemExit:
-        update_build_badge('failing')
-        raise
-    update_build_badge('passing')
+    """Compose the SBOM and build the package; reports all failures before exiting.
+
+    Deterministic from the tree: the SBOM comes from the lockfile, and `uv build` ships it
+    inside the wheel. There is no dependency audit here on purpose — see `secure.sbom` — so a
+    wheel can still be built when a fresh advisory lands. `release.dist` audits before it
+    builds, which is where refusing to proceed actually protects someone.
+
+    It records no outcome in a README badge: the CI badge points at the host's own status
+    endpoint, which is always current. See `document.update_pipeline_badge`.
+    """
+    run_steps(sbom, package)(context)
 
 
 namespace = Collection('build')

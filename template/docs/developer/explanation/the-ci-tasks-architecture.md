@@ -44,11 +44,11 @@ _CI/tasks/
 ├── __init__.py          # Namespace aggregation + bootstrap pre-task wiring
 ├── bootstrap.py         # First-run setup framework
 ├── configuration.py     # Shared constants (paths, env vars, registry settings)
-├── shared.py            # @logged, @run, execute, run_steps, IndentingStream
+├── shared.py            # @logged, @run, execute, run_steps, apply_badge, IndentingStream
 ├── github.py / gitlab.py  # Host-specific helpers (only one is present)
 ├── local.py             # Yours. Never overwritten by `copier update`
 └── <feature>.py         # build, container, develop, document, format_, lint,
-                         #   quality, release, secure, test
+                         #   preflight, quality, release, secure, test
 ```
 
 Everything there except `local.py` is template-owned and replaced on update, which is why

@@ -17,9 +17,7 @@ WSL_INTEROP_MARKERS = (
     '/proc/sys/fs/binfmt_misc/WSLInterop-late',
 )
 
-PROJECT_ROOT_DIRECTORY = next(
-    parent for parent in Path(__file__).resolve().parents if (parent / '_CI').is_dir()
-)
+PROJECT_ROOT_DIRECTORY = next(parent for parent in Path(__file__).resolve().parents if (parent / '_CI').is_dir())
 INVOKE_LOGGING_LEVEL = os.environ.get('INVOKE_LOGGING_LEVEL') or 'INFO'
 
 
@@ -45,7 +43,7 @@ def is_wsl() -> bool:
     """Return True when running under WSL (detected via /proc/version)."""
     if platform.system() != 'Linux':
         return False
-    with suppress(OSError), open('/proc/version', encoding='utf-8') as proc_version:
+    with suppress(OSError), Path('/proc/version').open(encoding='utf-8') as proc_version:
         return any(marker in proc_version.read().lower() for marker in ('microsoft', 'wsl'))
     return False
 
@@ -66,16 +64,21 @@ def open_in_default_application(target: Path) -> None:
         webbrowser.open(target.as_uri())
         return
     if shutil.which('wslview'):
-        subprocess.run(['wslview', str(target)], check=False)
+        subprocess.run(['wslview', str(target)], check=False)  # noqa: S603, S607 — argv is a fixed literal, resolved via PATH deliberately
         return
-    if not any(os.path.exists(marker) for marker in WSL_INTEROP_MARKERS):
+    if not any(Path(marker).exists() for marker in WSL_INTEROP_MARKERS):
         print(f'WSL interop is disabled, so {target} cannot be handed to Windows. Open it manually.')
         return
-    translated = subprocess.run(['wslpath', '-w', str(target)], capture_output=True, text=True, check=False)
+    translated = subprocess.run(  # noqa: S603 — argv is a fixed literal, resolved via PATH deliberately
+        ['wslpath', '-w', str(target)],  # noqa: S607 — argv is a fixed literal, resolved via PATH deliberately
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     windows_path = translated.stdout.strip()
     if translated.returncode != 0 or not windows_path:
         print(f'Could not translate {target} to a Windows path. Open it manually.')
         return
     # The empty '' is `start`'s window-title argument. Without it cmd.exe reads the
     # quoted path as the title and opens nothing.
-    subprocess.run(['cmd.exe', '/c', 'start', '', windows_path], check=False)
+    subprocess.run(['cmd.exe', '/c', 'start', '', windows_path], check=False)  # noqa: S603, S607 — argv is a fixed literal, resolved via PATH deliberately

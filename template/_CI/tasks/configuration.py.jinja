@@ -4,6 +4,14 @@ import re
 from pathlib import Path
 
 PATHS = 'src/ _CI/tasks/ tests/'
+# Which paths a per-file check accepts, and the same answer for anything else asking "is this
+# file ours?". These moved out of `.pre-commit-config.yaml`: with one hook for the whole bundle
+# there is only one `files:` filter left, so the per-tool distinction has to live somewhere it
+# can still be applied — and here it is one source of truth the invariant suite can read,
+# rather than six YAML patterns nobody diffs. The gate names it when it prints the command that
+# fixes a formatting failure, so that command covers the files the checks have an opinion on.
+CODE_FILES = re.compile(r'^(_CI/tasks/|src/|tests/).*\.py$')
+SRC_FILES = re.compile(r'^src/.*\.py$')
 SECURITY_OVERRIDE_ENV = '{{ project_slug | upper }}_SECURITY_OVERRIDE'
 SECURITY_OVERRIDES_FILE = Path('.security-overrides')
 
@@ -21,6 +29,25 @@ PROJECT_NAME = '{{ project_slug }}'
 # SBOM ships inside the wheel via the package data tree, so consumers of the
 # released artefact can extract it via importlib.resources or by unzipping.
 SBOM_FILE = Path('src') / PROJECT_NAME / 'sbom.cdx.json'
+# How many times `secure.audit` will re-run a pip-audit invocation that crashed. Three is one
+# original plus two retries: enough for a single reset connection or a service blip, few enough
+# that a service which is properly down still fails the run inside a minute.
+AUDIT_ATTEMPTS = 3
+
+# How far out an expiry can be before `secure.audit` points out that it is not really an
+# expiry. A remark, not a limit: the date is there to force a re-review, and a distant one
+# defeats that while looking like it honours it — but how long an acceptance is worth carrying
+# belongs to the project.
+MAX_SUPPRESSION_DAYS = 365
+
+# Where `secure.audit` writes the requirement files it derives from `uv.lock`. Gitignored with
+# the rest of `reports/`: they are a rendering of the lockfile, not a second source of truth.
+AUDIT_REQUIREMENTS = Path('reports') / 'audit-requirements.txt'
+
+# How pip-audit says it reached a conclusion, either way: "No known vulnerabilities found" or
+# "Found N known vulnerabilities in M packages". `secure.audit` retries a run that says neither,
+# because a run that never reported has established nothing.
+AUDIT_VERDICTS = ('known vulnerabilit',)
 VENDOR_TXT = Path('_CI') / 'lib' / 'vendor.txt'
 VENDOR_DIR = Path('_CI') / 'lib' / 'vendor'
 UV_LOCK = Path('uv.lock')

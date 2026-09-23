@@ -1,12 +1,12 @@
 # Publish docs to GitHub Pages
 
-For GitHub-hosted projects, the template ships `.github/workflows/pages.yaml` by default. It runs `./workflow.cmd document.deploy-github` on every push to `main`, which delegates to `properdocs gh-deploy` (no GitHub Pages deploy actions involved — see [Design principles](../../maintaining/explanation/design-principles.md#pipelines-run-template-commands-only) for the reasoning). The only manual step is enabling Pages on the GitHub side.
+For GitHub-hosted projects, the template ships `.github/workflows/pages.yaml` by default. It runs `./workflow.cmd document.deploy-github` when a release lands on `main`, which delegates to `properdocs gh-deploy` (no GitHub Pages deploy actions involved — see [Design principles](../../maintaining/explanation/design-principles.md#pipelines-run-template-commands-only) for the reasoning). The only manual step is enabling Pages on the GitHub side.
 
 The Pages scaffolding is **opt-in/opt-out at generation time** via the `integrate_pages` question (default `true`). Answering `false` omits both the workflow file and the matching `document.deploy-github` task from the generated project — see [Copier questions](../reference/copier-questions.md#integrate_pages).
 
 ## Step 1 — Push the template
 
-Generate the project with `git_hosting_service=github`, push to GitHub. The first push to `main` triggers the Pages workflow. The workflow creates the `gh-pages` branch on its first successful run.
+Generate the project with `git_hosting_service=github`, push to GitHub. The workflow creates the `gh-pages` branch on its first successful run — which happens on your first release, or immediately if you trigger it by hand from the **Actions** tab (`workflow_dispatch`), which is how a project that has not released yet gets a site.
 
 ## Step 2 — Enable Pages on the repo
 
@@ -18,7 +18,7 @@ On GitHub:
 
 The branch only appears after the first workflow run completes — wait for the Actions tab to show a green Pages run, then configure.
 
-That's it. Subsequent pushes to `main` redeploy automatically. The site lives at `https://<owner>.github.io/<repo>/`.
+That's it. Each subsequent release redeploys automatically. The site lives at `https://<owner>.github.io/<repo>/`.
 
 ## Why `gh-pages` branch instead of the Actions-source flow?
 
@@ -31,7 +31,7 @@ See [Design principles](../../maintaining/explanation/design-principles.md#pipel
 
 ## About the Node.js deprecation warning
 
-After every push to `main` you may see a deprecation warning on the **`pages build and deployment`** workflow run — *not* on our `Pages` workflow. The warning reads:
+After each deploy you may see a deprecation warning on the **`pages build and deployment`** workflow run — *not* on our `Pages` workflow. The warning reads:
 
 > Node.js 20 actions are deprecated. The following actions are running on Node.js 20 and may not work as expected: actions/checkout@v4, actions/upload-artifact@v4.
 
@@ -43,6 +43,19 @@ The warning is expected and intentionally not addressed. Silencing it would requ
 
 The workflow uses `concurrency: { group: pages, cancel-in-progress: false }`. If you push twice in quick succession, the second deploy waits for the first to finish rather than racing it. Cancelling mid-deploy would leave the `gh-pages` branch in an indeterminate state.
 
+## Why on release rather than on every push
+
+Docs built from `main` describe code that is in no release yet, so a reader following them can
+reach for a function they cannot install. The workflow triggers on a push to `main` and asks
+`detect-release-tag.yaml` whether it carried a v-prefixed tag — the same reusable workflow
+`publish.yaml` uses, so the site and the package cannot disagree about what counts as released.
+
+Not a `push: tags: ['v*']` trigger: `./workflow.cmd release` pushes the tag from the release
+branch before the pull request merges, so that would publish docs for a version yet to land.
+
+A site tracking `main` as well means versioned docs — a `stable` build plus a `dev` one — rather
+than a trigger change, which is more machinery than the template ships today.
+
 ## Custom domain
 
 After the first deploy:
@@ -51,7 +64,7 @@ After the first deploy:
 2. Configure DNS — ALIAS/ANAME for an apex domain, CNAME for a subdomain — pointing at `<owner>.github.io`.
 3. **Settings → Pages → Custom domain** to set it on the GitHub side.
 
-The next push to `main` redeploys with the custom domain.
+The next release redeploys with the custom domain (or trigger the workflow by hand).
 
 ## GitLab Pages instead
 

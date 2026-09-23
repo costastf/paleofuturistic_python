@@ -35,4 +35,6 @@ Full documentation lives in [`docs/`](docs/index.md) — build and open it with 
 
 Prerequisite: [uv](https://docs.astral.sh/uv/). Every development action runs through `./workflow.cmd <task>` — the first run bootstraps the environment automatically.
 
+The one command to remember is `./workflow.cmd preflight`: it lints, type-checks, tests, builds, and checks that the badges above and the coverage bar match what the tools measured. It is exactly what the pre-push hook and CI run, so a green run here means a green pipeline. Add `--write` when it tells you a badge is stale and it updates them. The hooks cover the rest — the staged files on every commit, `preflight` on every push.
+
 The scaffold manual lives in the docs' **Developer** section: start with [First-run setup](docs/developer/tutorials/first-run-setup.md); the full command list is in the [Invoke task catalog](docs/developer/reference/invoke-tasks.md).

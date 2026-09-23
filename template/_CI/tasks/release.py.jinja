@@ -14,11 +14,14 @@ from .configuration import OIDC_ENV_VARS, OWASP_DTRACK_SETTINGS, SBOM_FILE, UV_P
 {%- else %}
 from .configuration import OIDC_ENV_VARS, SBOM_FILE, UV_PUBLISH_SETTINGS
 {%- endif %}
+from .document import update_package_version_badge
 from .{{ git_hosting_service }} import create_release_pr, pr_create_url
 {%- if integrate_dependency_track %}
-from .secure import sbom_upload
+from .secure import audit, sbom_upload
+{%- else %}
+from .secure import audit
 {%- endif %}
-from .shared import commit, execute, logged
+from .shared import commit, execute, logged, note
 
 
 @task
@@ -76,11 +79,23 @@ def validate(context: Context) -> None:
 @task
 @logged('release.bump')
 def bump(context: Context, increment: str = '') -> None:
-    """Bump the version and create a git tag.
+    """Bump the version, refresh the version badge, and create a git tag.
+
+    The badge is refreshed *before* `cz bump`, so it lands in the commit the release tag points
+    at: `cz bump` commits every modified tracked file — verified, a README edited beforehand is
+    swept into its commit — which is also why `release` runs `validate` first to insist on a
+    clean tree. Otherwise the release would land a README contradicting the version it
+    released, and the next `preflight` on main would fail on the stale badge.
+
+    Writing before the step that can fail means putting the badge back when it does. `cz bump`
+    refuses on a dirty tree, an unparseable history or a hook it cannot satisfy, and a badge
+    announcing a version nobody released is worse than the failure that caused it. The restore
+    reads the version from pyproject.toml, which a failed bump has not touched.
 
     Args:
         context: Invoke context.
         increment: Version increment type — major, minor, patch, alpha, beta, or rc.
+
     """
     prerelease_types = ('alpha', 'beta', 'rc')
     semver_types = ('major', 'minor', 'patch')
@@ -89,10 +104,19 @@ def bump(context: Context, increment: str = '') -> None:
         print('Usage: ./workflow.cmd release -i <increment>')
         print(f'  increment: {", ".join(valid)}')
         raise SystemExit(1)
-    if increment in prerelease_types:
-        execute(context, f'uv run cz bump --increment patch --prerelease {increment} --allow-no-commit --yes')
-    else:
-        execute(context, f'uv run cz bump --increment {increment} --allow-no-commit --yes')
+    note(update_package_version_badge(version=resolve_next_version(context, increment)))
+    try:
+        if increment in prerelease_types:
+            execute(context, f'uv run cz bump --increment patch --prerelease {increment} --allow-no-commit --yes')
+        else:
+            execute(context, f'uv run cz bump --increment {increment} --allow-no-commit --yes')
+    except SystemExit:
+        # A failed bump leaves the version in pyproject.toml alone, so writing the badge from
+        # pyproject.toml puts back exactly what was there — through the same substitution that
+        # changed it, so there is still one writer.
+        note(update_package_version_badge())
+        print('Version badge restored: the bump it announced did not happen.')
+        raise
 
 
 @task
@@ -110,6 +134,7 @@ def changelog(context: Context, write: bool = False) -> None:
     Args:
         context: Invoke context.
         write: Write changelog to file and commit instead of printing to stdout.
+
     """
     if write:
         execute(context, 'uv run cz changelog')
@@ -143,8 +168,14 @@ def dist(context: Context) -> None:
     building and uploading them — CI attests their provenance there. Anything that inspects
     ``dist/`` must run against the exact files that get published, which is why ``publish
     --prebuilt`` exists rather than simply building a second time.
+
+    The dependency audit runs here rather than inside ``build``. Publishing is the moment the
+    outside world is exposed to what these dependencies contain, so it is the moment worth
+    blocking on a live advisory; merely building a wheel locally is not, and coupling the two
+    meant a new CVE could stop a hotfix from being built at all.
     """
     clean(context)
+    audit(context)
     build(context)
 
 
@@ -158,6 +189,7 @@ def publish(context: Context, prebuilt: bool = False) -> None:
         prebuilt: Publish what is already in ``dist/`` instead of rebuilding. Set this when an
             earlier step ran ``release.dist`` and acted on those artifacts — rebuilding would
             upload files that no attestation, checksum or signature refers to.
+
     """
     if all(os.environ.get(var) for var in OIDC_ENV_VARS):
         print('PyPI trusted publishing (OIDC) detected — skipping legacy credential check.')
@@ -229,6 +261,32 @@ def resolve_next_version(context: Context, increment: str) -> str:
     return match.group(1)
 
 
+def abort_if_ref_exists(
+    kind: str, name: str, retry_hint: str, *, has: tuple[bool, bool], delete: tuple[str, str]
+) -> None:
+    """Print where `name` already exists and abort, naming the commands that remove it.
+
+    The two calls in `ensure_refs_are_free` share this exact shape (check local, check origin,
+    report both, name the fix) and differ only in the ref kind and the delete commands. `has`
+    and `delete` are each `(local, remote)`, mirroring the two-sided check the body makes.
+    """
+    local_has, remote_has = has
+    if not (local_has or remote_has):
+        return
+    delete_local, delete_remote = delete
+    locations = []
+    if local_has:
+        locations.append('locally')
+    if remote_has:
+        locations.append('on origin')
+    print(f'{kind} `{name}` already exists {" and ".join(locations)}. {retry_hint}')
+    if remote_has:
+        print(f'  {delete_remote}')
+    if local_has:
+        print(f'  {delete_local}')
+    raise SystemExit(1)
+
+
 def ensure_refs_are_free(context: Context, new_version: str, release_branch: str) -> None:
     """Abort before any git mutation if the target tag or branch already exists.
 
@@ -238,55 +296,30 @@ def ensure_refs_are_free(context: Context, new_version: str, release_branch: str
     """
     tag_ref = f'v{new_version}'
     local_tag = context.run(f'git tag --list {tag_ref}', hide=True, warn=True)
-    remote_tag = context.run(
-        f'git ls-remote --tags origin refs/tags/{tag_ref}',
-        hide=True,
-        warn=True,
+    remote_tag = context.run(f'git ls-remote --tags origin refs/tags/{tag_ref}', hide=True, warn=True)
+    abort_if_ref_exists(
+        'Tag',
+        tag_ref,
+        'Bump to a different version, or remove the tag everywhere before retrying:',
+        has=(
+            bool(local_tag is not None and local_tag.stdout.strip()),
+            bool(remote_tag is not None and remote_tag.stdout.strip()),
+        ),
+        delete=(f'git tag -d {tag_ref}', f'git push origin :refs/tags/{tag_ref}'),
     )
-    local_has = local_tag is not None and local_tag.stdout.strip()
-    remote_has = remote_tag is not None and remote_tag.stdout.strip()
-    if local_has or remote_has:
-        locations = []
-        if local_has:
-            locations.append('locally')
-        if remote_has:
-            locations.append('on origin')
-        print(
-            f'Tag `{tag_ref}` already exists {" and ".join(locations)}. '
-            'Bump to a different version, or remove the tag everywhere before retrying:'
-        )
-        if remote_has:
-            print(f'  git push origin :refs/tags/{tag_ref}')
-        if local_has:
-            print(f'  git tag -d {tag_ref}')
-        raise SystemExit(1)
 
-    local_branch = context.run(
-        f'git show-ref --verify --quiet refs/heads/{release_branch}',
-        hide=True,
-        warn=True,
+    local_branch = context.run(f'git show-ref --verify --quiet refs/heads/{release_branch}', hide=True, warn=True)
+    remote_branch = context.run(f'git ls-remote --heads origin refs/heads/{release_branch}', hide=True, warn=True)
+    abort_if_ref_exists(
+        'Branch',
+        release_branch,
+        'Remove it everywhere before retrying:',
+        has=(
+            bool(local_branch is not None and not local_branch.failed),
+            bool(remote_branch is not None and remote_branch.stdout.strip()),
+        ),
+        delete=(f'git branch -D {release_branch}', f'git push origin --delete {release_branch}'),
     )
-    remote_branch = context.run(
-        f'git ls-remote --heads origin refs/heads/{release_branch}',
-        hide=True,
-        warn=True,
-    )
-    local_branch_has = local_branch is not None and not local_branch.failed
-    remote_branch_has = remote_branch is not None and remote_branch.stdout.strip()
-    if local_branch_has or remote_branch_has:
-        locations = []
-        if local_branch_has:
-            locations.append('locally')
-        if remote_branch_has:
-            locations.append('on origin')
-        print(
-            f'Branch `{release_branch}` already exists {" and ".join(locations)}. Remove it everywhere before retrying:'
-        )
-        if remote_branch_has:
-            print(f'  git push origin --delete {release_branch}')
-        if local_branch_has:
-            print(f'  git branch -D {release_branch}')
-        raise SystemExit(1)
 
 
 @task
@@ -303,6 +336,7 @@ def release(context: Context, increment: str = '', no_push: bool = False) -> Non
         context: Invoke context.
         increment: Version increment type — major, minor, patch, alpha, beta, or rc.
         no_push: Skip the push step (branch + tag stay local).
+
     """
     validate(context)
 

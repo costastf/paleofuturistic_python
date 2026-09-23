@@ -35,7 +35,7 @@ def registry_settings() -> RegistrySettings:
     return RegistrySettings(
         url='ghcr.io',
         user=os.environ['GITHUB_ACTOR'],
-        password_env='GITHUB_TOKEN',
+        password_env='GITHUB_TOKEN',  # noqa: S106 — the name of an env var to read, not a credential
         image_prefix=f'ghcr.io/{repo}',
     )
 
@@ -86,6 +86,27 @@ def origin_slug(context: Context) -> str:
         url,
     )
     return match.group(1) if match else ''
+
+
+def pipeline_badge(context: Context) -> str:
+    """Return the README markdown for GitHub's own workflow-status badge, or '' if unknown.
+
+    GitHub serves a badge that always reflects the latest run on the default branch, so the
+    status needs no writer here. Only the *URL* is derived, from `origin`, and it stops changing
+    once written — a locally written status would describe whoever last ran `build` on their own
+    machine, and could say "passing" on a run that failed.
+
+    An empty string means `origin` is not readable yet: a project not pushed anywhere is not the
+    same as a wrong badge, so the caller leaves the placeholder be.
+    """
+    slug = origin_slug(context)
+    if not slug:
+        return ''
+    workflow = 'continuous-integration.yaml'
+    return (
+        f'[![Build](https://github.com/{slug}/actions/workflows/{workflow}/badge.svg?branch=main)]'
+        f'(https://github.com/{slug}/actions/workflows/{workflow})'
+    )
 
 
 def pr_create_url(context: Context, release_branch: str) -> str:

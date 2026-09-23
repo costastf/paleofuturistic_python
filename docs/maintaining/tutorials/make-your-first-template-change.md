@@ -23,7 +23,7 @@ Pick something harmless: open `template/README.md.jinja` and adjust a sentence, 
 ./workflow.cmd test.invariants
 ```
 
-This generates a project for each matrix cell (git host × Dependency Track × Pages) once and asserts structural invariants over the results — the right files exist, conditional content matches the chosen knobs, nothing forbidden ships. It's the best signal-per-second check and should be your default while iterating.
+This generates a project for each of the nine matrix cells once: the eight-way cartesian product of git host × Dependency Track × Pages, plus one "matured" day-two cell. It then asserts structural invariants over the results — the right files exist, conditional content matches the chosen knobs, nothing forbidden ships. It's the best signal-per-second check and should be your default while iterating.
 
 ## Step 4. Run one full cell
 
@@ -39,6 +39,8 @@ To reproduce a specific CI matrix cell instead, use `test.combo`:
 ./workflow.cmd test.combo --git-hosting-service gitlab --no-integrate-pages
 ```
 
+If your change touches the coverage ratchet, the CI badge, or the dependency audit, add `--mature` instead — the ordinary cells generate a pristine day-one project and never exercise any of the three. See [Why a matured cell](../how-to/test-the-template.md#why-a-matured-cell).
+
 ## Step 5. Commit and open a pull request
 
 Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) — `feat(template): …`, `fix(ci): …` — the lint step rejects anything else.
@@ -49,7 +51,7 @@ git commit -am "feat(template): clarify the generated README wording"
 git push -u origin feat/my-first-change
 ```
 
-CI runs `test.invariants` plus a fanned-out `test.combo` per matrix cell on every pull request, so a green local run of steps 3–4 is a good predictor of a green PR.
+CI runs `test.invariants` plus a fanned-out `test.combo` per matrix cell, matured cell included, on every pull request, so a green local run of steps 3–4 is a good predictor of a green PR.
 
 ## Where to go next
 
