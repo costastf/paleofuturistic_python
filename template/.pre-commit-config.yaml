@@ -34,7 +34,7 @@ repos:
       # `preflight` makes without a flag.
       - id: staged
         name: Check staged files (formatting, ruff, pylint, complexipy)
-        entry: ./workflow.cmd preflight.staged
+        entry: sh -c './workflow.cmd preflight.staged'
         language: system
         pass_filenames: false
         files: ^(_CI/tasks/|src/|tests/).*\.py$
@@ -64,13 +64,13 @@ repos:
       # absence.
       - id: preflight
         name: Preflight checks (ty (types), commit messages, docs build, pyscn, test matrix, wheel, derived files)
-        entry: ./workflow.cmd preflight
+        entry: sh -c './workflow.cmd preflight'
         language: system
         pass_filenames: false
         stages: [pre-push]
       - id: security-overrides
         name: Validate .security-overrides
-        entry: ./workflow.cmd secure.validate-overrides
+        entry: sh -c './workflow.cmd secure.validate-overrides'
         language: system
         pass_filenames: false
         files: ^\.security-overrides$
