@@ -78,14 +78,14 @@ test = [
     # Bump with `./workflow.cmd develop.bump-uv`, never by hand: this is one of five
     # places the uv version appears, and one of them carries an image digest that has
     # to move with it.
-    "uv==0.12.6",
+    "uv==0.13.4",
     "tox==4.58.0",
     "tox-uv==1.36.0",
 ]
 
 [build-system]
 # The upper bound tracks the pinned uv. Bump with `./workflow.cmd develop.bump-uv`.
-requires = ["uv_build>=0.8.15,<=0.12.6"]
+requires = ["uv_build>=0.8.15,<=0.13.4"]
 build-backend = "uv_build"
 
 [tool.pyscn.complexity]
@@ -366,7 +366,7 @@ mode = "auto-detect"
 # generated. It does not advance on its own — `./workflow.cmd develop.bump-uv` moves it, and
 # every other place it appears, together. Editing it here alone leaves the base image below
 # pinned to the old version's digest.
-required-version = "==0.12.6"
+required-version = "==0.13.4"
 # Fixed date, not a relative window. A rolling `"1 week"` moved forward every day, so a
 # resolution — and therefore a green pipeline — could change with no commit behind it.
 # Every dependency above is pinned exactly, so this bounds the transitive closure.
@@ -419,11 +419,11 @@ commands = [
     one of them ships into any given project. `./workflow.cmd maintain.bump-uv` re-resolves all
     of them alongside the version literals — they are meaningless if they disagree. -#}
 {%- set base_image_digests = {
-  '3.10': 'sha256:b30faee4e4774ac16bd5a8e80acbef76679d3a537121b50b0fb79e07fd8dc2bb',
-  '3.11': 'sha256:f05c1ccaacd13550187dc910a5c8d328bfa224282da1133265edf735b0f26adb',
-  '3.12': 'sha256:715223f060ef0fca6cda1fbcb3e10f5d50be9423bf6ffb2e8ab9738c801c44cd',
-  '3.13': 'sha256:5f4c58a7de8dc88b65c71401bb95114c3ad1b0438310f3c633fe828e01a72af3',
-  '3.14': 'sha256:d61b872404ed1a0774e2098b5af64c178b59c99be171db6631455262bb0750b4',
+  '3.10': 'sha256:059b33d17906ee8536034962b0b6eb82b0551584fb849a14e417bb86dbb27087',
+  '3.11': 'sha256:f62fcb3f2b942d30f848720710df6e4bfdd28fb155521f3d19e4bae7a8d9bdd7',
+  '3.12': 'sha256:0d42b7b065ada5139af940bf3fb178b926675450e786badc854c9f73736cc6c4',
+  '3.13': 'sha256:bd45432c1376a243b6761b3546b344caff2d6e2a2b9530354f99b609b1f10ef1',
+  '3.14': 'sha256:db955a4c5fd85c9e08ae2c02f3fcedf76765aebc7c9bc10c55a6bbcc1b0510be',
 } %}
 
 [tool.docker-versions]
@@ -440,4 +440,4 @@ commands = [
 # Use `./workflow.cmd develop.bump-uv` rather than editing this line: it moves the tag and
 # re-resolves the digest in one step. A reference carrying both resolves to the *digest*, so a
 # hand-bumped tag left beside the old digest silently keeps building the previous image.
-base-image = "ghcr.io/astral-sh/uv:0.12.6-python{{ min_python_version }}-trixie-slim@{{ base_image_digests[min_python_version] }}"
+base-image = "ghcr.io/astral-sh/uv:0.13.4-python{{ min_python_version }}-trixie-slim@{{ base_image_digests[min_python_version] }}"
