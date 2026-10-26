@@ -45,7 +45,7 @@ Author email. Appears in `pyproject.toml` authors metadata.
 
 - **Type**: choice
 - **Default**: `3.11`
-- **Allowed**: `"3.11"`, `"3.12"`, `"3.13"`, `"3.14"`
+- **Allowed**: `"3.11"`, `"3.12"`, `"3.13"`, `"3.14"`, `"3.15"`
 
 Lower bound. Drives `requires-python`, classifier list, tox envs, and CI matrix. See [Choose the Python version range](../how-to/choose-python-version-range.md).
 
@@ -53,7 +53,7 @@ Lower bound. Drives `requires-python`, classifier list, tox envs, and CI matrix.
 
 - **Type**: choice
 - **Default**: `3.14`
-- **Allowed**: `"3.11"`, `"3.12"`, `"3.13"`, `"3.14"`
+- **Allowed**: `"3.11"`, `"3.12"`, `"3.13"`, `"3.14"`, `"3.15"`
 
 Upper bound. Must be `>= min_python_version` and share the same major version. A validator on this question in `copier.yml` enforces both constraints at generation time and aborts with a clear error if they are violated.
 
