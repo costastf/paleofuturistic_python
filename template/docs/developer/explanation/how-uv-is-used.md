@@ -32,7 +32,7 @@ uv replaces all of them with a single Rust binary that:
 - Keeping `pyproject.toml` valid against PEP 517 / 518 / 621 — any PEP-compliant tool could build it.
 - Not relying on uv-specific syntax beyond dependency groups (which are themselves standardised).
 
-**Older Python support.** uv itself supports far older interpreters than the template targets, so this project's chosen minimum Python version (as low as 3.10) isn't a constraint uv adds.
+**Older Python support.** uv itself supports far older interpreters than the template targets, so this project's chosen minimum Python version (as low as 3.11) isn't a constraint uv adds.
 
 **Familiarity.** Some contributors will arrive expecting `pip install -r requirements.txt`. The README points them at `./workflow.cmd`, and [First-run setup](../tutorials/first-run-setup.md) walks the whole loop.
 

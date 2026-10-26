@@ -16,10 +16,10 @@ Runs every env declared in `pyproject.toml`'s `[tool.tox]` section, in parallel.
 ## A single Python version
 
 ```bash
-./workflow.cmd test.tox --env=py310
+./workflow.cmd test.tox --env=py311
 ```
 
-Pass any single env name (`py310`, `py311`, …). Omit `--env` to run the whole matrix.
+Pass any single env name (`py311`, `py312`, …). Omit `--env` to run the whole matrix.
 
 ## A targeted subset (current venv)
 
@@ -34,7 +34,7 @@ Forward extra arguments to pytest with `--args`:
 This uses whichever Python version uv resolved for the project, slicing by file, name, or marker.
 
 > **Advanced — below the `./workflow.cmd` abstraction.** For tight interactive loops (e.g. `-x --pdb`,
-> plugin flags) you can call the tools directly: `uv run pytest -k sanity`, `uv run tox -e py310`. This
+> plugin flags) you can call the tools directly: `uv run pytest -k sanity`, `uv run tox -e py311`. This
 > bypasses the task runner — you take responsibility for the environment and flags you pass. If you find
 > yourself doing it often, model it as a task instead: see
 > [Add a workflow task](add-a-workflow-task.md).
@@ -48,7 +48,7 @@ The shipped CI matrix runs each Python version in parallel. To restrict locally 
 ## When you need a version uv hasn't fetched yet
 
 ```bash
-uv python install 3.10
+uv python install 3.11
 ```
 
 uv fetches and pins it; tox picks it up automatically on the next run.

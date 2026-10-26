@@ -33,10 +33,6 @@ dev = [
 ]
 develop = [
     "pre-commit==4.6.1",
-    # TOML parsing for the _CI tooling on Python < 3.11, which has no stdlib
-    # `tomllib`. Imported via a version-guarded fallback in _CI/info.py,
-    # _CI/tasks/sbom.py and _CI/tasks/test.py.
-    "tomli==2.4.1 ; python_version < '3.11'",
 ]
 document = [
     "properdocs==1.6.7",
@@ -50,10 +46,10 @@ lint = [
     "pylint==4.0.6",
     # Held below the exclude-newer boundary, unlike every other pin here. ruff 0.16 reports
     # 18 findings on a freshly generated project where 0.15.22 reports none, because it lints
-    # `_CI/` against `_CI/pyproject.toml`, which declares `requires-python = ">=3.12"` while
-    # the project itself may target 3.10. Two of those findings (UP036 on the tomli fallback,
-    # UP017 on `datetime.UTC`) would break generated projects on 3.10 if applied. Fixing the
-    # python-target mismatch is a separate change; see the ruff-0.16 migration issue.
+    # `_CI/` against `_CI/pyproject.toml`, which declares `requires-python = ">=3.11"` while
+    # the project itself may target a newer Python. Fixing the python-target mismatch is a
+    # separate change; see the ruff-0.16 migration issue. The 18 findings were measured when
+    # the floor was 3.10 and have not been re-measured against 3.11.
     "ruff==0.15.22",
     # Newest version clearing the [tool.uv] exclude-newer boundary.
     "ty==0.0.69",

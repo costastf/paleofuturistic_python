@@ -66,7 +66,7 @@ command that bumps the version. No task refreshes a value it did not compute, be
 from a report nobody just produced is a claim about a tree that may no longer exist.
 
 **A name carries a scope.** `reports/coverage.json` means coverage across every interpreter in
-`env_list`; `reports/coverage.py310.json` means one of them; `coverage.local.json` means whichever one
+`env_list`; `reports/coverage.py311.json` means one of them; `coverage.local.json` means whichever one
 a bare `pytest` happened to use. Whatever writes one of those names has to be running at that scope,
 because the readers cannot tell — the badge and the ratchet read a filename, not a provenance.
 
@@ -138,7 +138,7 @@ The four sections — Tutorials, How-to, Reference, Explanation — exist becaus
 
 - **No framework choice.** This is a library scaffold. It does not know about FastAPI, Django, or Click. Add what you need.
 - **No monorepo support.** One package, one repo. If you want a monorepo, use a different template.
-- **No Python below the project's chosen `min_python_version` (as low as 3.11).** `tomllib` is imported via a 3.10-compatible fallback, so it's no longer a reason to require a higher floor.
+- **No Python below the project's chosen `min_python_version` (as low as 3.11).** `tomllib` is in the standard library from 3.11, the template's floor, so no fallback is needed.
 - **No GitHub-only or GitLab-only assumptions in the dev cycle.** Host-specific code lives in `_CI/tasks/<host>.py`; the rest of the workflow runs identically.
 
 ## See also

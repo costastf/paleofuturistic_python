@@ -5,29 +5,19 @@ import base64
 import json
 import os
 import re
-import sys
+import tomllib
 import urllib.error
 import urllib.request
 from datetime import date, timedelta
 from pathlib import Path
 from typing import NamedTuple, cast
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib
 {%- else -%}
 import os
 import re
-import sys
+import tomllib
 from datetime import date, timedelta
 from pathlib import Path
 from typing import NamedTuple, cast
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib
 {%- endif %}
 
 from invoke import Collection, Context, Task, task
@@ -136,10 +126,10 @@ def audit_requirement_files() -> list[Path]:
 
     `uv export` cannot do this job. It produces a *universal* requirements file that keeps the
     environment markers, and pip-audit evaluates them — so `waitress==2.1.0 ; sys_platform ==
-    "win32"` audits clean on Linux, and on the default render an export audited on a 3.10 runner
-    skips `rpds-py==2026.6.3`, which four of the five matrix interpreters install and the SBOM
-    lists. Reading the lock directly is also why this needs no `--all-groups`/`--all-extras`
-    pair to keep in step with the project's own: a locked package is in the lock.
+    "win32"` audits clean on Linux, and an export audited on one interpreter skips every pin whose
+    marker excludes it, though other matrix interpreters install it and the SBOM lists it.
+    Reading the lock directly is also why this needs no `--all-groups`/`--all-extras` pair to
+    keep in step with the project's own: a locked package is in the lock.
 
     One file per version slot. pip-audit refuses a file that names a package twice — exit 1,
     "has duplicate requirements" — and a lockfile legitimately pins two versions of one package

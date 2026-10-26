@@ -5,8 +5,9 @@ from __future__ import annotations
 import re
 import subprocess
 import sys
+import tomllib
 import warnings
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, distribution, metadata, version
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple, cast
@@ -14,11 +15,6 @@ from typing import TYPE_CHECKING, NamedTuple, cast
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
     from email.message import Message
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib
 
 from cyclonedx.model import ExternalReference, ExternalReferenceType, HashAlgorithm, HashType, Property, XsUri
 from cyclonedx.model.bom import Bom
@@ -234,7 +230,7 @@ def lookup_pypi_license(name: str) -> LicenseRepository | None:
     try:
         # metadata() returns an email.message.Message at runtime; typeshed only
         # exposes `.get` on the PackageMetadata protocol from 3.12, so cast to the
-        # concrete type to keep the type checker happy on the 3.10/3.11 floor.
+        # concrete type to keep the type checker happy on the 3.11 floor.
         meta = cast('Message', metadata(name))
     except PackageNotFoundError:
         return None
@@ -498,7 +494,7 @@ def build_bom() -> Bom:  # ty: ignore[invalid-type-form]
     build_env = build_build_environment_component()
 
     bom = Bom()
-    bom.metadata.timestamp = datetime.now(timezone.utc)
+    bom.metadata.timestamp = datetime.now(UTC)
     bom.metadata.component = root
     bom.metadata.tools = build_metadata_tools()
     bom.metadata.lifecycles = build_lifecycles()
