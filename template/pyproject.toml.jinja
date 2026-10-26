@@ -44,13 +44,8 @@ lint = [
     "commitizen==4.17.0",
     "complexipy==6.2.0",
     "pylint==4.0.6",
-    # Held below the exclude-newer boundary, unlike every other pin here. ruff 0.16 reports
-    # 18 findings on a freshly generated project where 0.15.22 reports none, because it lints
-    # `_CI/` against `_CI/pyproject.toml`, which declares `requires-python = ">=3.11"` while
-    # the project itself may target a newer Python. Fixing the python-target mismatch is a
-    # separate change; see the ruff-0.16 migration issue. The 18 findings were measured when
-    # the floor was 3.10 and have not been re-measured against 3.11.
-    "ruff==0.15.22",
+    # Newest version clearing the [tool.uv] exclude-newer boundary.
+    "ruff==0.16.2",
     # Newest version clearing the [tool.uv] exclude-newer boundary.
     "ty==0.0.69",
 ]

@@ -37,7 +37,7 @@ test = [
 # Pinned to the same ruff the template pins, so this repository and the projects it
 # generates are judged by one version. Bump both together.
 lint = [
-    "ruff==0.15.22",
+    "ruff==0.16.2",
 ]
 
 # Mirrors the rule set generated projects get, so the repository that defines the standard is
