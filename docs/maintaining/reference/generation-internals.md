@@ -8,7 +8,7 @@ A `validator` expression on the `max_python_version` question in `copier.yml` ru
 
 - `max_python_version >= min_python_version`
 - Both values share the same major version (no cross-major ranges).
-- Both values appear in the choices list (currently `["3.13", "3.14"]`).
+- Both values appear in the choices list (currently `["3.11", "3.12", "3.13", "3.14"]`).
 
 Any failure aborts generation immediately with a clear error message. Because this runs before file output begins, there is no partial directory left on disk to clean up.
 

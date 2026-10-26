@@ -13,7 +13,7 @@ The questionnaire asks for `min_python_version` and `max_python_version`. They d
 
 A `validator` on the `max_python_version` question in `copier.yml` checks:
 
-1. Both values are in the choices list (currently `["3.13", "3.14"]`).
+1. Both values are in the choices list (currently `["3.11", "3.12", "3.13", "3.14"]`).
 2. `max_python_version >= min_python_version`.
 3. Both share the same major version — `3.x` to `4.x` ranges are not supported.
 

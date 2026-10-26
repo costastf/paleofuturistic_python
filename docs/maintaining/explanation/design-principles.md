@@ -138,7 +138,7 @@ The four sections — Tutorials, How-to, Reference, Explanation — exist becaus
 
 - **No framework choice.** This is a library scaffold. It does not know about FastAPI, Django, or Click. Add what you need.
 - **No monorepo support.** One package, one repo. If you want a monorepo, use a different template.
-- **No Python below the project's chosen `min_python_version` (as low as 3.10).** `tomllib` is imported via a 3.10-compatible fallback, so it's no longer a reason to require a higher floor.
+- **No Python below the project's chosen `min_python_version` (as low as 3.11).** `tomllib` is imported via a 3.10-compatible fallback, so it's no longer a reason to require a higher floor.
 - **No GitHub-only or GitLab-only assumptions in the dev cycle.** Host-specific code lives in `_CI/tasks/<host>.py`; the rest of the workflow runs identically.
 
 ## See also

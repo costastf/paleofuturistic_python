@@ -2673,7 +2673,7 @@ def test_exactly_one_matrix_cell_audits_its_dependencies(tmp_path):
         'report_failure': lambda *_: None,
         'generation_env': dict,
         'read_template_overrides': lambda: '',
-        'base_context': lambda: {'min_python_version': '3.10'},
+        'base_context': lambda: {'min_python_version': '3.11'},
         'qa_sequence': qa_sequence,
         'PROJECT_SLUG': PROJECT_SLUG,
         'TEMPLATE_SECURITY_OVERRIDE_ENV': 'TEMPLATE_SECURITY_OVERRIDE',
@@ -2694,7 +2694,7 @@ def test_exactly_one_matrix_cell_audits_its_dependencies(tmp_path):
             (project / directory).mkdir(parents=True, exist_ok=True)
         assert namespace['run_combo'](
             namespace['ComboWorkspace'](tmp_path / 'template', tmp_path),
-            {'min_python_version': '3.10'},
+            {'min_python_version': '3.11'},
             cell['label'],
             mature=cell['mature'],
         ), f'{cell["label"]} failed with every command stubbed as successful'

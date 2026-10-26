@@ -31,7 +31,7 @@ uv replaces all of them with a single Rust binary that:
 - Keeping the generated `pyproject.toml` valid against PEP 517 / 518 / 621 — any PEP-compliant tool could build it.
 - Not relying on uv-specific syntax beyond dependency groups (which are themselves standardised).
 
-**Older Python support.** uv itself supports far older interpreters than the template targets, so the project's chosen `min_python_version` (as low as 3.10) isn't a constraint uv adds — if a generated project wanted to support 3.8, uv wouldn't stop it; that configuration just isn't one the template tests.
+**Older Python support.** uv itself supports far older interpreters than the template targets, so the project's chosen `min_python_version` (as low as 3.11) isn't a constraint uv adds — if a generated project wanted to support 3.8, uv wouldn't stop it; that configuration just isn't one the template tests.
 
 **Familiarity.** Some contributors will arrive expecting `pip install -r requirements.txt`. The generated README points them to `./workflow.cmd bootstrap` and the [tutorial that walks through generating a first project](../tutorials/generate-your-first-project.md).
 
