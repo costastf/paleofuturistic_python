@@ -511,15 +511,15 @@ renders no browsable report — the same reason it asks pyscn for JSON only. <co
 test.coverage</code> renders the combined HTML from whatever the last run measured, and
 <code>./workflow.cmd test.view</code> runs the tests and opens it.</p>
 <p>A union is the only correct reading of a version matrix, and version-gated code shows why:</p>
-<pre><code class="language-python">if sys.version_info &gt;= (3, 11):
-    import tomllib
+<pre><code class="language-python">if sys.version_info &gt;= (3, 13):
+    from warnings import deprecated
 else:
-    import tomli as tomllib
+    from typing_extensions import deprecated
 </code></pre>
-<p>Under py310 the <code>else</code> runs; under py311+ the <code>if</code> does. No single env covers both, so each reports a miss on code the matrix as a whole exercises completely: on a scaffold with one such branch, each env reports 84.6% with one missing line and one missing branch, while the combined report is 100% with none. Averaging the percentages would give 84.6% for code that is fully exercised.</p>
-<p>The union does not tell you that a line reached only under py314 also works under py310. Coverage measures reach, not correctness; the tests check the latter on every interpreter.</p>
+<p>Under py311 and py312 the <code>else</code> runs; under py313+ the <code>if</code> does. No single env covers both, so each reports a miss on code the matrix as a whole exercises completely, while the combined report counts both arms as covered. Averaging the percentages would understate code that is fully exercised.</p>
+<p>The union does not tell you that a line reached only under py315 also works under py311. Coverage measures reach, not correctness; the tests check the latter on every interpreter.</p>
 <p>One consequence: because the ratchet bumps <code>fail_under</code> against the union, trimming <code>env_list</code> later can genuinely lower measured coverage and fail the next run. That is the ratchet working, and lowering the bar is a deliberate, reviewable change as it is everywhere else.</p>
-<p><code>./workflow.cmd test</code> runs only one Python version (whichever the active uv venv resolved to). The full matrix runs in CI per shipped workflow, or locally via <code>./workflow.cmd test.tox</code> (add <code>--env=py310</code> to run a single version). See <a href="../how-to/choose-python-version-range.html">Choose the Python version range</a> for how the matrix is derived.</p>
+<p><code>./workflow.cmd test</code> runs only one Python version (whichever the active uv venv resolved to). The full matrix runs in CI per shipped workflow, or locally via <code>./workflow.cmd test.tox</code> (add <code>--env=py311</code> to run a single version). See <a href="../how-to/choose-python-version-range.html">Choose the Python version range</a> for how the matrix is derived.</p>
 <h2 id="what-we-dont-ship">What we don't ship</h2>
 <ul>
 <li><strong>A testing pyramid.</strong> The template doesn't pre-create unit/integration/e2e folders. The example smoke test lives directly in <code>tests/</code>. Structure tests as the project warrants.</li>

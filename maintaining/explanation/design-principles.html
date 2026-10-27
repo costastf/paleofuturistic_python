@@ -552,7 +552,7 @@ that ran the matrix, the pyscn badge by the command that produced the grade, the
 command that bumps the version. No task refreshes a value it did not compute, because a value copied
 from a report nobody just produced is a claim about a tree that may no longer exist.</p>
 <p><strong>A name carries a scope.</strong> <code>reports/coverage.json</code> means coverage across every interpreter in
-<code>env_list</code>; <code>reports/coverage.py310.json</code> means one of them; <code>coverage.local.json</code> means whichever one
+<code>env_list</code>; <code>reports/coverage.py311.json</code> means one of them; <code>coverage.local.json</code> means whichever one
 a bare <code>pytest</code> happened to use. Whatever writes one of those names has to be running at that scope,
 because the readers cannot tell — the badge and the ratchet read a filename, not a provenance.</p>
 <p><strong>Flags add; they never subtract.</strong> The bare command is the narrow, read-only one: <code>--write</code> updates
@@ -596,7 +596,7 @@ untrue about it, so there is nothing for <code>--write</code> to write and nothi
 <ul>
 <li><strong>No framework choice.</strong> This is a library scaffold. It does not know about FastAPI, Django, or Click. Add what you need.</li>
 <li><strong>No monorepo support.</strong> One package, one repo. If you want a monorepo, use a different template.</li>
-<li><strong>No Python below the project's chosen <code>min_python_version</code> (as low as 3.10).</strong> <code>tomllib</code> is imported via a 3.10-compatible fallback, so it's no longer a reason to require a higher floor.</li>
+<li><strong>No Python below the project's chosen <code>min_python_version</code> (as low as 3.11).</strong> <code>tomllib</code> is in the standard library from 3.11, the template's floor, so no fallback is needed.</li>
 <li><strong>No GitHub-only or GitLab-only assumptions in the dev cycle.</strong> Host-specific code lives in <code>_CI/tasks/&lt;host&gt;.py</code>; the rest of the workflow runs identically.</li>
 </ul>
 <h2 id="see-also">See also</h2>

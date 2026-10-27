@@ -496,15 +496,15 @@
 <h3 id="min_python_version"><code>min_python_version</code></h3>
 <ul>
 <li><strong>Type</strong>: choice</li>
-<li><strong>Default</strong>: <code>3.13</code></li>
-<li><strong>Allowed</strong>: <code>"3.13"</code>, <code>"3.14"</code></li>
+<li><strong>Default</strong>: <code>3.11</code></li>
+<li><strong>Allowed</strong>: <code>"3.11"</code>, <code>"3.12"</code>, <code>"3.13"</code>, <code>"3.14"</code>, <code>"3.15"</code></li>
 </ul>
 <p>Lower bound. Drives <code>requires-python</code>, classifier list, tox envs, and CI matrix. See <a href="../how-to/choose-python-version-range.html">Choose the Python version range</a>.</p>
 <h3 id="max_python_version"><code>max_python_version</code></h3>
 <ul>
 <li><strong>Type</strong>: choice</li>
-<li><strong>Default</strong>: <code>3.14</code></li>
-<li><strong>Allowed</strong>: <code>"3.13"</code>, <code>"3.14"</code></li>
+<li><strong>Default</strong>: <code>3.15</code></li>
+<li><strong>Allowed</strong>: <code>"3.11"</code>, <code>"3.12"</code>, <code>"3.13"</code>, <code>"3.14"</code>, <code>"3.15"</code></li>
 </ul>
 <p>Upper bound. Must be <code>&gt;= min_python_version</code> and share the same major version. A validator on this question in <code>copier.yml</code> enforces both constraints at generation time and aborts with a clear error if they are violated.</p>
 <h3 id="license"><code>license</code></h3>

@@ -494,7 +494,7 @@
 <li>Keeping the generated <code>pyproject.toml</code> valid against PEP 517 / 518 / 621 — any PEP-compliant tool could build it.</li>
 <li>Not relying on uv-specific syntax beyond dependency groups (which are themselves standardised).</li>
 </ul>
-<p><strong>Older Python support.</strong> uv itself supports far older interpreters than the template targets, so the project's chosen <code>min_python_version</code> (as low as 3.10) isn't a constraint uv adds — if a generated project wanted to support 3.8, uv wouldn't stop it; that configuration just isn't one the template tests.</p>
+<p><strong>Older Python support.</strong> uv itself supports far older interpreters than the template targets, so the project's chosen <code>min_python_version</code> (as low as 3.11) isn't a constraint uv adds — if a generated project wanted to support 3.8, uv wouldn't stop it; that configuration just isn't one the template tests.</p>
 <p><strong>Familiarity.</strong> Some contributors will arrive expecting <code>pip install -r requirements.txt</code>. The generated README points them to <code>./workflow.cmd bootstrap</code> and the <a href="../tutorials/generate-your-first-project.html">tutorial that walks through generating a first project</a>.</p>
 <h2 id="which-uv-version-a-new-project-gets">Which uv version a new project gets</h2>
 <p>Because <code>[tool.uv] required-version</code> is an <strong>exact</strong> pin, a stale uv version does not merely
