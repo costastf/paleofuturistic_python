@@ -57,13 +57,13 @@ test.coverage` renders the combined HTML from whatever the last run measured, an
 A union is the only correct reading of a version matrix, and version-gated code shows why:
 
 ```python
-if sys.version_info >= (3, 11):
-    import tomllib
+if sys.version_info >= (3, 13):
+    from warnings import deprecated
 else:
-    import tomli as tomllib
+    from typing_extensions import deprecated
 ```
 
-Under the oldest interpreter the `else` runs; under the newer ones the `if` does. No single env covers both, so each reports a miss on code the matrix as a whole exercises completely: on a scaffold with one such branch, each env reports 84.6% with one missing line and one missing branch, while the combined report is 100% with none. Averaging the percentages would give 84.6% for code that is fully exercised.
+Under the oldest interpreter the `else` runs; under the newer ones the `if` does. No single env covers both, so each reports a miss on code the matrix as a whole exercises completely: while the combined report counts both arms as covered. Averaging the percentages would understate code that is fully exercised.
 
 The union does not tell you that a line reached only under the newest interpreter also works under the oldest. Coverage measures reach, not correctness; the tests check the latter on every interpreter.
 

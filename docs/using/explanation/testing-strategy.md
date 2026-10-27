@@ -50,19 +50,19 @@ test.coverage` renders the combined HTML from whatever the last run measured, an
 A union is the only correct reading of a version matrix, and version-gated code shows why:
 
 ```python
-if sys.version_info >= (3, 11):
-    import tomllib
+if sys.version_info >= (3, 13):
+    from warnings import deprecated
 else:
-    import tomli as tomllib
+    from typing_extensions import deprecated
 ```
 
-Under py310 the `else` runs; under py311+ the `if` does. No single env covers both, so each reports a miss on code the matrix as a whole exercises completely: on a scaffold with one such branch, each env reports 84.6% with one missing line and one missing branch, while the combined report is 100% with none. Averaging the percentages would give 84.6% for code that is fully exercised.
+Under py311 and py312 the `else` runs; under py313+ the `if` does. No single env covers both, so each reports a miss on code the matrix as a whole exercises completely, while the combined report counts both arms as covered. Averaging the percentages would understate code that is fully exercised.
 
-The union does not tell you that a line reached only under py314 also works under py310. Coverage measures reach, not correctness; the tests check the latter on every interpreter.
+The union does not tell you that a line reached only under py315 also works under py311. Coverage measures reach, not correctness; the tests check the latter on every interpreter.
 
 One consequence: because the ratchet bumps `fail_under` against the union, trimming `env_list` later can genuinely lower measured coverage and fail the next run. That is the ratchet working, and lowering the bar is a deliberate, reviewable change as it is everywhere else.
 
-`./workflow.cmd test` runs only one Python version (whichever the active uv venv resolved to). The full matrix runs in CI per shipped workflow, or locally via `./workflow.cmd test.tox` (add `--env=py310` to run a single version). See [Choose the Python version range](../how-to/choose-python-version-range.md) for how the matrix is derived.
+`./workflow.cmd test` runs only one Python version (whichever the active uv venv resolved to). The full matrix runs in CI per shipped workflow, or locally via `./workflow.cmd test.tox` (add `--env=py311` to run a single version). See [Choose the Python version range](../how-to/choose-python-version-range.md) for how the matrix is derived.
 
 ## What we don't ship
 

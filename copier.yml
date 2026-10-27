@@ -70,23 +70,23 @@ email:
 min_python_version:
   type: str
   choices:
-    - "3.10"
     - "3.11"
     - "3.12"
     - "3.13"
     - "3.14"
-  default: "3.10"
+    - "3.15"
+  default: "3.11"
   help: Minimum supported Python version
 
 max_python_version:
   type: str
   choices:
-    - "3.10"
     - "3.11"
     - "3.12"
     - "3.13"
     - "3.14"
-  default: "3.14"
+    - "3.15"
+  default: "3.15"
   help: Maximum supported Python version (must be >= the minimum and share its major)
   validator: >-
     {% if max_python_version.split('.')[0] != min_python_version.split('.')[0] %}

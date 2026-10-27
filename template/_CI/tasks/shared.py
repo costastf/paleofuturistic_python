@@ -512,7 +512,7 @@ def run_steps(*steps: Callable[[Context], None]) -> Callable[[Context], None]:
         for step in steps:
             try:
                 step(context)
-            except SystemExit:  # noqa: PERF203 — the loop's whole purpose is to keep going after a failure
+            except SystemExit:
                 failed = True
         if failed:
             raise SystemExit(1)

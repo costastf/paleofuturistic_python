@@ -225,8 +225,8 @@ def test_ci_tooling_never_claims_a_newer_python_than_the_project(generated_proje
 
     Ruff resolves that file for everything under `_CI/` and infers its Python target from
     it, but `_CI/tasks/*` runs on the *project's* interpreter. When it claimed 3.12 against a
-    3.10 project, ruff offered fixes that would break the generated project at runtime —
-    deleting the tomli fallback (UP036) and using the 3.11-only `datetime.UTC` (UP017).
+    3.11 project, ruff offered fixes that would break the generated project at runtime,
+    because they need syntax or standard library the project's interpreter does not have.
     """
     project, _ = generated_project
     assert python_floor(project / '_CI' / 'pyproject.toml') <= python_floor(project / 'pyproject.toml'), (
@@ -2319,8 +2319,8 @@ def test_the_audit_routes_every_query_through_the_retry(generated_project):
     The runner's behaviour is asserted by `test_the_retry_reports_a_verdict_and_retries_anything_else`;
     this is the other half — that the audit uses it, passes it the verdict phrases, and gets its
     input from `uv.lock` rather than from `uv export`. The export keeps environment markers and
-    pip-audit evaluates them, so an export audited on a 3.10 runner silently skips every pin that
-    only applies to 3.11+ — pinned, installed by four of five matrix interpreters, and in the SBOM.
+    pip-audit evaluates them, so an export audited on one runner silently skips every pin whose
+    marker excludes that runner's interpreter — pinned, installed by the others, and in the SBOM.
     """
     project, _ = generated_project
     secure = (project / '_CI' / 'tasks' / 'secure.py').read_text(encoding='utf-8')
@@ -2514,7 +2514,7 @@ def test_only_the_matrix_writes_the_unions_filename(generated_project):
 
     The badge and the ratchet read that path by name, so its name is a claim: coverage across
     every interpreter in `env_list`. Three things used to write it. Two were fixed a commit
-    apart — the per-env paths in `[tool.tox]`, then `test.tox --env=py310` — and the third was
+    apart — the per-env paths in `[tool.tox]`, then `test.tox --env=py311` — and the third was
     `addopts`, whose `--cov-report=json:` tox overrides *inside* the matrix but which applies to
     every bare `pytest` outside it: measured, `test.pytest` left one interpreter's 78.571% in the
     file where the union's 92.857% had been, and `erase_coverage_data`'s glob did not match the
@@ -2541,8 +2541,8 @@ def test_the_audit_input_covers_every_locked_version(generated_project, tmp_path
 
     Executed against a fixture lock rather than read, because this function is what closed the
     marker gap: `uv export` keeps environment markers and pip-audit evaluates them, so a pin
-    that applies only to 3.11+ went unaudited on a 3.10 runner while being installed by four of
-    five matrix interpreters and listed in the SBOM.
+    whose marker excluded the runner's interpreter went unaudited while the other matrix
+    interpreters installed it and the SBOM listed it.
 
     Three properties, and a text assertion can reach none of them: every registry version
     appears exactly once across the files, no file names a package twice — pip-audit exits 1 on
@@ -2673,7 +2673,7 @@ def test_exactly_one_matrix_cell_audits_its_dependencies(tmp_path):
         'report_failure': lambda *_: None,
         'generation_env': dict,
         'read_template_overrides': lambda: '',
-        'base_context': lambda: {'min_python_version': '3.10'},
+        'base_context': lambda: {'min_python_version': '3.11'},
         'qa_sequence': qa_sequence,
         'PROJECT_SLUG': PROJECT_SLUG,
         'TEMPLATE_SECURITY_OVERRIDE_ENV': 'TEMPLATE_SECURITY_OVERRIDE',
@@ -2694,7 +2694,7 @@ def test_exactly_one_matrix_cell_audits_its_dependencies(tmp_path):
             (project / directory).mkdir(parents=True, exist_ok=True)
         assert namespace['run_combo'](
             namespace['ComboWorkspace'](tmp_path / 'template', tmp_path),
-            {'min_python_version': '3.10'},
+            {'min_python_version': '3.11'},
             cell['label'],
             mature=cell['mature'],
         ), f'{cell["label"]} failed with every command stubbed as successful'
@@ -3049,7 +3049,7 @@ def test_matrix_coverage_is_combined_before_anything_reads_it(generated_project)
     assert 'coverage combine' in combine, 'the per-env data is never merged'
     assert 'coverage json -o {COVERAGE_REPORT}' in combine, 'the union never reaches the report the badge reads'
     # And it gates only when the data under it is the union the floor was measured from.
-    # `test.tox --env=py310` combines one env's data: enforcing there failed the command whose
+    # `test.tox --env=py311` combines one env's data: enforcing there failed the command whose
     # whole purpose is looking at one interpreter, on any project with an engaged ratchet.
     assert re.search(r'combine_coverage\([^)]*scope\s*=\s*env', test_py), 'the combine no longer knows its scope'
     # The two writes, by command line rather than by prose: the comments around them discuss

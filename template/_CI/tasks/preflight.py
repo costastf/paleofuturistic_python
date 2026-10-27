@@ -14,11 +14,11 @@ which keeps commit latency flat as the project grows. It is a rule about correct
 speed: a whole-program check narrowed to a diff does not run faster, it answers wrongly.
 
 *A name carries a scope.* ``reports/coverage.json`` means coverage across every interpreter in
-``env_list``; ``reports/coverage.py310.json`` means one of them, and ``coverage.local.json``
+``env_list``; ``reports/coverage.py311.json`` means one of them, and ``coverage.local.json``
 means whichever one a bare ``pytest`` happened to use. Whatever writes one of those names has to
 be running at that scope, because the readers cannot tell — the badge and the ratchet read a
 filename, not a provenance. That rule took three passes to hold: the per-env paths in
-``[tool.tox]``, then ``test.tox --env=py310`` writing its env's name rather than the union's,
+``[tool.tox]``, then ``test.tox --env=py311`` writing its env's name rather than the union's,
 then ``addopts`` and ``test.coverage`` — which had been overwriting the union's file with one
 interpreter's number every time anyone ran ``test.pytest`` outside tox. The CI badge is the same
 rule at the other end: its value is a fact about a clone rather than about this tree, so no run

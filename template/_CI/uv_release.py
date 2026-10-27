@@ -18,7 +18,7 @@ import json
 import re
 import urllib.error
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 # How long a release must have been public before this will pin it. Long enough that a
@@ -107,7 +107,7 @@ def latest_eligible(cooldown_days: int = COOLDOWN_DAYS, *, now: datetime | None 
     Raises:
         UvReleaseError: If PyPI cannot be read, or nothing has cleared the cool-down.
     """
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     cutoff = moment - timedelta(days=cooldown_days)
     eligible = {version: released for version, released in released_versions().items() if released <= cutoff}
     if not eligible:
@@ -169,7 +169,7 @@ def crosses_minor(current: str, candidate: str) -> bool:
 
 def describe_age(released: datetime, *, now: datetime | None = None) -> str:
     """Human-readable age of a release, for task output."""
-    days = ((now or datetime.now(timezone.utc)) - released).days
+    days = ((now or datetime.now(UTC)) - released).days
     return 'today' if days == 0 else f'{days} day{"s" if days != 1 else ""} ago'
 
 

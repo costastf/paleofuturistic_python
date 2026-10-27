@@ -3,14 +3,9 @@
 import json
 import math
 import re
-import sys
+import tomllib
 from pathlib import Path
 from typing import cast
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib
 
 from invoke import Collection, Context, Task, task
 
@@ -253,19 +248,19 @@ def combine_coverage(context: Context, *, scope: str = '') -> None:
     as covered if any env ran it, which is the only correct reading of a version matrix.
     Version-gated code makes it obvious:
 
-        if sys.version_info >= (3, 11):
-            import tomllib
+        if sys.version_info >= (3, 13):
+            from warnings import deprecated
         else:
-            import tomli as tomllib
+            from typing_extensions import deprecated
 
-    Under py310 the ``else`` runs; under py311+ the ``if`` does. No single env covers both, so
+    Under py311 and py312 the ``else`` runs; under py313+ the ``if`` does. No single env covers both, so
     each reports a miss on code the matrix as a whole exercises fully — reading one env's report
     understates coverage on exactly the code a five-interpreter matrix exists to test.
 
     Averaging the per-env percentages would be meaningless: coverage is not a noisy measurement
     of one quantity, it is the set of lines that ran.
 
-    The union does not tell you that a line reached only under py314 works under py310. Coverage
+    The union does not tell you that a line reached only under py315 works under py311. Coverage
     measures reach, not correctness; the tests check the latter on all five.
 
     ``[tool.coverage.paths]`` is what makes this possible: each env installs the package into
@@ -291,7 +286,7 @@ def combine_coverage(context: Context, *, scope: str = '') -> None:
         # One interpreter's data, so it is written under that interpreter's name and gates
         # nothing. `reports/coverage.json` means the union across `env_list` — every reader of
         # it, the badge and the ratchet included, is entitled to that — and `fail_under` is set
-        # from the union, so no single env can clear it. `test.tox --env=py310` used to write
+        # from the union, so no single env can clear it. `test.tox --env=py311` used to write
         # both the wrong file and a failure.
         execute(context, f'uv run coverage json -o reports/coverage.{scope}.json --fail-under=0')
         return
