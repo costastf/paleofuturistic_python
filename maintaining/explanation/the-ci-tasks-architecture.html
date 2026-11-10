@@ -522,12 +522,23 @@
 </table>
 <p>The deciding factor was vendoring: a fresh clone runs <code>./workflow.cmd …</code> immediately, no <code>pip install invoke</code> step. Invoke + its deps live committed under <code>_CI/lib/vendor/</code>.</p>
 <h2 id="the-polyglot-launcher">The polyglot launcher</h2>
-<p><code>workflow.cmd</code> is a script that's simultaneously valid sh and Windows cmd:</p>
-<pre><code>@echo off &amp; rem (Windows cmd interprets the rest; sh ignores the @ + rem prefix)
-@uv run python -m _CI.invoke -- %*
-:; uv run python -m _CI.invoke -- &quot;$@&quot;
+<p><code>workflow.cmd</code> is a single script that both sh and Windows cmd read as valid — three lines,
+each doing different work depending on who is reading:</p>
+<pre><code class="language-sh">#!/bin/sh
+: ; exec uv run python _CI/lib/vendor/bin/invoke --search-root _CI &quot;$@&quot;
+@uv run python _CI\lib\vendor\bin\invoke --search-root _CI %*
 </code></pre>
-<p>Both shells route through <code>uv run python -m _CI.invoke -- &lt;args&gt;</code> — uv handles venv creation, invoke handles task dispatch. No global installs required; no shell-specific copy.</p>
+<p>The trick is line 2, and it hinges on <code>:</code> meaning two different things:</p>
+<ul>
+<li><strong>sh</strong> treats <code>:</code> as the do-nothing builtin, runs the rest of the line, and <code>exec</code> replaces
+  the shell process — so line 3 is never reached. The Windows line is dead code to sh.</li>
+<li><strong>cmd</strong> treats a line starting with <code>:</code> as a <em>label</em>, so it skips line 2 entirely and falls
+  through to line 3, which carries the backslash paths and <code>%*</code> that cmd needs.</li>
+</ul>
+<p>Both routes end up running the same vendored Invoke, with <code>--search-root _CI</code> pointing it at
+the task package. uv creates and syncs the virtualenv on the way through; the vendored Invoke
+means there is nothing to install first. No global installs, and no second copy of the
+launcher to keep in step.</p>
 <h2 id="module-structure">Module structure</h2>
 <pre><code>_CI/tasks/
 ├── __init__.py          # Namespace aggregation + bootstrap pre-task wiring
