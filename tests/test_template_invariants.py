@@ -648,7 +648,7 @@ def test_gitlab_deps_job_matches_the_python_tag_algorithm(generated_project):
     if cell['git_hosting_service'] != 'gitlab':
         pytest.skip('GitLab-only pipeline')
     pipeline = (project / '.gitlab-ci.yml').read_text(encoding='utf-8')
-    deps_job = pipeline.split('build-deps-image:', 1)[1].split('\nlint:', 1)[0]
+    deps_job = pipeline.split('build-deps-image:', 1)[1].split('\npreflight:', 1)[0]
     for required in ('uv.lock', 'Dockerfile.deps', 'BASE_IMAGE'):
         assert required in deps_job, f'GitLab deps job does not hash {required}'
     assert 'sha256sum uv.lock' in deps_job, 'the deps tag does not hash the lockfile'
@@ -1093,23 +1093,105 @@ def test_github_publish_signs_pep740_attestations_over_the_uploaded_files(genera
     )
 
 
-def test_gitlab_publish_mints_both_tokens_and_signs_before_uploading(generated_project):
-    """The GitLab publish job requests the two OIDC audiences and runs dist → attest → publish.
+def test_gitlab_publish_mints_both_tokens_and_ships(generated_project):
+    """The GitLab publish job requests the two OIDC audiences and hands the push to `release.ship`.
 
     uv reads `PYPI_ID_TOKEN` (audience `pypi`) for Trusted Publishing and `pypi-attestations`
     reads `SIGSTORE_ID_TOKEN` (audience `sigstore`) to sign. The names are derived from the
     audiences by the tools, so a renamed variable is a silent fallback to no token at all.
+    The job's one command is the task: the pipeline file carries no logic of its own.
     """
     project, cell = generated_project
     if cell['git_hosting_service'] != 'gitlab':
         pytest.skip('GitLab-only pipeline')
     job = yaml.safe_load((project / '.gitlab-ci.yml').read_text(encoding='utf-8'))['publish']
     assert job['id_tokens'] == {'PYPI_ID_TOKEN': {'aud': 'pypi'}, 'SIGSTORE_ID_TOKEN': {'aud': 'sigstore'}}
-    assert job['script'] == [
-        './workflow.cmd release.dist',
-        './workflow.cmd release.attest',
-        './workflow.cmd release.publish --prebuilt',
-    ], f'the publish job runs {job["script"]}'
+    assert job['script'] == ['./workflow.cmd release.ship --before "$CI_COMMIT_BEFORE_SHA" --after "$CI_COMMIT_SHA"'], (
+        f'the publish job runs {job["script"]}'
+    )
+
+
+def test_gitlab_publishes_only_once_the_tag_reaches_the_default_branch(generated_project):
+    """The GitLab publish job runs on default-branch pushes, never on the tag push itself.
+
+    `release` pushes the tag from the release branch before the merge request merges, so a
+    `CI_COMMIT_TAG` rule would publish a version nobody has reviewed. The job runs on every push
+    to the default branch with full history, and `release.ship` looks for the tag among the
+    pushed commits. GitHub's `detect-release-tag.yaml` answers the same question the same way.
+    """
+    project, cell = generated_project
+    if cell['git_hosting_service'] != 'gitlab':
+        pytest.skip('GitLab-only pipeline')
+    job = yaml.safe_load((project / '.gitlab-ci.yml').read_text(encoding='utf-8'))['publish']
+    rules = [rule.get('if', '') for rule in job['rules']]
+    assert not any('CI_COMMIT_TAG' in rule for rule in rules), f'the publish job triggers on tags: {rules}'
+    assert rules == ['$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'], rules
+    assert job['variables']['GIT_DEPTH'] == 0, 'the tag walk needs the full history'
+
+
+def test_ship_publishes_a_tagged_push_and_skips_an_untagged_one(generated_project, tmp_path):
+    """`release.ship` publishes only when the pushed range carries a v-tag, from that commit.
+
+    Exercised against a real git history: a tagged release branch merged with a merge commit
+    is published from the tagged commit; the same branch squash-merged, or a push with no
+    release, publishes nothing and exits 0.
+    """
+    project, _ = generated_project
+    repo = tmp_path / 'repo'
+    repo.mkdir()
+
+    def git(*args: str) -> str:
+        identity = ('-c', 'user.name=t', '-c', 'user.email=t@example.com', '-c', 'commit.gpgsign=false')
+        return subprocess.run(
+            ['git', *identity, *args], cwd=repo, check=True, capture_output=True, text=True
+        ).stdout.strip()
+
+    git('init', '-q', '-b', 'main')
+    git('commit', '-q', '--allow-empty', '-m', 'init')
+    before = git('rev-parse', 'HEAD')
+    git('checkout', '-q', '-b', 'release/1.0.0')
+    git('commit', '-q', '--allow-empty', '-m', 'bump: 1.0.0')
+    git('tag', 'v1.0.0')
+    tagged = git('rev-parse', 'HEAD')
+    git('checkout', '-q', 'main')
+    git('merge', '-q', '--no-ff', '-m', 'merge', 'release/1.0.0')
+    after = git('rev-parse', 'HEAD')
+
+    class RepoContext:
+        """`context.run` against the scratch repository, with invoke's `Result` shape."""
+
+        def run(self, command: str, **_kwargs: object) -> SimpleNamespace:
+            done = subprocess.run(command, shell=True, cwd=repo, capture_output=True, text=True, check=False)  # noqa: S602
+            return SimpleNamespace(failed=done.returncode != 0, stdout=done.stdout, stderr=done.stderr)
+
+    ran: list[str] = []
+    namespace = exec_from(
+        (project / '_CI' / 'tasks' / 'release.py').read_text(encoding='utf-8'),
+        'NO_PREVIOUS_TIP',
+        'released_tag',
+        'ship',
+        re=re,
+        Context=object,
+        task=lambda fn: fn,
+        logged=lambda _name: lambda fn: fn,
+        execute=lambda context, command: context.run(command),
+        dist=lambda _context: ran.append('dist'),
+        attest=lambda _context: ran.append('attest'),
+        publish=lambda _context, **_kwargs: ran.append('publish'),
+    )
+    released_tag, ship = namespace['released_tag'], namespace['ship']
+    context = RepoContext()
+
+    assert released_tag(context, before, after) == ('v1.0.0', tagged)
+    assert released_tag(context, before, before) is None
+    assert released_tag(context, '0' * 40, after) == ('v1.0.0', tagged), 'a branch creation checks everything'
+    assert released_tag(context, '', after) is None, 'no lower bound checks the tip alone'
+
+    ship(context, before=before, after=before)
+    assert ran == [], 'an untagged push published'
+    ship(context, before=before, after=after)
+    assert ran == ['dist', 'attest', 'publish']
+    assert git('rev-parse', 'HEAD') == tagged, 'ship did not check out the tagged commit before building'
 
 
 def test_oidc_detection_names_the_hosts_own_token(generated_project):

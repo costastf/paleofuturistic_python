@@ -50,6 +50,12 @@ This change adds a question and three checks:
 - **New dependency group** `build`, and new pins in `lint` and `security`. Run `uv lock` after the update and commit `uv.lock` with it.
 - **Publishing.** The publish job now signs PEP 740 attestations. On GitLab it also requests `id_tokens:`, and PyPI needs a Trusted Publisher registered for the project (the new *Set up Trusted Publishing* how-to). If you publish with `UV_PUBLISH_*` credentials, nothing changes: that path uploads without attestations.
 
+## Upgrading past the GitLab publish gate
+
+The GitLab `publish` job used to run on every `v`-tag push. `release` pushes the tag from the release branch before the MR merges, so that published a version nobody had reviewed. The job now runs on pushes to the default branch and hands the push to `release.ship`, which publishes only if the pushed commits carry a `v`-tag, from that commit. Merge release MRs with a merge commit: a squash writes a new commit the tag does not point at, and nothing publishes.
+
+If you registered the PyPI Trusted Publisher, nothing changes: the job, pipeline file and `pypi` environment are the same. GitHub projects already worked this way through `detect-release-tag.yaml`.
+
 ## Upgrading past the changelog move
 
 Releases used to write the changelog to `docs/changelog.md`, a page missing from the docs nav, while *Reference → Changelog* showed a placeholder that never changed. They now write `docs/reference/changelog.md`, the page the nav shows.

@@ -262,6 +262,73 @@ def publish(context: Context, prebuilt: bool = False) -> None:
     clean(context)
 
 
+NO_PREVIOUS_TIP = '0' * 40
+
+
+def released_tag(context: Context, before: str, after: str) -> tuple[str, str] | None:
+    """Return the first v-prefixed tag on the commits ``before..after``, with the commit it marks.
+
+    ``before`` all zeros is a push that created the branch, so everything reachable from
+    ``after`` is arriving with it. ``before`` empty means there is no previous tip to diff
+    against, and only ``after`` itself is checked: walking from the tip with no lower bound
+    would sweep in every release the branch has ever carried and report the newest one as
+    arriving now.
+    """
+    after = after or 'HEAD'
+    if before == NO_PREVIOUS_TIP:
+        revisions = after
+    elif before:
+        revisions = f'{before}..{after}'
+    else:
+        revisions = f'--max-count=1 {after}'
+    # Tags are not part of what a runner fetches for a branch pipeline.
+    context.run('git fetch --tags --quiet origin', hide=True, warn=True)
+    log = context.run(f'git log --format=%H {revisions}', hide=True, warn=True)
+    if log.failed:
+        print(f'Could not list the commits {revisions}:\n{log.stderr.strip()}')
+        raise SystemExit(1)
+    for sha in log.stdout.split():
+        tags = context.run(f'git tag --points-at {sha}', hide=True, warn=True)
+        for tag in tags.stdout.split():
+            if re.match(r'v\d', tag):
+                return tag, sha
+    return None
+
+
+@task
+@logged('release.ship')
+def ship(context: Context, before: str = '', after: str = '') -> None:
+    """Publish from CI if the pushed commits ``before..after`` carry a release tag; else do nothing.
+
+    A tag-triggered publish job would be simpler, but ``release`` pushes the tag from the
+    release branch before the pull request merges, so a tag pipeline publishes a version nobody
+    has reviewed. What marks a release is a v-prefixed tag reaching the default branch, which
+    is what this looks for on every push to it. With no tag it prints why and exits 0, so the
+    pipeline stays green. With one it checks out the tagged commit — the commit rather than the
+    tag name, a tag being a mutable pointer — and runs ``release.dist``, ``release.attest`` and
+    ``release.publish --prebuilt`` over it.
+
+    Merge the release request with a merge commit: a squash writes a new commit that carries
+    no tag, and nothing publishes.
+
+    Args:
+        context: Invoke context.
+        before: The branch tip before the push (``CI_COMMIT_BEFORE_SHA`` on GitLab).
+        after: The branch tip after the push (``CI_COMMIT_SHA`` on GitLab); ``HEAD`` if empty.
+
+    """
+    found = released_tag(context, before, after)
+    if found is None:
+        print('No v-prefixed tag on the incoming commits; nothing to publish.')
+        return
+    tag, sha = found
+    print(f'Release tag detected: {tag} ({sha})')
+    execute(context, f'git checkout --quiet {sha}')
+    dist(context)
+    attest(context)
+    publish(context, prebuilt=True)
+
+
 def resolve_next_version(context: Context, increment: str) -> str:
     """Project the next version via ``cz bump --dry-run`` and parse it out.
 
@@ -430,4 +497,5 @@ namespace.add_task(cast(Task, push))
 namespace.add_task(cast(Task, dist))
 namespace.add_task(cast(Task, attest))
 namespace.add_task(cast(Task, publish))
+namespace.add_task(cast(Task, ship))
 namespace.add_task(cast(Task, clean))

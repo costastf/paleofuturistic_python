@@ -123,6 +123,9 @@ secure:
   script:
     - ./workflow.cmd secure.audit
 
+# Runs on every push to the default branch and does nothing unless a release tag arrived with
+# it — `release.ship` walks the pushed commits and explains why a tag trigger would publish
+# before review. `rules:` cannot look at tags on a commit, so the gate is in the task.
 publish:
   stage: publish
   image: $DEPS_IMAGE
@@ -130,7 +133,11 @@ publish:
     - job: build-deps-image
       artifacts: true
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v/
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  variables:
+    # Full history: the task walks the pushed commits, and the default shallow clone stops
+    # twenty commits back.
+    GIT_DEPTH: 0
   environment: pypi
   # Two OIDC tokens, one per audience. uv reads `PYPI_ID_TOKEN` and exchanges it for a
   # short-lived PyPI token (Trusted Publishing — register this project, `.gitlab-ci.yml` and
@@ -145,9 +152,8 @@ publish:
       aud: sigstore
   before_script:
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
-  # Build, sign, upload — three steps rather than `release.publish` alone, so the attestations
-  # are taken over the exact files `--prebuilt` then uploads without rebuilding.
+  # Build, sign, upload — `release.ship` runs `release.dist`, `release.attest` and
+  # `release.publish --prebuilt` in that order, so the attestations are taken over the exact
+  # files the upload then sends without rebuilding.
   script:
-    - ./workflow.cmd release.dist
-    - ./workflow.cmd release.attest
-    - ./workflow.cmd release.publish --prebuilt
+    - ./workflow.cmd release.ship --before "$CI_COMMIT_BEFORE_SHA" --after "$CI_COMMIT_SHA"

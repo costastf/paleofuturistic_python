@@ -95,7 +95,14 @@ skip-if-the-tag-exists branch — so the image can only ever be what this pipeli
 
 ## The publish pipeline
 
-A release tag runs one job that builds once and uploads exactly what it built:
+A release tag reaching `main` runs one job that builds once and uploads exactly what it built.
+The trigger is the push to `main`, not the tag: `release` pushes the tag from the release
+branch before the PR/MR merges, so a tag trigger would publish an unreviewed version.
+{% if git_hosting_service == 'github' %}`detect-release-tag.yaml` walks the pushed commits for a
+`v`-tag and hands the tagged commit to this workflow and to `pages.yaml`.{% else %}`release.ship`
+walks the pushed commits (`CI_COMMIT_BEFORE_SHA..CI_COMMIT_SHA`) for a `v`-tag, checks the
+tagged commit out, and runs the three steps; with no tag it exits 0.{% endif %} Merge the release
+PR/MR with a merge commit, not a squash: a squash writes a new commit the tag does not point at.
 
 {% if git_hosting_service == 'github' -%}
 1. `release.dist` — audit, clean, build, and run the distribution checks.
