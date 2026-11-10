@@ -26,10 +26,6 @@ The single source of truth for project metadata and tool configuration. Sections
 
 Locked dependency graph. Managed by uv; never edit by hand. Commit it.
 
-## `tox.ini`
-
-Empty placeholder. Tox config lives in `pyproject.toml`'s `[tool.tox]`. The file exists because some IDEs (and older `tox` versions) expect it.
-
 ## `.pre-commit-config.yaml`
 
 Hook definitions, split across three git stages:
@@ -128,9 +124,9 @@ Docs site config. Sections worth knowing:
 - `watch:` — `src/` is watched so docstring edits live-reload via mkdocstrings.
 - `plugins:` — `include-markdown` (pulls README into `index.md`) and `mkdocstrings` (API reference from Google-style docstrings).
 
-## `workflow.cmd` and `workflow.cmd.bat`
+## `workflow.cmd`
 
-Polyglot launcher: a shell script on Unix, a batch file on Windows. Resolves to `uv run python -m _CI.invoke -- <args>`. Don't edit.
+Polyglot launcher: the same file runs as a shell script on Unix and a batch file on Windows. Both lines run the vendored Invoke with `uv run python _CI/lib/vendor/bin/invoke --search-root _CI`, passing your arguments through. Don't edit. [The CI tasks architecture](../explanation/the-ci-tasks-architecture.md) explains the dispatch.
 
 ## `.github/` or `.gitlab-ci.yml`
 

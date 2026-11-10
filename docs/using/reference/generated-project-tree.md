@@ -57,10 +57,8 @@ example_project/
 │       └── example_project.py   Main module with example hello() function
 ├── tests/
 │   └── test_example_project.py  Smoke test for hello()
-├── tox.ini                      Multi-Python test matrix
 ├── uv.lock                      Locked dependency graph
-├── workflow.cmd                 Polyglot launcher (sh on Unix, cmd on Windows)
-└── workflow.cmd.bat             Windows entrypoint
+└── workflow.cmd                 Polyglot launcher (sh on Unix, cmd on Windows)
 ```
 
 ## File ownership
@@ -68,7 +66,7 @@ example_project/
 | Owner | Files |
 | --- | --- |
 | **You** | `src/`, `tests/`, `README.md`, `docs/` (after first edit), `.security-overrides` (curated list) |
-| **The template** | `_CI/`, `pyproject.toml`'s framework sections, `Dockerfile.deps`, `workflow.cmd*`, CI workflow files |
+| **The template** | `_CI/`, `pyproject.toml`'s framework sections, `Dockerfile.deps`, `workflow.cmd`, CI workflow files |
 | **Tooling** | `uv.lock` (managed by uv), `.copier-answers.yml` (managed by copier), `dist/` (build output) |
 
 The template-owned files are the ones `copier update` will reach for. Customising them is fine but introduces merge work on every update.

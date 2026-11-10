@@ -3512,16 +3512,20 @@ def test_add_a_workflow_task_directs_people_to_local(generated_project):
 
 
 def test_documented_launcher_matches_the_real_one(generated_project):
-    """The architecture doc quotes the launcher that actually ships.
+    """The docs describe the launcher that actually ships, and no launcher that does not.
 
-    It previously described `uv run python -m _CI.invoke -- <args>` — a module that has never
-    existed — alongside an `@echo off` first line the file does not have. Anyone debugging the
-    launcher from that description would be looking for code that isn't there.
+    The architecture doc once described `uv run python -m _CI.invoke -- <args>` — a module that
+    has never existed — alongside an `@echo off` first line the file does not have, and the
+    configuration-files reference kept that claim, plus a `workflow.cmd.bat`, after the
+    architecture doc was fixed. So the checks for what does not exist cover every shipped page.
     """
     project, _ = generated_project
     launcher = (project / 'workflow.cmd').read_text(encoding='utf-8')
     doc = (project / 'docs' / 'developer' / 'explanation' / 'the-ci-tasks-architecture.md').read_text(encoding='utf-8')
-    assert '_CI.invoke' not in doc, 'the doc still cites a nonexistent _CI.invoke module'
+    for page in sorted((project / 'docs').rglob('*.md')):
+        text = page.read_text(encoding='utf-8')
+        assert '_CI.invoke' not in text, f'{page.relative_to(project)} cites a nonexistent _CI.invoke module'
+        assert 'workflow.cmd.bat' not in text, f'{page.relative_to(project)} documents a nonexistent workflow.cmd.bat'
     # Every non-shebang line of the real launcher must appear verbatim in the doc.
     for line in (line.strip() for line in launcher.splitlines()):
         if not line or line.startswith('#!'):
