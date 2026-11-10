@@ -19,6 +19,7 @@ from _CI.uv_release import (
     version_key,
 )
 
+from .configuration import PYLOCK_FILE
 from .shared import execute, logged, run
 
 PYPROJECT = Path('pyproject.toml')
@@ -106,7 +107,24 @@ def bump_uv(context: Context, version: str = '') -> None:
     execute(context, 'uv lock')
 
 
+@task
+@logged('develop.pylock')
+def pylock(context: Context) -> None:
+    """Export the locked environment as a standard ``pylock.toml`` (PEP 751).
+
+    `uv.lock` stays the source of truth: uv reads it, and every other task resolves from it.
+    This writes the same pins, every dependency group included, in the format the packaging
+    specs define, for tools that do not read `uv.lock` — another installer, an auditor, a
+    platform that ingests lockfiles. It lands under `reports/`, which is gitignored: it is a
+    derived file to hand over, not a second lock to keep in step.
+    """
+    PYLOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    execute(context, f'uv export --quiet --frozen --format pylock.toml --all-groups --output-file {PYLOCK_FILE}')
+    print(f'Wrote {PYLOCK_FILE}.')
+
+
 namespace = Collection('develop')
 namespace.add_task(cast(Task, pre_commit_install), name='pre-commit-install')
 namespace.add_task(cast(Task, pre_commit), name='pre-commit')
 namespace.add_task(cast(Task, bump_uv), name='bump-uv')
+namespace.add_task(cast(Task, pylock))

@@ -3,6 +3,8 @@ name = "{{ project_slug }}"
 version = "0.0.0"
 description = "{{ project_description }}"
 readme = "README.md"
+# Words PyPI's search matches on. Empty until you have some; PyPI shows none rather than junk.
+keywords = []
 authors = [
     {name = "{{ full_name }}", email = "{{ email }}"},
 ]
@@ -21,15 +23,54 @@ classifiers = [
     "Programming Language :: Python :: {{ py_major }}.{{ minor }}",
 {%- endfor %}
 ]
+# The rest of the core-metadata fields, for when the project needs them. Each one is
+# validated by `./workflow.cmd lint.pyproject` (validate-pyproject) and `build.package`
+# (twine check) once uncommented. See docs/developer/reference/packaging-specifications.md.
+#
+#   maintainers = [{name = "...", email = "..."}]       # when they differ from `authors`
+#   [project.optional-dependencies]                     # extras: `pip install pkg[extra]`
+#   [project.scripts]                                   # console commands — see
+#   [project.gui-scripts]                               #   docs/developer/how-to/add-a-console-script.md
+#   [project.entry-points."<group>"]                    # plugin registrations
+#
+# `dynamic` stays unused: commitizen writes the version into `version` above on every release,
+# so it is static, and every other field is too.
+{%- set repo_url = repository_url | trim | regex_replace('(\\.git)?/*$', '') %}
+{%- if repo_url %}
+{%- set repo_parts = repo_url.split('/') %}
+{%- set on_github_com = git_hosting_service == 'github' and repo_parts[2] == 'github.com' and repo_parts | length == 5 %}
+{%- set pages_url = 'https://' ~ (repo_parts[3] | lower) ~ '.github.io/' ~ repo_parts[4] ~ '/' if on_github_com and integrate_pages else '' %}
+{%- set host_path = '/-/' if git_hosting_service == 'gitlab' else '/' %}
+
+# Well-known labels (packaging.python.org/en/latest/specifications/well-known-project-urls/),
+# so PyPI shows each with its own icon. Rendered from the `repository_url` copier answer.
+[project.urls]
+Homepage = "{{ pages_url or repo_url }}"
+Source = "{{ repo_url }}"
+Issues = "{{ repo_url }}{{ host_path }}issues"
+# Where `[tool.commitizen] changelog_file` writes; the first release creates it, before PyPI
+# ever shows this link.
+Changelog = "{{ repo_url }}{{ host_path }}blob/HEAD/docs/changelog.md"
+{%- if pages_url %}
+Documentation = "{{ pages_url }}"
+{%- endif %}
+{%- endif %}
 
 [dependency-groups]
 dev = [
+    {include-group = "build"},
     {include-group = "develop"},
     {include-group = "document"},
     {include-group = "lint"},
     {include-group = "quality"},
     {include-group = "security"},
     {include-group = "test"},
+]
+# What `build.package` runs over the built files: twine renders the metadata and README the
+# way PyPI will, check-wheel-contents inspects the wheel's layout.
+build = [
+    "check-wheel-contents==0.6.3",
+    "twine==7.0.0",
 ]
 develop = [
     "pre-commit==4.6.1",
@@ -48,6 +89,9 @@ lint = [
     "ruff==0.16.2",
     # Newest version clearing the [tool.uv] exclude-newer boundary.
     "ty==0.0.69",
+    # Schema-checks pyproject.toml against the PyPA specs (`lint.pyproject`). 0.25 is the
+    # newest release clearing the [tool.uv] exclude-newer boundary.
+    "validate-pyproject[all]==0.25",
 ]
 quality = [
     "pyscn==1.29.0",
@@ -56,6 +100,8 @@ security = [
     "cyclonedx-bom==7.3.1",
     "cyclonedx-python-lib[json-validation]==11.11.0",
     "pip-audit==2.10.1",
+    # Signs PEP 740 attestations for the release artifacts (`release.attest`).
+    "pypi-attestations==0.0.30",
 ]
 test = [
     "pytest==9.1.1",

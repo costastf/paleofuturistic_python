@@ -1,0 +1,79 @@
+# Add a console script
+
+Give the package a command that installers put on `PATH`, or register it as a plugin another
+tool discovers. Both are [entry points](https://packaging.python.org/en/latest/specifications/entry-points/),
+declared in `pyproject.toml` and written into the wheel's `entry_points.txt`.
+
+## 1. Write the function the command calls
+
+Create `src/{{ project_slug }}/cli.py`:
+
+```python
+"""Command-line interface."""
+
+from {{ project_slug }} import hello
+
+
+def main() -> None:
+    """Print a greeting."""
+    print(hello())
+```
+
+The function takes no arguments: the installer's generated wrapper calls it bare. Parse
+`sys.argv` inside it, with `argparse` or a library you add with `uv add`. Its return value
+becomes the process exit status, so return `None` or an `int`.
+
+## 2. Declare it
+
+Uncomment the matching line of the stanza below `[project]` in `pyproject.toml`, or add the
+table:
+
+```toml
+[project.scripts]
+{{ project_slug | replace('_', '-') }} = "{{ project_slug }}.cli:main"
+```
+
+The key is the command name; it may contain hyphens. The value is `module:function`, where the
+module path uses underscores. For a windowed program that should not open a console on Windows,
+use `[project.gui-scripts]` with the same shape.
+
+To register a plugin for another tool instead, use the group name that tool documents:
+
+```toml
+[project.entry-points."pytest11"]
+{{ project_slug }} = "{{ project_slug }}.plugin"
+```
+
+## 3. Check it
+
+```bash
+./workflow.cmd lint.pyproject           # the table's shape against the pyproject.toml spec
+uv sync                                 # reinstall the project so the command exists
+uv run {{ project_slug | replace('_', '-') }}                   # prints the greeting
+./workflow.cmd build.package            # build, twine check, check-wheel-contents
+unzip -p dist/{{ project_slug }}-*.whl '*.dist-info/entry_points.txt'
+```
+
+The last command prints the `[console_scripts]` section an installer reads:
+
+```ini
+[console_scripts]
+{{ project_slug | replace('_', '-') }} = {{ project_slug }}.cli:main
+```
+
+Add a test for `main` the way you would for any function. The coverage gate counts `cli.py`
+like the rest of `src/`.
+
+## 4. After you publish
+
+Anyone can then run the command without installing it permanently:
+
+```bash
+uvx {{ project_slug | replace('_', '-') }}
+```
+
+## Source of truth
+
+- [Entry points specification](https://packaging.python.org/en/latest/specifications/entry-points/)
+- [pyproject.toml: entry points](https://packaging.python.org/en/latest/specifications/pyproject-toml/#entry-points)
+- [uv: running tools](https://docs.astral.sh/uv/guides/tools/)

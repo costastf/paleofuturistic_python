@@ -18,7 +18,9 @@ The shipped `.github/workflows/publish.yaml` is configured for [PyPI trusted pub
 2. Restrict deployment branches: only `main` may deploy to `pypi`.
 3. On [pypi.org](https://pypi.org/), add a [trusted publisher](https://docs.pypi.org/trusted-publishers/adding-a-publisher/) pointing at your repo + workflow + environment name (`pypi`).
 
-The workflow grants `id-token: write` on the publish job — that's what makes the OIDC handshake possible. Don't ship a `PYPI_API_TOKEN` secret alongside; the workflow drops empty `UV_PUBLISH_*` env vars so OIDC remains the only path.
+The workflow grants `id-token: write` on the publish job — that's what makes the OIDC handshake possible. Don't set `UV_PUBLISH_*` secrets alongside: when all three are present `release.publish` uploads with them instead, and without attestations.
+
+The same OIDC identity signs two attestations over the wheel and sdist before they are uploaded. `actions/attest-build-provenance` records GitHub's own (needs `attestations: write`, already granted), verified with `gh attestation verify`. `release.attest` signs a [PEP 740](https://packaging.python.org/en/latest/specifications/index-hosted-attestations/) attestation per file that `uv publish` uploads to PyPI, where it shows as *Provenance* on each file and is verified with `pypi-attestations verify pypi`. PyPI takes the second kind only through Trusted Publishing, which is one more reason to keep the credential path unused. See [SBOM and security model](../explanation/sbom-and-security-model.md#layer-3-build-provenance).
 
 ## Hardening against external contributors
 

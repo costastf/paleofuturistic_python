@@ -41,6 +41,15 @@ After the update:
 1. Delete the `OWASP_DTRACK_URL` and `OWASP_DTRACK_API_KEY` secrets from your repository or group CI settings. Nothing reads them any more.
 2. If your organisation still wants every release in Dependency-Track, add the upload as your own task in `_CI/tasks/local.py`, which `copier update` never touches (see *Add a workflow task* in your project's developer docs), and call it from your pipeline after `release.publish`. The SBOM to send is `src/<your_package>/sbom.cdx.json`. Dependency-Track's [CI/CD integration guide](https://docs.dependencytrack.org/usage/cicd/) documents the upload endpoint.
 
+## Upgrading past the packaging-conformance change
+
+This change adds a question and three checks:
+
+- **`repository_url`** is asked once. Answer it to get `[project.urls]` (PyPI's sidebar links); leave it empty to skip.
+- **New gates.** `lint.pyproject` (validate-pyproject) runs on commits that stage `pyproject.toml` and in `preflight`; `build.package` now runs `twine check --strict` and `check-wheel-contents`. A `pyproject.toml` you edited may fail the first run. The error names the field; fix it rather than skip the gate.
+- **New dependency group** `build`, and new pins in `lint` and `security`. Run `uv lock` after the update and commit `uv.lock` with it.
+- **Publishing.** The publish job now signs PEP 740 attestations. On GitLab it also requests `id_tokens:`, and PyPI needs a Trusted Publisher registered for the project (the new *Set up Trusted Publishing* how-to). If you publish with `UV_PUBLISH_*` credentials, nothing changes: that path uploads without attestations.
+
 ## Resolving conflicts
 
 Copier uses a three-way merge; conflicts appear as standard conflict markers in the affected files. The most common cause is that you customised a file the template also changed. Resolve them by hand and re-run `./workflow.cmd test`.

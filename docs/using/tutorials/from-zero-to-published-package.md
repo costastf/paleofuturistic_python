@@ -91,12 +91,12 @@ You would not want to release a package with known vulnerabilities (that have no
 
 ## Step 4 — Publish to PyPI
 
-The `release.publish` task pushes the wheel and SBOM to PyPI. The recommended path is CI-driven [PyPI trusted publishing](https://docs.pypi.org/trusted-publishers/) — no long-lived tokens. Wire it up once for the project (see [Harden the GitHub repository](../how-to/harden-github-repository.md) for the GitHub Actions side), then:
+The publish job builds the wheel and sdist (the SBOM rides inside the wheel), checks both with `twine check --strict` and `check-wheel-contents`, signs a [PEP 740](https://packaging.python.org/en/latest/specifications/index-hosted-attestations/) attestation per file, and uploads files and attestations together. The recommended path is CI-driven [PyPI trusted publishing](https://docs.pypi.org/trusted-publishers/) — no long-lived tokens, and the only way PyPI accepts the attestations. Wire it up once for the project (your generated project's *Set up Trusted Publishing* how-to has the PyPI form for your host; [Harden the GitHub repository](../how-to/harden-github-repository.md) covers the GitHub side), then:
 
 Approve and merge the resulting PR.
 The tag and bump land on `main`.
 
-After all the pipelines ran you should see your project published on PyPI.
+After all the pipelines ran you should see your project published on PyPI. Each file's details show a *Provenance* section naming your repository; if you answered `repository_url`, the sidebar shows its links.
 
 ## Step 5 — Publish the docs
 

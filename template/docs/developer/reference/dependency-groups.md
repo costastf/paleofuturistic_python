@@ -16,13 +16,18 @@ Listed under `[dependency-groups]` in `pyproject.toml`. They're installed by `de
 
 | Group | Packages | Used by |
 | --- | --- | --- |
-| `dev` | Aggregator that pulls in every group below. | Default `uv sync` target; convenient for IDE setup. |
-| `develop` | `pre-commit`, `commitizen`, `tomlkit` | `./workflow.cmd develop.*`, `release.*` (commitizen). |
-| `lint` | `ruff`, `pylint`, `ty`, `complexipy` | `./workflow.cmd lint` and `format`. |
-| `test` | `pytest`, `pytest-cov`, `pytest-xdist`, `pytest-env`, `pytest-metadata`, `pytest-html`, `coverage`, `tox`, `tox-uv` | `./workflow.cmd test`. |
-| `document` | `properdocs`, `mkdocstrings[python]`, `mkdocs-include-markdown-plugin` | `./workflow.cmd document`. |
+| `dev` | Aggregator: an `include-group` entry for every group below. | Default `uv sync` target; what `uv run` installs for the workflow tasks. |
+| `build` | `check-wheel-contents`, `twine` | `./workflow.cmd build.package`, which checks every wheel and sdist it builds. |
+| `develop` | `pre-commit` | `./workflow.cmd develop.*`. |
+| `document` | `properdocs`, `properdocs-theme-mkdocs`, `mkdocs-include-markdown-plugin`, `mkdocstrings[python]` | `./workflow.cmd document`. |
+| `lint` | `commitizen`, `complexipy`, `pylint`, `ruff`, `ty`, `validate-pyproject[all]` | `./workflow.cmd lint`, `format`, `release.*` (commitizen). |
 | `quality` | `pyscn` | `./workflow.cmd quality`. |
-| `security` | `pip-audit`, `cyclonedx-py` | `./workflow.cmd secure`. |
+| `security` | `cyclonedx-bom`, `cyclonedx-python-lib[json-validation]`, `pip-audit`, `pypi-attestations` | `./workflow.cmd secure`, `release.attest`. |
+| `test` | `pytest`, `pytest-cov`, `pytest-env`, `pytest-html`, `pytest-xdist`, `uv`, `tox`, `tox-uv` | `./workflow.cmd test`. |
+
+`[dependency-groups]` follows the [dependency groups specification](https://packaging.python.org/en/latest/specifications/dependency-groups/),
+and `./workflow.cmd lint.pyproject` validates it against that spec's schema, including that
+every `include-group` names a group that exists.
 
 ## Adding to a group
 

@@ -14,9 +14,9 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 | `bootstrap` | `develop.bootstrap` | First-run setup; idempotent. Pass `--force` to re-run. |
 | `preflight` | `preflight.all` | **Everything, then the derived files.** The one to run before opening a pull request. |
 | `format` | `format.ruff` | Ruff format + import sort. `--paths="<paths>"` limits it to files you name; the commit hook prints that command scoped to whatever it just checked. |
-| `lint` | `lint.all` | Runs ruff, pylint, ty, complexipy, commitizen. |
+| `lint` | `lint.all` | Runs ruff, the formatting check, validate-pyproject, pylint, ty, complexipy, commitizen. |
 | `test` | `test.all` | pytest with coverage and xdist. |
-| `build` | `build.package` | SBOM compose + validate, then `uv build`. No dependency audit — see `secure` — and no README badge: the CI badge points at {% if git_hosting_service == 'github' %}GitHub's workflow-status endpoint{% else %}GitLab's pipeline-status endpoint{% endif %}, which is always current. |
+| `build` | `build.package` | SBOM compose + validate, then `uv build` and the distribution checks (`twine check --strict`, `check-wheel-contents`). No dependency audit — see `secure` — and no README badge: the CI badge points at {% if git_hosting_service == 'github' %}GitHub's workflow-status endpoint{% else %}GitLab's pipeline-status endpoint{% endif %}, which is always current. |
 | `release` | `release` | Validate, branch, bump, changelog, push, open PR/MR. |
 | `quality` | `quality.pyscn-analyze` | pyscn static analysis with HTML report. Reports whether the badge matches; `--write` updates it. |
 | `secure` | `secure.all` | Every security task at once: pip-audit + SBOM compose/validate. Nothing automated calls it; the pieces have their own homes. |
@@ -27,7 +27,7 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 
 | Task | Args | What it does |
 | --- | --- | --- |
-| `preflight` | `--write`, `--audit-dependencies` | Verify formatting, lint, type-check, the commit messages this push adds, the docs build, pyscn, the full tox matrix, the wheel, and the README badges plus the coverage ratchet against what the tools just measured — failing with everything out of date. This bare command is what the pre-push hook and the CI pipeline run. `--write` updates the badges and the ratchet instead of comparing them; it is opt-in because a command named for an inspection should not modify the tree. Never edits source either way — unformatted code fails and points at `format`. `--audit-dependencies` adds the pip-audit run, off by default because its answer depends on the advisory database rather than on your tree. |
+| `preflight` | `--write`, `--audit-dependencies` | Verify formatting, lint, `pyproject.toml` against the packaging specs, type-check, the commit messages this push adds, the docs build, pyscn, the full tox matrix, the wheel and sdist, and the README badges plus the coverage ratchet against what the tools just measured — failing with everything out of date. This bare command is what the pre-push hook and the CI pipeline run. `--write` updates the badges and the ratchet instead of comparing them; it is opt-in because a command named for an inspection should not modify the tree. Never edits source either way — unformatted code fails and points at `format`. `--audit-dependencies` adds the pip-audit run, off by default because its answer depends on the advisory database rather than on your tree. |
 | `preflight.staged` | `--paths="<paths>"` | Only the checks that can be judged from the given files alone, and by default only the files you have staged. What the pre-commit hook runs. Reports rather than fixes, like every other entry point — unformatted code names `format`. |
 
 It checks four badges fully: coverage and pyscn from the reports the run just produced, and
@@ -67,6 +67,7 @@ gitignored. What it never touches is a tracked file.
 | `develop.bootstrap` | `--force` | Run all bootstrap steps. Idempotent. |
 | `develop.pre-commit-install` | — | Install the hooks into `.git/hooks/` (all three stages at once). |
 | `develop.pre-commit` | — | A dry run of your next commit: the commit-stage hooks over the files you staged, run through pre-commit itself so it exercises the hook wiring (`files:` filters, `SKIP`, the entry itself), not just the checks. Read-only, like the hooks it runs. Not the full check either; `preflight` is what runs everything, including every file rather than the staged ones. |
+| `develop.pylock` | — | Export the locked environment, every group included, as a standard `reports/pylock.toml` (PEP 751) for tools that do not read `uv.lock`. See [Export a pylock file](../how-to/export-a-pylock-file.md). |
 | `develop.bump-uv` | `--version=<v>` | Move every uv pin to the newest release at least 7 days old: the four version literals, the base image's tag *and* its re-resolved digest, and `uv.lock`. Warns when the bump crosses a minor version. `--version` takes a specific release, ignoring the cool-down. See [Dependency groups](dependency-groups.md#the-uv-pin-and-the-one-command-that-moves-it). |
 
 ## `format`, `lint`, `test`, `quality`
@@ -86,6 +87,7 @@ Calling one directly is how to run a single tool over a single file:
 | `lint.ruff` | `ruff check`. |
 | `lint.pylint` | `pylint src/ _CI/tasks/ tests/`. |
 | `lint.ty` | `ty check src/ _CI/tasks/ tests/`. |
+| `lint.pyproject` | `validate-pyproject pyproject.toml`: the `[project]` table, `[dependency-groups]` and the `[tool.*]` tables it has schemas for, against the PyPA specifications. Runs on any commit that stages `pyproject.toml`. See [Packaging conformance](../explanation/packaging-conformance.md). |
 | `lint.complexipy` | Cognitive complexity check on `src/`. |
 | `lint.commitizen` | Validate commit messages since last tag. |
 | `test.pytest` | pytest with coverage, xdist, HTML reports on the active interpreter. Forward extra pytest args with `--args="…"` (e.g. `--args="-k test_hello"`). Writes no badge: one interpreter is not what the coverage badge means. |
@@ -104,8 +106,9 @@ Calling one directly is how to run a single tool over a single file:
 | `release.bump` | `-i <type>` | Refresh the README version badge, then `cz bump` with the given increment (major/minor/patch/alpha/beta/rc). The badge goes first so `cz bump` sweeps it into the commit the release tag points at — otherwise a release lands a README contradicting the version it released. |
 | `release.changelog` | `--write` | Generate changelog. `--write` persists and commits, signing per `commit.gpgsign`. |
 | `release.push` | — | `git push` + `git push --tags`. |
-| `release.dist` | — | Audit dependencies, then clean and build into `dist/`, leaving the artifacts for inspection{% if git_hosting_service == 'github' %} or attestation{% endif %}. The audit is here rather than in `build`: publishing is where a live advisory should stop you. |
-| `release.publish` | `--prebuilt` | Build + `uv publish`. Invoked from CI on release-tag merge. `--prebuilt` publishes what `release.dist` already built instead of rebuilding. |
+| `release.dist` | — | Audit dependencies, then clean and build into `dist/` (with `build.package`'s checks), leaving the artifacts for inspection or attestation. The audit is here rather than in `build`: publishing is where a live advisory should stop you. |
+| `release.attest` | — | Sign a PEP 740 attestation for each wheel and sdist in `dist/`, written beside it as `<file>.publish.attestation`. Uses the CI job's OIDC token; locally it opens a browser to sign in to Sigstore. Does nothing when `UV_PUBLISH_*` credentials are set, since that path uploads no attestations. Fails if `dist/` holds no distribution. See [Verify a release attestation](../how-to/verify-a-release-attestation.md). |
+| `release.publish` | `--prebuilt` | Build + `uv publish`. With `UV_PUBLISH_*` set it uploads with those credentials and without attestations; otherwise it requires an OIDC token and publishes through Trusted Publishing, attestations included. Invoked from CI on release-tag merge. `--prebuilt` publishes what `release.dist` already built instead of rebuilding. See [Set up Trusted Publishing](../how-to/set-up-trusted-publishing.md). |
 | `release.clean` | — | Remove `dist/` and `sbom.json`. |
 
 ## `secure` — pip-audit, SBOM

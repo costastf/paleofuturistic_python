@@ -1,7 +1,7 @@
 <!-- canonical: synced from docs/using/explanation/sbom-and-security-model.md in the paleofuturistic_python template repo. Edit there first. -->
 # SBOM and security model
 
-The scaffold's security pipeline has {% if git_hosting_service == 'github' %}three layers: known-vulnerability scanning, SBOM generation, and build provenance{% else %}two layers: known-vulnerability scanning and SBOM generation{% endif %}. This page explains what each layer does and what threat model it addresses.
+The scaffold's security pipeline has three layers: known-vulnerability scanning, SBOM generation, and build provenance. This page explains what each layer does and what threat model it addresses.
 
 ## The threat model
 
@@ -113,19 +113,31 @@ Each PyPI component (runtime, dev, vendored) carries:
 The SBOM is part of every release.
 
 Watching a released version for advisories published after the release is outside the scaffold. The scheduled audit re-checks `uv.lock` on the default branch every day, but that is the code as it is now, not the versions already on PyPI. To track those, point your organisation's software composition analysis platform (OWASP Dependency-Track, the GitHub dependency graph, or similar) at the SBOM inside each wheel. Which platform, and the credentials to reach it, are your organisation's call, so the scaffold ships no upload step.
-{% if git_hosting_service == 'github' %}
+
 ## Layer 3 — build provenance
 
-The SBOM says what is *inside* your artifact. Provenance says where it *came from* — and unlike the SBOM, it is not self-reported. `actions/attest-build-provenance` signs a statement binding the exact file digests to the workflow, commit and runner that produced them, and that signature chains to GitHub's Sigstore instance rather than to anything this project controls. A forged SBOM is a text edit; a forged attestation is not.
+The SBOM says what is *inside* your artifact. Provenance says where it *came from*, and unlike the SBOM it is not self-reported. `release.attest` signs a [PEP 740](https://packaging.python.org/en/latest/specifications/index-hosted-attestations/) attestation for every wheel and sdist: a statement binding the file's digest to this repository, the publish workflow and the commit. The signing identity is the CI job's own OIDC token{% if git_hosting_service == 'gitlab' %} (`SIGSTORE_ID_TOKEN`, from the publish job's `id_tokens:`){% endif %}, the signature chains to Sigstore's public instance, and the signing event lands in Sigstore's transparency log, so nothing this project controls can mint one after the fact. A forged SBOM is a text edit; a forged attestation is not.
 
-Anyone who downloads a release can verify it:
+`uv publish` uploads each `<file>.publish.attestation` with its file, and PyPI shows the publishing repository and workflow on the release page. Anyone who downloads a release can verify it:
+
+```bash
+pypi-attestations verify pypi --repository <repository URL> pypi:{{ project_slug }}-<version>-py3-none-any.whl
+```
+{%- if git_hosting_service == 'github' %}
+
+The publish job also records GitHub's own provenance attestation (`actions/attest-build-provenance`), stored with the repository:
 
 ```bash
 gh attestation verify {{ project_slug }}-<version>-py3-none-any.whl --repo <owner>/<repo>
 ```
 
-Order matters in the publish job: `release.dist` builds into `dist/`, the attestation is taken over those files, and `release.publish --prebuilt` uploads them *without* rebuilding. If you change that sequence so the artifacts are rebuilt after being attested, you will publish files no attestation refers to, and verification will fail — reading as tampering rather than as a fresh build.
-{% endif %}
+The two answer the same question for different audiences: the PEP 740 one travels with the package to PyPI, the GitHub one stays where the source is.
+{%- endif %}
+
+Order matters in the publish job: `release.dist` builds into `dist/`, the attestations are taken over those files, and `release.publish --prebuilt` uploads them *without* rebuilding. If you change that sequence so the artifacts are rebuilt after being attested, you will publish files no attestation refers to, and verification will fail — reading as tampering rather than as a fresh build.
+
+PyPI accepts attestations only through [Trusted Publishing](../how-to/set-up-trusted-publishing.md). Publishing with `UV_PUBLISH_*` credentials instead uploads none: `release.publish` passes `--no-attestations` on that path. [Verify a release attestation](../how-to/verify-a-release-attestation.md) walks through checking one.
+
 ## What about overrides?
 
 `.security-overrides` is a project-local allow-list with mandatory expiry dates. It applies to `pip-audit`. It does **not** suppress findings in the SBOM, which continues to show the world the full truth. Override = "we accept this locally for now," not "make this invisible."
@@ -141,3 +153,5 @@ The expiry dates are load-bearing: a stale override is a security regression hid
 ## See also
 
 - [Triage a security finding](../how-to/triage-a-security-finding.md) — what to do when pip-audit flags something.
+- [Verify a release attestation](../how-to/verify-a-release-attestation.md) — checking layer 3 on a published release.
+- [Packaging specifications](../reference/packaging-specifications.md) — every PyPA spec and what enforces it here.

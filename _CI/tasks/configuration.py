@@ -101,11 +101,21 @@ def base_context() -> dict:
     return {'min_python_version': known_versions[0], 'max_python_version': known_versions[-1]}
 
 
+# One repository URL per host, so every matrix cell renders `[project.urls]` and the
+# host-specific link shapes (`/issues` vs `/-/issues`, GitHub Pages) are exercised. The
+# empty-URL case is a single extra generation in the invariants suite, not an axis.
+REPOSITORY_URLS = {
+    'github': f'https://github.com/example-org/{PROJECT_SLUG}',
+    'gitlab': f'https://gitlab.com/example-org/{PROJECT_SLUG}',
+}
+
+
 def combo_context(*, git_hosting_service: str, integrate_pages: bool) -> dict:
-    """Matrix-cell context: widest Python range plus the two template knobs."""
+    """Matrix-cell context: widest Python range, the two template knobs, and a repository URL."""
     return {
         **base_context(),
         'git_hosting_service': git_hosting_service,
+        'repository_url': REPOSITORY_URLS[git_hosting_service],
         'integrate_pages': integrate_pages,
     }
 

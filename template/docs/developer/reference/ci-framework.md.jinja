@@ -25,6 +25,11 @@ Centralized constants shared across task modules:
 | `DOCKERFILE_DEPS` | Dockerfile for the deps image (also a deps-image tag input) |
 | `DEPS_IMAGE_FILE` | Where `container.publish` records the resolved image reference |
 | `PYSCN_REPORTS_DIR` | Directory for pyscn HTML reports |
+| `PYPROJECT_FILES` | Path filter of the `pyproject` preflight step: the commit hook runs `lint.pyproject` only when `pyproject.toml` is staged |
+| `UV_PUBLISH_SETTINGS` | The three `UV_PUBLISH_*` credentials; all set means `release.publish` uploads with them, without attestations |
+| `OIDC_ENV_VARS` | The OIDC token(s) the host injects into the publish job; present means Trusted Publishing. {% if git_hosting_service == 'github' %}`ACTIONS_ID_TOKEN_REQUEST_URL`/`_TOKEN`{% else %}`PYPI_ID_TOKEN`{% endif %} on this host |
+| `DIST_DIR` | `dist/`, where builds land and `release.attest` looks for wheels and sdists |
+| `PYLOCK_FILE` | `reports/pylock.toml`, written by `develop.pylock` |
 | `SENTINEL` | Bootstrap sentinel file path |
 
 ## The deps image and its cache
@@ -87,6 +92,27 @@ Because the mitigation is an access-control one, keep it that way:
 skip-if-the-tag-exists branch — so the image can only ever be what this pipeline produced.
 {%- endif %}
 
+## The publish pipeline
+
+A release tag runs one job that builds once and uploads exactly what it built:
+
+{% if git_hosting_service == 'github' -%}
+1. `release.dist` — audit, clean, build, and run the distribution checks.
+2. `actions/attest-build-provenance` — GitHub's provenance attestation over `dist/*`.
+3. `release.attest` — a PEP 740 attestation per wheel and sdist, `<file>.publish.attestation`.
+4. `release.publish --prebuilt` — `uv publish` uploads the files and their attestations.
+{%- else -%}
+1. `release.dist` — audit, clean, build, and run the distribution checks.
+2. `release.attest` — a PEP 740 attestation per wheel and sdist, `<file>.publish.attestation`,
+   signed with the job's `SIGSTORE_ID_TOKEN`.
+3. `release.publish --prebuilt` — `uv publish` exchanges `PYPI_ID_TOKEN` for a PyPI token and
+   uploads the files and their attestations.
+{%- endif %}
+
+Nothing rebuilds between the steps, so every attestation refers to a file that is uploaded.
+[Verify a release attestation](../how-to/verify-a-release-attestation.md) checks the result;
+[Set up Trusted Publishing](../how-to/set-up-trusted-publishing.md) covers the PyPI side.
+
 ## Bootstrap framework (`_CI/tasks/bootstrap.py`)
 
 A sentinel file (`_CI/.bootstrapped`) ensures first-time setup runs exactly once; every task inherits bootstrap as an Invoke `pre` task. New setup steps are added by appending to the `STEPS` list:
@@ -114,15 +140,15 @@ _CI/
     configuration.py   Centralized constants
     shared.py          Core decorators and utilities
     bootstrap.py       One-time setup framework
-    build.py           Package build
+    build.py           Package build + twine and check-wheel-contents checks
     container.py       Docker image
-    develop.py         Pre-commit management
+    develop.py         Pre-commit management, uv pin, pylock export
     document.py        ProperDocs documentation
     format_.py         Ruff formatting + import sorting
-    lint.py            Ruff, pylint, ty, complexipy, commitizen
+    lint.py            Ruff, validate-pyproject, pylint, ty, complexipy, commitizen
     preflight.py       The step registry: every check, its scope, and its tier
     quality.py         pyscn analysis
-    release.py         Version bump, changelog, publish
+    release.py         Version bump, changelog, PEP 740 attestations, publish
     secure.py          pip-audit, CycloneDX SBOM
     test.py            pytest
     {{ git_hosting_service }}.py          Host-specific helpers (registry, release PR/MR)

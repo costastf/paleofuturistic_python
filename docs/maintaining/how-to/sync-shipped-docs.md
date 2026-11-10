@@ -1,12 +1,13 @@
 # Keep shipped docs in sync
 
-Five explanation pages exist twice: the canonical copy in this repo's docs and a shipped copy that lands in every generated project's *Developer → Explanation* section, so project developers can read the rationale behind their scaffold offline.
+Six explanation pages exist twice: the canonical copy in this repo's docs and a shipped copy that lands in every generated project's *Developer → Explanation* section, so project developers can read the rationale behind their scaffold offline.
 
 | Canonical (this repo) | Shipped (generated projects) |
 |---|---|
 | `docs/maintaining/explanation/design-principles.md` | `template/docs/developer/explanation/design-principles.md` |
 | `docs/maintaining/explanation/the-ci-tasks-architecture.md` | `template/docs/developer/explanation/the-ci-tasks-architecture.md` |
 | `docs/using/explanation/how-uv-is-used.md` | `template/docs/developer/explanation/how-uv-is-used.md` |
+| `docs/using/explanation/packaging-conformance.md` | `template/docs/developer/explanation/packaging-conformance.md` |
 | `docs/using/explanation/sbom-and-security-model.md` | `template/docs/developer/explanation/sbom-and-security-model.md.jinja` |
 | `docs/using/explanation/testing-strategy.md` | `template/docs/developer/explanation/testing-strategy.md` |
 

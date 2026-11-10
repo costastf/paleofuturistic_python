@@ -31,9 +31,11 @@ nav:
       - Copier questions: using/reference/copier-questions.md
       - Generated project tree: using/reference/generated-project-tree.md
       - License options: using/reference/license-options.md
+      - Packaging specifications: using/reference/packaging-specifications.md
     - Explanation:
       - How uv is used: using/explanation/how-uv-is-used.md
       - SBOM and security model: using/explanation/sbom-and-security-model.md
+      - Packaging conformance: using/explanation/packaging-conformance.md
       - Testing strategy: using/explanation/testing-strategy.md
   - Maintaining the template:
     - Tutorials:

@@ -50,6 +50,18 @@ See [Triage a security finding](how-to/triage-a-security-finding.md).
 
 → Full rationale: [SBOM and security model](explanation/sbom-and-security-model.md)
 
+## Packaging and publishing
+
+`pyproject.toml` and the distributions built from it are checked against the
+[PyPA packaging specifications](https://packaging.python.org/en/latest/specifications/) on every
+push: validate-pyproject reads `pyproject.toml`, `twine check --strict` and
+check-wheel-contents read the built wheel and sdist. Releases go to PyPI through Trusted
+Publishing, with a PEP 740 attestation per file that anyone can verify. See
+[Set up Trusted Publishing](how-to/set-up-trusted-publishing.md) before the first release, and
+[Packaging specifications](reference/packaging-specifications.md) for what each spec means here.
+
+→ Full rationale: [Packaging conformance](explanation/packaging-conformance.md)
+
 ## Continuous integration
 
 The project ships a {% if git_hosting_service == 'github' %}GitHub Actions workflow{% else %}GitLab CI pipeline{% endif %}

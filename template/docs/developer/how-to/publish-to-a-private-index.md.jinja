@@ -1,0 +1,71 @@
+# Publish to a private index
+
+For releasing to your organisation's package index (Artifactory, Nexus, devpi, a cloud artifact
+registry, GitLab's package registry) instead of, or before, PyPI. Any index that implements the
+[simple repository API](https://packaging.python.org/en/latest/specifications/simple-repository-api/)
+for downloads and the legacy upload API for uploads works.
+
+## 1. Point the release pipeline at the index
+
+Set three variables as masked {% if git_hosting_service == 'github' %}secrets on the `pypi` environment (*Settings → Environments → pypi*){% else %}CI/CD variables scoped to the `pypi` environment (*Settings → CI/CD → Variables*){% endif %}:
+
+| Variable | Value |
+| --- | --- |
+| `UV_PUBLISH_URL` | The index's **upload** URL, e.g. `https://pkgs.example.com/api/pypi/internal/` |
+| `UV_PUBLISH_USERNAME` | The account or token name the index gives you |
+| `UV_PUBLISH_PASSWORD` | The password or token |
+
+Optionally add `UV_PUBLISH_CHECK_URL` with the index's **simple** URL (the one you would install
+from, e.g. `https://pkgs.example.com/api/pypi/internal/simple/`). uv then skips files the index
+already has, so re-running a publish that failed halfway does not fail on the half that
+succeeded.
+
+The environment name stays `pypi` even when the index is not PyPI: it is the name the publish
+job declares, and renaming it means renaming it there too.
+
+## 2. Release as usual
+
+`release.publish` sees all three `UV_PUBLISH_*` variables set and runs:
+
+```bash
+uv publish --trusted-publishing never --no-attestations
+```
+
+`--no-attestations` because PEP 740 attestations are accepted only by PyPI through Trusted
+Publishing, and an index that does not support them may reject the whole upload. For the same
+reason `release.attest` signs nothing on this path.
+
+## 3. Install from it
+
+To depend on packages from the private index in this project, declare it in `pyproject.toml`:
+
+```toml
+[[tool.uv.index]]
+name = "internal"
+url = "https://pkgs.example.com/api/pypi/internal/simple/"
+publish-url = "https://pkgs.example.com/api/pypi/internal/"
+explicit = true
+```
+
+`explicit = true` makes uv use this index only for packages you pin to it
+(`[tool.uv.sources] some-package = { index = "internal" }`), so a name that exists on both
+cannot be served from the wrong one. With `publish-url` set you can also publish by hand:
+
+```bash
+./workflow.cmd release.dist
+uv publish --index internal --no-attestations
+```
+
+`--index` uses the index's `url` as the check URL automatically.
+
+## Never a `.pypirc`
+
+Twine-era guides keep credentials in `~/.pypirc` (the [.pypirc format](https://packaging.python.org/en/latest/specifications/pypirc/)).
+uv does not read it, and the project gitignores `.pypirc` so one created in the tree by habit is
+not committed. Use the variables above, or `uv auth login` for an interactive session.
+
+## Source of truth
+
+- [Simple repository API specification](https://packaging.python.org/en/latest/specifications/simple-repository-api/)
+- [uv: publishing a package](https://docs.astral.sh/uv/guides/package/), [package indexes](https://docs.astral.sh/uv/concepts/indexes/)
+- [.pypirc specification](https://packaging.python.org/en/latest/specifications/pypirc/)

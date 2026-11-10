@@ -132,7 +132,22 @@ publish:
   rules:
     - if: $CI_COMMIT_TAG =~ /^v/
   environment: pypi
+  # Two OIDC tokens, one per audience. uv reads `PYPI_ID_TOKEN` and exchanges it for a
+  # short-lived PyPI token (Trusted Publishing — register this project, `.gitlab-ci.yml` and
+  # the `pypi` environment as a publisher on PyPI first). `pypi-attestations` reads
+  # `SIGSTORE_ID_TOKEN` to sign the PEP 740 attestations PyPI shows on the release page.
+  # The variable names are fixed by the audiences. See
+  # docs/developer/how-to/set-up-trusted-publishing.md.
+  id_tokens:
+    PYPI_ID_TOKEN:
+      aud: pypi
+    SIGSTORE_ID_TOKEN:
+      aud: sigstore
   before_script:
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
+  # Build, sign, upload — three steps rather than `release.publish` alone, so the attestations
+  # are taken over the exact files `--prebuilt` then uploads without rebuilding.
   script:
-    - ./workflow.cmd release.publish
+    - ./workflow.cmd release.dist
+    - ./workflow.cmd release.attest
+    - ./workflow.cmd release.publish --prebuilt

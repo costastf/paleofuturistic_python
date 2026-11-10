@@ -73,6 +73,26 @@ def ty(context: Context, paths: str = '') -> None:
 
 
 @task
+@logged('lint.pyproject')
+def pyproject(context: Context, paths: str = '') -> None:
+    """Validate pyproject.toml against the PyPA specifications.
+
+    validate-pyproject checks the `[project]` table against the core-metadata and pyproject.toml
+    specs (field names and types, PEP 508 requirements, SPDX license expressions, trove
+    classifiers), `[dependency-groups]` against the dependency-groups spec, and the `[tool.*]`
+    tables it has schemas for. It reads the file as written, so it catches what `uv build`
+    would only reject at release time, or would accept and publish wrong.
+
+    Args:
+        context: Invoke context.
+        paths: Space-separated paths to check. Defaults to ``pyproject.toml``; the commit hook
+            passes it only when that file is staged.
+
+    """
+    execute(context, f'uv run validate-pyproject {paths or "pyproject.toml"}')
+
+
+@task
 @logged('lint.complexipy')
 def complexipy(context: Context, paths: str = '') -> None:
     """Run complexipy cognitive complexity checker.
@@ -165,7 +185,7 @@ def commitizen(context: Context, commit_msg_file: str | None = None) -> None:
 @logged('lint')
 def lint(context: Context) -> None:
     """Run every linting step over the whole project; reports all failures before exiting."""
-    run_steps(ruff_lint, format_check, pylint, ty, complexipy, commitizen)(context)
+    run_steps(ruff_lint, format_check, pyproject, pylint, ty, complexipy, commitizen)(context)
 
 
 namespace = Collection('lint')
@@ -175,4 +195,5 @@ namespace.add_task(cast(Task, format_check), name='format-check')
 namespace.add_task(cast(Task, pylint))
 namespace.add_task(cast(Task, ty))
 namespace.add_task(cast(Task, complexipy))
+namespace.add_task(cast(Task, pyproject))
 namespace.add_task(cast(Task, commitizen))

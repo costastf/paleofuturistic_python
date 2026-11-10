@@ -2,6 +2,14 @@
 
 Picks up after [First-run setup](first-run-setup.md): you have a green dev cycle. This tutorial cuts a real release — branch, bump, changelog, tag, push.
 
+## Before your first release — register the publisher
+
+The publish {% if git_hosting_service == 'github' %}workflow{% else %}pipeline{% endif %} uploads to PyPI through Trusted Publishing, so PyPI has to know which
+repository and {% if git_hosting_service == 'github' %}workflow{% else %}pipeline{% endif %} may publish this project. Follow
+[Set up Trusted Publishing](../how-to/set-up-trusted-publishing.md) once, then come back. To
+publish somewhere other than PyPI, see [Publish to a private index](../how-to/publish-to-a-private-index.md)
+instead.
+
 ## Step 1 — Write a feature
 
 Open `src/{{ project_slug }}/{{ project_slug }}.py` and edit `hello()`:
@@ -50,16 +58,32 @@ Pass `--no-push` to keep the branch and tag local for inspection.
 
 ## Step 4 — Approve and merge
 
-On your git host, approve the release PR/MR and merge with a merge commit (not a squash). The tag and bump land on `main`. If CI is configured for trusted publishing, `release.publish` fires automatically when the tag appears on `main` and your wheel lands on PyPI.
+On your git host, approve the release PR/MR and merge with a merge commit (not a squash). The tag and bump land on `main`, and the publish {% if git_hosting_service == 'github' %}workflow{% else %}pipeline{% endif %} picks the tag up. It:
+
+1. builds the wheel and sdist (`release.dist`), checking both with `twine check --strict` and `check-wheel-contents`;
+{%- if git_hosting_service == 'github' %}
+2. records GitHub's build-provenance attestation over them;
+3. signs a PEP 740 attestation per file (`release.attest`);
+4. uploads the files and their attestations through Trusted Publishing (`release.publish --prebuilt`).
+{%- else %}
+2. signs a PEP 740 attestation per file (`release.attest`);
+3. uploads the files and their attestations through Trusted Publishing (`release.publish --prebuilt`).
+{%- endif %}
 
 ## Verify
 
-- `pip install <your_project_slug>==<new_version>` from a fresh venv succeeds.
-- `pypi.org/project/<your_project_slug>/` shows the new version.
+- `pip install {{ project_slug }}==<new_version>` from a fresh venv succeeds.
+- `pypi.org/project/{{ project_slug | replace('_', '-') }}/` shows the new version, with the links from `[project.urls]` in the sidebar.
+- The file details on PyPI show a *Provenance* section naming this repository. Check it from the command line with [Verify a release attestation](../how-to/verify-a-release-attestation.md):
+
+  ```bash
+  uv run pypi-attestations verify pypi --repository <repository URL> pypi:{{ project_slug }}-<new_version>-py3-none-any.whl
+  ```
 
 ## You're done
 
 You've cut a release. Next:
 
 - [Triage a security finding](../how-to/triage-a-security-finding.md) — what to do when pip-audit flags something.
+- [Yank or archive a release](../how-to/yank-or-archive-a-release.md) — when a release turns out to be broken.
 - [The scaffold](../index.md) — what the release shipped beyond the wheel (SBOM and security overview).

@@ -1,0 +1,68 @@
+# Write a standalone script
+
+For a one-file helper (a report, a data fix, a release chore) that needs a package the project
+does not depend on. The script declares its own Python version and dependencies in a comment
+block, and `uv run` builds a throwaway environment for it. The project's dependencies and lock
+are untouched.
+
+The format is the [inline script metadata](https://packaging.python.org/en/latest/specifications/inline-script-metadata/)
+specification (PEP 723), so any tool that implements it can run the script, not just uv.
+
+## 1. Create it
+
+```bash
+mkdir -p scripts
+uv init --script scripts/report.py --python 3.12
+```
+
+The file starts with the metadata block:
+
+```python
+# /// script
+# requires-python = ">=3.12"
+# dependencies = []
+# ///
+```
+
+## 2. Add what it needs
+
+```bash
+uv add --script scripts/report.py httpx
+```
+
+uv writes the requirement into the block (`"httpx>=…"`), not into `pyproject.toml`.
+
+## 3. Run it
+
+```bash
+uv run scripts/report.py
+```
+
+uv reads the block, resolves the dependencies into a cached environment, and runs the script
+there, outside `.venv`. To make the file executable on its own, give it this first line and
+`chmod +x` it:
+
+```python
+#!/usr/bin/env -S uv run --script
+```
+
+## 4. Lock it, if it has to be reproducible
+
+```bash
+uv lock --script scripts/report.py
+```
+
+This writes `scripts/report.py.lock` beside the script. Commit both, and later runs use exactly
+those versions.
+
+## What the workflow does not do for it
+
+`scripts/` is outside the paths the gate checks (`src/`, `_CI/tasks/`, `tests/`), so ruff,
+pylint, ty and the tests do not see it. That fits a script you run by hand. If it grows into
+something the project ships or depends on, move it into `src/{{ project_slug }}/` instead, and
+consider [a console script](add-a-console-script.md).
+
+## Source of truth
+
+- [Inline script metadata specification](https://packaging.python.org/en/latest/specifications/inline-script-metadata/)
+- [uv: running scripts](https://docs.astral.sh/uv/guides/scripts/)

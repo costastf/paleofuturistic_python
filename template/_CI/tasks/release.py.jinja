@@ -9,7 +9,7 @@ from typing import cast
 from invoke import Collection, Context, Task, task
 
 from .build import build
-from .configuration import OIDC_ENV_VARS, SBOM_FILE, UV_PUBLISH_SETTINGS
+from .configuration import DIST_DIR, OIDC_ENV_VARS, SBOM_FILE, UV_PUBLISH_SETTINGS
 from .document import update_package_version_badge
 from .{{ git_hosting_service }} import create_release_pr, pr_create_url
 from .secure import audit
@@ -171,10 +171,66 @@ def dist(context: Context) -> None:
     build(context)
 
 
+def distribution_files() -> list[Path]:
+    """Return the wheels and sdists in ``dist/``, the files an index accepts as a release."""
+    return sorted([*DIST_DIR.glob('*.whl'), *DIST_DIR.glob('*.tar.gz')])
+
+
+def publishes_with_credentials() -> bool:
+    """Report whether ``release.publish`` will upload with ``UV_PUBLISH_*`` rather than OIDC.
+
+    Drops empty ``UV_PUBLISH_*`` values first: GH Actions injects an undefined secret as an
+    empty string, and `uv publish` treats UV_PUBLISH_URL="" as an explicit --publish-url with
+    no base instead of falling back to PyPI. So empty reads as unset, here and in `uv`.
+    """
+    for var in UV_PUBLISH_SETTINGS:
+        if not os.environ.get(var, '').strip():
+            os.environ.pop(var, None)
+    return all(os.environ.get(var) for var in UV_PUBLISH_SETTINGS)
+
+
+@task
+@logged('release.attest')
+def attest(context: Context) -> None:
+    """Sign a PEP 740 attestation for every wheel and sdist in ``dist/``.
+
+    Writes ``<file>.publish.attestation`` beside each one, which ``uv publish`` uploads with the
+    file it belongs to. PyPI then shows the publishing workflow on the release page, and anyone
+    can check it with ``pypi-attestations verify pypi``.
+
+    The signing identity is the CI job's own OIDC token: ``ACTIONS_ID_TOKEN_*`` on GitHub
+    Actions, ``SIGSTORE_ID_TOKEN`` from the publish job's ``id_tokens:`` on GitLab. Run outside
+    CI, it opens a browser to sign in to Sigstore instead, which attests to a person rather
+    than a workflow — PyPI accepts attestations only from a Trusted Publisher's workflow.
+
+    Skipped when ``UV_PUBLISH_*`` credentials are set: that path uploads with
+    ``--no-attestations``, so there is nothing to sign for, and on a host PyPI cannot trust
+    (a self-managed GitLab, say) signing would fail the release for no benefit.
+
+    Raises:
+        SystemExit: If ``dist/`` holds no wheel or sdist — run ``release.dist`` first — or
+            signing fails.
+
+    """
+    if publishes_with_credentials():
+        print('UV_PUBLISH_* credentials set: release.publish uploads no attestations, so none are signed.')
+        return
+    files = distribution_files()
+    if not files:
+        print(f'No wheel or sdist in {DIST_DIR}/; run `./workflow.cmd release.dist` first.')
+        raise SystemExit(1)
+    execute(context, f'uv run pypi-attestations sign {" ".join(str(path) for path in files)}')
+
+
 @task
 @logged('release.publish')
 def publish(context: Context, prebuilt: bool = False) -> None:
     """Build and publish — the full post-release publishing pipeline.
+
+    Credentials decide how it uploads. With ``UV_PUBLISH_*`` set it uses them, and skips any
+    attestations in ``dist/``: PyPI accepts attestations only through Trusted Publishing, and
+    other indexes may reject the upload outright. Without them it requires an OIDC token and
+    publishes through Trusted Publishing, uploading the attestations ``release.attest`` signed.
 
     Args:
         context: Invoke context.
@@ -183,30 +239,25 @@ def publish(context: Context, prebuilt: bool = False) -> None:
             upload files that no attestation, checksum or signature refers to.
 
     """
-    if all(os.environ.get(var) for var in OIDC_ENV_VARS):
-        print('PyPI trusted publishing (OIDC) detected — skipping legacy credential check.')
-        # GH Actions injects `secrets.UV_PUBLISH_*` as empty strings when the
-        # secret is undefined, and `uv publish` treats UV_PUBLISH_URL="" as an
-        # explicit --publish-url with no base instead of falling back to PyPI.
-        # Drop empty legacy vars so OIDC users get the default publish URL.
-        for var in UV_PUBLISH_SETTINGS:
-            if not os.environ.get(var, '').strip():
-                os.environ.pop(var, None)
+    if publishes_with_credentials():
+        print('UV_PUBLISH_* credentials set — publishing with them, without attestations.')
+        command = 'uv publish --trusted-publishing never --no-attestations'
+    elif all(os.environ.get(var) for var in OIDC_ENV_VARS):
+        print('OIDC token present — publishing through PyPI Trusted Publishing.')
+        command = 'uv publish --trusted-publishing always'
     else:
-        missing = [v for v in UV_PUBLISH_SETTINGS if not os.environ.get(v)]
-        if missing:
-            print(
-                f'Missing required environment variables: {", ".join(missing)}.\n'
-                'Either provide them, or grant the publish job '
-                '`permissions: id-token: write` so PyPI trusted publishing can mint a token.'
-            )
-            raise SystemExit(1)
+        print(
+            f'No way to authenticate: set {", ".join(UV_PUBLISH_SETTINGS)}, or run in a CI job\n'
+            f'that mints an OIDC token ({", ".join(OIDC_ENV_VARS)}) for PyPI Trusted Publishing.\n'
+            'See docs/developer/how-to/set-up-trusted-publishing.md.'
+        )
+        raise SystemExit(1)
     if not prebuilt:
         dist(context)
-    elif not any(Path('dist').glob('*')):
+    elif not distribution_files():
         print('--prebuilt was given but dist/ is empty; run `./workflow.cmd release.dist` first.')
         raise SystemExit(1)
-    execute(context, 'uv publish')
+    execute(context, command)
     clean(context)
 
 
@@ -377,5 +428,6 @@ namespace.add_task(cast(Task, bump))
 namespace.add_task(cast(Task, changelog))
 namespace.add_task(cast(Task, push))
 namespace.add_task(cast(Task, dist))
+namespace.add_task(cast(Task, attest))
 namespace.add_task(cast(Task, publish))
 namespace.add_task(cast(Task, clean))

@@ -5,7 +5,7 @@ An annotated tour of what copier creates. Tree is for a project named `example_p
 ```
 example_project/
 ├── .copier-answers.yml          Copier state — template URL + answers + revision
-├── .gitignore
+├── .gitignore                   Includes .pypirc, dist/, reports/
 ├── .pre-commit-config.yaml      Hooks: ruff, pylint, commitizen
 ├── .security-overrides          pip-audit allow-list (vuln id → expiry)
 ├── .github/                     GitHub Actions workflows (absent if gitlab)
@@ -23,18 +23,18 @@ example_project/
 │   └── tasks/
 │       ├── __init__.py          Namespace aggregation + bootstrap wiring
 │       ├── bootstrap.py         develop.bootstrap implementation
-│       ├── build.py             uv build
+│       ├── build.py             uv build + twine check + check-wheel-contents
 │       ├── configuration.py     Shared constants (paths, env vars, settings)
 │       ├── container.py         Deps container image; imports from <host>.py
-│       ├── develop.py           pre-commit hook management
+│       ├── develop.py           pre-commit hooks, uv pin, pylock export
 │       ├── document.py          properdocs build/view
 │       ├── format_.py           ruff format + import sort
 │       ├── github.py            (Only if git_hosting_service=github)
 │       ├── gitlab.py            (Only if git_hosting_service=gitlab)
-│       ├── lint.py              ruff/pylint/ty/complexipy/commitizen
+│       ├── lint.py              ruff/validate-pyproject/pylint/ty/complexipy/commitizen
 │       ├── preflight.py         Step registry; preflight + preflight.staged
 │       ├── quality.py           pyscn
-│       ├── release.py           Validate, bump, changelog, push, publish
+│       ├── release.py           Validate, bump, changelog, push, attest, publish
 │       ├── secure.py            pip-audit, SBOM
 │       ├── shared.py            @logged, @run, execute(), run_steps(), apply_badge()
 │       └── test.py              pytest + coverage
@@ -46,9 +46,11 @@ example_project/
 │   ├── tutorials/
 │   ├── how-to/
 │   ├── reference/
-│   └── explanation/
+│   ├── explanation/
+│   └── developer/               The scaffold's own manual, incl. packaging specs, Trusted Publishing, attestations
 ├── properdocs.yml               Docs config + mkdocstrings setup
-├── pyproject.toml               Project + dependency groups + tool configs
+├── pyproject.toml               Project (+ [project.urls] if repository_url) + dependency groups + tool configs
+├── reports/                     Generated reports, gitignored (coverage, pyscn, pylock.toml)
 ├── src/
 │   └── example_project/
 │       ├── __init__.py          Re-exports + LOGGER setup

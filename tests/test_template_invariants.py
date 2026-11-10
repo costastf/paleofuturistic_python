@@ -1103,6 +1103,204 @@ def test_attestation_action_is_pinned_by_sha(generated_project):
     assert re.fullmatch(r'[0-9a-f]{40}', ref), f'attestation action is pinned to {ref!r}, not a commit SHA'
 
 
+def test_github_publish_signs_pep740_attestations_over_the_uploaded_files(generated_project):
+    """`release.attest` runs after the build and provenance steps and before `--prebuilt` publish.
+
+    After provenance, so GitHub's attestation covers exactly the wheel and sdist rather than
+    the `.publish.attestation` files this step adds. Before publish, because `uv publish`
+    uploads whatever attestation files it finds beside each distribution and generates none.
+    """
+    project, cell = generated_project
+    if cell['git_hosting_service'] != 'github':
+        pytest.skip('GitHub-only workflow')
+    steps = publish_steps(project)
+    provenance = step_index(steps, 'attest-build-provenance')
+    signed = step_index(steps, 'release.attest')
+    published = step_index(steps, 'release.publish')
+    assert signed >= 0, 'the publish job signs no PEP 740 attestations'
+    assert provenance < signed < published, (
+        f'wrong order: provenance={provenance}, pep740={signed}, publish={published}'
+    )
+
+
+def test_gitlab_publish_mints_both_tokens_and_signs_before_uploading(generated_project):
+    """The GitLab publish job requests the two OIDC audiences and runs dist → attest → publish.
+
+    uv reads `PYPI_ID_TOKEN` (audience `pypi`) for Trusted Publishing and `pypi-attestations`
+    reads `SIGSTORE_ID_TOKEN` (audience `sigstore`) to sign. The names are derived from the
+    audiences by the tools, so a renamed variable is a silent fallback to no token at all.
+    """
+    project, cell = generated_project
+    if cell['git_hosting_service'] != 'gitlab':
+        pytest.skip('GitLab-only pipeline')
+    job = yaml.safe_load((project / '.gitlab-ci.yml').read_text(encoding='utf-8'))['publish']
+    assert job['id_tokens'] == {'PYPI_ID_TOKEN': {'aud': 'pypi'}, 'SIGSTORE_ID_TOKEN': {'aud': 'sigstore'}}
+    assert job['script'] == [
+        './workflow.cmd release.dist',
+        './workflow.cmd release.attest',
+        './workflow.cmd release.publish --prebuilt',
+    ], f'the publish job runs {job["script"]}'
+
+
+def test_oidc_detection_names_the_hosts_own_token(generated_project):
+    """`OIDC_ENV_VARS` is what the chosen host injects, or Trusted Publishing is never detected."""
+    project, cell = generated_project
+    expected = {
+        'github': ('ACTIONS_ID_TOKEN_REQUEST_URL', 'ACTIONS_ID_TOKEN_REQUEST_TOKEN'),
+        'gitlab': ('PYPI_ID_TOKEN',),
+    }[cell['git_hosting_service']]
+    actual = load_generated_configuration(project).OIDC_ENV_VARS
+    assert actual == expected, f'OIDC_ENV_VARS is {actual}, the host injects {expected}'
+
+
+def test_publish_skips_attestations_only_on_the_credential_path(generated_project):
+    """Credentials upload without attestations; OIDC uploads through Trusted Publishing.
+
+    PyPI accepts attestations only from a Trusted Publisher, and other indexes may reject an
+    upload that carries them, so the credential path must pass `--no-attestations`. The OIDC
+    path must force Trusted Publishing, or a missing publisher on PyPI would surface as a
+    confusing credential prompt instead of an OIDC error.
+    """
+    project, _ = generated_project
+    source = (project / '_CI' / 'tasks' / 'release.py').read_text(encoding='utf-8')
+    commands = re.findall(r"command = '(uv publish[^']*)'", source)
+    assert sorted(commands) == [
+        'uv publish --trusted-publishing always',
+        'uv publish --trusted-publishing never --no-attestations',
+    ], f'publish commands: {commands}'
+    assert "execute(context, 'uv publish')" not in source, 'a bare `uv publish` bypasses the mode choice'
+
+
+def test_build_checks_the_distributions_it_builds(generated_project):
+    """`build.package` runs twine and check-wheel-contents over wheels and sdists by name.
+
+    `dist/*` would also match the `.publish.attestation` files `release.attest` writes, which
+    neither tool accepts, so a rebuild after signing would fail for no real reason.
+    """
+    project, _ = generated_project
+    source = (project / '_CI' / 'tasks' / 'build.py').read_text(encoding='utf-8')
+    assert "'uv build'" in source
+    assert "'uv run twine check --strict dist/*.whl dist/*.tar.gz'" in source
+    assert "'uv run check-wheel-contents dist/*.whl'" in source
+    assert "dist/*'" not in source, 'a bare dist/* glob reaches a checker'
+    assert 'dist/* ' not in source, 'a bare dist/* glob reaches a checker'
+
+
+def test_pyproject_validation_is_a_per_file_gate_and_part_of_lint(generated_project):
+    """validate-pyproject runs from the commit hook, `preflight`, and the `lint` aggregator."""
+    project, _ = generated_project
+    assert registry_steps(project).get('pyproject') == 'PER_FILE', 'pyproject validation is not a per-file step'
+    lint_py = (project / '_CI' / 'tasks' / 'lint.py').read_text(encoding='utf-8')
+    aggregator = re.search(r'run_steps\(([^)]*)\)\(context\)', lint_py)
+    assert aggregator, 'lint.py has no run_steps aggregator'
+    assert 'pyproject' in aggregator.group(1).split(', '), 'the lint aggregator skips pyproject validation'
+    assert "'uv run validate-pyproject" in lint_py
+
+
+def test_pypirc_is_never_committed(generated_project):
+    """`.pypirc` is gitignored: this project never reads one, so one in the tree is a leak."""
+    project, _ = generated_project
+    ignored = (project / '.gitignore').read_text(encoding='utf-8').splitlines()
+    assert '.pypirc' in ignored
+
+
+# The labels the well-known-project-urls spec lists, after its own normalisation
+# (lowercase, punctuation and whitespace removed). PyPI shows these with dedicated icons.
+WELL_KNOWN_URL_LABELS = {
+    'homepage',
+    'source',
+    'download',
+    'changelog',
+    'releasenotes',
+    'documentation',
+    'issues',
+    'funding',
+}
+
+
+def normalize_url_label(label):
+    """Normalise a Project-URL label per the well-known-project-urls spec."""
+    return re.sub(r'[^a-z0-9]', '', label.lower())
+
+
+def test_project_urls_use_well_known_labels(generated_project):
+    """`[project.urls]` renders in every cell, every label is well-known, and links fit the host."""
+    project, cell = generated_project
+    urls = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))['project']['urls']
+    unknown = sorted(label for label in urls if normalize_url_label(label) not in WELL_KNOWN_URL_LABELS)
+    assert not unknown, f'labels PyPI will not recognise: {unknown}'
+    repository = urls['Source']
+    assert not repository.endswith(('/', '.git'))
+    issues = '/-/issues' if cell['git_hosting_service'] == 'gitlab' else '/issues'
+    assert urls['Issues'] == f'{repository}{issues}'
+    pyproject = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
+    changelog_file = pyproject['tool']['commitizen']['changelog_file']
+    assert urls['Changelog'].endswith(f'/HEAD/{changelog_file}'), 'the Changelog URL is not where commitizen writes'
+    pages = cell['git_hosting_service'] == 'github' and cell['integrate_pages']
+    assert ('Documentation' in urls) == pages
+    if pages:
+        assert urls['Homepage'] == urls['Documentation']
+        assert urls['Homepage'].endswith('.github.io/' + repository.rsplit('/', 1)[1] + '/')
+    else:
+        assert urls['Homepage'] == repository
+
+
+def generate(template_snapshot, workdir, data, *, check=True):
+    """Run copier over the template snapshot with ``data``; return the completed process."""
+    data_file = workdir / 'data.json'
+    data_file.write_text(json.dumps(data), encoding='utf-8')
+    return subprocess.run(
+        [
+            'uvx',
+            'copier',
+            'copy',
+            '--defaults',
+            '--trust',
+            '--data-file',
+            str(data_file),
+            str(template_snapshot),
+            str(workdir / PROJECT_SLUG),
+        ],
+        check=check,
+        capture_output=True,
+        env={**os.environ, **generation_env()},
+    )
+
+
+def test_no_repository_url_ships_no_project_urls(template_snapshot, tmp_path_factory):
+    """Without `repository_url`, `[project.urls]` is absent rather than full of dead links."""
+    workdir = tmp_path_factory.mktemp('no-repository-url')
+    generate(template_snapshot, workdir, {'repository_url': ''})
+    pyproject = tomllib.loads((workdir / PROJECT_SLUG / 'pyproject.toml').read_text(encoding='utf-8'))
+    assert 'urls' not in pyproject['project']
+
+
+def test_repository_url_is_normalised(template_snapshot, tmp_path_factory):
+    """A pasted clone URL (`.git`, trailing slash, surrounding space) yields clean links."""
+    workdir = tmp_path_factory.mktemp('clone-url')
+    generate(template_snapshot, workdir, {'repository_url': ' https://github.com/Acme/widget.git/ '})
+    urls = tomllib.loads((workdir / PROJECT_SLUG / 'pyproject.toml').read_text(encoding='utf-8'))['project']['urls']
+    assert urls['Source'] == 'https://github.com/Acme/widget'
+    assert urls['Documentation'] == 'https://acme.github.io/widget/'
+
+
+@pytest.mark.parametrize(
+    'bad_url',
+    [
+        pytest.param('http://github.com/acme/widget', id='plain-http'),
+        pytest.param('git@github.com:acme/widget.git', id='ssh'),
+        pytest.param('https://github.com', id='no-path'),
+        pytest.param('github.com/acme/widget', id='no-scheme'),
+    ],
+)
+def test_repository_url_validator_rejects_invalid(template_snapshot, tmp_path_factory, bad_url):
+    """The validator refuses anything but an https URL with a path, before writing a project."""
+    workdir = tmp_path_factory.mktemp('bad-repository-url')
+    result = generate(template_snapshot, workdir, {'repository_url': bad_url}, check=False)
+    assert result.returncode != 0, f'copier accepted repository_url={bad_url!r}'
+    assert not (workdir / PROJECT_SLUG / 'pyproject.toml').exists()
+
+
 TEMPLATE_WORKFLOWS = REPO_ROOT / 'template' / "{% if git_hosting_service == 'github' %}.github{% endif %}" / 'workflows'
 # `uses: owner/repo@ref  # vX.Y.Z`. Local refs (`uses: ./.github/...`) carry no `@` and are
 # skipped by the pattern, which is correct: they are versioned by the commit being built.
@@ -1593,23 +1791,68 @@ def test_commit_stage_is_one_invocation_of_the_per_file_steps(generated_project)
     )
 
 
-def test_commit_stage_filter_is_not_narrower_than_the_steps_it_runs(generated_project):
-    """The one remaining `files:` filter is the union of the per-file steps' own filters.
+def per_file_step_filters(project):
+    """Return ``{step name: compiled files pattern}`` for every per-file step in the registry.
 
-    Collapsing six hooks into one left a single `files:` key in front of four tools that do not
-    agree on what they check — complexipy is `src/` only, the rest also cover `_CI/tasks/` and
-    `tests/`. The per-tool filters therefore live in the registry, and this pattern decides
-    only whether the hook *wakes*: narrower than the widest step, and staging a file that step
-    cares about would leave the hook skipped and the file unchecked.
+    The pattern constants are read from the generated `configuration.py`, which is the one
+    place they are declared, so this follows a filter that is renamed or tightened.
+    """
+    source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
+    constants = load_generated_configuration(project)
+    filters = {}
+    for node in ast.walk(ast.parse(source)):
+        if not (isinstance(node, ast.Assign) and any(getattr(t, 'id', None) == 'STEPS' for t in node.targets)):
+            continue
+        for call in node.value.elts:
+            supplied = dict(zip(('name', 'scope'), call.args, strict=False))
+            supplied.update({word.arg: word.value for word in call.keywords})
+            if getattr(supplied.get('scope'), 'id', None) != 'PER_FILE':
+                continue
+            files = supplied.get('files')
+            assert isinstance(files, ast.Name), f'per-file step {supplied["name"].value!r} has no files= constant'
+            filters[supplied['name'].value] = getattr(constants, files.id)
+    return filters
+
+
+# Paths a commit can plausibly stage, chosen so that every per-file filter accepts at least one
+# and some accept none. The hook is judged on what it does with each.
+STAGEABLE_PATHS = (
+    'src/pkg/module.py',
+    '_CI/tasks/local.py',
+    'tests/test_module.py',
+    'pyproject.toml',
+    'README.md',
+    'docs/index.md',
+    'src/pkg/py.typed',
+    'uv.lock',
+    '_CI/tasks/README.md',
+    'nested/pyproject.toml',
+)
+
+
+def test_commit_stage_filter_is_the_union_of_the_steps_it_runs(generated_project):
+    """The one remaining `files:` filter wakes the hook for exactly the files some step reads.
+
+    Collapsing six hooks into one left a single `files:` key in front of tools that do not
+    agree on what they check — complexipy is `src/` only, the pyproject check reads one file,
+    the rest cover `_CI/tasks/`, `src/` and `tests/`. The per-tool filters live in the registry,
+    and this pattern decides only whether the hook *wakes*. Narrower than the union, and staging
+    a file some step cares about leaves the hook skipped and the file unchecked; wider, and
+    every commit of an unrelated file pays the startup for nothing.
     """
     project, _ = generated_project
-    source = (project / '_CI' / 'tasks' / 'configuration.py').read_text(encoding='utf-8')
-    widest = re.search(r"CODE_FILES = re\.compile\(r'([^']+)'\)", source)
-    assert widest, 'configuration.py no longer declares CODE_FILES'
+    filters = per_file_step_filters(project)
+    assert filters, 'the registry declares no per-file steps'
     staged = next(hook for hook in pre_commit_hooks(project) if invoked_task(hook) == 'preflight.staged')
-    assert staged['files'] == widest.group(1), (
-        f"hook filter {staged['files']!r} does not match the registry's widest per-file filter {widest.group(1)!r}"
-    )
+    hook_filter = re.compile(staged['files'])
+    for path in STAGEABLE_PATHS:
+        readers = sorted(name for name, pattern in filters.items() if pattern.search(path))
+        wakes = bool(hook_filter.search(path))
+        assert wakes == bool(readers), (
+            f'{path!r}: the hook {"wakes" if wakes else "sleeps"} but the steps that read it are {readers}'
+        )
+    accepted = {name for name, pattern in filters.items() if any(pattern.search(p) for p in STAGEABLE_PATHS)}
+    assert accepted == set(filters), f'per-file steps no probe path exercises: {sorted(set(filters) - accepted)}'
 
 
 def test_whole_program_steps_are_never_scoped_to_a_diff(generated_project):
@@ -3340,6 +3583,7 @@ SHIPPED_RATIONALE_PAGES = {
         f'{SHIPPED_EXPLANATION_DIR}/the-ci-tasks-architecture.md'
     ),
     'docs/using/explanation/how-uv-is-used.md': f'{SHIPPED_EXPLANATION_DIR}/how-uv-is-used.md',
+    'docs/using/explanation/packaging-conformance.md': f'{SHIPPED_EXPLANATION_DIR}/packaging-conformance.md',
     'docs/using/explanation/sbom-and-security-model.md': f'{SHIPPED_EXPLANATION_DIR}/sbom-and-security-model.md.jinja',
     'docs/using/explanation/testing-strategy.md': f'{SHIPPED_EXPLANATION_DIR}/testing-strategy.md',
 }

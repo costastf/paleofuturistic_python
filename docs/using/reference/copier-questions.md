@@ -73,6 +73,24 @@ Selects which license file is installed to `LICENSE` by `tasks_render.py`. See [
 
 Determines which CI scaffolding ships and which host-specific submodule lives at `_CI/tasks/<host>.py`. The unchosen host's files are omitted at generation time via copier conditional filenames — a file or directory whose rendered name is an empty string is simply not created. See [Choose a git host](../how-to/choose-a-git-host.md).
 
+### `repository_url`
+
+- **Type**: string
+- **Default**: empty
+- **Allowed**: empty, or an `https://` URL with a path, e.g. `https://github.com/acme/widget`
+
+The public home of the repository. It renders `[project.urls]` in `pyproject.toml`, the links PyPI shows in the project sidebar, under [well-known labels](https://packaging.python.org/en/latest/specifications/well-known-project-urls/) so each gets its own icon:
+
+| Label | Value |
+| --- | --- |
+| `Homepage` | The GitHub Pages site when `git_hosting_service=github`, the repository is on github.com and `integrate_pages=true`; otherwise the repository |
+| `Source` | The repository |
+| `Issues` | `<repository>/issues` on GitHub, `<repository>/-/issues` on GitLab |
+| `Changelog` | `docs/changelog.md` on the default branch, where `release` writes it |
+| `Documentation` | The GitHub Pages site, under the same conditions as `Homepage` |
+
+A trailing `/` or `.git` is dropped, so a pasted clone URL works. Left empty, the project ships no `[project.urls]` at all rather than links that would 404 on PyPI; answer it on a later `copier update`, or add the table by hand. Self-hosted GitLab and GitHub Enterprise URLs work too; only the Pages links assume github.com.
+
 ### `integrate_pages`
 
 - **Type**: bool
@@ -86,7 +104,8 @@ Validation is split between copier's built-in mechanisms and the `tasks_render.p
 
 1. **Python version range** — a `validator` on the `max_python_version` question in `copier.yml` checks that `max >= min`, that both values share the same major version, and that both appear in the choices list. Any failure aborts generation immediately before any files are written.
 2. **Project slug** — a `validator` on the `project_slug` question checks the value is a valid Python identifier and PyPI project name (`^[a-z]([a-z0-9_]*[a-z0-9])?$`), rejecting empty values, leading digits, and punctuation such as apostrophes. Generation aborts before any files are written on failure.
-3. **License installation** — `tasks_render.py` installs the chosen `LICENSE` file (substituting author/year tokens) and removes the `licenses/` staging directory. It runs only on `copier copy`, not on `copier update`.
+3. **Repository URL** — a `validator` on `repository_url` accepts an empty value or `^https://[^/\s]+/[^\s]+$`, so `http://`, SSH remotes and a bare host are refused before any files are written.
+4. **License installation** — `tasks_render.py` installs the chosen `LICENSE` file (substituting author/year tokens) and removes the `licenses/` staging directory. It runs only on `copier copy`, not on `copier update`.
 
 ## See also
 

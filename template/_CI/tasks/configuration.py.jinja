@@ -12,6 +12,7 @@ PATHS = 'src/ _CI/tasks/ tests/'
 # fixes a formatting failure, so that command covers the files the checks have an opinion on.
 CODE_FILES = re.compile(r'^(_CI/tasks/|src/|tests/).*\.py$')
 SRC_FILES = re.compile(r'^src/.*\.py$')
+PYPROJECT_FILES = re.compile(r'^pyproject\.toml$')
 SECURITY_OVERRIDE_ENV = '{{ project_slug | upper }}_SECURITY_OVERRIDE'
 SECURITY_OVERRIDES_FILE = Path('.security-overrides')
 
@@ -57,9 +58,20 @@ UV_LOCK = Path('uv.lock')
 DOCKERFILE_DEPS = Path('Dockerfile.deps')
 DEPS_IMAGE_FILE = Path('.deps-image')
 UV_PUBLISH_SETTINGS = ('UV_PUBLISH_URL', 'UV_PUBLISH_PASSWORD', 'UV_PUBLISH_USERNAME')
-# Presence of both signals PyPI Trusted Publishing (OIDC) — `uv publish`
-# exchanges them for a short-lived token, so the legacy UV_PUBLISH_* creds
-# become unnecessary. See release.publish for the branching logic.
+{%- if git_hosting_service == 'github' %}
+# Presence of both signals an OIDC-capable job: GitHub Actions injects them when the job has
+# `id-token: write`. `uv publish` exchanges them for a short-lived PyPI token (Trusted
+# Publishing), and `pypi-attestations sign` for a Sigstore signing certificate.
 OIDC_ENV_VARS = ('ACTIONS_ID_TOKEN_REQUEST_URL', 'ACTIONS_ID_TOKEN_REQUEST_TOKEN')
+{%- else %}
+# The token the publish job's `id_tokens:` block mints for audience `pypi`. uv reads
+# `<AUDIENCE>_ID_TOKEN` on GitLab, so the name is fixed by the audience, not chosen here.
+# `pypi-attestations sign` reads its own, `SIGSTORE_ID_TOKEN`, minted by the same block.
+OIDC_ENV_VARS = ('PYPI_ID_TOKEN',)
+{%- endif %}
+# `uv export --format pylock.toml` writes here: a standard lock for tools that do not read
+# uv.lock. Under reports/ because it is derived, and gitignored there.
+PYLOCK_FILE = Path('reports') / 'pylock.toml'
+DIST_DIR = Path('dist')
 
 SENTINEL = Path('_CI/.bootstrapped')

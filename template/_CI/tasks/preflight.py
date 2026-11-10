@@ -49,10 +49,10 @@ from typing import NamedTuple, cast
 from invoke import Collection, Context, Task, task
 
 from .build import build
-from .configuration import CODE_FILES, SRC_FILES
+from .configuration import CODE_FILES, PYPROJECT_FILES, SRC_FILES
 from .document import build as document_build
 from .document import update_package_version_badge, update_pipeline_badge, update_python_badge
-from .lint import commitizen, complexipy, format_check, pylint, ruff_lint, ty
+from .lint import commitizen, complexipy, format_check, pylint, pyproject, ruff_lint, ty
 from .quality import pyscn_check, pyscn_json_report, update_pyscn_badge
 from .secure import audit
 from .shared import logged, run_steps
@@ -179,6 +179,9 @@ def artifacts(context: Context, *, write: bool) -> None:
 STEPS = (
     Step('format', PER_FILE, check=formatting, files=CODE_FILES),
     Step('ruff', PER_FILE, check=ruff_lint, files=CODE_FILES),
+    # Per-file: whether pyproject.toml conforms to the specs is a question about that file
+    # alone, so it runs on the commit that stages it, and is skipped on every other commit.
+    Step('pyproject', PER_FILE, check=pyproject, files=PYPROJECT_FILES),
     Step('complexipy', PER_FILE, check=complexipy, files=SRC_FILES),
     Step('ty', WHOLE_PROGRAM, check=ty),
     # `cz bump` derives the version and the changelog from commit messages, so their format is
@@ -389,10 +392,11 @@ def preflight(context: Context, write: bool = False, audit_dependencies: bool = 
     """Run every check that answers from this tree, and bring the derived files up to date.
 
     The bare command is what the pre-push hook and the CI pipeline run, so reproducing a
-    pipeline failure needs no flag. It verifies formatting, lints, type-checks, checks the
-    commit messages this push adds, builds the docs, runs pyscn, runs the test matrix, builds
-    the wheel, and compares the badges and the coverage ratchet against what the tools just
-    measured, failing with everything out of date.
+    pipeline failure needs no flag. It verifies formatting, lints, validates pyproject.toml
+    against the packaging specs, type-checks, checks the commit messages this push adds, builds
+    the docs, runs pyscn, runs the test matrix, builds and checks the wheel and sdist, and
+    compares the badges and the coverage ratchet against what the tools just measured, failing
+    with everything out of date.
 
     Two checks are not here, both because their answer is not a property of the tree: the
     dependency audit, whose verdict comes from the advisory database on the day it runs

@@ -8,8 +8,9 @@ The single source of truth for project metadata and tool configuration. Sections
 
 | Section | Owner | Notes |
 | --- | --- | --- |
-| `[project]` | You | Name, description, classifiers, scripts, dependencies. Edit freely. |
-| `[project.scripts]` | You | Console entry points. Add a `__main__.py` and an entry under this section to ship a CLI. |
+| `[project]` | You | Name, description, keywords, classifiers, dependencies, licence. Edit freely; `lint.pyproject` validates every change against the [pyproject.toml specification](https://packaging.python.org/en/latest/specifications/pyproject-toml/). A commented stanza below the table lists the optional fields (`maintainers`, extras, entry points). |
+| `[project.urls]` | You (rendered once from the `repository_url` copier answer) | The links PyPI shows beside the project, under [well-known labels](https://packaging.python.org/en/latest/specifications/well-known-project-urls/) (`Homepage`, `Source`, `Issues`, `Changelog`, `Documentation`) so each gets its own icon. Absent if `repository_url` was left empty; add it by hand or answer the question on the next `copier update`. |
+| `[project.scripts]` | You | Console entry points. See [Add a console script](../how-to/add-a-console-script.md). |
 | `[dependency-groups]` | You | Add deps via `uv add --group <name>`. See [Dependency groups](dependency-groups.md). |
 | `[tool.uv]` | Template | uv-specific settings, required uv version. Don't lower `required-version`. |
 | `[tool.ruff]` | Template (rule list), you (line-length etc.) | Rule selection is opinionated; ad-hoc disables go in code with `# noqa`. |
@@ -36,7 +37,7 @@ Hook definitions, split across three git stages:
 | Stage | Hooks | Scope | Cost on a fresh project |
 |---|---|---|---|
 | `commit-msg` | commitizen (conventional-commit format) | the message | ~0.4s |
-| `pre-commit` | `preflight.staged` — ruff format, ruff, complexipy, pylint | **staged files only** | ~0.7s |
+| `pre-commit` | `preflight.staged` — ruff format, ruff, validate-pyproject, complexipy, pylint | **staged files only** | ~0.7s |
 | `pre-commit` | `.security-overrides` validation | that file, when staged | ~0.1s |
 | `pre-push` | `preflight` — ty, commitizen, the docs build, pyscn, the tox matrix, the wheel, derived files | whole project | ~13s |
 
@@ -54,10 +55,11 @@ declares — cheapest first, so a formatting slip is not something you wait for 
 about.
 
 Which tools run there is decided by the step registry in `_CI/tasks/preflight.py`, not by this
-file, and the registry holds the per-tool path filters too (complexipy is `src/` only; the rest
-also cover `_CI/tasks/` and `tests/`), so a commit touching only `tests/` skips complexipy. The
-one `files:` here is the union of them, and an invariant asserts it is never narrower than the
-widest step's filter.
+file, and the registry holds the per-tool path filters too (complexipy is `src/` only, the
+pyproject check only `pyproject.toml`; the rest also cover `_CI/tasks/` and `tests/`), so a
+commit touching only `tests/` skips complexipy. The one `files:` here is the union of them, and
+an invariant asserts it is exactly that: the hook wakes for every file some step reads and for no
+other.
 
 The hook entry is the bare `./workflow.cmd preflight.staged`, with `pass_filenames: false`,
 because the task reads the index itself — so the line is the command you would type. That also
@@ -109,6 +111,9 @@ part of the entry. See [Triage a security finding](../how-to/triage-a-security-f
 ## `.gitignore`
 
 Standard Python + the project's own outputs (`reports/`, `site/`, `dist/`, `.deps-image`, `_CI/.bootstrapped`).
+It also ignores `.pypirc`: this project authenticates to indexes through Trusted Publishing or
+`UV_PUBLISH_*` variables, never a `.pypirc` ([format spec](https://packaging.python.org/en/latest/specifications/pypirc/)),
+so a file of that name in the tree is a password about to be committed.
 
 ## `Dockerfile.deps`
 

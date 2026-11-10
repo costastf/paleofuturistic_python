@@ -1,0 +1,118 @@
+# Set up Trusted Publishing
+
+Do this once, before your first release. Trusted Publishing lets the publish job upload to PyPI
+with a short-lived token minted from the job's own OIDC identity, so no PyPI API token is stored
+anywhere, and it is the only way PyPI accepts the PEP 740 attestations this project signs.
+
+{%- if git_hosting_service == 'gitlab' %}
+
+PyPI supports Trusted Publishing from **gitlab.com only**. On a self-managed GitLab instance, skip
+to [Publishing with credentials instead](#publishing-with-credentials-instead).
+{%- endif %}
+
+## 1. Register the publisher on PyPI
+
+Sign in to PyPI and open the publishing settings:
+
+- **First release of a new project:** *Your account → Publishing* (<https://pypi.org/manage/account/publishing/>),
+  and add a *pending* publisher. PyPI creates the project on the first upload. A pending
+  publisher is invalidated if someone else registers the name first, so do not wait long.
+- **Existing project:** *Your projects → {{ project_slug | replace('_', '-') }} → Manage → Publishing*.
+
+Fill in the form for {% if git_hosting_service == 'github' %}GitHub Actions{% else %}GitLab CI/CD{% endif %}:
+
+| Field | Value |
+| --- | --- |
+| PyPI project name | `{{ project_slug | replace('_', '-') }}` |
+{%- if git_hosting_service == 'github' %}
+| Owner | the GitHub user or organisation that owns the repository |
+| Repository name | the repository's name |
+| Workflow name | `publish.yaml` |
+| Environment name | `pypi` |
+{%- else %}
+| Namespace | the GitLab group or user path, e.g. `acme` or `acme/platform` |
+| Project name | the GitLab project's name |
+| Top-level pipeline file path | `.gitlab-ci.yml` |
+| Environment name | `pypi` |
+{%- endif %}
+
+The environment must match exactly. The publish job declares `environment: pypi`, and a token
+minted for any other environment is refused.
+
+## 2. Protect the environment
+
+{%- if git_hosting_service == 'github' %}
+
+In the repository, *Settings → Environments → New environment*, name it `pypi`. Add required
+reviewers if a release should wait for a second person, and restrict deployment to the default
+branch and release tags. Optional, but it is what turns "anyone who can push a tag" into "a
+reviewer approved this upload". GitHub's [environments guide](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments)
+has the details.
+
+## 3. Nothing to configure in the workflow
+
+`.github/workflows/publish.yaml` already has what Trusted Publishing needs: `id-token: write` on
+the publish job, and `environment: pypi`. GitHub injects `ACTIONS_ID_TOKEN_REQUEST_URL` and
+`ACTIONS_ID_TOKEN_REQUEST_TOKEN`; `release.publish` sees them and runs
+`uv publish --trusted-publishing always`.
+{%- else %}
+
+In the project, *Operate → Environments → New environment*, name it `pypi`. Under *Settings →
+CI/CD → Protected environments*, protect it and add approvers if a release should wait for a
+second person. Optional, but it is what turns "anyone who can push a tag" into "a reviewer
+approved this upload".
+
+## 3. Nothing to configure in the pipeline
+
+The `publish` job in `.gitlab-ci.yml` already requests the two tokens:
+
+```yaml
+id_tokens:
+  PYPI_ID_TOKEN:
+    aud: pypi
+  SIGSTORE_ID_TOKEN:
+    aud: sigstore
+```
+
+uv reads `PYPI_ID_TOKEN` and exchanges it for a PyPI upload token; `pypi-attestations` reads
+`SIGSTORE_ID_TOKEN` to sign. Both names are fixed by their audiences (`<AUDIENCE>_ID_TOKEN`), so
+do not rename them. `release.publish` sees `PYPI_ID_TOKEN` and runs
+`uv publish --trusted-publishing always`.
+{%- endif %}
+
+## 4. Check it worked
+
+Make a release ([Make your first release](../tutorials/make-your-first-release.md)). In the
+publish job's log, `release.publish` prints:
+
+```console
+OIDC token present — publishing through PyPI Trusted Publishing.
+```
+
+On PyPI, the release's files list a *Provenance* section naming this repository and the publish
+{% if git_hosting_service == 'github' %}workflow{% else %}pipeline{% endif %}. [Verify a release attestation](verify-a-release-attestation.md) checks it from
+the command line.
+
+If the upload fails with `invalid-publisher`, the form in step 1 does not match the job: compare
+the repository, {% if git_hosting_service == 'github' %}workflow file{% else %}pipeline file path{% endif %} and environment character by character.
+
+## Publishing with credentials instead
+
+For an index without Trusted Publishing (a private one, or PyPI from a self-managed GitLab), set
+all three of `UV_PUBLISH_URL`, `UV_PUBLISH_USERNAME` and `UV_PUBLISH_PASSWORD` as masked
+{% if git_hosting_service == 'github' %}secrets on the `pypi` environment{% else %}CI/CD variables scoped to the `pypi` environment{% endif %}. For PyPI with an API token, the
+username is `__token__` and the URL `https://upload.pypi.org/legacy/`.
+
+When all three are set, `release.publish` uploads with them and passes `--no-attestations`, and
+`release.attest` signs nothing. PyPI accepts attestations only through Trusted Publishing, and
+other indexes may reject an upload that carries them. [Publish to a private index](publish-to-a-private-index.md)
+covers the rest.
+
+## Source of truth
+
+- [PyPI: Trusted Publishers](https://docs.pypi.org/trusted-publishers/) and [adding a publisher](https://docs.pypi.org/trusted-publishers/adding-a-publisher/)
+- [PyPI: creating a project through a pending publisher](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/)
+- [uv: publishing a package](https://docs.astral.sh/uv/guides/package/)
+{%- if git_hosting_service == 'gitlab' %}
+- [GitLab: OpenID Connect ID tokens](https://docs.gitlab.com/ci/secrets/id_token_authentication/)
+{%- endif %}

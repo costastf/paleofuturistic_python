@@ -113,6 +113,21 @@ git_hosting_service:
   default: "github"
   help: Which git hosting service the project targets
 
+# Feeds `[project.urls]`, the links PyPI shows in the sidebar of the project page. Optional
+# because a project may not have a public home yet; empty ships no `[project.urls]` at all
+# rather than placeholder links that would 404 on PyPI forever. Normalised in
+# pyproject.toml.jinja (trailing `/` and `.git` dropped), so a pasted clone URL works too.
+repository_url:
+  type: str
+  default: ""
+  help: >-
+    Public https URL of the repository, e.g. https://github.com/acme/widget
+    (leave empty to ship no [project.urls] for now)
+  validator: >-
+    {% if repository_url and not (repository_url | trim | regex_search('^https://[^/\\s]+/[^\\s]+$')) %}
+    repository_url must be empty or an https URL like https://github.com/acme/widget
+    {% endif %}
+
 integrate_pages:
   type: bool
   default: true

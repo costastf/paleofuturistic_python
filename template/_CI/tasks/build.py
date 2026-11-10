@@ -5,14 +5,25 @@ from typing import cast
 from invoke import Collection, Context, Task, task
 
 from .secure import sbom
-from .shared import logged, run, run_steps
+from .shared import execute, logged, run_steps
 
 
 @task
 @logged('build.package')
-@run('uv build')
 def package(context: Context) -> None:
-    """Build the package."""
+    """Build the sdist and wheel, then check both the way PyPI and installers will read them.
+
+    `uv build` writes `dist/`. `twine check --strict` renders the metadata and the README
+    exactly as PyPI's upload endpoint does, so a long description PyPI would refuse fails here
+    instead of mid-release. `check-wheel-contents` inspects the wheel itself: duplicate or
+    stray files, a missing package, bytecode, an empty wheel.
+
+    The globs name wheels and sdists explicitly. `release.attest` later writes
+    `*.publish.attestation` files beside them, which are neither, and would fail both checks.
+    """
+    execute(context, 'uv build')
+    execute(context, 'uv run twine check --strict dist/*.whl dist/*.tar.gz')
+    execute(context, 'uv run check-wheel-contents dist/*.whl')
 
 
 @task

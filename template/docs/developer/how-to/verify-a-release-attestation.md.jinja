@@ -1,0 +1,74 @@
+# Verify a release attestation
+
+Check that a file on PyPI was built and published by this project's own {% if git_hosting_service == 'github' %}workflow{% else %}pipeline{% endif %}, and not
+uploaded by anyone else who got hold of a credential. Do it after your first release to confirm
+the setup, and whenever someone asks whether a release is genuine.
+
+Every release published through Trusted Publishing carries a [PEP 740](https://packaging.python.org/en/latest/specifications/index-hosted-attestations/)
+attestation per wheel and sdist, signed by `release.attest` in the publish job.
+{%- if git_hosting_service == 'github' %} The GitHub publish
+job also records a second, GitHub-native provenance attestation; both are covered below.
+{%- endif %} Releases published with `UV_PUBLISH_*` credentials carry none; see
+[Set up Trusted Publishing](set-up-trusted-publishing.md).
+
+## On PyPI's website
+
+Open the release on PyPI, go to *Download files*, and pick a file's *view details*. The
+*Provenance* section names the repository, the {% if git_hosting_service == 'github' %}workflow file{% else %}pipeline file{% endif %} and the commit that published it.
+A file without that section was not uploaded with an attestation.
+
+## From the command line
+
+`pypi-attestations` is in the project's `security` group, so `uv run` has it:
+
+```bash
+uv run pypi-attestations verify pypi \
+  --repository <repository URL> \
+  pypi:{{ project_slug }}-<version>-py3-none-any.whl
+```
+
+`<repository URL>` is the https URL of this repository{% if repository_url %} (`{{ repository_url | trim | regex_replace('(\\\\.git)?/*$', '') }}`){% endif %}.
+It downloads the file and its attestation from PyPI and checks that the signature is valid, that
+it covers this exact file, and that the signer is a workflow in that repository. Success prints
+`OK:` and the file name; any mismatch fails with the reason.
+
+To check a file you already downloaded, pass its path instead of `pypi:<filename>`.
+
+To see what an attestation in `dist/` says before uploading, for instance after running
+`release.attest` locally:
+
+```bash
+uv run pypi-attestations inspect dist/{{ project_slug }}-<version>-py3-none-any.whl.publish.attestation
+```
+{%- if git_hosting_service == 'github' %}
+
+## GitHub's provenance attestation
+
+The publish job's *Attest build provenance* step records a second attestation with GitHub, over
+the same wheel and sdist. Check a downloaded file against it with the
+[GitHub CLI](https://cli.github.com/):
+
+```bash
+gh attestation verify {{ project_slug }}-<version>-py3-none-any.whl --repo <owner>/<repo>
+```
+
+It answers the same question as the PEP 740 check. The difference is where the attestation is
+stored: with the repository on GitHub, instead of with the package on PyPI.
+{%- endif %}
+
+## When verification fails
+
+- **No attestation found:** the release was published with credentials, or before this project
+  signed attestations. Nothing is wrong with the file; there is just nothing to verify.
+- **Identity mismatch:** the `--repository` you passed is not the one that signed. Check for a
+  fork, a renamed repository, or a typo. If the repository is right, treat the file as untrusted.
+- **Digest mismatch:** the file is not the one that was signed. Do not install it.
+
+## Source of truth
+
+- [Index hosted attestations (PEP 740)](https://packaging.python.org/en/latest/specifications/index-hosted-attestations/)
+- [PyPI: attestations](https://docs.pypi.org/attestations/), [consuming attestations](https://docs.pypi.org/attestations/consuming-attestations/)
+- [pypi-attestations](https://github.com/pypi/pypi-attestations)
+{%- if git_hosting_service == 'github' %}
+- [GitHub: artifact attestations](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds)
+{%- endif %}

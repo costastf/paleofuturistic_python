@@ -32,7 +32,7 @@ In `pyproject.toml`:
 <your-project-slug> = "<your_project_slug>.__main__:main"
 ```
 
-The key on the left is the executable name installed on `PATH`. Hyphens are fine; the import target on the right must use underscores.
+The key on the left is the executable name installed on `PATH`. Hyphens are fine; the import target on the right must use underscores. The format is the [entry points specification](https://packaging.python.org/en/latest/specifications/entry-points/); `./workflow.cmd lint.pyproject` checks the table's shape, and a generated project's *Add a console script* how-to covers GUI scripts and plugin entry points too.
 
 ## Step 3 — Verify
 

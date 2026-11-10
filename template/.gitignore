@@ -12,6 +12,9 @@ __pycache__/
 *.so
 
 # Distribution / packaging
+# Index credentials. This project publishes with Trusted Publishing or UV_PUBLISH_* env
+# vars, never a .pypirc, so one in the tree is a password about to be committed.
+.pypirc
 .Python
 build/
 develop-eggs/

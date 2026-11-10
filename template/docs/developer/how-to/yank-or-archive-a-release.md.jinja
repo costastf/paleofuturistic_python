@@ -1,0 +1,58 @@
+# Yank or archive a release
+
+What to do on PyPI when a release turns out to be broken, or when the project is done. None of
+this happens in the repository: these are actions on the index, taken by a project owner on
+pypi.org.
+
+## Pick the action
+
+| Situation | Action | What installers do afterwards |
+| --- | --- | --- |
+| A release is broken, uninstallable, accidentally incompatible, or has a security hole | **Yank** it | Skip it, unless it is the only version matching an exact `==` / `===` pin |
+| A file must not exist at all (a leaked secret inside the wheel, say) | **Delete** it | Cannot get it. PyPI never accepts that filename again, so a fixed file needs a new version |
+| No more releases are planned | **Archive** the project | Install existing releases as before. PyPI refuses new uploads |
+
+Yanking is the default answer to a bad release. It keeps every project that pinned the exact
+version working, while new resolutions move past it. Deletion breaks those pins and cannot be
+undone, so keep it for content that must not stay public, and rotate whatever leaked anyway.
+
+## Yank a release
+
+1. Release the fix first, so there is a version to move to.
+2. Open <https://pypi.org/manage/project/{{ project_slug | replace('_', '-') }}/releases/>, choose *Options* next to the bad
+   release, then *Yank*.
+3. Give a reason. PyPI shows it on the release page and serves it to installers through the
+   index API; pip, for one, prints it when a pin forces the yanked version. Say what to do
+   instead, e.g. "Broken import on Python 3.12, use 1.4.1".
+
+PyPI yanks whole releases, not single files. Un-yanking is the same menu.
+
+## Archive the project
+
+1. Make a final release whose README says the project is archived and why, and names an
+   alternative if there is one. The README is the project description on PyPI, and the archive
+   notice sits above it.
+2. On the project's settings page on PyPI, use the *Project archival* section.
+
+Existing releases stay installable; uploads are refused, so the release pipeline will fail if a
+tag is pushed afterwards. Archiving can be undone from the same section.
+
+## The status a project can have
+
+The [project status markers](https://packaging.python.org/en/latest/specifications/project-status-markers/)
+specification defines four. An index may implement any subset.
+
+| Status | Meaning | New uploads | Downloads |
+| --- | --- | --- | --- |
+| `active` | The default | Yes | Yes |
+| `archived` | No updates expected | No | Yes |
+| `deprecated` | Obsolete, maybe superseded | Yes | Yes |
+| `quarantined` | Unsafe, e.g. malware; set by index administrators | No | No |
+
+On PyPI, project owners can set `archived`; `quarantined` is applied by PyPI's administrators.
+
+## Source of truth
+
+- [File yanking specification](https://packaging.python.org/en/latest/specifications/file-yanking/)
+- [Project status markers specification](https://packaging.python.org/en/latest/specifications/project-status-markers/)
+- [PyPI: yanking](https://docs.pypi.org/project-management/yanking/), [archiving projects](https://docs.pypi.org/project-management/archiving-projects/)

@@ -31,8 +31,12 @@ exclude-newer = "2026-08-07"
 dev = [
     "pyyaml",
 ]
+# `packaging` and `validate-pyproject` are what tests/test_packaging_specs.py reads the built
+# distributions with: the same parsers an index and an installer use.
 test = [
+    "packaging",
     "pytest",
+    "validate-pyproject[all]",
 ]
 # Pinned to the same ruff the template pins, so this repository and the projects it
 # generates are judged by one version. Bump both together.

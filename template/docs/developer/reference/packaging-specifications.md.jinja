@@ -1,0 +1,67 @@
+# Packaging specifications
+
+The [PyPA specifications index](https://packaging.python.org/en/latest/specifications/) lists
+every interoperability standard for Python packages. This page says, for each one, what this
+project does about it and what checks that it still does. "Gate" means a check that fails
+`./workflow.cmd preflight`, and with it the pre-push hook and the pipeline.
+
+For why the gates are these three tools and where each runs, see
+[Packaging conformance](../explanation/packaging-conformance.md).
+
+## Package metadata and the files that carry it
+
+| Spec | What this project does | Enforced by |
+| --- | --- | --- |
+| [Names and normalization](https://packaging.python.org/en/latest/specifications/name-normalization/) | `{{ project_slug }}` is lowercase letters, digits and underscores, so it is a valid import name and a valid project name. PyPI and installers normalize it to `{{ project_slug | replace('_', '-') }}`. | Copier's `project_slug` validator, at generation. |
+| [Core metadata](https://packaging.python.org/en/latest/specifications/core-metadata/) | `uv_build` writes `METADATA` from `[project]`: name, version, summary, README as `text/markdown`, authors, `Requires-Python`, licence, classifiers, keywords and project URLs. | `twine check --strict` on every build (`build.package`). |
+| [Version specifiers](https://packaging.python.org/en/latest/specifications/version-specifiers/) | The version is plain PEP 440 (`0.0.0`, then whatever `release` bumps it to). commitizen is configured with `version_scheme = "pep440"`. | validate-pyproject (`lint.pyproject`). |
+| [Dependency specifiers](https://packaging.python.org/en/latest/specifications/dependency-specifiers/) | Every entry in `dependencies` and `[dependency-groups]` is a PEP 508 requirement. | validate-pyproject. |
+| [pyproject.toml](https://packaging.python.org/en/latest/specifications/pyproject-toml/) | One file declares the build system, the project metadata and every tool's configuration. | validate-pyproject, on any commit that stages `pyproject.toml` and on every push. |
+| [Dependency groups](https://packaging.python.org/en/latest/specifications/dependency-groups/) | All development tooling lives in `[dependency-groups]`; `dev` includes the rest. See [Dependency groups](dependency-groups.md). | validate-pyproject, including that each `include-group` resolves. |
+| [Inline script metadata](https://packaging.python.org/en/latest/specifications/inline-script-metadata/) | Not used by the package itself. [Write a standalone script](../how-to/write-a-standalone-script.md) shows how to add one-file scripts with their own dependencies. | — |
+| [Well-known project URLs](https://packaging.python.org/en/latest/specifications/well-known-project-urls/) | {% if repository_url %}`[project.urls]` uses only well-known labels: `Homepage`, `Source`, `Issues`, `Changelog`{% if git_hosting_service == 'github' and integrate_pages %}, `Documentation`{% endif %}.{% else %}No `[project.urls]` yet: the `repository_url` question was left empty. Add the table by hand with well-known labels (`Homepage`, `Source`, `Issues`, `Changelog`, `Documentation`), or answer the question on the next `copier update`.{% endif %} | validate-pyproject (shape); the labels are a convention PyPI renders, not a rule a tool enforces. |
+| [glob patterns](https://packaging.python.org/en/latest/specifications/glob-patterns/) | {% if license != 'None' %}`license-files = ["LICENSE"]`, which `uv_build` copies into the wheel's `.dist-info/licenses/`.{% else %}No `license-files`: this project ships no licence.{% endif %} | validate-pyproject; `uv build` fails on a pattern that matches nothing. |
+| [License expression](https://packaging.python.org/en/latest/specifications/license-expression/) | {% if license != 'None' %}`license = "{{ license }}"`, an SPDX expression, with no legacy `License ::` classifier beside it. Keep it that way: the spec says tools should refuse the combination, but `uv_build` currently builds it anyway, so nothing here would stop you.{% else %}No `license` field: this project ships no licence.{% endif %} | validate-pyproject (SPDX syntax). |
+
+## Distributions
+
+| Spec | What this project does | Enforced by |
+| --- | --- | --- |
+| [Source distribution format](https://packaging.python.org/en/latest/specifications/source-distribution-format/) | `uv build` writes `dist/{{ project_slug }}-<version>.tar.gz`: one top-level directory, `PKG-INFO`, `pyproject.toml`. | `twine check --strict` (`build.package`). |
+| [Binary distribution format](https://packaging.python.org/en/latest/specifications/binary-distribution-format/) | `uv build` writes `dist/{{ project_slug }}-<version>-py3-none-any.whl` with `WHEEL`, `METADATA`, `RECORD` and the licence. `py.typed` ships with the package. | `check-wheel-contents` (layout: no bytecode, duplicates, stray top-level files or empty package) and `twine check --strict` (metadata), both in `build.package`. |
+| [Platform compatibility tags](https://packaging.python.org/en/latest/specifications/platform-compatibility-tags/) | Pure Python, so one `py3-none-any` wheel serves every interpreter in the supported range. | `uv_build`, which builds pure-Python wheels only. |
+| [Entry points](https://packaging.python.org/en/latest/specifications/entry-points/) | None: the scaffold is a library. [Add a console script](../how-to/add-a-console-script.md) shows how to add commands or plugin entry points. | validate-pyproject checks the `[project.scripts]` / `[project.entry-points]` shape once you add one. |
+
+## Publishing and indexes
+
+| Spec | What this project does | Enforced by |
+| --- | --- | --- |
+| [Index hosted attestations](https://packaging.python.org/en/latest/specifications/index-hosted-attestations/) | `release.attest` signs a PEP 740 attestation per wheel and sdist in the publish job, and `uv publish` uploads them through Trusted Publishing. See [Verify a release attestation](../how-to/verify-a-release-attestation.md). | `release.attest` fails the publish job if it cannot sign; PyPI rejects an attestation that does not match the publisher. |
+| [Simple repository API](https://packaging.python.org/en/latest/specifications/simple-repository-api/) | uv reads PyPI (or any `[[tool.uv.index]]`) through it. [Publish to a private index](../how-to/publish-to-a-private-index.md) covers publishing somewhere other than PyPI. | uv, as the client. |
+| [.pypirc](https://packaging.python.org/en/latest/specifications/pypirc/) | Not used. Credentials come from Trusted Publishing or `UV_PUBLISH_*`, and `.pypirc` is gitignored. | `.gitignore`. |
+| [File yanking](https://packaging.python.org/en/latest/specifications/file-yanking/) | A PyPI-side action. [Yank or archive a release](../how-to/yank-or-archive-a-release.md) says when and how. | PyPI. |
+| [Project status markers](https://packaging.python.org/en/latest/specifications/project-status-markers/) | A PyPI-side action, covered by the same how-to. | PyPI. |
+
+## Installers and environments
+
+These describe what an installer or interpreter does, not what a project ships. They are listed
+so the coverage is complete; nothing in this project needs to change for them.
+
+| Spec | What this project does | Enforced by |
+| --- | --- | --- |
+| [Recording installed projects](https://packaging.python.org/en/latest/specifications/recording-installed-packages/) | uv records each install (`RECORD`, `INSTALLER`) in `.venv`. The wheel's own `RECORD` is what an installer verifies against. | uv. |
+| [Direct URL data structure](https://packaging.python.org/en/latest/specifications/direct-url-data-structure/) | uv writes `direct_url.json` when it installs from a path or URL, including this project's own editable install. | uv. |
+| [Virtual environments](https://packaging.python.org/en/latest/specifications/virtual-environments/) | Every task runs in the project's `.venv`, which uv creates and syncs. | uv. |
+| [Externally managed environments](https://packaging.python.org/en/latest/specifications/externally-managed-environments/) | Nothing here installs into a system interpreter, so the marker never applies. | — |
+| [build-details.json](https://packaging.python.org/en/latest/specifications/build-details/) | Describes an interpreter build. Nothing for a pure-Python package to do. | — |
+| [pylock.toml](https://packaging.python.org/en/latest/specifications/pylock-toml/) | `uv.lock` is the lock. `./workflow.cmd develop.pylock` exports it as a standard `reports/pylock.toml` for tools that do not read `uv.lock`. See [Export a pylock file](../how-to/export-a-pylock-file.md). | — |
+| [PyPA schemas](https://packaging.python.org/en/latest/specifications/schemas/) | The machine-readable schemas for the formats above. validate-pyproject carries the pyproject ones. | validate-pyproject. |
+
+## Checking it yourself
+
+```bash
+./workflow.cmd lint.pyproject   # pyproject.toml against the specs
+./workflow.cmd build.package    # build, then twine check --strict and check-wheel-contents
+```
+
+Both run inside `./workflow.cmd preflight`, so a green gate means both passed.

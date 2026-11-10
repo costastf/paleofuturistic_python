@@ -113,17 +113,19 @@ Watching a released version for advisories published after the release is outsid
 
 ## Layer 3 — build provenance
 
-The SBOM says what is *inside* an artifact. Provenance says where the artifact *came from* — and unlike the SBOM, it is not self-reported. `actions/attest-build-provenance` signs a statement binding the exact file digests to the workflow, commit and runner that produced them, and that signature chains to GitHub's Sigstore instance rather than to anything the project controls. A forged SBOM is a text edit; a forged attestation is not.
+The SBOM says what is *inside* an artifact. Provenance says where the artifact *came from*, and unlike the SBOM it is not self-reported. On both hosts, `release.attest` signs a [PEP 740](https://packaging.python.org/en/latest/specifications/index-hosted-attestations/) attestation for every wheel and sdist: a statement binding the file's digest to the repository, workflow and commit that published it. The signing identity is the CI job's own OIDC token, the signature chains to Sigstore's public instance, and the signing event lands in Sigstore's transparency log, so nothing the project controls can mint one after the fact. A forged SBOM is a text edit; a forged attestation is not.
 
-A consumer verifies a downloaded artifact with:
+`uv publish` uploads each `<file>.publish.attestation` with its file, and PyPI shows the publishing repository and workflow on the release page. A consumer verifies a release on PyPI with:
 
 ```bash
-gh attestation verify <package>-<version>-py3-none-any.whl --repo <owner>/<repo>
+pypi-attestations verify pypi --repository https://github.com/<owner>/<repo> pypi:<package>-<version>-py3-none-any.whl
 ```
 
-Order matters in the publish job: `release.dist` builds into `dist/`, the attestation is taken over those files, and `release.publish --prebuilt` uploads them *without* rebuilding. Rebuilding in between would publish files that no attestation refers to, and verification would then fail — reading as tampering rather than as a fresh build.
+GitHub projects also get GitHub's own provenance attestation from `actions/attest-build-provenance`, stored with the repository and checked with `gh attestation verify <file> --repo <owner>/<repo>`. The two answer the same question for different audiences: the PEP 740 one travels with the package to PyPI, the GitHub one stays where the source is.
 
-**GitHub only.** GitLab has no equivalent that works without extra infrastructure, so GitLab projects ship the SBOM without provenance. Nothing else about the release differs.
+Order matters in the publish job: `release.dist` builds into `dist/`, the attestations are taken over those files, and `release.publish --prebuilt` uploads them *without* rebuilding. Rebuilding in between would publish files that no attestation refers to, and verification would then fail — reading as tampering rather than as a fresh build.
+
+PyPI accepts attestations only through [Trusted Publishing](https://docs.pypi.org/trusted-publishers/). A project that publishes with `UV_PUBLISH_*` credentials instead (a private index, say) uploads none: `release.publish` passes `--no-attestations` on that path, because indexes that do not support attestations may reject the upload.
 
 ## What about overrides?
 
@@ -140,3 +142,4 @@ The expiry dates are load-bearing: a stale override is a security regression hid
 ## See also
 
 - [Harden the GitHub repository](../how-to/harden-github-repository.md) — the repository settings the publish job, and so the provenance layer, depends on.
+- [Packaging specifications](../reference/packaging-specifications.md) — every PyPA spec, and how a generated project meets it.

@@ -1,6 +1,6 @@
 # {{ project_name }}
 
-[![Version](https://img.shields.io/badge/version-0.0.0-blue)](https://pypi.org/project/{{ project_slug }}/)
+[![Version](https://img.shields.io/badge/version-0.0.0-blue)](https://pypi.org/project/{{ project_slug | replace('_', '-') }}/)
 {%- set badge_py_major = min_python_version.split('.')[0] %}
 {%- set badge_py_min_minor = min_python_version.split('.')[1] | int %}
 {%- set badge_py_max_minor = max_python_version.split('.')[1] | int %}

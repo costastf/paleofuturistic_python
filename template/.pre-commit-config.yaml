@@ -12,7 +12,7 @@ repos:
         pass_filenames: true
         stages: [commit-msg]
       # One hook, one invocation, for every check that can be judged from the staged files
-      # alone: formatting, ruff, complexipy, pylint. Not four hooks, which pre-commit would
+      # alone: formatting, ruff, pyproject validation, complexipy, pylint. Not four hooks, which pre-commit would
       # partition and run concurrently: each partition prints its own banner, reads the index
       # again, and reports a verdict about a different subset of one commit. Launcher startup
       # is 0.12s since the SBOM composer stopped being imported eagerly, so the argument is one
@@ -24,20 +24,21 @@ repos:
       #
       # `files:` decides whether this hook *runs*, not what it looks at. Stage only a `.md` and
       # it is skipped; stage a `.py` and the task reads the whole index, applying each step's
-      # own filter from the registry (complexipy is `src/` only, the rest also cover
-      # `_CI/tasks/` and `tests/`). So the pattern must stay no narrower than the union of those
-      # filters, or staging a file some step cares about would not wake the hook. An invariant
+      # own filter from the registry (complexipy is `src/` only, the pyproject check only
+      # `pyproject.toml`, the rest also cover `_CI/tasks/` and `tests/`). So the pattern must be
+      # exactly the union of those filters: narrower, and staging a file some step cares about
+      # would not wake the hook; wider, and it wakes for files no step reads. An invariant
       # asserts that. Which tools run here is decided in `_CI/tasks/preflight.py`.
       #
       # The hook reports; it does not rewrite. Unformatted code fails the commit and names
       # `./workflow.cmd format`, so no hook in this file writes anything — the same promise
       # `preflight` makes without a flag.
       - id: staged
-        name: Check staged files (formatting, ruff, pylint, complexipy)
+        name: Check staged files (formatting, ruff, pyproject, pylint, complexipy)
         entry: ./workflow.cmd preflight.staged
         language: system
         pass_filenames: false
-        files: ^(_CI/tasks/|src/|tests/).*\.py$
+        files: ^((_CI/tasks/|src/|tests/).*\.py|pyproject\.toml)$
         stages: [pre-commit]
       # Everything whole-program runs here rather than on every commit: ty needs the callers
       # of a changed signature, pyscn needs every file to know what is dead or duplicated, the

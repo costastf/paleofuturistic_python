@@ -95,6 +95,15 @@ jobs:
         with:
           subject-path: dist/*
 
+      # A second attestation, in the format PyPI stores (PEP 740): `uv publish` uploads each
+      # `dist/<file>.publish.attestation` with its file, and PyPI shows the workflow that
+      # published it on the release page. Verify with `pypi-attestations verify pypi`. The
+      # step above is GitHub's own record (`gh attestation verify`); this one travels with the
+      # package to PyPI. Same signing identity — the `id-token: write` this job already has.
+      # After the provenance step, so that one covers exactly the wheel and sdist.
+      - name: Sign PEP 740 attestations
+        run: ./workflow.cmd release.attest
+
       - name: Publish package
         env:
           {#- Escape curly braces for Copier. -#}
