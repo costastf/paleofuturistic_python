@@ -1,0 +1,15 @@
+diff --git a/_CI/lib/vendor/invoke/__init__.py b/_CI/lib/vendor/invoke/__init__.py
+--- a/_CI/lib/vendor/invoke/__init__.py
++++ b/_CI/lib/vendor/invoke/__init__.py
+@@ -1,3 +1,2 @@
+-from importlib import metadata
+ from typing import Any
+ 
+@@ -31,5 +30,6 @@
+ from .watchers import FailingResponder, Responder, StreamWatcher  # noqa
+ 
+-__version__ = metadata.version("invoke")
++# Vendored copies have no installed distribution metadata to read the version from.
++__version__ = "3.0.3"
+ 
+ 

@@ -4,7 +4,6 @@ from contextlib import contextmanager
 from itertools import cycle
 from os import PathLike
 from typing import (
-    TYPE_CHECKING,
     Any,
     Generator,
     Iterator,
@@ -15,12 +14,9 @@ from typing import (
 from unittest.mock import Mock
 
 from .config import Config, DataProxy
-from .exceptions import Failure, AuthFailure, ResponseNotAccepted
-from .runners import Result
+from .exceptions import AuthFailure, Failure, ResponseNotAccepted
+from .runners import Result, Runner
 from .watchers import FailingResponder
-
-if TYPE_CHECKING:
-    from lib.vendor.invoke.runners import Runner
 
 
 class Context(DataProxy):
@@ -43,37 +39,59 @@ class Context(DataProxy):
     .. versionadded:: 1.0
     """
 
-    def __init__(self, config: Optional[Config] = None) -> None:
+    # NOTE: sometime after Sphinx 1.7, autodoc stopped being able to see
+    # doc-comments inside __init__ (or something equivalent, anyway). Moving
+    # the type definitions up here seems to work better and /shouldn't/ mess up
+    # the DataProxy magic going on...
+
+    #: A list of commands to run (via "&&") before the main argument to any
+    #: `run` or `sudo` calls. Note that the primary API for manipulating
+    #: this list is `prefix`; see its docs for details.
+    command_prefixes: List[str]
+    #: A list of directories to 'cd' into before running commands with
+    #: `run` or `sudo`; intended for management via `cd`, please see its
+    #: docs for details.
+    command_cwds: List[str]
+    #: The CLI parser's 'remainder' value (text given after a standalone
+    #: ``--`` in the command line), or the empty string if not given.
+    remainder: str
+
+    def __init__(
+        self,
+        config: Optional[Config] = None,
+        remainder: str = "",
+    ) -> None:
         """
         :param config:
             `.Config` object to use as the base configuration.
 
             Defaults to an anonymous/default `.Config` instance.
+
+        :param remainder:
+            The invoking program's :ref:`parser remainder <remainder>` value,
+            if any was obtained.
         """
-        #: The fully merged `.Config` object appropriate for this context.
-        #:
-        #: `.Config` settings (see their documentation for details) may be
-        #: accessed like dictionary keys (``c.config['foo']``) or object
-        #: attributes (``c.config.foo``).
-        #:
-        #: As a convenience shorthand, the `.Context` object proxies to its
-        #: ``config`` attribute in the same way - e.g. ``c['foo']`` or
-        #: ``c.foo`` returns the same value as ``c.config['foo']``.
         config = config if config is not None else Config()
-        self._set(_config=config)
-        #: A list of commands to run (via "&&") before the main argument to any
-        #: `run` or `sudo` calls. Note that the primary API for manipulating
-        #: this list is `prefix`; see its docs for details.
-        command_prefixes: List[str] = list()
-        self._set(command_prefixes=command_prefixes)
-        #: A list of directories to 'cd' into before running commands with
-        #: `run` or `sudo`; intended for management via `cd`, please see its
-        #: docs for details.
-        command_cwds: List[str] = list()
-        self._set(command_cwds=command_cwds)
+        self._set(
+            _config=config,
+            command_prefixes=[],
+            command_cwds=[],
+            remainder=remainder,
+        )
 
     @property
     def config(self) -> Config:
+        """
+        The fully merged `.Config` object appropriate for this context.
+
+        `.Config` settings (see their documentation for details) may be
+        accessed like dictionary keys (``c.config['foo']``) or object
+        attributes (``c.config.foo``).
+
+        As a convenience shorthand, the `.Context` object proxies to its
+        ``config`` attribute in the same way - e.g. ``c['foo']`` or
+        ``c.foo`` returns the same value as ``c.config['foo']``.
+        """
         # Allows Context to expose a .config attribute even though DataProxy
         # otherwise considers it a config key.
         return self._config
@@ -87,7 +105,7 @@ class Context(DataProxy):
         # runtime.
         self._set(_config=value)
 
-    def run(self, command: str, **kwargs: Any) -> Optional[Result]:
+    def run(self, command: str, **kwargs: Any) -> Result:
         """
         Execute a local shell command, honoring config options.
 
@@ -106,13 +124,11 @@ class Context(DataProxy):
     # NOTE: broken out of run() to allow for runner class injection in
     # Fabric/etc, which needs to juggle multiple runner class types (local and
     # remote).
-    def _run(
-        self, runner: "Runner", command: str, **kwargs: Any
-    ) -> Optional[Result]:
+    def _run(self, runner: "Runner", command: str, **kwargs: Any) -> Result:
         command = self._prefix_commands(command)
         return runner.run(command, **kwargs)
 
-    def sudo(self, command: str, **kwargs: Any) -> Optional[Result]:
+    def sudo(self, command: str, **kwargs: Any) -> Result:
         """
         Execute a shell command via ``sudo`` with password auto-response.
 
@@ -185,9 +201,7 @@ class Context(DataProxy):
         return self._sudo(runner, command, **kwargs)
 
     # NOTE: this is for runner injection; see NOTE above _run().
-    def _sudo(
-        self, runner: "Runner", command: str, **kwargs: Any
-    ) -> Optional[Result]:
+    def _sudo(self, runner: "Runner", command: str, **kwargs: Any) -> Result:
         prompt = self.config.sudo.prompt
         password = kwargs.pop("password", self.config.sudo.password)
         user = kwargs.pop("user", self.config.sudo.user)

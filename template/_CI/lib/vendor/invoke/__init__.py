@@ -1,6 +1,5 @@
-from typing import Any, Optional
+from typing import Any
 
-from ._version import __version_info__, __version__  # noqa
 from .collection import Collection  # noqa
 from .config import Config  # noqa
 from .context import Context, MockContext  # noqa
@@ -8,6 +7,7 @@ from .exceptions import (  # noqa
     AmbiguousEnvVar,
     AuthFailure,
     CollectionNotFound,
+    CommandTimedOut,
     Exit,
     ParseError,
     PlatformError,
@@ -19,19 +19,21 @@ from .exceptions import (  # noqa
     UnknownFileType,
     UnpicklableConfigMember,
     WatcherError,
-    CommandTimedOut,
 )
 from .executor import Executor  # noqa
 from .loader import FilesystemLoader  # noqa
 from .parser import Argument, Parser, ParserContext, ParseResult  # noqa
 from .program import Program  # noqa
-from .runners import Runner, Local, Failure, Result, Promise  # noqa
-from .tasks import task, call, Call, Task  # noqa
+from .runners import Failure, Local, Promise, Result, Runner  # noqa
+from .tasks import Call, Task, call, task  # noqa
 from .terminals import pty_size  # noqa
 from .watchers import FailingResponder, Responder, StreamWatcher  # noqa
 
+# Vendored copies have no installed distribution metadata to read the version from.
+__version__ = "3.0.3"
 
-def run(command: str, **kwargs: Any) -> Optional[Result]:
+
+def run(command: str, **kwargs: Any) -> Result:
     """
     Run ``command`` in a subprocess and return a `.Result` object.
 
@@ -50,7 +52,7 @@ def run(command: str, **kwargs: Any) -> Optional[Result]:
     return Context().run(command, **kwargs)
 
 
-def sudo(command: str, **kwargs: Any) -> Optional[Result]:
+def sudo(command: str, **kwargs: Any) -> Result:
     """
     Run ``command`` in a ``sudo`` subprocess and return a `.Result` object.
 

@@ -167,9 +167,10 @@ VENDOR_DESTINATIONS = (
     PROJECT_ROOT_DIRECTORY / 'template' / '_CI' / 'lib',
 )
 # Copied verbatim out of the upstream archive. `vendor.txt` records what was resolved and
-# `path_inject.patch` is what makes the launcher importable, so a tree without them cannot be
-# rebuilt or explained.
-VENDOR_ARTEFACTS = ('vendor', 'vendor.txt', 'patches/path_inject.patch')
+# `patches/` holds the hand-maintained edits to the tree (the launcher's import path, invoke's
+# version string), so a tree without them cannot be rebuilt or explained. The whole directory
+# is copied, so a patch upstream adds arrives without a change here.
+VENDOR_ARTEFACTS = ('vendor', 'vendor.txt', 'patches')
 
 
 def vendored_invoke_pin() -> dict:

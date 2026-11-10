@@ -1,20 +1,21 @@
 import errno
 import locale
 import os
+import signal
 import struct
 import sys
 import threading
 import time
-import signal
-from subprocess import Popen, PIPE
+from contextlib import AbstractContextManager
+from subprocess import PIPE, Popen
 from types import TracebackType
 from typing import (
+    IO,
     TYPE_CHECKING,
     Any,
     Callable,
     Dict,
     Generator,
-    IO,
     List,
     Optional,
     Tuple,
@@ -37,21 +38,21 @@ except ImportError:
     termios = None  # type: ignore[assignment]
 
 from .exceptions import (
-    UnexpectedExit,
-    Failure,
-    ThreadException,
-    WatcherError,
-    SubprocessPipeError,
     CommandTimedOut,
+    Failure,
+    SubprocessPipeError,
+    ThreadException,
+    UnexpectedExit,
+    WatcherError,
 )
 from .terminals import (
     WINDOWS,
-    pty_size,
-    character_buffered,
-    ready_for_reading,
     bytes_to_read,
+    character_buffered,
+    pty_size,
+    ready_for_reading,
 )
-from .util import has_fileno, isatty, ExceptionHandlingThread
+from .util import ExceptionHandlingThread, has_fileno, isatty
 
 if TYPE_CHECKING:
     from .context import Context
@@ -90,7 +91,7 @@ class Runner:
                 minimum, this means values for each of the default
                 `.Runner.run` keyword arguments such as ``echo`` and ``warn``.
 
-        :raises exceptions.ValueError:
+        :raises ValueError:
             if not all expected default values are found in ``context``.
         """
         #: The `.Context` given to the same-named argument of `__init__`.
@@ -122,7 +123,7 @@ class Runner:
         self._asynchronous = False
         self._disowned = False
 
-    def run(self, command: str, **kwargs: Any) -> Optional["Result"]:
+    def run(self, command: str, **kwargs: Any) -> "Result":
         """
         Execute ``command``, returning an instance of `Result` once complete.
 
@@ -188,19 +189,26 @@ class Runner:
 
             Specifically, ``disown=True`` has the following behaviors:
 
-            - The return value is ``None`` instead of a `Result` or subclass.
+            - The return value is still a `Result`, but it is severely limited
+              in functionality & data, per below.
             - No I/O worker threads are spun up, so you will have no access to
-              the subprocess' stdout/stderr, your stdin will not be forwarded,
+              the subprocess' stdout/stderr (those attributes on the result
+              will be empty strings), your stdin will not be forwarded,
               ``(out|err|in)_stream`` will be ignored, and features like
               ``watchers`` will not function.
             - No exit code is checked for, so you will not receive any errors
-              if the subprocess fails to exit cleanly.
+              if the subprocess fails to exit cleanly, the result's ``exited``
+              will be ``None``, and convenience properties like `ok` and
+              `failed` will not be reliable.
             - ``pty=True`` may not function correctly (subprocesses may not run
               at all; this seems to be a potential bug in Python's
               ``pty.fork``) unless your command line includes tools such as
               ``nohup`` or (the shell builtin) ``disown``.
 
             .. versionadded:: 1.4
+            .. versionchanged:: 3.0
+                The return value when ``disown=True`` changed from `None` to
+                `Result`.
 
         :param bool dry:
             Whether to dry-run instead of truly invoking the given command. See
@@ -428,7 +436,7 @@ class Runner:
             encoding=self.encoding,
         )
 
-    def _run_body(self, command: str, **kwargs: Any) -> Optional["Result"]:
+    def _run_body(self, command: str, **kwargs: Any) -> "Result":
         # Prepare all the bits n bobs.
         self._setup(command, kwargs)
         # If dry-run, stop here.
@@ -438,10 +446,20 @@ class Runner:
             )
         # Start executing the actual command (runs in background)
         self.start(command, self.opts["shell"], self.env)
+        # Update result data with anything only obtainable post-start.
+        self.result_kwargs["pid"] = self.get_pid()
         # If disowned, we just stop here - no threads, no timer, no error
         # checking, nada.
         if self._disowned:
-            return None
+            return self.generate_result(
+                **dict(
+                    self.result_kwargs,
+                    stdout="",
+                    stderr="",
+                    exited=None,
+                    disowned=True,
+                )
+            )
         # Stand up & kick off IO, timer threads
         self.start_timer(self.opts["timeout"])
         self.threads, self.stdout, self.stderr = self.create_io_threads()
@@ -1051,7 +1069,7 @@ class Runner:
         execution on a remote system.
 
         In most cases, this method will also set subclass-specific member
-        variables used in other methods such as `wait` and/or `returncode`.
+        variables used in other methods such as `.wait` and/or `returncode`.
 
         :param str command:
             Command string to execute.
@@ -1169,9 +1187,9 @@ class Runner:
         """
         Perform final cleanup, if necessary.
 
-        This method is called within a ``finally`` clause inside the main `run`
-        method. Depending on the subclass, it may be a no-op, or it may do
-        things such as close network connections or open files.
+        This method is called within a ``finally`` clause inside the main
+        `~.Runner.run` method. Depending on the subclass, it may be a no-op, or
+        it may do things such as close network connections or open files.
 
         :returns: ``None``
 
@@ -1202,6 +1220,15 @@ class Runner:
         # Timer expiry implies we did time out. (The timer itself will have
         # killed the subprocess, allowing us to even get to this point.)
         return bool(self._timer and not self._timer.is_alive())
+
+    def get_pid(self) -> Optional[int]:
+        """
+        When possible, obtain the subprocess PID.
+
+        The default implementation returns None; subclasses may return useful
+        integers.
+        """
+        return None
 
 
 class Local(Runner):
@@ -1327,12 +1354,11 @@ class Local(Runner):
                 # TODO: make subroutine?
                 winsize = struct.pack("HHHH", rows, cols, 0, 0)
                 fcntl.ioctl(sys.stdout.fileno(), termios.TIOCSWINSZ, winsize)
-                # Use execve for bare-minimum "exec w/ variable # args + env"
-                # behavior. No need for the 'p' (use PATH to find executable)
-                # for now.
+                # Use execvpe for bare-minimum "exec w/ variable # args + env"
+                # behavior.
                 # NOTE: stdlib subprocess (actually its posix flavor, which is
                 # written in C) uses either execve or execv, depending.
-                os.execve(shell, [shell, "-c", command], env)
+                os.execvpe(shell, [shell, "-c", command], env)
         else:
             self.process = Popen(
                 command,
@@ -1344,10 +1370,12 @@ class Local(Runner):
                 stdin=PIPE,
             )
 
+    def get_pid(self) -> int:
+        return self.pid if self.using_pty else self.process.pid
+
     def kill(self) -> None:
-        pid = self.pid if self.using_pty else self.process.pid
         try:
-            os.kill(pid, signal.SIGKILL)
+            os.kill(self.get_pid(), signal.SIGKILL)
         except ProcessLookupError:
             # In odd situations where our subprocess is already dead, don't
             # throw this upwards.
@@ -1453,6 +1481,21 @@ class Result:
         results in ``result.hide == ('stdout', 'stderr')``; and ``hide=False``
         (the default) generates ``result.hide == ()`` (the empty tuple.)
 
+    :param int pid:
+        The process ID of the subprocess that was executed (normally) or is
+        executing (when asynchronous or disowned).
+
+        .. versionadded:: 3.0
+
+    :param bool disowned:
+        Whether the subprocess was 'disowned' or detached from ourselves; in
+        this mode may other attributes or methods of this `Result` will be
+        unreliable, see `Runner.run` docs for details. You may want to use your
+        own methods to interrogate your operating system about this object's
+        ``pid``, however, which will usually be valid.
+
+        .. versionadded:: 3.0
+
     .. note::
         `Result` objects' truth evaluation is equivalent to their `.ok`
         attribute's value. Therefore, quick-and-dirty expressions like the
@@ -1481,6 +1524,8 @@ class Result:
         exited: int = 0,
         pty: bool = False,
         hide: Tuple[str, ...] = tuple(),
+        pid: Optional[int] = None,
+        disowned: bool = False,
     ):
         self.stdout = stdout
         self.stderr = stderr
@@ -1493,6 +1538,8 @@ class Result:
         self.exited = exited
         self.pty = pty
         self.hide = hide
+        self.pid = pid
+        self.disowned = disowned
 
     @property
     def return_code(self) -> int:
@@ -1515,11 +1562,9 @@ class Result:
         for x in ("stdout", "stderr"):
             val = getattr(self, x)
             ret.append(
-                """=== {} ===
-{}
-""".format(
-                    x, val.rstrip()
-                )
+                f"""=== {x} ===
+{val.rstrip()}
+"""
                 if val
                 else "(no {})".format(x)
             )
@@ -1570,7 +1615,7 @@ class Result:
         return "\n\n" + "\n".join(getattr(self, stream).splitlines()[-count:])
 
 
-class Promise(Result):
+class Promise(Result, AbstractContextManager):
     """
     A promise of some future `Result`, yielded from asynchronous execution.
 
@@ -1585,6 +1630,9 @@ class Promise(Result):
 
     .. versionadded:: 1.4
     """
+
+    #: The `.Runner` instance which made this `.Promise`.
+    runner: Runner
 
     def __init__(self, runner: "Runner") -> None:
         """
@@ -1633,6 +1681,9 @@ class Promise(Result):
         exc_tb: Optional[TracebackType],
     ) -> None:
         self.join()
+
+    def __repr__(self) -> str:
+        return f"<Promise cmd={self.command!r}>"
 
 
 def normalize_hide(
