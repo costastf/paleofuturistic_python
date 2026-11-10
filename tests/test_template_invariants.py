@@ -3442,6 +3442,66 @@ def test_documented_launcher_matches_the_real_one(generated_project):
     assert 'label' in doc, 'the doc omits the cmd label trick that makes the dispatch work'
 
 
+def registered_tasks(project):
+    """Return ``{namespace: (task names, default task name)}`` from the generated `_CI/tasks/`.
+
+    Read from source, like `registry_steps`: every module builds `namespace = Collection(name)`
+    and registers with `namespace.add_task(cast(Task, fn), name=..., default=...)`. Invoke names
+    a task after its function with underscores turned into dashes unless `name=` says otherwise.
+    """
+    registered = {}
+    for module in sorted((project / '_CI' / 'tasks').glob('*.py')):
+        tree = ast.parse(module.read_text(encoding='utf-8'))
+        collection, names, default = None, set(), None
+        for node in tree.body:
+            value = node.value if isinstance(node, ast.Assign) else None
+            if isinstance(value, ast.Call) and getattr(value.func, 'id', None) == 'Collection' and value.args:
+                collection = value.args[0].value
+            call = node.value if isinstance(node, ast.Expr) else None
+            if not (isinstance(call, ast.Call) and getattr(call.func, 'attr', None) == 'add_task'):
+                continue
+            target = call.args[0]
+            if isinstance(target, ast.Call):  # cast(Task, fn)
+                target = target.args[1]
+            words = {word.arg: word.value for word in call.keywords}
+            name = words['name'].value if 'name' in words else target.id.replace('_', '-')
+            names.add(name)
+            if 'default' in words and words['default'].value is True:
+                default = name
+        if collection and names:
+            registered[collection] = (names, default)
+    return registered
+
+
+def test_task_catalog_matches_the_registered_tasks(generated_project):
+    """The task catalog names every registered task, and no task that is not registered.
+
+    The catalog drifted silently: it documented a `develop.bootstrap` that never existed,
+    listed five shortcut defaults under names they do not have, and had no row for three real
+    tasks. Nothing compared the page with the code, so each rename left a stale row behind.
+    """
+    project, _ = generated_project
+    registered = registered_tasks(project)
+    real = {f'{namespace}.{name}' for namespace, (names, _) in registered.items() for name in names}
+    page = (project / 'docs' / 'developer' / 'reference' / 'invoke-tasks.md').read_text(encoding='utf-8')
+    documented = set(re.findall(r'^\| `([a-z][a-z0-9_.-]*)`', page, re.MULTILINE))
+
+    unknown = sorted(name for name in documented if (name not in real if '.' in name else name not in registered))
+    assert not unknown, f'the catalog documents tasks that are not registered: {unknown}'
+
+    # A namespace's default is reachable by the bare namespace name, so a row for that counts.
+    defaults = {f'{namespace}.{default}' for namespace, (_, default) in registered.items() if namespace in documented}
+    undocumented = sorted(name for name in real if name not in documented and name not in defaults)
+    assert not undocumented, f'registered tasks with no row in the catalog: {undocumented}'
+
+    shortcuts = page.split('## Top-level shortcuts', 1)[1].split('\n## ', 1)[0]
+    for namespace, default_of in re.findall(r'^\| `([a-z_-]+)` \| `([a-z_.-]+)` \|', shortcuts, re.MULTILINE):
+        _, default = registered[namespace]
+        assert default_of == f'{namespace}.{default}', (
+            f'the shortcut `{namespace}` runs {namespace}.{default}, the catalog says {default_of}'
+        )
+
+
 def test_launcher_dispatch_is_intact(generated_project):
     """The launcher execs on the sh line so the cmd line is unreachable from a POSIX shell.
 

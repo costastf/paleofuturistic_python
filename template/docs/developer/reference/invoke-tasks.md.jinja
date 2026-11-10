@@ -99,6 +99,13 @@ Calling one directly is how to run a single tool over a single file:
 | `quality.pyscn-analyze` | Full pyscn analysis with HTML report, opened unless in CI. Reports whether the pyscn badge still matches the grade it measured; `--write` updates it. |
 | `quality.pyscn-check` | CI-friendly pass/fail quality gate. Writes no report, so it has no grade to offer the badge — `quality.pyscn-analyze` is what produces one. |
 
+## `build` — distributions
+
+| Task | Args | What it does |
+| --- | --- | --- |
+| `build` | — | `secure.sbom`, then `build.package`, reporting both failures. What `preflight` and `release.dist` run. |
+| `build.package` | — | `uv build` into `dist/`, then `twine check --strict` and `check-wheel-contents` over the wheel and sdist. Run alone, it packages whatever SBOM is already in `src/{{ project_slug }}/`. See [Packaging conformance](../explanation/packaging-conformance.md). |
+
 ## `release` — versioning and publishing
 
 | Task | Args | What it does |
