@@ -2,6 +2,8 @@
 
 import re
 import shutil
+import subprocess
+from pathlib import Path
 
 import yaml
 
@@ -17,7 +19,34 @@ TEMPLATE_PYPROJECT = PROJECT_ROOT_DIRECTORY / 'template' / 'pyproject.toml.jinja
 UV_VERSION_ENV = 'TEMPLATE_UV_VERSION'
 
 PROJECT_SLUG = 'paleofuturistic_python_project'
-IGNORE_PATTERNS = shutil.ignore_patterns('.git', '.venv', '__pycache__', '*.pyc', '.copier-answers.yml')
+
+
+def snapshot_files() -> list[str]:
+    """Return the repository files a template snapshot holds: what `git add -A` would commit.
+
+    That is the tracked files plus untracked ones `.gitignore` does not exclude, minus tracked
+    files deleted from the working tree. Uncommitted edits are tested, as they should be, while
+    caches, `.DS_Store` and editor or agent state stay out of the generated projects. Copier
+    renders a published template from git, so this is also what a user's project is built from.
+    """
+    listing = subprocess.run(
+        ['git', 'ls-files', '--cached', '--others', '--exclude-standard', '-z'],  # noqa: S607
+        cwd=PROJECT_ROOT_DIRECTORY,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    return [name for name in listing.split('\0') if name and (PROJECT_ROOT_DIRECTORY / name).exists()]
+
+
+def copy_template_snapshot(destination: Path) -> Path:
+    """Copy the files `snapshot_files` names into `destination`, keeping mode bits, and return it."""
+    for name in snapshot_files():
+        target = destination / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(PROJECT_ROOT_DIRECTORY / name, target)
+    return destination
+
 # `preflight` covers format, lint, ty, pyscn, the tox matrix, the wheel and the derived files,
 # so what is left to list is what it deliberately does not do: the dependency audit, whose
 # answer depends on the advisory database rather than on the generated tree, and the docs build.

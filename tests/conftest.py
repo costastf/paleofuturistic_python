@@ -3,7 +3,6 @@
 import importlib.util
 import json
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -31,9 +30,9 @@ sys.path.insert(0, str(REPO_ROOT))
 
 # E402: the sys.path wiring above has to run first — this import is what it exists for.
 from _CI.tasks.configuration import (  # noqa: E402
-    IGNORE_PATTERNS,
     PROJECT_SLUG,
     combo_context,
+    copy_template_snapshot,
     generation_env,
     matrix_combos,
 )
@@ -41,13 +40,12 @@ from _CI.tasks.configuration import (  # noqa: E402
 
 @pytest.fixture(scope='session')
 def template_snapshot(tmp_path_factory):
-    """Snapshot the parent template into a plain temp dir so copier sees every current file.
+    """Copy the template into a plain temp dir so copier sees uncommitted changes too.
 
-    Copier copies happily from a non-git local directory, so no git init/commit is needed.
+    Copier copies happily from a non-git local directory, so no git snapshot is needed. Only
+    files git would commit are copied; see `copy_template_snapshot`.
     """
-    snapshot = tmp_path_factory.mktemp('template') / 'repo'
-    shutil.copytree(REPO_ROOT, snapshot, ignore=IGNORE_PATTERNS)
-    return snapshot
+    return copy_template_snapshot(tmp_path_factory.mktemp('template') / 'repo')
 
 
 @pytest.fixture(scope='session', params=matrix_combos(), ids=lambda cell: cell['label'])

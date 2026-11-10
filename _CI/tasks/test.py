@@ -14,7 +14,7 @@ from invoke import Context, task
 
 from _CI import PROJECT_ROOT_DIRECTORY, emojize_message, make_file_executable
 from _CI.tasks.configuration import (
-    IGNORE_PATTERNS,
+    copy_template_snapshot,
     PROJECT_SLUG,
     TEMPLATE_SECURITY_OVERRIDE_ENV,
     base_context,
@@ -97,13 +97,12 @@ def run_command(
 
 
 def prepare_snapshot(tmpdir: Path) -> Path:
-    """Copy the template into a plain temp dir so copier sees all current files.
+    """Copy the template into a plain temp dir so copier sees uncommitted changes too.
 
-    Copier copies happily from a non-git local directory, so no git snapshot is needed.
+    Copier copies happily from a non-git local directory, so no git snapshot is needed. Only
+    files git would commit are copied; see `copy_template_snapshot`.
     """
-    template_repo = tmpdir / 'template'
-    shutil.copytree(str(PROJECT_ROOT_DIRECTORY), str(template_repo), ignore=IGNORE_PATTERNS)
-    return template_repo
+    return copy_template_snapshot(tmpdir / 'template')
 
 
 def report_failure(message: str, log_file: Path | None) -> None:
