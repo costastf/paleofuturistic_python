@@ -346,7 +346,7 @@ def staged_files(context: Context) -> str:
 
     """
     result = context.run('git diff --cached --name-only --diff-filter=ACMR', hide=True, warn=True)
-    if result is None or result.failed:
+    if result.failed:
         return ''
     # Split on lines, not whitespace, so a path containing a space arrives intact and can be
     # refused below rather than silently becoming two paths that match no filter and get

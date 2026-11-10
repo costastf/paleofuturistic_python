@@ -26,7 +26,7 @@ def validate(context: Context) -> None:
     behind origin after a fetch.
     """
     status = context.run('git status --porcelain', hide=True, warn=True)
-    if status is None or status.failed:
+    if status.failed:
         print('Could not determine git status.')
         raise SystemExit(1)
     if status.stdout.strip():
@@ -35,19 +35,19 @@ def validate(context: Context) -> None:
         raise SystemExit(1)
 
     fetch = context.run('git fetch --quiet origin', hide=True, warn=True)
-    if fetch is None or fetch.failed:
+    if fetch.failed:
         print('Could not fetch origin. Check your remote connection before releasing.')
-        if fetch is not None and fetch.stderr:
+        if fetch.stderr:
             print(fetch.stderr.strip())
         raise SystemExit(1)
 
     upstream = context.run('git rev-parse --abbrev-ref @{upstream}', hide=True, warn=True)
-    if upstream is None or upstream.failed:
+    if upstream.failed:
         print('Current branch has no upstream configured. Set one with `git push -u origin <branch>` before releasing.')
         raise SystemExit(1)
 
     counts = context.run('git rev-list --left-right --count @{upstream}...HEAD', hide=True, warn=True)
-    if counts is None or counts.failed:
+    if counts.failed:
         print('Could not compare local branch with upstream.')
         raise SystemExit(1)
     behind_str, ahead_str = counts.stdout.strip().split()
@@ -56,7 +56,7 @@ def validate(context: Context) -> None:
     if ahead > 0:
         ahead_log = context.run('git log --oneline @{upstream}..HEAD', hide=True, warn=True)
         print(f'You have {ahead} unpushed commit(s) on this branch. Push them before releasing:')
-        if ahead_log is not None and ahead_log.stdout.strip():
+        if ahead_log.stdout.strip():
             print(ahead_log.stdout.rstrip())
         raise SystemExit(1)
 
@@ -136,7 +136,7 @@ def changelog(context: Context, write: bool = False) -> None:
         # already-current changelog is a no-op, not a failure, so this returns rather than
         # letting `git commit` fail on an empty index.
         staged = context.run('git diff --cached --quiet', hide=True, warn=True)
-        if staged is not None and staged.ok:
+        if staged.ok:
             print('Changelog is already up to date; nothing to commit.')
             return
         commit(context, 'docs: update changelog')
@@ -279,11 +279,10 @@ def resolve_next_version(context: Context, increment: str) -> str:
     else:
         cmd = f'uv run cz bump --increment {increment} --allow-no-commit --yes --dry-run'
     result = context.run(cmd, hide=True, warn=True)
-    if result is None or result.failed:
+    if result.failed:
         print('Could not determine the next version (cz bump --dry-run failed).')
-        if result is not None:
-            print(result.stdout)
-            print(result.stderr)
+        print(result.stdout)
+        print(result.stderr)
         raise SystemExit(1)
     output = f'{result.stdout}\n{result.stderr}'
     match = re.search(r'tag to create:\s*v?(\S+)', output)
@@ -337,8 +336,8 @@ def ensure_refs_are_free(context: Context, new_version: str, release_branch: str
         tag_ref,
         'Bump to a different version, or remove the tag everywhere before retrying:',
         has=(
-            bool(local_tag is not None and local_tag.stdout.strip()),
-            bool(remote_tag is not None and remote_tag.stdout.strip()),
+            bool(local_tag.stdout.strip()),
+            bool(remote_tag.stdout.strip()),
         ),
         delete=(f'git tag -d {tag_ref}', f'git push origin :refs/tags/{tag_ref}'),
     )
@@ -350,8 +349,8 @@ def ensure_refs_are_free(context: Context, new_version: str, release_branch: str
         release_branch,
         'Remove it everywhere before retrying:',
         has=(
-            bool(local_branch is not None and not local_branch.failed),
-            bool(remote_branch is not None and remote_branch.stdout.strip()),
+            not local_branch.failed,
+            bool(remote_branch.stdout.strip()),
         ),
         delete=(f'git branch -D {release_branch}', f'git push origin --delete {release_branch}'),
     )
@@ -376,7 +375,7 @@ def release(context: Context, increment: str = '', no_push: bool = False) -> Non
     validate(context)
 
     current = context.run('git rev-parse --abbrev-ref HEAD', hide=True, warn=True)
-    if current is None or current.failed:
+    if current.failed:
         print('Could not determine the current branch.')
         raise SystemExit(1)
     current_branch = current.stdout.strip()

@@ -69,7 +69,7 @@ def publish(context: Context) -> None:
         image = f'{IMAGE_NAME}:{tag}'
         engine = container_engine()
         result = context.run(f'{engine} image inspect {image}', hide=True, warn=True)
-        if result and not result.failed:
+        if not result.failed:
             print(f'Image already exists: {image}')
         else:
             base_image = read_info('info.base-image')

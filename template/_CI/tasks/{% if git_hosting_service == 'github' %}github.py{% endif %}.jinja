@@ -61,7 +61,7 @@ def publish_deps_image(context: Context, tag: str) -> str:
         hide=True,
     )
     result = context.run(f'{engine} manifest inspect {image}', hide=True, warn=True)
-    if result and not result.failed:
+    if not result.failed:
         print(f'Image already exists: {image}')
         # Pull so a repo digest exists locally to pin against, and so a corrupt or
         # unpullable image fails here rather than in every consumer job.
@@ -76,7 +76,7 @@ def publish_deps_image(context: Context, tag: str) -> str:
 def origin_slug(context: Context) -> str:
     """Return the ``owner/repo`` slug of the origin remote, or '' if not GitHub."""
     remote = context.run('git remote get-url origin', hide=True, warn=True)
-    if remote is None or remote.failed:
+    if remote.failed:
         return ''
     # In CI origin carries a token (https://x-access-token:<token>@github.com/…),
     # which the patterns below would otherwise fail to match.

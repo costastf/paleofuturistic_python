@@ -33,7 +33,7 @@ class BootstrapStep:
 def ensure_git_repo(context: Context) -> None:
     """Initialise a git repository in the current directory if one does not exist."""
     result = context.run('git rev-parse --git-dir', hide=True, warn=True)
-    if result is None or result.failed:
+    if result.failed:
         execute(context, 'git init')
 
 

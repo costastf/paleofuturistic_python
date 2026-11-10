@@ -232,7 +232,7 @@ def open_on_wsl(context: Context, target: str) -> None:
         print(f'WSL interop is disabled, so {target} cannot be handed to Windows. Open it manually.')
         return
     result = context.run(f'wslpath -w "{target}"', hide=True, warn=True)
-    windows_path = result.stdout.strip() if result is not None and not result.failed else ''
+    windows_path = result.stdout.strip() if not result.failed else ''
     if not windows_path:
         print(f'Could not translate {target} to a Windows path. Open it manually.')
         return
@@ -282,7 +282,7 @@ def image_digest_reference(context: Context, engine: str, image: str) -> str:
     """
     repository = image.rsplit(':', 1)[0]
     result = context.run(f'{engine} image inspect {image}', hide=True, warn=True)
-    if result is None or result.failed:
+    if result.failed:
         print(f'Could not inspect {image} for a digest; falling back to the tag.')
         return image
     try:
@@ -366,7 +366,7 @@ def execute(context: Context, cmd: str) -> None:
     shell = os.environ.get('INVOKE_SHELL')
     kwargs: dict[str, object] = {'shell': shell} if shell else {}
     result = context.run(cmd, echo=True, warn=True, **kwargs)
-    if result is None or result.failed:
+    if result.failed:
         raise SystemExit(1)
 
 
@@ -397,9 +397,9 @@ def execute_with_retries(context: Context, cmd: str, *, attempts: int, verdicts:
     kwargs: dict[str, object] = {'shell': shell} if shell else {}
     for attempt in range(1, attempts + 1):
         result = context.run(cmd, echo=True, warn=True, **kwargs)
-        if result is not None and not result.failed:
+        if not result.failed:
             return
-        output = '' if result is None else f'{result.stdout}{result.stderr}'
+        output = f'{result.stdout}{result.stderr}'
         if any(verdict in output for verdict in verdicts) or attempt == attempts:
             raise SystemExit(1)
         # Three seconds, then six: enough for a service to finish whatever it was doing, short
@@ -416,7 +416,7 @@ def signing_requested(context: Context) -> bool:
     ``true``, so this does not have to guess at the value.
     """
     result = context.run('git config --type=bool --get commit.gpgsign', hide=True, warn=True)
-    return result is not None and result.ok and result.stdout.strip() == 'true'
+    return result.ok and result.stdout.strip() == 'true'
 
 
 def commit(context: Context, message: str) -> None:
@@ -439,9 +439,9 @@ def commit(context: Context, message: str) -> None:
 
     """
     result = context.run(f'git commit -m "{message}"', echo=True, warn=True)
-    if result is not None and result.ok:
+    if result.ok:
         return
-    stderr = (result.stderr if result is not None else '') or ''
+    stderr = result.stderr or ''
     if SIGNING_FAILURE_MARKER not in stderr or not signing_requested(context):
         raise SystemExit(1)
     print(

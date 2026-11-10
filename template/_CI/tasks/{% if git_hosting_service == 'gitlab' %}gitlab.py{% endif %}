@@ -90,7 +90,7 @@ def origin_ref(context: Context) -> RemoteRef:
     (`https://gitlab-ci-token:<token>@host/…`) before parsing.
     """
     remote = context.run('git remote get-url origin', hide=True, warn=True)
-    if remote is None or remote.failed:
+    if remote.failed:
         return RemoteRef(host='', path='')
     return parse_remote_url(remote.stdout)
 

@@ -246,7 +246,7 @@ def sync_vendor(context: Context) -> None:
     """
     pin = vendored_invoke_pin()
     status = context.run('git status --porcelain', hide=True, warn=True)
-    if status is None or status.stdout.strip():
+    if status.stdout.strip():
         print(emojize_message('Working tree is dirty; commit or stash first.', success=False))
         raise SystemExit(1)
     url = f'https://codeload.github.com/{pin["repository"]}/tar.gz/{pin["commit"]}'

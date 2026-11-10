@@ -35,7 +35,7 @@ def is_ci() -> bool:
 def run_properdocs(context: Context, args: str, label: str) -> None:
     """Run a properdocs subcommand and emit a pass/fail status line."""
     result = context.run(properdocs_command(args), warn=True)
-    if result is None or result.failed:
+    if result.failed:
         print(emojize_message(f'{label} failed', success=False))
         raise SystemExit(1)
     print(emojize_message(f'{label} succeeded'))

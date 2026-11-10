@@ -108,7 +108,7 @@ def complexipy(context: Context, paths: str = '') -> None:
 def resolves(context: Context, revision: str) -> bool:
     """Report whether git can resolve ``revision`` in this clone."""
     result = context.run(f'git rev-parse --verify --quiet {revision}', hide=True, warn=True)
-    return bool(result and not result.failed)
+    return not result.failed
 
 
 def unpushed_range(context: Context) -> str | None:
@@ -148,7 +148,7 @@ def unpushed_range(context: Context) -> str | None:
     candidates.extend(f'{base}..HEAD' for base in ('@{upstream}', 'origin/HEAD') if resolves(context, base))
     for candidate in candidates:
         counted = context.run(f'git rev-list --count {candidate}', hide=True, warn=True)
-        if counted is not None and not counted.failed and counted.stdout.strip() not in ('', '0'):
+        if not counted.failed and counted.stdout.strip() not in ('', '0'):
             return candidate
     # The tip alone. `HEAD` is the form for a root commit, where `HEAD~1` does not exist — and
     # a shallow graft is that same shape, its tip having no parent in the clone.

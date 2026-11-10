@@ -23,7 +23,7 @@ RUFF = 'uv run --group lint ruff'
 def run_ruff(context: Context, args: str, label: str) -> bool:
     """Run one ruff invocation, print a status line, and return whether it passed."""
     result = context.run(f'{RUFF} {args}', warn=True)
-    passed = result is not None and not result.failed
+    passed = not result.failed
     print(emojize_message(f'{label} {"passed" if passed else "failed"}', success=passed))
     return passed
 
