@@ -7,7 +7,7 @@ import re
 import shutil
 import sys
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager, suppress
 from contextvars import ContextVar
 from functools import wraps
@@ -116,7 +116,7 @@ class IndentingStream:
 
 
 @contextmanager
-def indented_streams(prefix: str) -> Iterator[None]:
+def indented_streams(prefix: str) -> Generator[None]:
     """Wrap sys.stdout and sys.stderr to prepend `prefix` to each new line."""
     original_out, original_err = sys.stdout, sys.stderr
     sys.stdout = IndentingStream(original_out, prefix)  # type: ignore[assignment]

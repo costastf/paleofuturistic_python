@@ -23,7 +23,7 @@ required-version = "==0.13.4"
 # This is the template repository's own boundary, maintained by hand. Generated projects
 # get theirs stamped with their generation date by tasks_render.py, so a project created
 # later does not inherit a boundary that has receded into the past.
-exclude-newer = "2026-08-07"
+exclude-newer = "2026-11-10"
 
 [dependency-groups]
 # PyYAML parses copier.yml in _CI.tasks.configuration.base_context; the `dev` group is
@@ -41,7 +41,7 @@ test = [
 # Pinned to the same ruff the template pins, so this repository and the projects it
 # generates are judged by one version. Bump both together.
 lint = [
-    "ruff==0.16.2",
+    "ruff==0.17.4",
 ]
 
 # Mirrors the rule set generated projects get, so the repository that defines the standard is

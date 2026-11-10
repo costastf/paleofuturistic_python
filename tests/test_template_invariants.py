@@ -154,7 +154,10 @@ def test_pyproject_is_valid_toml(generated_project):
 # scoping is the whole point — see the comment beside the override in the template.
 UNION_WORKAROUND_RULES = {
     'unknown-argument',
-    'unresolved-attribute',
+    # Called `unresolved-attribute` before ty 0.0.100, which renamed it and split out
+    # `missing-union-attribute` for an attribute missing from some members of a union.
+    'missing-attribute',
+    'missing-union-attribute',
     'too-many-positional-arguments',
     'invalid-argument-type',
 }
@@ -163,13 +166,13 @@ UNION_WORKAROUND_RULES = {
 def test_ty_suppressions_stay_scoped_to_one_module(generated_project):
     """The py-serializable workaround must never become a project-wide rule change.
 
-    Moving these four rules to `[tool.ty.rules]` would silence them everywhere and look
+    Moving these rules to `[tool.ty.rules]` would silence them everywhere and look
     like a tidy-up in review, while quietly removing the checks most likely to catch a real
     call-signature bug across the whole project. `invalid-type-form` — the same union leaking
     into a *return* annotation — briefly rode along as a fifth rule in this same override; it
     is deliberately not one of `UNION_WORKAROUND_RULES`, because that rule is instead tagged
     per line in `sbom.py` (see below), so a config-level rule set that grows beyond this exact
-    four means the fifth one has drifted back into the override rather than staying per line.
+    list means the fifth one has drifted back into the override rather than staying per line.
     """
     project, _ = generated_project
     ty_config = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))['tool']['ty']
@@ -184,7 +187,7 @@ def test_ty_suppressions_stay_scoped_to_one_module(generated_project):
     for override in sbom_overrides:
         rules = set(override.get('rules', {}))
         assert rules == UNION_WORKAROUND_RULES, (
-            f'the sbom.py ty override covers {sorted(rules)}, not exactly the four union-workaround '
+            f'the sbom.py ty override covers {sorted(rules)}, not exactly the union-workaround '
             f'rules — invalid-type-form belongs per line in sbom.py, not in this config'
         )
 
@@ -193,8 +196,8 @@ def test_ty_ignores_in_sbom_are_scoped_to_one_rule(generated_project):
     """Every `# ty: ignore` in `sbom.py` names `invalid-type-form`, not a bare blanket ignore.
 
     A bare `# ty: ignore` on one of these lines would also silence `unknown-argument`,
-    `unresolved-attribute`, `too-many-positional-arguments` and `invalid-argument-type` on
-    that exact line — the four rules the config-level override exists to keep live everywhere
+    `missing-attribute`, `missing-union-attribute`, `too-many-positional-arguments` and
+    `invalid-argument-type` on that exact line — the rules the config-level override exists to keep live everywhere
     outside constructor calls this module makes. Naming the rule keeps that promise per line.
     """
     project, _ = generated_project

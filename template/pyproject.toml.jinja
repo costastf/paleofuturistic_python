@@ -73,40 +73,39 @@ build = [
     "twine==7.0.0",
 ]
 develop = [
-    "pre-commit==4.6.1",
+    "pre-commit==4.7.0",
 ]
 document = [
     "properdocs==1.6.7",
     "properdocs-theme-mkdocs==1.6.7",
-    "mkdocs-include-markdown-plugin==7.3.0",
+    "mkdocs-include-markdown-plugin==7.3.1",
     "mkdocstrings[python]==1.0.8",
 ]
 lint = [
-    "commitizen==4.17.0",
-    "complexipy==6.2.0",
-    "pylint==4.0.9",
+    "commitizen==4.19.3",
+    "complexipy==8.3.0",
+    "pylint==4.1.3",
     # Newest version clearing the [tool.uv] exclude-newer boundary.
-    "ruff==0.16.2",
+    "ruff==0.17.4",
     # Newest version clearing the [tool.uv] exclude-newer boundary.
-    "ty==0.0.69",
-    # Schema-checks pyproject.toml against the PyPA specs (`lint.pyproject`). 0.25 is the
-    # newest release clearing the [tool.uv] exclude-newer boundary.
-    "validate-pyproject[all]==0.25",
+    "ty==0.0.100",
+    # Schema-checks pyproject.toml against the PyPA specs (`lint.pyproject`).
+    "validate-pyproject[all]==0.27",
 ]
 quality = [
-    "pyscn==1.29.0",
+    "pyscn==1.33.2",
 ]
 security = [
-    "cyclonedx-bom==7.3.1",
-    "cyclonedx-python-lib[json-validation]==11.11.0",
+    "cyclonedx-bom==8.0.1",
+    "cyclonedx-python-lib[json-validation]==11.12.0",
     "pip-audit==2.10.1",
     # Signs PEP 740 attestations for the release artifacts (`release.attest`).
-    "pypi-attestations==0.0.30",
+    "pypi-attestations==0.0.31",
 ]
 test = [
-    "pytest==9.1.1",
+    "pytest==9.2.0",
     "pytest-cov==7.1.0",
-    "pytest-env==1.7.0",
+    "pytest-env==1.8.5",
     "pytest-html==4.2.0",
     "pytest-xdist==3.8.0",
     # Pin uv to match [tool.uv] required-version — tox-uv depends on the uv
@@ -116,8 +115,8 @@ test = [
     # places the uv version appears, and one of them carries an image digest that has
     # to move with it.
     "uv==0.13.4",
-    "tox==4.58.0",
-    "tox-uv==1.36.0",
+    "tox==4.67.13",
+    "tox-uv==1.37.7",
 ]
 
 [build-system]
@@ -271,13 +270,17 @@ extra-paths = ["_CI/lib/vendor"]
 # written; the annotation is what is wrong, not the checker.
 #
 # Older ty resolved those mixins as `@Todo` and checked nothing here, which is why this
-# surfaced as a "regression" when ty gained the ability to model them. Silencing these four
+# surfaced as a "regression" when ty gained the ability to model them. Silencing these five
 # rules costs less than the alternative of freezing ty, which left every cyclonedx
 # constructor call in this module unchecked instead.
 #
 # The same union also leaks into a *return* annotation: writing `-> Component` names a class
 # whose own decorator resolves to that unsound union, and `invalid-type-form` reports it.
 # That one is not in this list — it lands on eleven identifiable `def` lines in `sbom.py`
+# ty 0.0.100 renamed `unresolved-attribute` to `missing-attribute` and split out
+# `missing-union-attribute` for an attribute missing from *some* members of a union.
+# `bom.metadata` on the `Bom()` union is exactly that case, so both are listed.
+#
 # rather than on every constructor call, so it is tagged there with
 # `# ty: ignore[invalid-type-form]` instead of ignored for the whole file. A per-line tag is
 # also the one ty itself will flag as unused the day py-serializable's annotation is fixed;
@@ -291,7 +294,8 @@ include = ["_CI/tasks/sbom.py"]
 
 [tool.ty.overrides.rules]
 unknown-argument = "ignore"
-unresolved-attribute = "ignore"
+missing-attribute = "ignore"
+missing-union-attribute = "ignore"
 too-many-positional-arguments = "ignore"
 invalid-argument-type = "ignore"
 
@@ -414,7 +418,7 @@ required-version = "==0.13.4"
 # disagree. See docs/developer/reference/dependency-groups.md for the flow.
 #
 # (The literal below is only a fallback; `tasks_render.py` overwrites it at generation.)
-exclude-newer = "2026-08-07"
+exclude-newer = "2026-11-10"
 
 [tool.tox]
 requires = ["tox>=4.21", "tox-uv>=1.16"]
