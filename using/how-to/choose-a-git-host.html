@@ -100,6 +100,10 @@
 <li>
     <a href="../reference/license-options.html" class="dropdown-item">License options</a>
 </li>
+            
+<li>
+    <a href="../reference/packaging-specifications.html" class="dropdown-item">Packaging specifications</a>
+</li>
     </ul>
   </li>
                                     
@@ -113,6 +117,10 @@
             
 <li>
     <a href="../explanation/sbom-and-security-model.html" class="dropdown-item">SBOM and security model</a>
+</li>
+            
+<li>
+    <a href="../explanation/packaging-conformance.html" class="dropdown-item">Packaging conformance</a>
 </li>
             
 <li>
@@ -339,6 +347,9 @@
             <li class="nav-item">
                 <a href="../reference/license-options.html" class="nav-link">License options</a>
             </li>
+            <li class="nav-item">
+                <a href="../reference/packaging-specifications.html" class="nav-link">Packaging specifications</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -351,6 +362,9 @@
             </li>
             <li class="nav-item">
                 <a href="../explanation/sbom-and-security-model.html" class="nav-link">SBOM and security model</a>
+            </li>
+            <li class="nav-item">
+                <a href="../explanation/packaging-conformance.html" class="nav-link">Packaging conformance</a>
             </li>
             <li class="nav-item">
                 <a href="../explanation/testing-strategy.html" class="nav-link">Testing strategy</a>
@@ -503,6 +517,21 @@
 <td>auto-opened via GitHub API when <code>GITHUB_TOKEN</code> is set</td>
 <td>auto-opened via GitLab API when <code>GITLAB_TOKEN</code> is set</td>
 </tr>
+<tr>
+<td>PyPI Trusted Publishing</td>
+<td><code>id-token: write</code> on the publish job; uv reads <code>ACTIONS_ID_TOKEN_*</code></td>
+<td><code>id_tokens:</code> on the publish job (<code>PYPI_ID_TOKEN</code>, audience <code>pypi</code>); <strong>gitlab.com only</strong> — PyPI does not trust self-managed instances</td>
+</tr>
+<tr>
+<td>PEP 740 attestations</td>
+<td><code>release.attest</code> signs with the job's OIDC identity</td>
+<td><code>release.attest</code> signs with <code>SIGSTORE_ID_TOKEN</code> (audience <code>sigstore</code>); gitlab.com only, for the same reason</td>
+</tr>
+<tr>
+<td>GitHub build provenance (<code>gh attestation verify</code>)</td>
+<td>yes, a second attestation stored with the repository</td>
+<td>—</td>
+</tr>
 </tbody>
 </table>
 <p>Everything else — the package layout, <code>pyproject.toml</code>, dependency groups, <code>./workflow.cmd</code> tasks, tests, docs — is identical.</p>
@@ -522,6 +551,7 @@
 <li><strong>Releasing needs <code>GITLAB_TOKEN</code>.</strong> <code>create_release_pr</code> opens the MR through the GitLab API using a personal, project, or group access token with the <code>api</code> scope. Without one it says so and <code>release</code> falls back to printing the manual <code>pr_create_url</code>, which is also what happens if the API call fails — a release never stops because the MR could not be opened.</li>
 <li><strong>Self-hosted instances work.</strong> The instance host is read from your <code>origin</code> remote rather than assumed to be gitlab.com, for both the API call and the manual URL. Nested groups are handled too; the project path is URL-encoded as the API requires.</li>
 <li>The shipped <code>.gitlab-ci.yml</code> covers the <code>preflight</code> gate, the dependency audit and publish for <code>gitlab.com</code> runners; self-hosted runners with kaniko may need adjustments.</li>
+<li><strong>Trusted Publishing needs gitlab.com.</strong> PyPI accepts OIDC tokens only from gitlab.com, so register the publisher there with the namespace, project, <code>.gitlab-ci.yml</code> and environment <code>pypi</code> (<a href="https://docs.pypi.org/trusted-publishers/adding-a-publisher/">PyPI's guide</a>). On a self-managed instance, set <code>UV_PUBLISH_URL</code>, <code>UV_PUBLISH_USERNAME</code> and <code>UV_PUBLISH_PASSWORD</code> as CI/CD variables instead: <code>release.publish</code> then uploads with them, without attestations, and <code>release.attest</code> signs nothing. A generated project's <em>Set up Trusted Publishing</em> how-to walks through both.</li>
 </ul>
 <h2 id="see-also">See also</h2>
 <ul>

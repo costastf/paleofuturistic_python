@@ -100,6 +100,10 @@
 <li>
     <a href="license-options.html" class="dropdown-item">License options</a>
 </li>
+            
+<li>
+    <a href="packaging-specifications.html" class="dropdown-item">Packaging specifications</a>
+</li>
     </ul>
   </li>
                                     
@@ -113,6 +117,10 @@
             
 <li>
     <a href="../explanation/sbom-and-security-model.html" class="dropdown-item">SBOM and security model</a>
+</li>
+            
+<li>
+    <a href="../explanation/packaging-conformance.html" class="dropdown-item">Packaging conformance</a>
 </li>
             
 <li>
@@ -339,6 +347,9 @@
             <li class="nav-item">
                 <a href="license-options.html" class="nav-link">License options</a>
             </li>
+            <li class="nav-item">
+                <a href="packaging-specifications.html" class="nav-link">Packaging specifications</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -351,6 +362,9 @@
             </li>
             <li class="nav-item">
                 <a href="../explanation/sbom-and-security-model.html" class="nav-link">SBOM and security model</a>
+            </li>
+            <li class="nav-item">
+                <a href="../explanation/packaging-conformance.html" class="nav-link">Packaging conformance</a>
             </li>
             <li class="nav-item">
                 <a href="../explanation/testing-strategy.html" class="nav-link">Testing strategy</a>
@@ -514,6 +528,44 @@
 <li><strong>Allowed</strong>: <code>github</code>, <code>gitlab</code></li>
 </ul>
 <p>Determines which CI scaffolding ships and which host-specific submodule lives at <code>_CI/tasks/&lt;host&gt;.py</code>. The unchosen host's files are omitted at generation time via copier conditional filenames — a file or directory whose rendered name is an empty string is simply not created. See <a href="../how-to/choose-a-git-host.html">Choose a git host</a>.</p>
+<h3 id="repository_url"><code>repository_url</code></h3>
+<ul>
+<li><strong>Type</strong>: string</li>
+<li><strong>Default</strong>: empty</li>
+<li><strong>Allowed</strong>: empty, or an <code>https://</code> URL with a path, e.g. <code>https://github.com/acme/widget</code></li>
+</ul>
+<p>The public home of the repository. It renders <code>[project.urls]</code> in <code>pyproject.toml</code>, the links PyPI shows in the project sidebar, under <a href="https://packaging.python.org/en/latest/specifications/well-known-project-urls/">well-known labels</a> so each gets its own icon:</p>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Homepage</code></td>
+<td>The GitHub Pages site when <code>git_hosting_service=github</code>, the repository is on github.com and <code>integrate_pages=true</code>; otherwise the repository</td>
+</tr>
+<tr>
+<td><code>Source</code></td>
+<td>The repository</td>
+</tr>
+<tr>
+<td><code>Issues</code></td>
+<td><code>&lt;repository&gt;/issues</code> on GitHub, <code>&lt;repository&gt;/-/issues</code> on GitLab</td>
+</tr>
+<tr>
+<td><code>Changelog</code></td>
+<td><code>docs/changelog.md</code> on the default branch, where <code>release</code> writes it</td>
+</tr>
+<tr>
+<td><code>Documentation</code></td>
+<td>The GitHub Pages site, under the same conditions as <code>Homepage</code></td>
+</tr>
+</tbody>
+</table>
+<p>A trailing <code>/</code> or <code>.git</code> is dropped, so a pasted clone URL works. Left empty, the project ships no <code>[project.urls]</code> at all rather than links that would 404 on PyPI; answer it on a later <code>copier update</code>, or add the table by hand. Self-hosted GitLab and GitHub Enterprise URLs work too; only the Pages links assume github.com.</p>
 <h3 id="integrate_pages"><code>integrate_pages</code></h3>
 <ul>
 <li><strong>Type</strong>: bool</li>
@@ -525,6 +577,7 @@
 <ol>
 <li><strong>Python version range</strong> — a <code>validator</code> on the <code>max_python_version</code> question in <code>copier.yml</code> checks that <code>max &gt;= min</code>, that both values share the same major version, and that both appear in the choices list. Any failure aborts generation immediately before any files are written.</li>
 <li><strong>Project slug</strong> — a <code>validator</code> on the <code>project_slug</code> question checks the value is a valid Python identifier and PyPI project name (<code>^[a-z]([a-z0-9_]*[a-z0-9])?$</code>), rejecting empty values, leading digits, and punctuation such as apostrophes. Generation aborts before any files are written on failure.</li>
+<li><strong>Repository URL</strong> — a <code>validator</code> on <code>repository_url</code> accepts an empty value or <code>^https://[^/\s]+/[^\s]+$</code>, so <code>http://</code>, SSH remotes and a bare host are refused before any files are written.</li>
 <li><strong>License installation</strong> — <code>tasks_render.py</code> installs the chosen <code>LICENSE</code> file (substituting author/year tokens) and removes the <code>licenses/</code> staging directory. It runs only on <code>copier copy</code>, not on <code>copier update</code>.</li>
 </ol>
 <h2 id="see-also">See also</h2>

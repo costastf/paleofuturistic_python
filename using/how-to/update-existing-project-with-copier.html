@@ -100,6 +100,10 @@
 <li>
     <a href="../reference/license-options.html" class="dropdown-item">License options</a>
 </li>
+            
+<li>
+    <a href="../reference/packaging-specifications.html" class="dropdown-item">Packaging specifications</a>
+</li>
     </ul>
   </li>
                                     
@@ -113,6 +117,10 @@
             
 <li>
     <a href="../explanation/sbom-and-security-model.html" class="dropdown-item">SBOM and security model</a>
+</li>
+            
+<li>
+    <a href="../explanation/packaging-conformance.html" class="dropdown-item">Packaging conformance</a>
 </li>
             
 <li>
@@ -339,6 +347,9 @@
             <li class="nav-item">
                 <a href="../reference/license-options.html" class="nav-link">License options</a>
             </li>
+            <li class="nav-item">
+                <a href="../reference/packaging-specifications.html" class="nav-link">Packaging specifications</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -351,6 +362,9 @@
             </li>
             <li class="nav-item">
                 <a href="../explanation/sbom-and-security-model.html" class="nav-link">SBOM and security model</a>
+            </li>
+            <li class="nav-item">
+                <a href="../explanation/packaging-conformance.html" class="nav-link">Packaging conformance</a>
             </li>
             <li class="nav-item">
                 <a href="../explanation/testing-strategy.html" class="nav-link">Testing strategy</a>
@@ -445,6 +459,10 @@
               <ul class="nav flex-column">
               </ul>
             </li>
+            <li class="nav-item" data-bs-level="2"><a href="#upgrading-past-the-packaging-conformance-change" class="nav-link">Upgrading past the packaging-conformance change</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
             <li class="nav-item" data-bs-level="2"><a href="#resolving-conflicts" class="nav-link">Resolving conflicts</a>
               <ul class="nav flex-column">
               </ul>
@@ -498,6 +516,14 @@
 <li>Delete the <code>OWASP_DTRACK_URL</code> and <code>OWASP_DTRACK_API_KEY</code> secrets from your repository or group CI settings. Nothing reads them any more.</li>
 <li>If your organisation still wants every release in Dependency-Track, add the upload as your own task in <code>_CI/tasks/local.py</code>, which <code>copier update</code> never touches (see <em>Add a workflow task</em> in your project's developer docs), and call it from your pipeline after <code>release.publish</code>. The SBOM to send is <code>src/&lt;your_package&gt;/sbom.cdx.json</code>. Dependency-Track's <a href="https://docs.dependencytrack.org/usage/cicd/">CI/CD integration guide</a> documents the upload endpoint.</li>
 </ol>
+<h2 id="upgrading-past-the-packaging-conformance-change">Upgrading past the packaging-conformance change</h2>
+<p>This change adds a question and three checks:</p>
+<ul>
+<li><strong><code>repository_url</code></strong> is asked once. Answer it to get <code>[project.urls]</code> (PyPI's sidebar links); leave it empty to skip.</li>
+<li><strong>New gates.</strong> <code>lint.pyproject</code> (validate-pyproject) runs on commits that stage <code>pyproject.toml</code> and in <code>preflight</code>; <code>build.package</code> now runs <code>twine check --strict</code> and <code>check-wheel-contents</code>. A <code>pyproject.toml</code> you edited may fail the first run. The error names the field; fix it rather than skip the gate.</li>
+<li><strong>New dependency group</strong> <code>build</code>, and new pins in <code>lint</code> and <code>security</code>. Run <code>uv lock</code> after the update and commit <code>uv.lock</code> with it.</li>
+<li><strong>Publishing.</strong> The publish job now signs PEP 740 attestations. On GitLab it also requests <code>id_tokens:</code>, and PyPI needs a Trusted Publisher registered for the project (the new <em>Set up Trusted Publishing</em> how-to). If you publish with <code>UV_PUBLISH_*</code> credentials, nothing changes: that path uploads without attestations.</li>
+</ul>
 <h2 id="resolving-conflicts">Resolving conflicts</h2>
 <p>Copier uses a three-way merge; conflicts appear as standard conflict markers in the affected files. The most common cause is that you customised a file the template also changed. Resolve them by hand and re-run <code>./workflow.cmd test</code>.</p>
 <h2 id="pinning-a-specific-template-version">Pinning a specific template version</h2>

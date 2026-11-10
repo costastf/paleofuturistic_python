@@ -100,6 +100,10 @@
 <li>
     <a href="../reference/license-options.html" class="dropdown-item">License options</a>
 </li>
+            
+<li>
+    <a href="../reference/packaging-specifications.html" class="dropdown-item">Packaging specifications</a>
+</li>
     </ul>
   </li>
                                     
@@ -113,6 +117,10 @@
             
 <li>
     <a href="../explanation/sbom-and-security-model.html" class="dropdown-item">SBOM and security model</a>
+</li>
+            
+<li>
+    <a href="../explanation/packaging-conformance.html" class="dropdown-item">Packaging conformance</a>
 </li>
             
 <li>
@@ -339,6 +347,9 @@
             <li class="nav-item">
                 <a href="../reference/license-options.html" class="nav-link">License options</a>
             </li>
+            <li class="nav-item">
+                <a href="../reference/packaging-specifications.html" class="nav-link">Packaging specifications</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -351,6 +362,9 @@
             </li>
             <li class="nav-item">
                 <a href="../explanation/sbom-and-security-model.html" class="nav-link">SBOM and security model</a>
+            </li>
+            <li class="nav-item">
+                <a href="../explanation/packaging-conformance.html" class="nav-link">Packaging conformance</a>
             </li>
             <li class="nav-item">
                 <a href="../explanation/testing-strategy.html" class="nav-link">Testing strategy</a>
@@ -487,7 +501,7 @@ if __name__ == '__main__':
 <pre><code class="language-toml">[project.scripts]
 &lt;your-project-slug&gt; = &quot;&lt;your_project_slug&gt;.__main__:main&quot;
 </code></pre>
-<p>The key on the left is the executable name installed on <code>PATH</code>. Hyphens are fine; the import target on the right must use underscores.</p>
+<p>The key on the left is the executable name installed on <code>PATH</code>. Hyphens are fine; the import target on the right must use underscores. The format is the <a href="https://packaging.python.org/en/latest/specifications/entry-points/">entry points specification</a>; <code>./workflow.cmd lint.pyproject</code> checks the table's shape, and a generated project's <em>Add a console script</em> how-to covers GUI scripts and plugin entry points too.</p>
 <h2 id="step-3-verify">Step 3 — Verify</h2>
 <pre><code class="language-bash">uv sync
 uv run &lt;your-project-slug&gt;          # via console script

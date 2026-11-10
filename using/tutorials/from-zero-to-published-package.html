@@ -100,6 +100,10 @@
 <li>
     <a href="../reference/license-options.html" class="dropdown-item">License options</a>
 </li>
+            
+<li>
+    <a href="../reference/packaging-specifications.html" class="dropdown-item">Packaging specifications</a>
+</li>
     </ul>
   </li>
                                     
@@ -113,6 +117,10 @@
             
 <li>
     <a href="../explanation/sbom-and-security-model.html" class="dropdown-item">SBOM and security model</a>
+</li>
+            
+<li>
+    <a href="../explanation/packaging-conformance.html" class="dropdown-item">Packaging conformance</a>
 </li>
             
 <li>
@@ -339,6 +347,9 @@
             <li class="nav-item">
                 <a href="../reference/license-options.html" class="nav-link">License options</a>
             </li>
+            <li class="nav-item">
+                <a href="../reference/packaging-specifications.html" class="nav-link">Packaging specifications</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -351,6 +362,9 @@
             </li>
             <li class="nav-item">
                 <a href="../explanation/sbom-and-security-model.html" class="nav-link">SBOM and security model</a>
+            </li>
+            <li class="nav-item">
+                <a href="../explanation/packaging-conformance.html" class="nav-link">Packaging conformance</a>
             </li>
             <li class="nav-item">
                 <a href="../explanation/testing-strategy.html" class="nav-link">Testing strategy</a>
@@ -533,10 +547,10 @@ That is because a commit edited <code>uv.lock</code>.
 This is a desired side-effect during release.
 You would not want to release a package with known vulnerabilities (that have not been suppressed in <code>.security-overrides</code>).</p>
 <h2 id="step-4-publish-to-pypi">Step 4 — Publish to PyPI</h2>
-<p>The <code>release.publish</code> task pushes the wheel and SBOM to PyPI. The recommended path is CI-driven <a href="https://docs.pypi.org/trusted-publishers/">PyPI trusted publishing</a> — no long-lived tokens. Wire it up once for the project (see <a href="../how-to/harden-github-repository.html">Harden the GitHub repository</a> for the GitHub Actions side), then:</p>
+<p>The publish job builds the wheel and sdist (the SBOM rides inside the wheel), checks both with <code>twine check --strict</code> and <code>check-wheel-contents</code>, signs a <a href="https://packaging.python.org/en/latest/specifications/index-hosted-attestations/">PEP 740</a> attestation per file, and uploads files and attestations together. The recommended path is CI-driven <a href="https://docs.pypi.org/trusted-publishers/">PyPI trusted publishing</a> — no long-lived tokens, and the only way PyPI accepts the attestations. Wire it up once for the project (your generated project's <em>Set up Trusted Publishing</em> how-to has the PyPI form for your host; <a href="../how-to/harden-github-repository.html">Harden the GitHub repository</a> covers the GitHub side), then:</p>
 <p>Approve and merge the resulting PR.
 The tag and bump land on <code>main</code>.</p>
-<p>After all the pipelines ran you should see your project published on PyPI.</p>
+<p>After all the pipelines ran you should see your project published on PyPI. Each file's details show a <em>Provenance</em> section naming your repository; if you answered <code>repository_url</code>, the sidebar shows its links.</p>
 <h2 id="step-5-publish-the-docs">Step 5 — Publish the docs</h2>
 <p>For GitHub-hosted projects, see <a href="../how-to/publish-docs-to-github-pages.html">Publish docs to GitHub Pages</a> for the workflow file and Pages setup.</p>
 <h2 id="youre-done">You're done</h2>

@@ -100,6 +100,10 @@
 <li>
     <a href="../reference/license-options.html" class="dropdown-item">License options</a>
 </li>
+            
+<li>
+    <a href="../reference/packaging-specifications.html" class="dropdown-item">Packaging specifications</a>
+</li>
     </ul>
   </li>
                                     
@@ -113,6 +117,10 @@
             
 <li>
     <a href="sbom-and-security-model.html" class="dropdown-item active" aria-current="page">SBOM and security model</a>
+</li>
+            
+<li>
+    <a href="packaging-conformance.html" class="dropdown-item">Packaging conformance</a>
 </li>
             
 <li>
@@ -205,7 +213,7 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a rel="next" href="testing-strategy.html" class="nav-link">
+                                <a rel="next" href="packaging-conformance.html" class="nav-link">
                                     Next <i class="fa fa-arrow-right"></i>
                                 </a>
                             </li>
@@ -339,6 +347,9 @@
             <li class="nav-item">
                 <a href="../reference/license-options.html" class="nav-link">License options</a>
             </li>
+            <li class="nav-item">
+                <a href="../reference/packaging-specifications.html" class="nav-link">Packaging specifications</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -351,6 +362,9 @@
             </li>
             <li class="nav-item">
                 <a href="sbom-and-security-model.html" class="nav-link active fw-bold">SBOM and security model</a>
+            </li>
+            <li class="nav-item">
+                <a href="packaging-conformance.html" class="nav-link">Packaging conformance</a>
             </li>
             <li class="nav-item">
                 <a href="testing-strategy.html" class="nav-link">Testing strategy</a>
@@ -589,12 +603,13 @@ impossible to build a wheel from code that built yesterday. <code>./workflow.cmd
 <p>The SBOM is part of every release.</p>
 <p>Watching a released version for advisories published after the release is outside the template. The scheduled audit re-checks <code>uv.lock</code> on the default branch every day, but that is the code as it is now, not the versions already on PyPI. To track those, point your organisation's software composition analysis platform (OWASP Dependency-Track, the GitHub dependency graph, or similar) at the SBOM inside each wheel. Which platform, and the credentials to reach it, are your organisation's call, so the template ships no upload step.</p>
 <h2 id="layer-3-build-provenance">Layer 3 — build provenance</h2>
-<p>The SBOM says what is <em>inside</em> an artifact. Provenance says where the artifact <em>came from</em> — and unlike the SBOM, it is not self-reported. <code>actions/attest-build-provenance</code> signs a statement binding the exact file digests to the workflow, commit and runner that produced them, and that signature chains to GitHub's Sigstore instance rather than to anything the project controls. A forged SBOM is a text edit; a forged attestation is not.</p>
-<p>A consumer verifies a downloaded artifact with:</p>
-<pre><code class="language-bash">gh attestation verify &lt;package&gt;-&lt;version&gt;-py3-none-any.whl --repo &lt;owner&gt;/&lt;repo&gt;
+<p>The SBOM says what is <em>inside</em> an artifact. Provenance says where the artifact <em>came from</em>, and unlike the SBOM it is not self-reported. On both hosts, <code>release.attest</code> signs a <a href="https://packaging.python.org/en/latest/specifications/index-hosted-attestations/">PEP 740</a> attestation for every wheel and sdist: a statement binding the file's digest to the repository, workflow and commit that published it. The signing identity is the CI job's own OIDC token, the signature chains to Sigstore's public instance, and the signing event lands in Sigstore's transparency log, so nothing the project controls can mint one after the fact. A forged SBOM is a text edit; a forged attestation is not.</p>
+<p><code>uv publish</code> uploads each <code>&lt;file&gt;.publish.attestation</code> with its file, and PyPI shows the publishing repository and workflow on the release page. A consumer verifies a release on PyPI with:</p>
+<pre><code class="language-bash">pypi-attestations verify pypi --repository https://github.com/&lt;owner&gt;/&lt;repo&gt; pypi:&lt;package&gt;-&lt;version&gt;-py3-none-any.whl
 </code></pre>
-<p>Order matters in the publish job: <code>release.dist</code> builds into <code>dist/</code>, the attestation is taken over those files, and <code>release.publish --prebuilt</code> uploads them <em>without</em> rebuilding. Rebuilding in between would publish files that no attestation refers to, and verification would then fail — reading as tampering rather than as a fresh build.</p>
-<p><strong>GitHub only.</strong> GitLab has no equivalent that works without extra infrastructure, so GitLab projects ship the SBOM without provenance. Nothing else about the release differs.</p>
+<p>GitHub projects also get GitHub's own provenance attestation from <code>actions/attest-build-provenance</code>, stored with the repository and checked with <code>gh attestation verify &lt;file&gt; --repo &lt;owner&gt;/&lt;repo&gt;</code>. The two answer the same question for different audiences: the PEP 740 one travels with the package to PyPI, the GitHub one stays where the source is.</p>
+<p>Order matters in the publish job: <code>release.dist</code> builds into <code>dist/</code>, the attestations are taken over those files, and <code>release.publish --prebuilt</code> uploads them <em>without</em> rebuilding. Rebuilding in between would publish files that no attestation refers to, and verification would then fail — reading as tampering rather than as a fresh build.</p>
+<p>PyPI accepts attestations only through <a href="https://docs.pypi.org/trusted-publishers/">Trusted Publishing</a>. A project that publishes with <code>UV_PUBLISH_*</code> credentials instead (a private index, say) uploads none: <code>release.publish</code> passes <code>--no-attestations</code> on that path, because indexes that do not support attestations may reject the upload.</p>
 <h2 id="what-about-overrides">What about overrides?</h2>
 <p><code>.security-overrides</code> is a project-local allow-list with mandatory expiry dates. It applies to <code>pip-audit</code>. It does <strong>not</strong> suppress findings in the SBOM, which continues to show the world the full truth. Override = "we accept this locally for now," not "make this invisible."</p>
 <p>The expiry dates are load-bearing: a stale override is a security regression hidden in plain sight. The template's lint config doesn't enforce this; treat it as a code-review convention.</p>
@@ -607,6 +622,7 @@ impossible to build a wheel from code that built yesterday. <code>./workflow.cmd
 <h2 id="see-also">See also</h2>
 <ul>
 <li><a href="../how-to/harden-github-repository.html">Harden the GitHub repository</a> — the repository settings the publish job, and so the provenance layer, depends on.</li>
+<li><a href="../reference/packaging-specifications.html">Packaging specifications</a> — every PyPA spec, and how a generated project meets it.</li>
 </ul></div>
             </div>
         </div>

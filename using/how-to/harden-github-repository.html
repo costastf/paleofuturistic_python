@@ -100,6 +100,10 @@
 <li>
     <a href="../reference/license-options.html" class="dropdown-item">License options</a>
 </li>
+            
+<li>
+    <a href="../reference/packaging-specifications.html" class="dropdown-item">Packaging specifications</a>
+</li>
     </ul>
   </li>
                                     
@@ -113,6 +117,10 @@
             
 <li>
     <a href="../explanation/sbom-and-security-model.html" class="dropdown-item">SBOM and security model</a>
+</li>
+            
+<li>
+    <a href="../explanation/packaging-conformance.html" class="dropdown-item">Packaging conformance</a>
 </li>
             
 <li>
@@ -339,6 +347,9 @@
             <li class="nav-item">
                 <a href="../reference/license-options.html" class="nav-link">License options</a>
             </li>
+            <li class="nav-item">
+                <a href="../reference/packaging-specifications.html" class="nav-link">Packaging specifications</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -351,6 +362,9 @@
             </li>
             <li class="nav-item">
                 <a href="../explanation/sbom-and-security-model.html" class="nav-link">SBOM and security model</a>
+            </li>
+            <li class="nav-item">
+                <a href="../explanation/packaging-conformance.html" class="nav-link">Packaging conformance</a>
             </li>
             <li class="nav-item">
                 <a href="../explanation/testing-strategy.html" class="nav-link">Testing strategy</a>
@@ -480,7 +494,8 @@
 <li>Restrict deployment branches: only <code>main</code> may deploy to <code>pypi</code>.</li>
 <li>On <a href="https://pypi.org/">pypi.org</a>, add a <a href="https://docs.pypi.org/trusted-publishers/adding-a-publisher/">trusted publisher</a> pointing at your repo + workflow + environment name (<code>pypi</code>).</li>
 </ol>
-<p>The workflow grants <code>id-token: write</code> on the publish job — that's what makes the OIDC handshake possible. Don't ship a <code>PYPI_API_TOKEN</code> secret alongside; the workflow drops empty <code>UV_PUBLISH_*</code> env vars so OIDC remains the only path.</p>
+<p>The workflow grants <code>id-token: write</code> on the publish job — that's what makes the OIDC handshake possible. Don't set <code>UV_PUBLISH_*</code> secrets alongside: when all three are present <code>release.publish</code> uploads with them instead, and without attestations.</p>
+<p>The same OIDC identity signs two attestations over the wheel and sdist before they are uploaded. <code>actions/attest-build-provenance</code> records GitHub's own (needs <code>attestations: write</code>, already granted), verified with <code>gh attestation verify</code>. <code>release.attest</code> signs a <a href="https://packaging.python.org/en/latest/specifications/index-hosted-attestations/">PEP 740</a> attestation per file that <code>uv publish</code> uploads to PyPI, where it shows as <em>Provenance</em> on each file and is verified with <code>pypi-attestations verify pypi</code>. PyPI takes the second kind only through Trusted Publishing, which is one more reason to keep the credential path unused. See <a href="../explanation/sbom-and-security-model.html#layer-3-build-provenance">SBOM and security model</a>.</p>
 <h2 id="hardening-against-external-contributors">Hardening against external contributors</h2>
 <ul>
 <li>Set <strong>Settings → Actions → Fork pull request workflows → Require approval for all external contributors</strong>.</li>
