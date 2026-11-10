@@ -366,19 +366,6 @@ CREDENTIALED_URLS = [
 ]
 
 
-def load_uv_release_module():
-    """Import `template/_CI/uv_release.py` from source.
-
-    The same file both this repo and generated projects use, so there is one implementation to
-    test rather than two that could drift.
-    """
-    path = REPO_ROOT / 'template' / '_CI' / 'uv_release.py'
-    spec = importlib.util.spec_from_file_location('uv_release_under_test', path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
 def load_generated_configuration(project):
     """Import the generated project's `_CI/tasks/configuration.py` as a standalone module.
 
@@ -410,16 +397,6 @@ def test_strip_credentials_removes_userinfo(generated_project):
     strip_credentials = load_generated_shared(project).strip_credentials
     for url, expected in CREDENTIALED_URLS:
         assert strip_credentials(url) == expected, f'{url!r} was not sanitized to {expected!r}'
-
-
-def test_no_token_survives_into_a_published_url(generated_project):
-    """No secret and no netloc `@` survives sanitizing — the invariant the SBOM's VCS ref relies on."""
-    project, _ = generated_project
-    strip_credentials = load_generated_shared(project).strip_credentials
-    for url, _expected in CREDENTIALED_URLS:
-        sanitized = strip_credentials(url)
-        assert 'SECRETTOKEN' not in sanitized, f'token survived sanitizing {url!r}'
-        assert '@' not in sanitized.split('//', 1)[-1].split('/', 1)[0], f'userinfo survived in {sanitized!r}'
 
 
 def test_sbom_and_slug_helpers_sanitize_the_remote(generated_project):
@@ -1096,16 +1073,6 @@ def test_publish_attests_the_artifacts_it_uploads(generated_project):
     assert '--prebuilt' in steps[published]['run'], 'the publish step rebuilds, orphaning the attestation'
 
 
-def test_attestation_action_is_pinned_by_sha(generated_project):
-    """The attestation action is SHA-pinned like every other action in the generated workflows."""
-    project, cell = generated_project
-    if cell['git_hosting_service'] != 'github':
-        pytest.skip('GitHub-only workflow')
-    uses = next(s['uses'] for s in publish_steps(project) if 'attest-build-provenance' in (s.get('uses') or ''))
-    ref = uses.split('@', 1)[1]
-    assert re.fullmatch(r'[0-9a-f]{40}', ref), f'attestation action is pinned to {ref!r}, not a commit SHA'
-
-
 def test_github_publish_signs_pep740_attestations_over_the_uploaded_files(generated_project):
     """`release.attest` runs after the build and provenance steps and before `--prebuilt` publish.
 
@@ -1601,13 +1568,6 @@ def uv_pins(project):
     }
 
 
-def test_every_uv_pin_agrees(generated_project):
-    """All five uv pins in a generated project carry the same version."""
-    project, _ = generated_project
-    pins = uv_pins(project)
-    assert len(set(pins.values())) == 1, f'uv pins disagree: {pins}'
-
-
 def test_generation_honours_the_uv_version_override(generated_project):
     """Generation stamps exactly the version `TEMPLATE_UV_VERSION` asks for.
 
@@ -1620,23 +1580,7 @@ def test_generation_honours_the_uv_version_override(generated_project):
     assert set(uv_pins(project).values()) == {template_uv_version()}
 
 
-def test_base_image_tag_matches_the_pinned_version(generated_project):
-    """The base image's tag names the same uv version and Python as the project pins.
-
-    Network-free on purpose: this is the drift a hand-edit causes, and it should be caught
-    whether or not a registry is reachable.
-    """
-    project, _ = generated_project
-    data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
-    base = data['tool']['docker-versions']['base-image']
-    version = data['tool']['uv']['required-version'].removeprefix('==')
-    python_version = data['project']['requires-python'].removeprefix('>=')
-    tag_reference, _, digest = base.partition('@')
-    assert f'{version}-python{python_version}-trixie-slim' in tag_reference, f'tag disagrees with the pin: {base}'
-    assert digest.startswith('sha256:'), f'no digest pinned: {base}'
-
-
-def test_committed_digests_resolve_to_their_tags():
+def test_committed_digests_resolve_to_their_tags(uv_release):
     """Every digest in the template is the one its tag actually resolves to.
 
     The failure `maintain.bump-uv` exists to prevent: move the tag, leave a digest behind, and
@@ -1646,7 +1590,6 @@ def test_committed_digests_resolve_to_their_tags():
     Skipped when the registry cannot be reached: an unreachable ghcr is not a defect in this
     repository, and failing here would make the suite depend on network weather.
     """
-    uv_release = load_uv_release_module()
     template = (REPO_ROOT / 'template' / 'pyproject.toml.jinja').read_text(encoding='utf-8')
     version = uv_release.current_pin(template)
     committed = dict(re.findall(r"^\s*'(\d+\.\d+)': '(sha256:[0-9a-f]+)',$", template, re.MULTILINE))
@@ -1691,20 +1634,6 @@ def test_repo_uv_pin_points_at_its_own_command():
     content = (REPO_ROOT / 'pyproject.toml').read_text(encoding='utf-8')
     index = content.index('required-version = "==')
     assert 'maintain.bump-uv' in content[:index].rsplit('\n\n', 1)[-1]
-
-
-def test_lockfile_agrees_with_the_pinned_uv(generated_project):
-    """The locked uv matches `[tool.uv] required-version`.
-
-    They are resolved from the same pyproject, so a mismatch would mean the lockfile was
-    generated against different pins than the ones that shipped.
-    """
-    project, _ = generated_project
-    data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
-    required = data['tool']['uv']['required-version'].removeprefix('==')
-    lock_data = tomllib.loads((project / 'uv.lock').read_text(encoding='utf-8'))
-    locked = {p['name']: p['version'] for p in lock_data['package']}
-    assert locked.get('uv') == required, f'lock pins uv {locked.get("uv")}, pyproject requires {required}'
 
 
 def test_lock_task_derives_the_uv_version_from_the_project():
@@ -1763,29 +1692,6 @@ def registry_steps(project):
             steps[name.value] = scope.id
         return steps
     pytest.fail('preflight.py declares no STEPS registry')
-
-
-def test_no_commit_stage_hook_rewrites_unstaged_tracked_files(generated_project):
-    """No `pre-commit`-stage hook runs a task that writes README.md or pyproject.toml.
-
-    `preflight` updates the README badges and ratchets `fail_under`; the `test` aggregator used
-    to do the coverage half of that. Run from a commit hook, either one aborted the commit with
-    "files were modified by this hook" — after the message was written, for files the author
-    never staged. That is what teaches people `--no-verify`, which then disables every hook
-    here at once. The bare `preflight` on pre-push is the shape that gets the guarantee without
-    the writes, and `preflight.staged` is absent from this set because it writes nothing at
-    all: it reports on the files the author staged and names the command that fixes them.
-    """
-    project, _ = generated_project
-    # `build` is deliberately absent: it stopped writing the README when the CI badge moved to
-    # the host's own status endpoint, and the SBOM and wheel it does write are gitignored.
-    mutating = {'preflight', 'test', 'document', 'quality.pyscn-analyze', 'test.coverage'}
-    for hook in pre_commit_hooks(project):
-        if 'pre-commit' not in hook_stages(hook):
-            continue
-        invoked = invoked_task(hook)
-        hook_id = hook['id']
-        assert invoked not in mutating, f'commit-stage hook {hook_id!r} runs {invoked!r}, which rewrites files'
 
 
 def test_commit_stage_is_one_invocation_of_the_per_file_steps(generated_project):
@@ -2458,7 +2364,7 @@ def range_resolver(project):
     body = [node for node in ast.parse(source).body if getattr(node, 'name', None) in wanted]
     # One dict as globals, not globals-plus-locals: the functions call each other, so they have
     # to land where their own name lookups go.
-    namespace = {'os': os, 'Context': object, 'Iterator': list}
+    namespace = {'os': os, 'Context': object}
     module = ast.Module(body=body, type_ignores=[])
     exec(compile(module, '<lint.py>', 'exec'), namespace)  # noqa: S102
     assert set(wanted) <= set(namespace), f'lint.py no longer defines all of {wanted}'

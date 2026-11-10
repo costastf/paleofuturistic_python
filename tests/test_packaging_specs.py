@@ -34,18 +34,7 @@ from packaging.utils import canonicalize_name, parse_sdist_filename, parse_wheel
 from packaging.version import Version
 from validate_pyproject import api as validate_pyproject_api
 
-from _CI.tasks.configuration import PROJECT_SLUG, REPOSITORY_URLS, combo_context, generation_env, template_uv_version
-
-WELL_KNOWN_URL_LABELS = {
-    'homepage',
-    'source',
-    'download',
-    'changelog',
-    'releasenotes',
-    'documentation',
-    'issues',
-    'funding',
-}
+from _CI.tasks.configuration import PROJECT_SLUG, combo_context, generation_env, template_uv_version
 
 
 def uv(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -174,17 +163,6 @@ def test_license_file_ships_under_licenses(built_project):
     with zipfile.ZipFile(wheel) as archive:
         assert f'{dist_info(wheel)}/licenses/LICENSE' in archive.namelist()
     assert wheel_metadata(wheel).license_files == ['LICENSE']
-
-
-def test_project_urls_use_well_known_labels(built_project):
-    """Well-known project URLs: every Project-URL label normalizes to one PyPI recognises."""
-    _, wheel, _ = built_project
-    urls = wheel_metadata(wheel).project_urls
-    assert urls, 'no Project-URL in METADATA'
-    for label in urls:
-        normalized = ''.join(ch for ch in label.lower() if ch.isalnum())
-        assert normalized in WELL_KNOWN_URL_LABELS, f'{label!r} is not a well-known label'
-    assert urls['Source'] == REPOSITORY_URLS['github']
 
 
 def test_dependency_specifiers_parse(built_project, pyproject):

@@ -5,30 +5,11 @@ frozen clock. `template/_CI/uv_release.py` is loaded from source because it ship
 projects and is imported here from the same file — one implementation, one set of tests.
 """
 
-import importlib.util
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-
 NOW = datetime(2026, 8, 4, 12, 0, tzinfo=UTC)
-
-
-def load_module():
-    """Import the resolver from the template source."""
-    path = REPO_ROOT / 'template' / '_CI' / 'uv_release.py'
-    spec = importlib.util.spec_from_file_location('uv_release_unit', path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-@pytest.fixture
-def uv_release():
-    """Load the stdlib-only uv-release resolver once per test."""
-    return load_module()
 
 
 def payload(releases):

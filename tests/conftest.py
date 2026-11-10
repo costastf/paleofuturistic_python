@@ -1,5 +1,6 @@
 """Shared fixtures for the template invariants suite."""
 
+import importlib.util
 import json
 import os
 import shutil
@@ -81,3 +82,17 @@ def generated_project(request, template_snapshot, tmp_path_factory):
         env={**os.environ, **generation_env()},
     )
     return project, cell
+
+
+@pytest.fixture
+def uv_release():
+    """Import `template/_CI/uv_release.py` from source, fresh for each test.
+
+    The same file both this repo and generated projects use, so there is one implementation to
+    test rather than two that could drift.
+    """
+    path = REPO_ROOT / 'template' / '_CI' / 'uv_release.py'
+    spec = importlib.util.spec_from_file_location('uv_release_under_test', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
