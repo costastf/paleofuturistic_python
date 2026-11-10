@@ -463,6 +463,10 @@
               <ul class="nav flex-column">
               </ul>
             </li>
+            <li class="nav-item" data-bs-level="2"><a href="#upgrading-past-the-changelog-move" class="nav-link">Upgrading past the changelog move</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
             <li class="nav-item" data-bs-level="2"><a href="#resolving-conflicts" class="nav-link">Resolving conflicts</a>
               <ul class="nav flex-column">
               </ul>
@@ -524,6 +528,9 @@
 <li><strong>New dependency group</strong> <code>build</code>, and new pins in <code>lint</code> and <code>security</code>. Run <code>uv lock</code> after the update and commit <code>uv.lock</code> with it.</li>
 <li><strong>Publishing.</strong> The publish job now signs PEP 740 attestations. On GitLab it also requests <code>id_tokens:</code>, and PyPI needs a Trusted Publisher registered for the project (the new <em>Set up Trusted Publishing</em> how-to). If you publish with <code>UV_PUBLISH_*</code> credentials, nothing changes: that path uploads without attestations.</li>
 </ul>
+<h2 id="upgrading-past-the-changelog-move">Upgrading past the changelog move</h2>
+<p>Releases used to write the changelog to <code>docs/changelog.md</code>, a page missing from the docs nav, while <em>Reference → Changelog</em> showed a placeholder that never changed. They now write <code>docs/reference/changelog.md</code>, the page the nav shows.</p>
+<p>Nothing is lost: the new page has no releases in it yet, so the first <code>release.changelog</code> after the update writes your full history into it from the tags, below the page's header. Later releases add their entries on top. Delete <code>docs/changelog.md</code> in that release, or any time after. If you hand-edited entries there, copy them across before deleting it, since the history is rebuilt from commit messages.</p>
 <h2 id="resolving-conflicts">Resolving conflicts</h2>
 <p>Copier uses a three-way merge; conflicts appear as standard conflict markers in the affected files. The most common cause is that you customised a file the template also changed. Resolve them by hand and re-run <code>./workflow.cmd test</code>.</p>
 <h2 id="pinning-a-specific-template-version">Pinning a specific template version</h2>
