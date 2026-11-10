@@ -12,7 +12,7 @@ uv add <package>
 
 ## Dev-time groups
 
-Listed under `[dependency-groups]` in `pyproject.toml`. They're installed by `develop.bootstrap` and on demand by individual workflow tasks, but never end up in the wheel.
+Listed under `[dependency-groups]` in `pyproject.toml`. They're installed by `bootstrap` and on demand by individual workflow tasks, but never end up in the wheel.
 
 | Group | Packages | Used by |
 | --- | --- | --- |

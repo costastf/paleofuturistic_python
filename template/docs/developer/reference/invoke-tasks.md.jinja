@@ -11,16 +11,16 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 
 | Task | Default of | What it does |
 | --- | --- | --- |
-| `bootstrap` | `develop.bootstrap` | First-run setup; idempotent. Pass `--force` to re-run. |
+| `bootstrap` | `bootstrap.all` | First-run setup; idempotent. Pass `--force` to re-run. |
 | `preflight` | `preflight.all` | **Everything, then the derived files.** The one to run before opening a pull request. |
-| `format` | `format.ruff` | Ruff format + import sort. `--paths="<paths>"` limits it to files you name; the commit hook prints that command scoped to whatever it just checked. |
+| `format` | `format.all` | Ruff format + import sort. `--paths="<paths>"` limits it to files you name; the commit hook prints that command scoped to whatever it just checked. |
 | `lint` | `lint.all` | Runs ruff, the formatting check, validate-pyproject, pylint, ty, complexipy, commitizen. |
 | `test` | `test.all` | pytest with coverage and xdist. |
-| `build` | `build.package` | SBOM compose + validate, then `uv build` and the distribution checks (`twine check --strict`, `check-wheel-contents`). No dependency audit — see `secure` — and no README badge: the CI badge points at {% if git_hosting_service == 'github' %}GitHub's workflow-status endpoint{% else %}GitLab's pipeline-status endpoint{% endif %}, which is always current. |
-| `release` | `release` | Validate, branch, bump, changelog, push, open PR/MR. |
-| `quality` | `quality.pyscn-analyze` | pyscn static analysis with HTML report. Reports whether the badge matches; `--write` updates it. |
+| `build` | `build.all` | SBOM compose + validate, then `uv build` and the distribution checks (`twine check --strict`, `check-wheel-contents`). No dependency audit — see `secure` — and no README badge: the CI badge points at {% if git_hosting_service == 'github' %}GitHub's workflow-status endpoint{% else %}GitLab's pipeline-status endpoint{% endif %}, which is always current. |
+| `release` | `release.all` | Validate, branch, bump, changelog, push, open PR/MR. |
+| `quality` | `quality.all` | `quality.pyscn`: pyscn analysis (HTML and JSON, not opened) and the pass/fail check. Reports whether the badge matches; `--write` updates it. |
 | `secure` | `secure.all` | Every security task at once: pip-audit + SBOM compose/validate. Nothing automated calls it; the pieces have their own homes. |
-| `document` | `document` | properdocs build + view in browser. |
+| `document` | `document.all` | properdocs build + view in browser. |
 | `container` | `container.publish` | Build deps image; in CI pushes to the registry. |
 
 ## `preflight` — the one command that does it all
@@ -64,7 +64,7 @@ gitignored. What it never touches is a tracked file.
 
 | Task | Args | What it does |
 | --- | --- | --- |
-| `develop.bootstrap` | `--force` | Run all bootstrap steps. Idempotent. |
+| `bootstrap` | `--force` | Run all bootstrap steps. Idempotent. Its own namespace, so `./workflow.cmd bootstrap`. |
 | `develop.pre-commit-install` | — | Install the hooks into `.git/hooks/` (all three stages at once). |
 | `develop.pre-commit` | — | A dry run of your next commit: the commit-stage hooks over the files you staged, run through pre-commit itself so it exercises the hook wiring (`files:` filters, `SKIP`, the entry itself), not just the checks. Read-only, like the hooks it runs. Not the full check either; `preflight` is what runs everything, including every file rather than the staged ones. |
 | `develop.pylock` | — | Export the locked environment, every group included, as a standard `reports/pylock.toml` (PEP 751) for tools that do not read `uv.lock`. See [Export a pylock file](../how-to/export-a-pylock-file.md). |
@@ -85,6 +85,7 @@ Calling one directly is how to run a single tool over a single file:
 | --- | --- |
 | `format.ruff` | `ruff check --select I --fix` + `ruff format`. |
 | `lint.ruff` | `ruff check`. |
+| `lint.format-check` | `ruff format --check`: reports unformatted files without rewriting them. What `preflight` runs; `format` is what fixes them. |
 | `lint.pylint` | `pylint src/ _CI/tasks/ tests/`. |
 | `lint.ty` | `ty check src/ _CI/tasks/ tests/`. |
 | `lint.pyproject` | `validate-pyproject pyproject.toml`: the `[project]` table, `[dependency-groups]` and the `[tool.*]` tables it has schemas for, against the PyPA specifications. Runs on any commit that stages `pyproject.toml`. See [Packaging conformance](../explanation/packaging-conformance.md). |
@@ -94,6 +95,7 @@ Calling one directly is how to run a single tool over a single file:
 | `test.tox` | Full multi-version tox matrix in parallel, then `coverage combine` into one `reports/coverage.json` — the union across interpreters, which is what the badge and the ratchet read. The only test command whose number *is* the badge's, so it reports whether the badge still matches and updates it with `--write`. `--env=py313` runs a single environment, which suppresses both and refuses `--write`. |
 | `test.coverage` | Print the coverage report from the latest run and render the browsable HTML into `reports/coverage/`. After `test.tox` that is the union across the matrix. This is where the HTML comes from: `preflight` produces only the JSON it reads. Writes no badge and says nothing about one — it reports whatever is in the data file, so it cannot know whether the badge is stale. |
 | `test.view` | Open HTML test + coverage reports in browser. |
+| `quality.pyscn` | pyscn analysis without opening the report, then `pyscn-check`; reports both failures. What `quality` runs. `--write` updates the badge. |
 | `quality.pyscn-analyze` | Full pyscn analysis with HTML report, opened unless in CI. Reports whether the pyscn badge still matches the grade it measured; `--write` updates it. |
 | `quality.pyscn-check` | CI-friendly pass/fail quality gate. Writes no report, so it has no grade to offer the badge — `quality.pyscn-analyze` is what produces one. |
 
@@ -109,7 +111,7 @@ Calling one directly is how to run a single tool over a single file:
 | `release.dist` | — | Audit dependencies, then clean and build into `dist/` (with `build.package`'s checks), leaving the artifacts for inspection or attestation. The audit is here rather than in `build`: publishing is where a live advisory should stop you. |
 | `release.attest` | — | Sign a PEP 740 attestation for each wheel and sdist in `dist/`, written beside it as `<file>.publish.attestation`. Uses the CI job's OIDC token; locally it opens a browser to sign in to Sigstore. Does nothing when `UV_PUBLISH_*` credentials are set, since that path uploads no attestations. Fails if `dist/` holds no distribution. See [Verify a release attestation](../how-to/verify-a-release-attestation.md). |
 | `release.publish` | `--prebuilt` | Build + `uv publish`. With `UV_PUBLISH_*` set it uploads with those credentials and without attestations; otherwise it requires an OIDC token and publishes through Trusted Publishing, attestations included. Invoked from CI on release-tag merge. `--prebuilt` publishes what `release.dist` already built instead of rebuilding. See [Set up Trusted Publishing](../how-to/set-up-trusted-publishing.md). |
-| `release.clean` | — | Remove `dist/` and `sbom.json`. |
+| `release.clean` | — | Remove `dist/` and the SBOM written to `src/{{ project_slug }}/sbom.cdx.json`. |
 
 ## `secure` — pip-audit, SBOM
 
@@ -118,6 +120,7 @@ Calling one directly is how to run a single tool over a single file:
 | `secure.audit` | — | pip-audit honoring `.security-overrides`. Runs on a schedule, on pushes that change the dependency surface, and before publishing — deliberately not on every push, and not from `build`. |
 | `secure.sbom` | — | The half `build` depends on: `sbom-extract --write` + `sbom-validate`. |
 | `secure.sbom-extract` | `--write` | Compose a CycloneDX 1.7 SBOM with metadata header (lifecycles, tools, supplier, authors), a two-level dependency graph (project → runtime + dev + build-environment; build-environment → vendored + pipeline), and per-component licence + hash + external-reference enrichment. Prints to stdout; with `--write` lands at `src/<slug>/sbom.cdx.json` so `uv build` ships it inside the wheel. |
+| `secure.validate-overrides` | — | Check every `.security-overrides` entry (format, real expiry date, no merge-conflict markers) without running the audit. The commit hook runs it when the file is staged. |
 | `secure.sbom-validate` | — | Validate the SBOM against the CycloneDX 1.7 JSON schema (runs the validator in a clean `uv run python` subprocess so the venv-installed `jsonschema` wins over the older vendored one). Re-runs sbom-extract first if the file is missing. |
 
 ## `document` — documentation site

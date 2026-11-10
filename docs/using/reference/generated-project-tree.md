@@ -22,7 +22,7 @@ example_project/
 │   │   └── vendor/              Vendored Invoke + dependencies (committed)
 │   └── tasks/
 │       ├── __init__.py          Namespace aggregation + bootstrap wiring
-│       ├── bootstrap.py         develop.bootstrap implementation
+│       ├── bootstrap.py         bootstrap task (first-run setup)
 │       ├── build.py             uv build + twine check + check-wheel-contents
 │       ├── configuration.py     Shared constants (paths, env vars, settings)
 │       ├── container.py         Deps container image; imports from <host>.py
