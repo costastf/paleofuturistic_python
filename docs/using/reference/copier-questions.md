@@ -86,7 +86,7 @@ The public home of the repository. It renders `[project.urls]` in `pyproject.tom
 | `Homepage` | The GitHub Pages site when `git_hosting_service=github`, the repository is on github.com and `integrate_pages=true`; otherwise the repository |
 | `Source` | The repository |
 | `Issues` | `<repository>/issues` on GitHub, `<repository>/-/issues` on GitLab |
-| `Changelog` | `docs/changelog.md` on the default branch, where `release` writes it |
+| `Changelog` | `docs/reference/changelog.md` on the default branch, the page `release` updates |
 | `Documentation` | The GitHub Pages site, under the same conditions as `Homepage` |
 
 A trailing `/` or `.git` is dropped, so a pasted clone URL works. Left empty, the project ships no `[project.urls]` at all rather than links that would 404 on PyPI; answer it on a later `copier update`, or add the table by hand. Self-hosted GitLab and GitHub Enterprise URLs work too; only the Pages links assume github.com.

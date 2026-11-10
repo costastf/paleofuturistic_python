@@ -72,6 +72,9 @@ OIDC_ENV_VARS = ('PYPI_ID_TOKEN',)
 # `uv export --format pylock.toml` writes here: a standard lock for tools that do not read
 # uv.lock. Under reports/ because it is derived, and gitignored there.
 PYLOCK_FILE = Path('reports') / 'pylock.toml'
+# Must match `[tool.commitizen] changelog_file`, which is what `cz changelog` writes; this is
+# what `release.changelog` stages. It is also the page the docs nav lists as the changelog.
+CHANGELOG_FILE = Path('docs') / 'reference' / 'changelog.md'
 DIST_DIR = Path('dist')
 
 SENTINEL = Path('_CI/.bootstrapped')

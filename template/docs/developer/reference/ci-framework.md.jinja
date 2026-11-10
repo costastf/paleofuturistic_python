@@ -30,6 +30,7 @@ Centralized constants shared across task modules:
 | `OIDC_ENV_VARS` | The OIDC token(s) the host injects into the publish job; present means Trusted Publishing. {% if git_hosting_service == 'github' %}`ACTIONS_ID_TOKEN_REQUEST_URL`/`_TOKEN`{% else %}`PYPI_ID_TOKEN`{% endif %} on this host |
 | `DIST_DIR` | `dist/`, where builds land and `release.attest` looks for wheels and sdists |
 | `PYLOCK_FILE` | `reports/pylock.toml`, written by `develop.pylock` |
+| `CHANGELOG_FILE` | `docs/reference/changelog.md`, which `release.changelog` updates and commits; must match `[tool.commitizen] changelog_file` |
 | `SENTINEL` | Bootstrap sentinel file path |
 
 ## The deps image and its cache

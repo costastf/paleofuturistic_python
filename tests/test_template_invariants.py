@@ -1236,9 +1236,6 @@ def test_project_urls_use_well_known_labels(generated_project):
     assert not repository.endswith(('/', '.git'))
     issues = '/-/issues' if cell['git_hosting_service'] == 'gitlab' else '/issues'
     assert urls['Issues'] == f'{repository}{issues}'
-    pyproject = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
-    changelog_file = pyproject['tool']['commitizen']['changelog_file']
-    assert urls['Changelog'].endswith(f'/HEAD/{changelog_file}'), 'the Changelog URL is not where commitizen writes'
     pages = cell['git_hosting_service'] == 'github' and cell['integrate_pages']
     assert ('Documentation' in urls) == pages
     if pages:
@@ -1246,6 +1243,28 @@ def test_project_urls_use_well_known_labels(generated_project):
         assert urls['Homepage'].endswith('.github.io/' + repository.rsplit('/', 1)[1] + '/')
     else:
         assert urls['Homepage'] == repository
+
+
+def test_changelog_is_one_file_everywhere(generated_project):
+    """commitizen, `release.changelog`, the docs nav and the Changelog URL name the same file.
+
+    They once disagreed: commitizen wrote `docs/changelog.md`, which no nav entry listed, while
+    the nav's Reference → Changelog was a placeholder no release touched. Every release then
+    updated a page nobody could reach from the site and left the reachable one stale.
+    """
+    project, _ = generated_project
+    pyproject = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
+    written = pyproject['tool']['commitizen']['changelog_file']
+    staged = load_generated_configuration(project).CHANGELOG_FILE.as_posix()
+    assert staged == written, f'release.changelog stages {staged}, commitizen writes {written}'
+    # Incremental, or every release rewrites the page and drops its title and intro.
+    assert pyproject['tool']['commitizen'].get('changelog_incremental') is True
+    nav = collect_nav_pages(yaml.safe_load((project / 'properdocs.yml').read_text(encoding='utf-8'))['nav'])
+    assert written.removeprefix('docs/') in nav, f'{written} is not in the docs nav'
+    assert (project / written).is_file(), f'{written} does not ship, so the nav entry is broken before a release'
+    url = pyproject['project'].get('urls', {}).get('Changelog')
+    if url:
+        assert url.endswith(f'/HEAD/{written}'), f'the Changelog URL {url} is not {written}'
 
 
 def generate(template_snapshot, workdir, data, *, check=True):

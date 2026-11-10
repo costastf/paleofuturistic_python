@@ -50,6 +50,12 @@ This change adds a question and three checks:
 - **New dependency group** `build`, and new pins in `lint` and `security`. Run `uv lock` after the update and commit `uv.lock` with it.
 - **Publishing.** The publish job now signs PEP 740 attestations. On GitLab it also requests `id_tokens:`, and PyPI needs a Trusted Publisher registered for the project (the new *Set up Trusted Publishing* how-to). If you publish with `UV_PUBLISH_*` credentials, nothing changes: that path uploads without attestations.
 
+## Upgrading past the changelog move
+
+Releases used to write the changelog to `docs/changelog.md`, a page missing from the docs nav, while *Reference → Changelog* showed a placeholder that never changed. They now write `docs/reference/changelog.md`, the page the nav shows.
+
+Nothing is lost: the new page has no releases in it yet, so the first `release.changelog` after the update writes your full history into it from the tags, below the page's header. Later releases add their entries on top. Delete `docs/changelog.md` in that release, or any time after. If you hand-edited entries there, copy them across before deleting it, since the history is rebuilt from commit messages.
+
 ## Resolving conflicts
 
 Copier uses a three-way merge; conflicts appear as standard conflict markers in the affected files. The most common cause is that you customised a file the template also changed. Resolve them by hand and re-run `./workflow.cmd test`.

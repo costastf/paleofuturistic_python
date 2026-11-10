@@ -48,9 +48,8 @@ classifiers = [
 Homepage = "{{ pages_url or repo_url }}"
 Source = "{{ repo_url }}"
 Issues = "{{ repo_url }}{{ host_path }}issues"
-# Where `[tool.commitizen] changelog_file` writes; the first release creates it, before PyPI
-# ever shows this link.
-Changelog = "{{ repo_url }}{{ host_path }}blob/HEAD/docs/changelog.md"
+# `[tool.commitizen] changelog_file`, the file every release updates.
+Changelog = "{{ repo_url }}{{ host_path }}blob/HEAD/docs/reference/changelog.md"
 {%- if pages_url %}
 Documentation = "{{ pages_url }}"
 {%- endif %}
@@ -141,7 +140,11 @@ name = "cz_conventional_commits"
 version_provider = "uv"
 version_scheme = "pep440"
 tag_format = "v$version"
-changelog_file = "docs/changelog.md"
+# The page the docs nav lists under Reference → Changelog. Incremental: each release adds its
+# entries below the file's header instead of rewriting the file, so the title and intro stay.
+# On a file with no releases in it yet (the placeholder), it writes the whole history from the tags.
+changelog_file = "docs/reference/changelog.md"
+changelog_incremental = true
 
 [tool.commitizen.change_type_map]
 feat = "Features"
@@ -274,13 +277,13 @@ extra-paths = ["_CI/lib/vendor"]
 # rules costs less than the alternative of freezing ty, which left every cyclonedx
 # constructor call in this module unchecked instead.
 #
-# The same union also leaks into a *return* annotation: writing `-> Component` names a class
-# whose own decorator resolves to that unsound union, and `invalid-type-form` reports it.
-# That one is not in this list — it lands on eleven identifiable `def` lines in `sbom.py`
 # ty 0.0.100 renamed `unresolved-attribute` to `missing-attribute` and split out
 # `missing-union-attribute` for an attribute missing from *some* members of a union.
 # `bom.metadata` on the `Bom()` union is exactly that case, so both are listed.
 #
+# The same union also leaks into a *return* annotation: writing `-> Component` names a class
+# whose own decorator resolves to that unsound union, and `invalid-type-form` reports it.
+# That one is not in this list — it lands on eleven identifiable `def` lines in `sbom.py`
 # rather than on every constructor call, so it is tagged there with
 # `# ty: ignore[invalid-type-form]` instead of ignored for the whole file. A per-line tag is
 # also the one ty itself will flag as unused the day py-serializable's annotation is fixed;
