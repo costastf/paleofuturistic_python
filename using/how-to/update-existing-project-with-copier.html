@@ -68,10 +68,6 @@
 </li>
             
 <li>
-    <a href="enable-dependency-track.html" class="dropdown-item">Enable Dependency Track integration</a>
-</li>
-            
-<li>
     <a href="harden-github-repository.html" class="dropdown-item">Harden the GitHub repository</a>
 </li>
             
@@ -316,9 +312,6 @@
                 <a href="choose-a-git-host.html" class="nav-link">Choose a git host</a>
             </li>
             <li class="nav-item">
-                <a href="enable-dependency-track.html" class="nav-link">Enable Dependency Track integration</a>
-            </li>
-            <li class="nav-item">
                 <a href="harden-github-repository.html" class="nav-link">Harden the GitHub repository</a>
             </li>
             <li class="nav-item">
@@ -448,6 +441,10 @@
               <ul class="nav flex-column">
               </ul>
             </li>
+            <li class="nav-item" data-bs-level="2"><a href="#upgrading-past-the-dependency-track-removal" class="nav-link">Upgrading past the Dependency-Track removal</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
             <li class="nav-item" data-bs-level="2"><a href="#resolving-conflicts" class="nav-link">Resolving conflicts</a>
               <ul class="nav flex-column">
               </ul>
@@ -487,6 +484,20 @@
 <p>Review the changes with <code>git diff</code>, run the dev cycle (<code>./workflow.cmd format &amp;&amp; lint &amp;&amp; test &amp;&amp; build</code>), and commit when happy.</p>
 <h2 id="when-questions-have-changed">When questions have changed</h2>
 <p>If the new template version added or renamed a question (for example <code>git_hosting_service</code> was added in an earlier revision), copier will prompt for any missing answers during the update. Provide them — your <code>.copier-answers.yml</code> is updated in place.</p>
+<h2 id="upgrading-past-the-dependency-track-removal">Upgrading past the Dependency-Track removal</h2>
+<p>Earlier versions asked <code>integrate_dependency_track</code> and, when it was on, uploaded the SBOM to an OWASP Dependency-Track server after every publish. The template no longer does this. The SBOM is still generated, validated and shipped inside every wheel. Only the upload is gone.</p>
+<p>Updating removes:</p>
+<ul>
+<li>the <code>secure.sbom-upload</code> task and the <code>OWASP_DTRACK_SETTINGS</code> constant in <code>_CI/tasks/configuration.py</code>;</li>
+<li>the <code>OWASP_DTRACK_URL</code> / <code>OWASP_DTRACK_API_KEY</code> environment block in the GitHub publish workflow;</li>
+<li>the <em>Upload an SBOM to Dependency Track</em> page from the developer docs.</li>
+</ul>
+<p>Copier no longer asks the question, and an <code>integrate_dependency_track</code> line left in <code>.copier-answers.yml</code> has no effect. If you customised any of the removed code, expect conflicts in <code>secure.py</code>, <code>release.py</code> or <code>publish.yaml</code>. Resolve them in favour of the template's version.</p>
+<p>After the update:</p>
+<ol>
+<li>Delete the <code>OWASP_DTRACK_URL</code> and <code>OWASP_DTRACK_API_KEY</code> secrets from your repository or group CI settings. Nothing reads them any more.</li>
+<li>If your organisation still wants every release in Dependency-Track, add the upload as your own task in <code>_CI/tasks/local.py</code>, which <code>copier update</code> never touches (see <em>Add a workflow task</em> in your project's developer docs), and call it from your pipeline after <code>release.publish</code>. The SBOM to send is <code>src/&lt;your_package&gt;/sbom.cdx.json</code>. Dependency-Track's <a href="https://docs.dependencytrack.org/usage/cicd/">CI/CD integration guide</a> documents the upload endpoint.</li>
+</ol>
 <h2 id="resolving-conflicts">Resolving conflicts</h2>
 <p>Copier uses a three-way merge; conflicts appear as standard conflict markers in the affected files. The most common cause is that you customised a file the template also changed. Resolve them by hand and re-run <code>./workflow.cmd test</code>.</p>
 <h2 id="pinning-a-specific-template-version">Pinning a specific template version</h2>

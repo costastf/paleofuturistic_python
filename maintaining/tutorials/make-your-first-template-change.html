@@ -68,10 +68,6 @@
 </li>
             
 <li>
-    <a href="../../using/how-to/enable-dependency-track.html" class="dropdown-item">Enable Dependency Track integration</a>
-</li>
-            
-<li>
     <a href="../../using/how-to/harden-github-repository.html" class="dropdown-item">Harden the GitHub repository</a>
 </li>
             
@@ -316,9 +312,6 @@
                 <a href="../../using/how-to/choose-a-git-host.html" class="nav-link">Choose a git host</a>
             </li>
             <li class="nav-item">
-                <a href="../../using/how-to/enable-dependency-track.html" class="nav-link">Enable Dependency Track integration</a>
-            </li>
-            <li class="nav-item">
                 <a href="../../using/how-to/harden-github-repository.html" class="nav-link">Harden the GitHub repository</a>
             </li>
             <li class="nav-item">
@@ -484,7 +477,7 @@ cd paleofuturistic_python
 <h2 id="step-3-run-the-fast-check">Step 3. Run the fast check</h2>
 <pre><code class="language-bash">./workflow.cmd test.invariants
 </code></pre>
-<p>This generates a project for each of the nine matrix cells once: the eight-way cartesian product of git host × Dependency Track × Pages, plus one "matured" day-two cell. It then asserts structural invariants over the results — the right files exist, conditional content matches the chosen knobs, nothing forbidden ships. It's the best signal-per-second check and should be your default while iterating.</p>
+<p>This generates a project for each of the five matrix cells once: the four-way cartesian product of git host × Pages, plus one "matured" day-two cell. It then asserts structural invariants over the results — the right files exist, conditional content matches the chosen knobs, nothing forbidden ships. It's the best signal-per-second check and should be your default while iterating.</p>
 <h2 id="step-4-run-one-full-cell">Step 4. Run one full cell</h2>
 <pre><code class="language-bash">./workflow.cmd test
 </code></pre>

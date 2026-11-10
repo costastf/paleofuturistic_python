@@ -68,10 +68,6 @@
 </li>
             
 <li>
-    <a href="../how-to/enable-dependency-track.html" class="dropdown-item">Enable Dependency Track integration</a>
-</li>
-            
-<li>
     <a href="../how-to/harden-github-repository.html" class="dropdown-item">Harden the GitHub repository</a>
 </li>
             
@@ -316,9 +312,6 @@
                 <a href="../how-to/choose-a-git-host.html" class="nav-link">Choose a git host</a>
             </li>
             <li class="nav-item">
-                <a href="../how-to/enable-dependency-track.html" class="nav-link">Enable Dependency Track integration</a>
-            </li>
-            <li class="nav-item">
                 <a href="../how-to/harden-github-repository.html" class="nav-link">Harden the GitHub repository</a>
             </li>
             <li class="nav-item">
@@ -456,7 +449,7 @@
                     <div class="col-md-9" role="main">
 
 <h1 id="generated-project-tree">Generated project tree</h1>
-<p>An annotated tour of what copier creates. Tree is for a project named <code>example_project</code> with <code>git_hosting_service=github</code> and <code>integrate_dependency_track=true</code>. Differences for <code>gitlab</code> and DT-off variants are noted inline.</p>
+<p>An annotated tour of what copier creates. Tree is for a project named <code>example_project</code> with <code>git_hosting_service=github</code> and <code>integrate_pages=true</code>. Differences for <code>gitlab</code> and Pages-off variants are noted inline.</p>
 <pre><code>example_project/
 ├── .copier-answers.yml          Copier state — template URL + answers + revision
 ├── .gitignore
@@ -489,7 +482,7 @@
 │       ├── preflight.py         Step registry; preflight + preflight.staged
 │       ├── quality.py           pyscn
 │       ├── release.py           Validate, bump, changelog, push, publish
-│       ├── secure.py            pip-audit, SBOM, (optional) DT upload
+│       ├── secure.py            pip-audit, SBOM
 │       ├── shared.py            @logged, @run, execute(), run_steps(), apply_badge()
 │       └── test.py              pytest + coverage
 ├── Dockerfile.deps              Multi-stage deps-cache image

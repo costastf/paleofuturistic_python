@@ -68,10 +68,6 @@
 </li>
             
 <li>
-    <a href="../../using/how-to/enable-dependency-track.html" class="dropdown-item">Enable Dependency Track integration</a>
-</li>
-            
-<li>
     <a href="../../using/how-to/harden-github-repository.html" class="dropdown-item">Harden the GitHub repository</a>
 </li>
             
@@ -316,9 +312,6 @@
                 <a href="../../using/how-to/choose-a-git-host.html" class="nav-link">Choose a git host</a>
             </li>
             <li class="nav-item">
-                <a href="../../using/how-to/enable-dependency-track.html" class="nav-link">Enable Dependency Track integration</a>
-            </li>
-            <li class="nav-item">
                 <a href="../../using/how-to/harden-github-repository.html" class="nav-link">Harden the GitHub repository</a>
             </li>
             <li class="nav-item">
@@ -488,7 +481,7 @@
 <h3 id="a-custom-shell-or-python-script">A custom shell or Python script</h3>
 <p>Some teams write a <code>bootstrap-project.sh</code> instead of using a templating tool. It works, but reinvents update tracking, questionnaire handling, and Jinja rendering — and locks the format into a bespoke shape no one else recognises.</p>
 <h3 id="a-scaffolding-monorepo-one-repo-with-all-templates">A scaffolding monorepo (one repo with all templates)</h3>
-<p>Considered for variants (CLI vs. library vs. service). Rejected because copier handles variation through questionnaire branches (e.g. <code>git_hosting_service</code>, <code>integrate_dependency_track</code>) without forking the template. Variants live as code paths inside one repo.</p>
+<p>Considered for variants (CLI vs. library vs. service). Rejected because copier handles variation through questionnaire branches (e.g. <code>git_hosting_service</code>, <code>integrate_pages</code>) without forking the template. Variants live as code paths inside one repo.</p>
 <h2 id="what-we-gave-up">What we gave up</h2>
 <ul>
 <li><strong>Per-file ownership tracking.</strong> Copier's update is at the file level; it doesn't know "this section of pyproject.toml is template-owned, that section is yours." We compensate by structuring template-owned files so user edits land in predictable, non-overlapping locations (e.g. dependency groups vs. project metadata).</li>

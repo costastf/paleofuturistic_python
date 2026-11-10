@@ -68,10 +68,6 @@
 </li>
             
 <li>
-    <a href="../../using/how-to/enable-dependency-track.html" class="dropdown-item">Enable Dependency Track integration</a>
-</li>
-            
-<li>
     <a href="../../using/how-to/harden-github-repository.html" class="dropdown-item">Harden the GitHub repository</a>
 </li>
             
@@ -316,9 +312,6 @@
                 <a href="../../using/how-to/choose-a-git-host.html" class="nav-link">Choose a git host</a>
             </li>
             <li class="nav-item">
-                <a href="../../using/how-to/enable-dependency-track.html" class="nav-link">Enable Dependency Track integration</a>
-            </li>
-            <li class="nav-item">
                 <a href="../../using/how-to/harden-github-repository.html" class="nav-link">Harden the GitHub repository</a>
             </li>
             <li class="nav-item">
@@ -486,7 +479,7 @@
 <ul>
 <li><strong>Vendored CI tooling.</strong> <code>_CI/lib/vendor/</code> ships Invoke and its deps; <code>./workflow.cmd</code> works on a fresh clone.</li>
 <li><strong>Multiple linters and analyzers.</strong> ruff alone wasn't enough — pylint, ty, complexipy, and pyscn cover what ruff doesn't.</li>
-<li><strong>Security pipeline.</strong> pip-audit, CycloneDX SBOM generation, optional Dependency Track upload.</li>
+<li><strong>Security pipeline.</strong> pip-audit, CycloneDX SBOM generation, optional Dependency Track upload. The upload was later removed: the SBOM ships inside the wheel, and which SCA platform reads it is left to each organisation.</li>
 <li><strong>Multi-host CI support.</strong> Both GitHub Actions and GitLab CI scaffolding, gated on the <code>git_hosting_service</code> answer.</li>
 <li><strong>Conventional Commits + commitizen</strong> for automated release notes, replacing Release Please. The version bump stays explicit; only the changelog is derived from commit messages.</li>
 <li><strong>pytest + tox + xdist</strong> for the test layer, replacing the original <code>python -m unittest</code>.</li>
