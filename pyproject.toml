@@ -101,8 +101,8 @@ quote-style = "single"
 # reason every GitHub Action here is pinned by SHA rather than by version.
 [tool.vendored-invoke]
 repository = "schubergphilis/vendored_invoke"
-version = "v1.0.0"
-commit = "ffbd48d334d80a79cca65a0f31cc86f25d489e96"
+version = "v2.0.0"
+commit = "0eb18751c19dab81cbcceea0d55dfa6af50c3e1d"
 
 [tool.properdocs]
 version = "1.6.7"

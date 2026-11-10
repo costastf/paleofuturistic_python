@@ -11,7 +11,7 @@ build-backend = "setuptools.build_meta"
 [project.optional-dependencies]
 # Content: what ends up in lib/vendor/ and, for the template copy, ships to every generated
 # project. Nothing belongs here that the shipped `_CI/` code does not import.
-vendor = ['invoke', 'coloredlogs']
+vendor = ['invoke']
 
 # Tooling: performs the vendoring, never gets vendored. Run on demand with `uvx`; see
 # `./workflow.cmd maintain.sync-vendor` and the upstream README. This used to sit in `vendor`
@@ -38,18 +38,9 @@ py-modules = []  # https://github.com/jazzband/pip-tools/issues/1711 :facepalm:
 substitute = []
 
 drop = [
-    # Test suites: never imported, and they pull fixtures the tree does not carry.
-    'coloredlogs/tests.py',
-    # humanfriendly ships modules that cannot run on the Pythons this template supports:
-    # cli.py and testing.py `import pipes`, removed in 3.13, and sphinx.py needs docutils,
-    # which is not vendored. coloredlogs imports none of them.
-    'humanfriendly/cli.py',
-    'humanfriendly/testing.py',
-    'humanfriendly/sphinx.py',
-    # Console entry points for libraries we import but never run as commands. Only the invoke
-    # ones are launched, and each surviving script needs a hunk in path_inject.patch.
-    'bin/coloredlogs',
-    'bin/humanfriendly',
+    # invoke installs two console scripts, `inv` and `invoke`, and both are kept: each one has a
+    # hunk in path_inject.patch. Add an entry here for any console script a newly vendored
+    # library brings that is never run, otherwise it needs a patch hunk of its own.
 ]
 
 [tool.ruff]

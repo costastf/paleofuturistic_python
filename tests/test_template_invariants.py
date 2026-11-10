@@ -3748,5 +3748,5 @@ def test_generated_projects_get_the_slim_vendor_tree(generated_project):
     project, _ = generated_project
     vendor = project / '_CI' / 'lib' / 'vendor'
     packages = {p.name for p in vendor.iterdir() if p.is_dir() and p.name != 'bin'}
-    assert packages == {'invoke', 'coloredlogs', 'humanfriendly'}, f'unexpected vendored packages: {packages}'
+    assert packages == {'invoke'}, f'unexpected vendored packages: {packages}'
     assert not [p for p in vendor.rglob('*') if p.suffix in {'.so', '.pyd', '.dylib'}]

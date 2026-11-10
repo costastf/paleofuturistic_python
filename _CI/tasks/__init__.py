@@ -1,7 +1,5 @@
-import coloredlogs
 from invoke import Collection
 
-from _CI import INVOKE_LOGGING_LEVEL, validate_log_level
 from _CI.tasks.document import build as document_build
 from _CI.tasks.document import deploy_github as document_deploy_github
 from _CI.tasks.document import document
@@ -12,7 +10,6 @@ from _CI.tasks.lint import ruff as lint_ruff
 from _CI.tasks.maintain import bump_uv, sync_vendor
 from _CI.tasks.test import combo, invariants, list_combos, matrix, test
 
-coloredlogs.install(level=validate_log_level(INVOKE_LOGGING_LEVEL))
 
 test_collection = Collection('test')
 test_collection.add_task(test, default=True)
