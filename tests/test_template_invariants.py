@@ -141,13 +141,6 @@ def test_pages_task_definition_matches_choice(generated_project):
     assert ('def deploy_github' in document_py) == expected
 
 
-def test_dependency_track_imports_match_choice(generated_project):
-    """`OWASP_DTRACK_SETTINGS` is imported by secure.py iff integrate_dependency_track=true."""
-    project, cell = generated_project
-    secure_py = (project / '_CI' / 'tasks' / 'secure.py').read_text(encoding='utf-8')
-    assert ('OWASP_DTRACK_SETTINGS' in secure_py) == cell['integrate_dependency_track']
-
-
 def test_pyproject_is_valid_toml(generated_project):
     """The generated pyproject.toml parses cleanly and carries the expected blocks."""
     project, _ = generated_project
@@ -292,7 +285,7 @@ def test_every_environment_variable_the_workflow_reads_is_documented(generated_p
     # Both forms. `os.environ['NAME']` is how the deps-image job reads its registry settings,
     # and matching only the call form meant six variables were exempt from this page.
     # Either quote style: an f-string forces the inner lookup to double quotes, and matching
-    # only single ones left `os.environ["OWASP_DTRACK_URL"]` invisible to this walk.
+    # only single ones left `os.environ["UV_PUBLISH_URL"]`-style reads invisible to this walk.
     quoted = '[\'"]'
     reads = (
         rf'os\.environ(?:\.get)?\(\s*{quoted}([A-Z][A-Z0-9_]+){quoted}',
@@ -302,7 +295,7 @@ def test_every_environment_variable_the_workflow_reads_is_documented(generated_p
     )
     literal = {name for pattern in reads for name in re.findall(pattern, sources)}
     # The names the tasks reach through a constant rather than inline.
-    for constant in ('OWASP_DTRACK_SETTINGS', 'UV_PUBLISH_SETTINGS', 'OIDC_ENV_VARS'):
+    for constant in ('UV_PUBLISH_SETTINGS', 'OIDC_ENV_VARS'):
         match = re.search(rf'^{constant} = \(([^)]*)\)', sources, re.MULTILINE)
         if match:
             literal.update(re.findall(r"'([A-Z][A-Z0-9_]+)'", match.group(1)))
@@ -337,14 +330,23 @@ def test_docs_have_no_orphans(generated_project):
     assert not orphans, f'docs pages missing from nav: {orphans}'
 
 
-def test_dependency_track_doc_matches_choice(generated_project):
-    """The SBOM-upload how-to (file and nav entry) ships iff integrate_dependency_track=true."""
-    project, cell = generated_project
-    expected = cell['integrate_dependency_track']
-    page = project / 'docs' / 'developer' / 'how-to' / 'upload-an-sbom-to-dependency-track.md'
-    assert page.exists() == expected
-    nav_text = (project / 'properdocs.yml').read_text(encoding='utf-8')
-    assert ('upload-an-sbom-to-dependency-track' in nav_text) == expected
+def test_no_dependency_track_remnants(generated_project):
+    """No generated file carries the removed Dependency-Track upload, its knob, or its page.
+
+    A stray `OWASP_DTRACK_*` read would make a release fail on a secret nobody is told to set,
+    and a stray doc link would point at a page that no longer ships. Naming Dependency-Track
+    as one SCA platform a team might feed the SBOM to is fine, so the name alone is not matched.
+    """
+    project, _ = generated_project
+    pattern = re.compile(r'OWASP_DTRACK|sbom[_-]upload|integrate_dependency_track|upload-an-sbom-to-dependency-track')
+    hits = [
+        str(path.relative_to(project))
+        for path in project.rglob('*')
+        if path.is_file()
+        and '_CI/lib/vendor' not in path.as_posix()
+        and pattern.search(path.read_text(encoding='utf-8', errors='ignore'))
+    ]
+    assert not hits, f'Dependency-Track remnants in: {hits}'
 
 
 CREDENTIALED_URLS = [
@@ -825,7 +827,7 @@ def test_the_matrix_verifies_what_it_wrote():
     produced. A deadlock where writing a coverage floor makes the next run fail is invisible
     until something re-reads.
 
-    The eight knob cells have nothing interesting to write: a generated project keeps the
+    The four knob cells have nothing interesting to write: a generated project keeps the
     scaffolded smoke test, so coverage is 100% and the ratchet stays dormant, and it has no
     remote for the CI badge to name. One matured cell removes both of those, which is where a
     disagreement can exist at all.

@@ -46,13 +46,7 @@ suite across your whole Python version range. See [Run tests for one Python vers
 
 `./workflow.cmd secure` runs [pip-audit](https://pypi.org/project/pip-audit/) and builds a CycloneDX SBOM
 that ships inside your wheel. Findings you've reviewed are suppressed via `.security-overrides`.
-{%- if integrate_dependency_track %}
-The SBOM is uploaded to an OWASP Dependency Track server on release — over the standard library, no extra
-tooling. See [Triage a security finding](how-to/triage-a-security-finding.md) and
-[Upload an SBOM to Dependency Track](how-to/upload-an-sbom-to-dependency-track.md).
-{%- else %}
 See [Triage a security finding](how-to/triage-a-security-finding.md).
-{%- endif %}
 
 → Full rationale: [SBOM and security model](explanation/sbom-and-security-model.md)
 

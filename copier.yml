@@ -113,11 +113,6 @@ git_hosting_service:
   default: "github"
   help: Which git hosting service the project targets
 
-integrate_dependency_track:
-  type: bool
-  default: true
-  help: Integrate OWASP Dependency Track for SBOM upload?
-
 integrate_pages:
   type: bool
   default: true

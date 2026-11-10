@@ -35,7 +35,7 @@ Some teams write a `bootstrap-project.sh` instead of using a templating tool. It
 
 ### A scaffolding monorepo (one repo with all templates)
 
-Considered for variants (CLI vs. library vs. service). Rejected because copier handles variation through questionnaire branches (e.g. `git_hosting_service`, `integrate_dependency_track`) without forking the template. Variants live as code paths inside one repo.
+Considered for variants (CLI vs. library vs. service). Rejected because copier handles variation through questionnaire branches (e.g. `git_hosting_service`, `integrate_pages`) without forking the template. Variants live as code paths inside one repo.
 
 ## What we gave up
 

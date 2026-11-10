@@ -1,6 +1,6 @@
 # SBOM and security model
 
-The template's security pipeline has three layers: known-vulnerability scanning, SBOM generation, and (optional) SBOM upload to an OWASP Dependency Track server. This page explains what each layer does and what threat model it addresses.
+The template's security pipeline has three layers: known-vulnerability scanning, SBOM generation, and build provenance. This page explains what each layer does and what threat model it addresses.
 
 ## The threat model
 
@@ -107,24 +107,11 @@ Each PyPI component (runtime, dev, vendored) carries:
 - A security responder can answer "are we affected by X?" against a project built from this template in seconds, not hours.
 - Compliance frameworks (SLSA, NIST SSDF, EU CRA) that mandate SBOMs are satisfied — the SBOM travels with the artefact instead of needing to be re-correlated post-release.
 
-The SBOM exists whether a project has a Dependency Track server or not. It's part of every release.
+The SBOM is part of every release.
 
-## Layer 3 — Dependency Track (optional)
+Watching a released version for advisories published after the release is outside the template. The scheduled audit re-checks `uv.lock` on the default branch every day, but that is the code as it is now, not the versions already on PyPI. To track those, point your organisation's software composition analysis platform (OWASP Dependency-Track, the GitHub dependency graph, or similar) at the SBOM inside each wheel. Which platform, and the credentials to reach it, are your organisation's call, so the template ships no upload step.
 
-If `integrate_dependency_track` was enabled at generation time, `./workflow.cmd secure.sbom-upload` uploads the SBOM straight to Dependency Track's `/api/v1/bom` REST endpoint, using nothing beyond the Python standard library's `urllib` — no extra dependency is pulled in just to make that one HTTP call.
-
-What DT adds on top of layer 2:
-
-- Continuous re-evaluation. DT re-checks the project against new CVEs every time the advisory database updates — without anyone re-running anything.
-- Aggregation. One pane of glass across many projects in the same DT instance.
-- Policy. DT can be set to fail builds based on policies (e.g. "no critical CVEs older than 30 days").
-- Notification. DT can email/Slack on new findings against any tracked project.
-
-Without DT, only what `pip-audit` reported at the moment it ran is visible. With DT, every release is *continuously* re-assessed against the world.
-
-See [Enable Dependency Track integration](../how-to/enable-dependency-track.md) for setup.
-
-## Layer 4 — build provenance
+## Layer 3 — build provenance
 
 The SBOM says what is *inside* an artifact. Provenance says where the artifact *came from* — and unlike the SBOM, it is not self-reported. `actions/attest-build-provenance` signs a statement binding the exact file digests to the workflow, commit and runner that produced them, and that signature chains to GitHub's Sigstore instance rather than to anything the project controls. A forged SBOM is a text edit; a forged attestation is not.
 
@@ -140,7 +127,7 @@ Order matters in the publish job: `release.dist` builds into `dist/`, the attest
 
 ## What about overrides?
 
-`.security-overrides` is a project-local allow-list with mandatory expiry dates. It applies to `pip-audit`. It does **not** suppress findings in the SBOM or in Dependency Track — those continue to show the world the full truth. Override = "we accept this locally for now," not "make this invisible."
+`.security-overrides` is a project-local allow-list with mandatory expiry dates. It applies to `pip-audit`. It does **not** suppress findings in the SBOM, which continues to show the world the full truth. Override = "we accept this locally for now," not "make this invisible."
 
 The expiry dates are load-bearing: a stale override is a security regression hidden in plain sight. The template's lint config doesn't enforce this; treat it as a code-review convention.
 
@@ -148,8 +135,8 @@ The expiry dates are load-bearing: a stale override is a security regression hid
 
 - **SAST**: Bandit / Semgrep / pyright security rules are not shipped. Add them as a `secure.*` task if needed.
 - **Container scanning**: Trivy / Grype are not shipped. The deps image built by `container.publish` is a dev convenience, not a published artifact, so releases aren't gated on it.
-- **License compliance**: SBOM includes license metadata, but the template doesn't enforce license policies. DT does, if turned on.
+- **License compliance**: SBOM includes license metadata, but the template doesn't enforce license policies. An SCA platform reading the SBOM can.
 
 ## See also
 
-- [Enable Dependency Track integration](../how-to/enable-dependency-track.md) — wiring up layer 3.
+- [Harden the GitHub repository](../how-to/harden-github-repository.md) — the repository settings the publish job, and so the provenance layer, depends on.

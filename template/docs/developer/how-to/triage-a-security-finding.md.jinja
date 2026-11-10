@@ -94,15 +94,8 @@ everything else with `./workflow.cmd preflight --audit-dependencies`.
 ./workflow.cmd secure
 ```
 
-This runs the full security pass: audit, SBOM generation{% if integrate_dependency_track %}, and Dependency Track upload (when configured){% endif %}. Audit failures abort the run before SBOM upload.
-{% if integrate_dependency_track %}
-## What gets uploaded to Dependency Track
+This runs the full security pass: the audit, then SBOM generation and validation. Both run even if the first fails, and the task exits non-zero if either did.
 
-Every successful `secure` run uploads a CycloneDX SBOM. Vulnerabilities you've overridden locally still appear in DT as known issues — DT tracks the full state of your project regardless of your local override list.
-{% endif %}
 ## See also
 
-{% if integrate_dependency_track -%}
-- [Upload an SBOM to Dependency Track](upload-an-sbom-to-dependency-track.md) — wiring the upload step.
-{% endif -%}
 - [SBOM and security model](../explanation/sbom-and-security-model.md) — why pip-audit and the SBOM layer together.

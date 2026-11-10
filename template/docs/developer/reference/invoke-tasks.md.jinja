@@ -105,13 +105,10 @@ Calling one directly is how to run a single tool over a single file:
 | `release.changelog` | `--write` | Generate changelog. `--write` persists and commits, signing per `commit.gpgsign`. |
 | `release.push` | — | `git push` + `git push --tags`. |
 | `release.dist` | — | Audit dependencies, then clean and build into `dist/`, leaving the artifacts for inspection{% if git_hosting_service == 'github' %} or attestation{% endif %}. The audit is here rather than in `build`: publishing is where a live advisory should stop you. |
-| `release.publish` | `--prebuilt` | Build + `uv publish` + SBOM upload (if DT enabled). Invoked from CI on release-tag merge. `--prebuilt` publishes what `release.dist` already built instead of rebuilding. |
+| `release.publish` | `--prebuilt` | Build + `uv publish`. Invoked from CI on release-tag merge. `--prebuilt` publishes what `release.dist` already built instead of rebuilding. |
 | `release.clean` | — | Remove `dist/` and `sbom.json`. |
-{%- if integrate_dependency_track %}
-| `release.sbom-upload` | — | Extract and upload SBOM to Dependency Track. |
-{%- endif %}
 
-## `secure` — pip-audit, SBOM, Dependency Track
+## `secure` — pip-audit, SBOM
 
 | Task | Args | What it does |
 | --- | --- | --- |
@@ -119,9 +116,6 @@ Calling one directly is how to run a single tool over a single file:
 | `secure.sbom` | — | The half `build` depends on: `sbom-extract --write` + `sbom-validate`. |
 | `secure.sbom-extract` | `--write` | Compose a CycloneDX 1.7 SBOM with metadata header (lifecycles, tools, supplier, authors), a two-level dependency graph (project → runtime + dev + build-environment; build-environment → vendored + pipeline), and per-component licence + hash + external-reference enrichment. Prints to stdout; with `--write` lands at `src/<slug>/sbom.cdx.json` so `uv build` ships it inside the wheel. |
 | `secure.sbom-validate` | — | Validate the SBOM against the CycloneDX 1.7 JSON schema (runs the validator in a clean `uv run python` subprocess so the venv-installed `jsonschema` wins over the older vendored one). Re-runs sbom-extract first if the file is missing. |
-{%- if integrate_dependency_track %}
-| `secure.sbom-upload` | — | Generate SBOM, write to `src/<slug>/sbom.cdx.json`, upload to Dependency Track. |
-{%- endif %}
 
 ## `document` — documentation site
 

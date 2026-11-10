@@ -55,9 +55,6 @@ Nothing here needs setting for local work. Every one has a default or a reason t
 {%- endif %}
 | `ACTIONS_ID_TOKEN_REQUEST_URL`, `ACTIONS_ID_TOKEN_REQUEST_TOKEN` | `release.publish` | Checked, not set by you. Their presence is how PyPI Trusted Publishing is detected, at which point the legacy credentials below are dropped. {% if git_hosting_service == 'github' %}GitHub Actions injects both when a job has `id-token: write`.{% else %}Only GitHub Actions injects them, so on GitLab this detection never fires and publishing uses the credentials below.{% endif %} |
 | `UV_PUBLISH_URL`, `UV_PUBLISH_USERNAME`, `UV_PUBLISH_PASSWORD` | `release.publish` | Publishing credentials, needed wherever Trusted Publishing is unavailable{% if git_hosting_service == 'gitlab' %} — which, per the row above, is this project{% endif %}. `release.publish` drops them when it detects OIDC, because `uv publish` treats an empty `UV_PUBLISH_URL` as an explicit "no base URL" rather than falling back to PyPI. |
-{%- if integrate_dependency_track %}
-| `OWASP_DTRACK_URL`, `OWASP_DTRACK_API_KEY` | `secure.sbom-upload` | Where to upload the SBOM, and the key to do it with. Both must be present or the task refuses rather than half-uploading. |
-{%- endif %}
 | `PRE_COMMIT_FROM_REF`, `PRE_COMMIT_TO_REF` | `lint.commitizen` | The commit range a push would add, which pre-commit hands to pre-push hooks straight from git. It is the authoritative answer to "which messages are mine to fix", so it wins over anything the task can infer from the branch. Absent outside a pre-push hook, where the tracking branch stands in. |
 | `SKIP` | pre-commit, not this workflow | The escape hatch below. |
 

@@ -1,6 +1,6 @@
 # Generated project tree
 
-An annotated tour of what copier creates. Tree is for a project named `example_project` with `git_hosting_service=github` and `integrate_dependency_track=true`. Differences for `gitlab` and DT-off variants are noted inline.
+An annotated tour of what copier creates. Tree is for a project named `example_project` with `git_hosting_service=github` and `integrate_pages=true`. Differences for `gitlab` and Pages-off variants are noted inline.
 
 ```
 example_project/
@@ -35,7 +35,7 @@ example_project/
 │       ├── preflight.py         Step registry; preflight + preflight.staged
 │       ├── quality.py           pyscn
 │       ├── release.py           Validate, bump, changelog, push, publish
-│       ├── secure.py            pip-audit, SBOM, (optional) DT upload
+│       ├── secure.py            pip-audit, SBOM
 │       ├── shared.py            @logged, @run, execute(), run_steps(), apply_badge()
 │       └── test.py              pytest + coverage
 ├── Dockerfile.deps              Multi-stage deps-cache image

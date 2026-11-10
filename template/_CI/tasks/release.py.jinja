@@ -9,18 +9,10 @@ from typing import cast
 from invoke import Collection, Context, Task, task
 
 from .build import build
-{%- if integrate_dependency_track %}
-from .configuration import OIDC_ENV_VARS, OWASP_DTRACK_SETTINGS, SBOM_FILE, UV_PUBLISH_SETTINGS
-{%- else %}
 from .configuration import OIDC_ENV_VARS, SBOM_FILE, UV_PUBLISH_SETTINGS
-{%- endif %}
 from .document import update_package_version_badge
 from .{{ git_hosting_service }} import create_release_pr, pr_create_url
-{%- if integrate_dependency_track %}
-from .secure import audit, sbom_upload
-{%- else %}
 from .secure import audit
-{%- endif %}
 from .shared import commit, execute, logged, note
 
 
@@ -182,7 +174,7 @@ def dist(context: Context) -> None:
 @task
 @logged('release.publish')
 def publish(context: Context, prebuilt: bool = False) -> None:
-    """Build, publish, and upload SBOM — the full post-release publishing pipeline.
+    """Build and publish — the full post-release publishing pipeline.
 
     Args:
         context: Invoke context.
@@ -209,21 +201,12 @@ def publish(context: Context, prebuilt: bool = False) -> None:
                 '`permissions: id-token: write` so PyPI trusted publishing can mint a token.'
             )
             raise SystemExit(1)
-{%- if integrate_dependency_track %}
-    missing_dtrack = [v for v in OWASP_DTRACK_SETTINGS if not os.environ.get(v)]
-    if missing_dtrack:
-        print(f'Missing Dependency Track environment variables: {", ".join(missing_dtrack)}.')
-        raise SystemExit(1)
-{%- endif %}
     if not prebuilt:
         dist(context)
     elif not any(Path('dist').glob('*')):
         print('--prebuilt was given but dist/ is empty; run `./workflow.cmd release.dist` first.')
         raise SystemExit(1)
     execute(context, 'uv publish')
-{%- if integrate_dependency_track %}
-    sbom_upload(context)
-{%- endif %}
     clean(context)
 
 

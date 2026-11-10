@@ -23,7 +23,6 @@ nav:
     - How-to:
       - Update an existing project with copier: using/how-to/update-existing-project-with-copier.md
       - Choose a git host: using/how-to/choose-a-git-host.md
-      - Enable Dependency Track integration: using/how-to/enable-dependency-track.md
       - Harden the GitHub repository: using/how-to/harden-github-repository.md
       - Convert the library into a CLI: using/how-to/convert-library-to-cli.md
       - Choose the Python version range: using/how-to/choose-python-version-range.md

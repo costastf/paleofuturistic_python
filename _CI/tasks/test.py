@@ -239,7 +239,7 @@ def run_combo(
 
     # Accumulate rather than stop at the first failure, matching what the matrix already does
     # across cells and what `run_scope` does across steps. This loop is the slowest feedback
-    # in the system — eight cells at tens of seconds each — so one run reporting everything is
+    # in the system — five cells at tens of seconds each — so one run reporting everything is
     # worth the seconds it costs when something is already red. Stopping early also skipped the
     # litter check below in precisely the cells that were already unhappy.
     steps = qa_sequence(audit=mature)
@@ -288,7 +288,6 @@ def test(context: Context) -> None:  # noqa: ARG001 — invoke always passes a C
 @task(
     help={
         'git_hosting_service': 'github (default) or gitlab',
-        'integrate_dependency_track': 'Bool — opt the SBOM-upload code in (default true)',
         'integrate_pages': 'Bool — opt the Pages workflow + task in (default true)',
         'mature': 'Bool — day-two project: no smoke test, an origin, and the dependency audit',
     }
@@ -296,11 +295,10 @@ def test(context: Context) -> None:  # noqa: ARG001 — invoke always passes a C
 def combo(
     context: Context,  # noqa: ARG001 — invoke always passes a Context to a @task
     git_hosting_service: str = 'github',
-    integrate_dependency_track: bool = True,
     integrate_pages: bool = True,
     mature: bool = False,
 ) -> None:
-    """Run the full QA cycle for one matrix cell across all three template knobs."""
+    """Run the full QA cycle for one matrix cell across both template knobs."""
     tmpdir = Path(tempfile.mkdtemp(prefix='paleofuturistic_combo_'))
     try:
         template_repo = prepare_snapshot(tmpdir)
@@ -308,7 +306,6 @@ def combo(
         output_root.mkdir()
         label = combo_label(
             git_hosting_service=git_hosting_service,
-            integrate_dependency_track=integrate_dependency_track,
             integrate_pages=integrate_pages,
             mature=mature,
         )
@@ -316,7 +313,6 @@ def combo(
             ComboWorkspace(template_repo, output_root),
             extra_context=combo_context(
                 git_hosting_service=git_hosting_service,
-                integrate_dependency_track=integrate_dependency_track,
                 integrate_pages=integrate_pages,
             ),
             label=label,
@@ -363,7 +359,6 @@ def matrix(context: Context, workers: int = 1) -> None:  # noqa: ARG001 — invo
                     workspace,
                     extra_context=combo_context(
                         git_hosting_service=cell['git_hosting_service'],
-                        integrate_dependency_track=cell['integrate_dependency_track'],
                         integrate_pages=cell['integrate_pages'],
                     ),
                     label=label,
@@ -404,12 +399,11 @@ def list_combos(context: Context, as_json: bool = False) -> None:  # noqa: ARG00
     if as_json:
         print(json.dumps(combos, separators=(',', ':')))
         return
-    print(f'{"label":<24} {"host":<7} {"dep_track":<10} {"pages":<6} {"mature":<6}')
+    print(f'{"label":<24} {"host":<7} {"pages":<6} {"mature":<6}')
     for cell in combos:
         print(
             f'{cell["label"]:<24} '
             f'{cell["git_hosting_service"]:<7} '
-            f'{cell["integrate_dependency_track"]!s:<10} '
             f'{cell["integrate_pages"]!s:<6} '
             f'{cell["mature"]!s:<6}'
         )

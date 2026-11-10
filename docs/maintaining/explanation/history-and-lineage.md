@@ -17,7 +17,7 @@ Paleofuturistic Python added the infrastructure that turns a starter into an ent
 
 - **Vendored CI tooling.** `_CI/lib/vendor/` ships Invoke and its deps; `./workflow.cmd` works on a fresh clone.
 - **Multiple linters and analyzers.** ruff alone wasn't enough — pylint, ty, complexipy, and pyscn cover what ruff doesn't.
-- **Security pipeline.** pip-audit, CycloneDX SBOM generation, optional Dependency Track upload.
+- **Security pipeline.** pip-audit, CycloneDX SBOM generation, optional Dependency Track upload. The upload was later removed: the SBOM ships inside the wheel, and which SCA platform reads it is left to each organisation.
 - **Multi-host CI support.** Both GitHub Actions and GitLab CI scaffolding, gated on the `git_hosting_service` answer.
 - **Conventional Commits + commitizen** for automated release notes, replacing Release Please. The version bump stays explicit; only the changelog is derived from commit messages.
 - **pytest + tox + xdist** for the test layer, replacing the original `python -m unittest`.

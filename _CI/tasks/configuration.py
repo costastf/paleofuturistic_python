@@ -23,7 +23,7 @@ IGNORE_PATTERNS = shutil.ignore_patterns('.git', '.venv', '__pycache__', '*.pyc'
 # answer depends on the advisory database rather than on the generated tree, and the docs build.
 #
 # Every step runs even after one fails — `run_combo` accumulates, as the matrix already does
-# across cells. The feedback loop here is the slowest in the system, eight cells at tens of
+# across cells. The feedback loop here is the slowest in the system, five cells at tens of
 # seconds each, so a fix-rerun cycle is what costs most and complete information is worth most.
 #
 # `--write` because a freshly generated project's badges all read "unknown", and the matrix is
@@ -32,7 +32,7 @@ IGNORE_PATTERNS = shutil.ignore_patterns('.git', '.venv', '__pycache__', '*.pyc'
 QA_STEPS = ('preflight --write', 'document')
 # The dependency audit, run in one cell rather than all of them. Every cell resolves the same
 # lockfile and ships the same `vendor.txt`, so the audit's answer cannot differ between them —
-# what differed was the exposure: nine jobs each querying the advisory database for ~125
+# what differed was the exposure: one job per cell, each querying the advisory database for ~125
 # packages, where one transient service error fails a cell for a reason that has nothing to do
 # with the template. It rides with the matured cell rather than carrying a knob of its own,
 # there being one of those and a dependency audit belonging to a day-two project anyway. It
@@ -101,40 +101,31 @@ def base_context() -> dict:
     return {'min_python_version': known_versions[0], 'max_python_version': known_versions[-1]}
 
 
-def combo_context(*, git_hosting_service: str, integrate_dependency_track: bool, integrate_pages: bool) -> dict:
-    """Matrix-cell context: widest Python range plus the three binary template knobs."""
+def combo_context(*, git_hosting_service: str, integrate_pages: bool) -> dict:
+    """Matrix-cell context: widest Python range plus the two template knobs."""
     return {
         **base_context(),
         'git_hosting_service': git_hosting_service,
-        'integrate_dependency_track': integrate_dependency_track,
         'integrate_pages': integrate_pages,
     }
 
 
-def combo_label(
-    *, git_hosting_service: str, integrate_dependency_track: bool, integrate_pages: bool, mature: bool = False
-) -> str:
-    """Stable short label for log files and CI job names: e.g. ``gh-dep1-pages0``."""
+def combo_label(*, git_hosting_service: str, integrate_pages: bool, mature: bool = False) -> str:
+    """Stable short label for log files and CI job names: e.g. ``gh-pages0``."""
     host_short = 'gh' if git_hosting_service == 'github' else 'gl'
     suffix = '-mature' if mature else ''
-    return f'{host_short}-dep{int(integrate_dependency_track)}-pages{int(integrate_pages)}{suffix}'
+    return f'{host_short}-pages{int(integrate_pages)}{suffix}'
 
 
 def matrix_combos() -> list[dict]:
-    """Cartesian product over git_hosting_service x integrate_dependency_track x integrate_pages."""
+    """Cartesian product over git_hosting_service x integrate_pages."""
     return [
         {
-            'label': combo_label(
-                git_hosting_service=host,
-                integrate_dependency_track=dep_track,
-                integrate_pages=pages,
-            ),
+            'label': combo_label(git_hosting_service=host, integrate_pages=pages),
             'git_hosting_service': host,
-            'integrate_dependency_track': dep_track,
             'integrate_pages': pages,
         }
         for host in ('github', 'gitlab')
-        for dep_track in (False, True)
         for pages in (False, True)
     ]
 
@@ -154,9 +145,9 @@ def qa_cells() -> list[dict]:
 
     A generated project is a day-one project: the scaffolded smoke test keeps coverage at 100%
     and the ratchet dormant, and there is no remote for the CI badge to name. That leaves the
-    ratchet, the coverage floor and the badge slug unexercised by the eight knob cells, which
+    ratchet, the coverage floor and the badge slug unexercised by the four knob cells, which
     differ only in what copier renders. The matured cell removes the smoke test and adds an
-    origin, so those paths run too. It is one extra cell rather than a fourth axis because
+    origin, so those paths run too. It is one extra cell rather than a third axis because
     nothing it touches interacts with the knobs.
 
     See docs/maintaining/how-to/test-the-template.md#why-a-matured-cell for the maintainer-facing
@@ -165,7 +156,6 @@ def qa_cells() -> list[dict]:
     cells = [{**cell, 'mature': False} for cell in matrix_combos()]
     mature_config = {
         'git_hosting_service': 'github',
-        'integrate_dependency_track': True,
         'integrate_pages': True,
         'mature': True,
     }

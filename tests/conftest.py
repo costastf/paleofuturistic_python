@@ -56,7 +56,6 @@ def generated_project(request, template_snapshot, tmp_path_factory):
     workdir = tmp_path_factory.mktemp(cell['label'])
     data = combo_context(
         git_hosting_service=cell['git_hosting_service'],
-        integrate_dependency_track=cell['integrate_dependency_track'],
         integrate_pages=cell['integrate_pages'],
     )
     data_file = workdir / 'data.json'
