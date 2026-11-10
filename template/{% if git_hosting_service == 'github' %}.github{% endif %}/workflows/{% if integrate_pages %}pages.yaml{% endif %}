@@ -43,7 +43,11 @@ jobs:
     needs: [detect, build-deps-image]
     if: ${{ needs.detect.outputs.tag != '' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
-    container: ${{ needs.build-deps-image.outputs.image }}
+    container:
+      image: ${{ needs.build-deps-image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     permissions:
       # `contents: write` is required, not an oversight: `properdocs gh-deploy` commits the
       # built site to the `gh-pages` branch. That flow is deliberate — see "Why gh-pages

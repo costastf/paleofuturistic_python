@@ -19,15 +19,15 @@ Uses the detected container engine (docker or podman) to build `{{ project_slug 
 In CI, this delegates to the host-specific publish in `_CI/tasks/{{ git_hosting_service }}.py`:
 
 - **GitHub**: logs into `ghcr.io` with `GITHUB_ACTOR` / `GITHUB_TOKEN`, checks for an existing tag, builds and pushes only if missing.
-- **GitLab**: writes kaniko credentials from `CI_REGISTRY_*` and runs the kaniko executor (daemonless build + push). Required where privileged docker-in-docker isn't allowed.
+- **GitLab**: writes kaniko credentials from `CI_REGISTRY` and the `DEPS_IMAGE_USERNAME` / `DEPS_IMAGE_PASSWORD` Deploy Token, then runs the kaniko executor (daemonless build + push) to `$CI_REGISTRY_IMAGE:deps-<tag>`, the same reference the shipped `build-deps-image` job builds. Required where privileged docker-in-docker isn't allowed.
 
-The image tag is the SHA-256 of `uv.lock` (first 16 hex chars), so re-builds on the same dependency set are no-ops.
+The image tag is 32 hex characters of a SHA-256 over `uv.lock`, `Dockerfile.deps` and the base image, so a change to any of the three produces a new tag and the same three reuse the existing image.
 
-The full image reference is written to `.deps-image` for downstream CI steps to pick up.
+The full image reference is written to `.deps-image` (gitignored) for downstream CI steps to pick up.
 
 ## Publish locally (uncommon)
 
-`container.publish` outside CI falls back to a local build + tag, no push. If you need to push from a developer machine, set the same env vars CI sets and run the task — the host code path checks for those, not for a "is this CI" flag.
+`container.publish` outside CI falls back to a local build + tag, no push. The task branches on `CI=true`, so to push from a developer machine set that together with the registry variables above and run the task.
 
 ## Customizing the build
 

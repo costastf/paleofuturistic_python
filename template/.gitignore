@@ -223,3 +223,8 @@ cython_debug/
 
 ## Complexipy cache
 .complexipy_cache/
+
+## Dependency image references written by `container.publish` and the pipeline's deps job
+.deps-image
+.deps-image-digest
+.deps-image.env

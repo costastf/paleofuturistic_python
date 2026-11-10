@@ -106,7 +106,7 @@ part of the entry. See [Triage a security finding](../how-to/triage-a-security-f
 
 ## `.gitignore`
 
-Standard Python + the project's own outputs (`reports/`, `site/`, `dist/`, `.deps-image`, `_CI/.bootstrapped`).
+Standard Python + the project's own outputs (`reports/`, `site/`, `dist/`, the `.deps-image*` references, `_CI/.bootstrapped`).
 It also ignores `.pypirc`: this project authenticates to indexes through Trusted Publishing or
 `UV_PUBLISH_*` variables, never a `.pypirc` ([format spec](https://packaging.python.org/en/latest/specifications/pypirc/)),
 so a file of that name in the tree is a password about to be committed.

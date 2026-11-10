@@ -168,6 +168,7 @@ def create_release_pr(context: Context, release_branch: str, new_version: str) -
         print(f'GitHub API request failed: {exc}')
         return ''
     return data.get('html_url', '')
+{%- if integrate_pages %}
 
 
 def request_pages_build(context: Context) -> None:
@@ -205,6 +206,7 @@ def request_pages_build(context: Context) -> None:
     except OSError as exc:
         print(f'GitHub Pages build request failed: {exc}')
         raise SystemExit(1) from exc
+{%- endif %}
 
 
 def iter_pipeline_components() -> Iterator[PipelineComponent]:

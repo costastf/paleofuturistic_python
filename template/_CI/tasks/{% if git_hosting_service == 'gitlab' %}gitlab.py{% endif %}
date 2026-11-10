@@ -34,11 +34,18 @@ class RegistrySettings(NamedTuple):
 
 
 def registry_settings() -> RegistrySettings:
-    """Return GitLab container registry credentials sourced from GitLab CI env vars."""
+    """Return the container registry settings the shipped ``build-deps-image`` job pushes with.
+
+    The registry and image path are GitLab's own ``CI_REGISTRY*`` variables. The credentials
+    are the project Deploy Token the pipeline file asks for, ``DEPS_IMAGE_USERNAME`` and
+    ``DEPS_IMAGE_PASSWORD``, rather than ``CI_REGISTRY_USER``/``CI_REGISTRY_PASSWORD``: some
+    registries reject the job token for pushes, and a run of this task by hand should push to
+    the same place with the same identity as the pipeline, or the two images drift apart.
+    """
     return RegistrySettings(
         url=os.environ['CI_REGISTRY'],
-        user=os.environ['CI_REGISTRY_USER'],
-        password_env='CI_REGISTRY_PASSWORD',  # noqa: S106 — the name of an env var to read, not a credential
+        user=os.environ['DEPS_IMAGE_USERNAME'],
+        password_env='DEPS_IMAGE_PASSWORD',  # noqa: S106 — the name of an env var to read, not a credential
         image_prefix=os.environ['CI_REGISTRY_IMAGE'],
     )
 
@@ -54,9 +61,13 @@ def publish_deps_image(context: Context, tag: str) -> str:
     here — so the image can only ever be what this pipeline just produced.
     ``--digest-file`` reports the digest kaniko pushed, which is what downstream jobs
     pin to; being daemonless, there is no local image to inspect for it afterwards.
+
+    The image is ``<project registry>:deps-<tag>``, the same reference the shipped
+    ``build-deps-image`` job builds: a ``-deps`` sub-path is denied on registries that
+    restrict deploy tokens to the project root.
     """
     settings = registry_settings()
-    image = f'{settings.image_prefix}-deps:{tag}'
+    image = f'{settings.image_prefix}:deps-{tag}'
     password = os.environ[settings.password_env]
     token = base64.b64encode(f'{settings.user}:{password}'.encode()).decode()
     config = {'auths': {settings.url: {'auth': token}}}
@@ -93,11 +104,6 @@ def origin_ref(context: Context) -> RemoteRef:
     if remote.failed:
         return RemoteRef(host='', path='')
     return parse_remote_url(remote.stdout)
-
-
-def origin_slug(context: Context) -> str:
-    """Return the project path (group/.../project) of the origin remote, or '' if unparseable."""
-    return origin_ref(context).path
 
 
 def pipeline_badge(context: Context) -> str:

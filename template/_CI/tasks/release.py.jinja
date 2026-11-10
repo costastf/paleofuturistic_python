@@ -90,12 +90,6 @@ def bump(context: Context, increment: str = '') -> None:
 
     """
     prerelease_types = ('alpha', 'beta', 'rc')
-    semver_types = ('major', 'minor', 'patch')
-    valid = semver_types + prerelease_types
-    if increment not in valid:
-        print('Usage: ./workflow.cmd release -i <increment>')
-        print(f'  increment: {", ".join(valid)}')
-        raise SystemExit(1)
     note(update_package_version_badge(version=resolve_next_version(context, increment)))
     try:
         if increment in prerelease_types:

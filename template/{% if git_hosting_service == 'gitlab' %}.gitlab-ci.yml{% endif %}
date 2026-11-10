@@ -35,15 +35,15 @@ build-deps-image:
         "$(printf '%s' "$BASE_IMAGE" | sha256sum | cut -d' ' -f1)" \
         | sha256sum | cut -c1-32)
     # Push to $CI_REGISTRY_IMAGE (the project's registry root) with a
-    # deps-prefixed tag. SBP's registry restricts deploy tokens to the
+    # deps-prefixed tag. Some registries restrict deploy tokens to the
     # root path only — /deps and -deps subpaths both return DENIED.
     - IMAGE="${CI_REGISTRY_IMAGE}:deps-${TAG}"
     - mkdir -p /kaniko/.docker
-    # SBP's registry rejects the default CI_JOB_TOKEN for pushes, so this job
+    # Some registries reject the default CI_JOB_TOKEN for pushes, so this job
     # authenticates with a project Deploy Token (scopes: read_registry +
     # write_registry). Create one at Settings → Repository → Deploy tokens,
     # then expose as protected/masked CI variables DEPS_IMAGE_USERNAME and
-    # DEPS_IMAGE_PASSWORD.
+    # DEPS_IMAGE_PASSWORD. `container.publish` reads the same two by hand.
     #
     # Mark both Protected and Masked, and set their Environment scope to `deps`
     # (this job's environment) rather than leaving it at `*`. An unscoped variable

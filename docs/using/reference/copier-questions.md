@@ -95,8 +95,9 @@ A trailing `/` or `.git` is dropped, so a pasted clone URL works. Left empty, th
 
 - **Type**: bool
 - **Default**: `true`
+- **Asked when**: `git_hosting_service=github`
 
-Controls whether documentation-publishing scaffolding (the Pages workflow file and the matching `document.deploy-github` task) ships in the generated project. The actual scaffolding is host-specific: today only `git_hosting_service=github` has shipping Pages scaffolding — picking `gitlab` with `integrate_pages=true` is a silent no-op until GitLab Pages support lands. See [Publish docs to GitHub Pages](../how-to/publish-docs-to-github-pages.md).
+Controls whether documentation-publishing scaffolding (the Pages workflow file and the matching `document.deploy-github` task) ships in the generated project. The scaffolding is GitHub-specific, so GitLab projects are not asked; the answer keeps its default there and nothing reads it. See [Publish docs to GitHub Pages](../how-to/publish-docs-to-github-pages.md).
 
 ## Validation
 

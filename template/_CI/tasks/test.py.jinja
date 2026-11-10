@@ -296,7 +296,7 @@ def combine_coverage(context: Context, *, scope: str = '') -> None:
     execute(context, f'uv run coverage json -o {COVERAGE_REPORT}')
 
 
-@logged('test.matrix')
+@logged('preflight.tox')
 def tox_matrix(context: Context, env: str = '') -> None:
     """Run the matrix and combine its coverage, touching no derived value.
 

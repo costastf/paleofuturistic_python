@@ -441,7 +441,7 @@ def commit(context: Context, message: str) -> None:
     result = context.run(f'git commit -m "{message}"', echo=True, warn=True)
     if result.ok:
         return
-    stderr = result.stderr or ''
+    stderr = result.stderr
     if SIGNING_FAILURE_MARKER not in stderr or not signing_requested(context):
         raise SystemExit(1)
     print(

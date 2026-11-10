@@ -132,3 +132,6 @@ integrate_pages:
   type: bool
   default: true
   help: Integrate GitHub Pages for documentation deployment?
+  # Every use of the answer is gated on GitHub, so GitLab projects are not asked. The default
+  # still applies, which keeps the variable defined wherever the templates read it.
+  when: "{{ git_hosting_service == 'github' }}"
