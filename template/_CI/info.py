@@ -4,8 +4,6 @@ Runnable without uv/invoke/bootstrap: exposes pyproject.toml values for
 pipeline bootstrap and local inspection.
 """
 
-from __future__ import annotations
-
 import re
 import sys
 import tomllib

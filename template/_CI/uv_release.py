@@ -12,8 +12,6 @@ straight from source, so both share one implementation. Stdlib only — a genera
 nothing but invoke vendored, and this runs before any environment exists.
 """
 
-from __future__ import annotations
-
 import json
 import re
 import urllib.error

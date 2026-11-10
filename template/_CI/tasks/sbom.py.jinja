@@ -1,20 +1,16 @@
 """Compose a CycloneDX 1.7 SBOM covering runtime, dev, vendored, and pipeline components."""
 
-from __future__ import annotations
-
 import re
 import subprocess
 import sys
 import tomllib
 import warnings
+from collections.abc import Iterable, Iterator
 from datetime import UTC, datetime
+from email.message import Message
 from importlib.metadata import PackageNotFoundError, distribution, metadata, version
 from pathlib import Path
-from typing import TYPE_CHECKING, NamedTuple, cast
-
-if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
-    from email.message import Message
+from typing import NamedTuple, cast
 
 from cyclonedx.model import ExternalReference, ExternalReferenceType, HashAlgorithm, HashType, Property, XsUri
 from cyclonedx.model.bom import Bom
@@ -231,7 +227,7 @@ def lookup_pypi_license(name: str) -> LicenseRepository | None:
         # metadata() returns an email.message.Message at runtime; typeshed only
         # exposes `.get` on the PackageMetadata protocol from 3.12, so cast to the
         # concrete type to keep the type checker happy on the 3.11 floor.
-        meta = cast('Message', metadata(name))
+        meta = cast(Message, metadata(name))
     except PackageNotFoundError:
         return None
     expression = meta.get('License-Expression')
