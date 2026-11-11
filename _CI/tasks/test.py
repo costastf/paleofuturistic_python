@@ -12,7 +12,7 @@ from typing import NamedTuple
 
 from invoke import Context, task
 
-from _CI import PROJECT_ROOT_DIRECTORY, emojize_message, make_file_executable
+from _CI import PROJECT_ROOT_DIRECTORY, emojize_message
 from _CI.tasks.configuration import (
     PROJECT_SLUG,
     TEMPLATE_SECURITY_OVERRIDE_ENV,
@@ -213,8 +213,6 @@ def run_combo(
     # is using — otherwise every `uv sync` below fails on a version mismatch.
     if not run_command(copier_cmd, env=generation_env(), log_file=log_file):
         return False
-
-    make_file_executable(project_dir / 'workflow.cmd')
 
     if mature:
         write_mature_project(project_dir, extra_context)

@@ -2,7 +2,6 @@
 
 import platform
 import shutil
-import stat
 import subprocess
 import webbrowser
 from contextlib import suppress
@@ -16,11 +15,6 @@ WSL_INTEROP_MARKERS = (
 )
 
 PROJECT_ROOT_DIRECTORY = next(parent for parent in Path(__file__).resolve().parents if (parent / '_CI').is_dir())
-
-
-def make_file_executable(filename: Path) -> None:
-    """Add the executable bit to a file."""
-    filename.chmod(filename.stat().st_mode | stat.S_IEXEC)
 
 
 def emojize_message(message: str, success: bool = True) -> str:

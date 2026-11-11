@@ -1030,12 +1030,6 @@ def test_every_github_job_declares_least_privilege_permissions(generated_project
             assert not writes, f'{name}:{job_name} asks for write scopes {writes}'
 
 
-def publish_steps(project):
-    """Return the `publish` job's steps from the generated publish workflow."""
-    config = yaml.safe_load((project / '.github' / 'workflows' / 'publish.yaml').read_text(encoding='utf-8'))
-    return config['jobs']['publish']['steps']
-
-
 def step_index(steps, needle):
     """Return the index of the first step whose `run` or `uses` contains `needle`."""
     for index, step in enumerate(steps):
@@ -2868,7 +2862,6 @@ def test_exactly_one_matrix_cell_audits_its_dependencies(tmp_path):
         'os': os,
         'Path': Path,
         'run_command': record,
-        'make_file_executable': lambda _path: None,
         'untracked_after_qa': lambda _project: [],
         'report_failure': lambda *_: None,
         'generation_env': dict,

@@ -123,8 +123,8 @@ test = [
 requires = ["uv_build>=0.8.15,<=0.13.7"]
 build-backend = "uv_build"
 
+# What to analyse is the `src/` argument the quality tasks pass; pyscn has no `paths` key.
 [tool.pyscn.complexity]
-paths = ["src", "tests", "_CI/tasks"]
 low_threshold = 5
 medium_threshold = 10
 max_complexity = 15
