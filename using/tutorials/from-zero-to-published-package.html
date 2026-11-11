@@ -546,7 +546,7 @@ It runs the same preflight as before, this time where everyone can see its outco
 <li>Validates the working tree is clean and synched with origin.</li>
 <li>Creates a <code>release/&lt;version&gt;</code> branch off <code>main</code>.</li>
 <li>Bumps the version, writes the changelog, updates the version badge, commits all.</li>
-<li>Pushes the branch and the new <code>vX.Y.Z</code> tag.</li>
+<li>Pushes the branch. No tag yet: CI creates <code>vX.Y.Z</code> on <code>main</code> once the release is merged.</li>
 <li>Opens a release pull request on your git host (GitHub: via API if <code>GITHUB_TOKEN</code> is set, otherwise prints a manual URL; GitLab: prints a manual URL).</li>
 </ol>
 <p>Note that the security audit pipeline now does run.
@@ -554,8 +554,8 @@ That is because a commit edited <code>uv.lock</code>.
 This is a desired side-effect during release.
 You would not want to release a package with known vulnerabilities (that have not been suppressed in <code>.security-overrides</code>).</p>
 <h2 id="step-4-publish-to-pypi">Step 4 — Publish to PyPI</h2>
-<p>The publish job builds the wheel and sdist (the SBOM rides inside the wheel), checks both with <code>twine check --strict</code> and <code>check-wheel-contents</code>, signs a <a href="https://packaging.python.org/en/latest/specifications/index-hosted-attestations/">PEP 740</a> attestation per file, and uploads files and attestations together. The recommended path is CI-driven <a href="https://docs.pypi.org/trusted-publishers/">PyPI trusted publishing</a> — no long-lived tokens, and the only way PyPI accepts the attestations. Wire it up once for the project (your generated project's <em>Set up Trusted Publishing</em> how-to has the PyPI form for your host; <a href="../how-to/harden-github-repository.html">Harden the GitHub repository</a> covers the GitHub side), then approve and merge the release PR from Step 3 with a merge commit.
-The tag and bump land on <code>main</code>, which is what triggers the publish job.</p>
+<p>The publish job builds the wheel and sdist (the SBOM rides inside the wheel), checks both with <code>twine check --strict</code> and <code>check-wheel-contents</code>, signs a <a href="https://packaging.python.org/en/latest/specifications/index-hosted-attestations/">PEP 740</a> attestation per file, and uploads files and attestations together. The recommended path is CI-driven <a href="https://docs.pypi.org/trusted-publishers/">PyPI trusted publishing</a> — no long-lived tokens, and the only way PyPI accepts the attestations. Wire it up once for the project (your generated project's <em>Set up Trusted Publishing</em> how-to has the PyPI form for your host; <a href="../how-to/harden-github-repository.html">Harden the GitHub repository</a> covers the GitHub side), then approve and merge the release PR from Step 3, any way you like.
+The version bump lands on <code>main</code>; the publish job sees it, creates the tag there, and publishes.</p>
 <p>After all the pipelines ran you should see your project published on PyPI. Each file's details show a <em>Provenance</em> section naming your repository; if you answered <code>repository_url</code>, the sidebar shows its links.</p>
 <h2 id="step-5-publish-the-docs">Step 5 — Publish the docs</h2>
 <p>For GitHub-hosted projects, see <a href="../how-to/publish-docs-to-github-pages.html">Publish docs to GitHub Pages</a> for the workflow file and Pages setup.</p>

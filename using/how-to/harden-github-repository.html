@@ -486,12 +486,12 @@
                     <div class="col-md-9" role="main">
 
 <h1 id="harden-the-github-repository">Harden the GitHub repository</h1>
-<p>After generating with <code>git_hosting_service=github</code>, you have six workflow files under <code>.github/workflows/</code> (five without Pages) and a release pipeline that wants to publish to PyPI. This page lists the GitHub-side settings worth applying before that pipeline ever fires.</p>
+<p>After generating with <code>git_hosting_service=github</code>, you have five workflow files under <code>.github/workflows/</code> (four without Pages) and a release pipeline that wants to publish to PyPI. This page lists the GitHub-side settings worth applying before that pipeline ever fires.</p>
 <h2 id="prerequisite-security">Prerequisite security</h2>
 <p>These are non-negotiable for any repository connected to CI/CD:</p>
 <ul>
 <li><strong>Branch protection on <code>main</code>.</strong> Require pull requests, require status checks, require a linear history. Block force pushes and deletions. Require only checks that run on every pull request — and today that is none of the shipped ones. <strong>Do not require <code>Preflight</code></strong>: the workflows trigger on <code>push</code>, so a pull request from a fork runs nothing in this repository and a required check would sit pending forever, leaving the repository unable to merge an external contribution. <code>security-audit</code> is filtered by <code>on.push.paths</code> on top of that. Require them once the workflows gain a <code>pull_request</code> trigger, which is a decision the template has not taken yet.</li>
-<li><strong>Tag protection for <code>v*</code>.</strong> Forbid deleting and editing release tags.</li>
+<li><strong>Tag protection for <code>v*</code>.</strong> Forbid deleting and editing release tags. Creation must stay open to the publish workflow: <code>release.tag</code> creates each <code>v*</code> tag through the API with the workflow's <code>GITHUB_TOKEN</code>, so a ruleset that restricts who may create tags needs a bypass for GitHub Actions, or releases fail at that step.</li>
 <li><strong>Required approvals.</strong> At least one reviewer per PR.</li>
 </ul>
 <h2 id="pypi-trusted-publishing">PyPI trusted publishing</h2>
@@ -502,7 +502,7 @@
 <li>On <a href="https://pypi.org/">pypi.org</a>, add a <a href="https://docs.pypi.org/trusted-publishers/adding-a-publisher/">trusted publisher</a> pointing at your repo + workflow + environment name (<code>pypi</code>).</li>
 </ol>
 <p>The workflow grants <code>id-token: write</code> on the publish job — that's what makes the OIDC handshake possible. Don't set <code>UV_PUBLISH_*</code> secrets alongside: when all three are present <code>release.publish</code> uploads with them instead, and without attestations.</p>
-<p>The same OIDC identity signs two attestations over the wheel and sdist before they are uploaded. <code>actions/attest-build-provenance</code> records GitHub's own (needs <code>attestations: write</code>, already granted), verified with <code>gh attestation verify</code>. <code>release.attest</code> signs a <a href="https://packaging.python.org/en/latest/specifications/index-hosted-attestations/">PEP 740</a> attestation per file that <code>uv publish</code> uploads to PyPI, where it shows as <em>Provenance</em> on each file and is verified with <code>pypi-attestations verify pypi</code>. PyPI takes the second kind only through Trusted Publishing, which is one more reason to keep the credential path unused. See <a href="../explanation/sbom-and-security-model.html#layer-3-build-provenance">SBOM and security model</a>.</p>
+<p>The same OIDC identity signs two attestations over the wheel and sdist, one before they are uploaded and one after. <code>actions/attest-build-provenance</code> records GitHub's own (needs <code>attestations: write</code>, already granted), verified with <code>gh attestation verify</code>. <code>release.attest</code> signs a <a href="https://packaging.python.org/en/latest/specifications/index-hosted-attestations/">PEP 740</a> attestation per file that <code>uv publish</code> uploads to PyPI, where it shows as <em>Provenance</em> on each file and is verified with <code>pypi-attestations verify pypi</code>. PyPI takes the second kind only through Trusted Publishing, which is one more reason to keep the credential path unused. See <a href="../explanation/sbom-and-security-model.html#layer-3-build-provenance">SBOM and security model</a>.</p>
 <h2 id="hardening-against-external-contributors">Hardening against external contributors</h2>
 <ul>
 <li>Set <strong>Settings → Actions → Fork pull request workflows → Require approval for all external contributors</strong>.</li>

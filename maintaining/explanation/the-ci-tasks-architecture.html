@@ -592,6 +592,8 @@ for module in (build, container, develop, ...):
 <li><code>publish_deps_image(context, tag) -&gt; str</code></li>
 <li><code>create_release_pr(context, branch, version) -&gt; str</code></li>
 <li><code>pr_create_url(context, branch) -&gt; str</code></li>
+<li><code>release_tag_commit(context, tag) -&gt; str</code></li>
+<li><code>create_release(context, tag, sha) -&gt; str</code></li>
 <li><code>pipeline_badge(context) -&gt; str</code></li>
 <li><code>iter_pipeline_components() -&gt; Iterator[PipelineComponent]</code></li>
 </ul>
