@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="auto">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        <meta name="author" content="Carlo 'carlovo' van Overbeek">
+        
+        <link rel="shortcut icon" href="../../img/favicon.ico">
+        <title>ADR-0011 Report names carry a scope - Paleofuturistic Python</title>
+        <link href="../../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../../css/brands.min.css" rel="stylesheet">
+        <link href="../../css/solid.min.css" rel="stylesheet">
+        <link href="../../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" disabled>
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="../../index.html">Paleofuturistic Python</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href="../../index.html" class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Using the template</a>
+                                <ul class="dropdown-menu">
+                                    
+  <li class="dropdown-submenu">
+    <a href="#" class="dropdown-item">Tutorials</a>
+    <ul class="dropdown-menu">
+            
+<li>
+    <a href="../../using/tutorials/generate-your-first-project.html" class="dropdown-item">Generate your first project</a>
+</li>
+            
+<li>
+    <a href="../../using/tutorials/from-zero-to-published-package.html" class="dropdown-item">From zero to a published package</a>
+</li>
+    </ul>
+  </li>
+                                    
+  <li class="dropdown-submenu">
+    <a href="#" class="dropdown-item">How-to</a>
+    <ul class="dropdown-menu">
+            
+<li>
+    <a href="../../using/how-to/update-existing-project-with-copier.html" class="dropdown-item">Update an existing project with copier</a>
+</li>
+            
+<li>
+    <a href="../../using/how-to/choose-a-git-host.html" class="dropdown-item">Choose a git host</a>
+</li>
+            
+<li>
+    <a href="../../using/how-to/harden-github-repository.html" class="dropdown-item">Harden the GitHub repository</a>
+</li>
+            
+<li>
+    <a href="../../using/how-to/convert-library-to-cli.html" class="dropdown-item">Convert the library into a CLI</a>
+</li>
+            
+<li>
+    <a href="../../using/how-to/choose-python-version-range.html" class="dropdown-item">Choose the Python version range</a>
+</li>
+            
+<li>
+    <a href="../../using/how-to/publish-docs-to-github-pages.html" class="dropdown-item">Publish docs to GitHub Pages</a>
+</li>
+    </ul>
+  </li>
+                                    
+  <li class="dropdown-submenu">
+    <a href="#" class="dropdown-item">Reference</a>
+    <ul class="dropdown-menu">
+            
+<li>
+    <a href="../../using/reference/copier-questions.html" class="dropdown-item">Copier questions</a>
+</li>
+            
+<li>
+    <a href="../../using/reference/generated-project-tree.html" class="dropdown-item">Generated project tree</a>
+</li>
+            
+<li>
+    <a href="../../using/reference/license-options.html" class="dropdown-item">License options</a>
+</li>
+            
+<li>
+    <a href="../../using/reference/packaging-specifications.html" class="dropdown-item">Packaging specifications</a>
+</li>
+    </ul>
+  </li>
+                                    
+  <li class="dropdown-submenu">
+    <a href="#" class="dropdown-item">Explanation</a>
+    <ul class="dropdown-menu">
+            
+<li>
+    <a href="../../using/explanation/how-uv-is-used.html" class="dropdown-item">How uv is used</a>
+</li>
+            
+<li>
+    <a href="../../using/explanation/sbom-and-security-model.html" class="dropdown-item">SBOM and security model</a>
+</li>
+            
+<li>
+    <a href="../../using/explanation/packaging-conformance.html" class="dropdown-item">Packaging conformance</a>
+</li>
+            
+<li>
+    <a href="../../using/explanation/testing-strategy.html" class="dropdown-item">Testing strategy</a>
+</li>
+    </ul>
+  </li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Maintaining the template</a>
+                                <ul class="dropdown-menu">
+                                    
+  <li class="dropdown-submenu">
+    <a href="#" class="dropdown-item">Tutorials</a>
+    <ul class="dropdown-menu">
+            
+<li>
+    <a href="../tutorials/make-your-first-template-change.html" class="dropdown-item">Make your first template change</a>
+</li>
+    </ul>
+  </li>
+                                    
+  <li class="dropdown-submenu">
+    <a href="#" class="dropdown-item">How-to</a>
+    <ul class="dropdown-menu">
+            
+<li>
+    <a href="../how-to/test-the-template.html" class="dropdown-item">Test the template</a>
+</li>
+            
+<li>
+    <a href="../how-to/extend-the-template-tasks.html" class="dropdown-item">Extend the template workflow tasks</a>
+</li>
+            
+<li>
+    <a href="../how-to/sync-shipped-docs.html" class="dropdown-item">Keep shipped docs in sync</a>
+</li>
+            
+<li>
+    <a href="../how-to/bump-the-uv-pin.html" class="dropdown-item">Bump the uv pin</a>
+</li>
+            
+<li>
+    <a href="../how-to/refresh-the-vendored-invoke.html" class="dropdown-item">Refresh the vendored invoke</a>
+</li>
+    </ul>
+  </li>
+                                    
+  <li class="dropdown-submenu">
+    <a href="#" class="dropdown-item">Reference</a>
+    <ul class="dropdown-menu">
+            
+<li>
+    <a href="../reference/generation-internals.html" class="dropdown-item">Generation internals</a>
+</li>
+    </ul>
+  </li>
+                                    
+  <li class="dropdown-submenu">
+    <a href="#" class="dropdown-item">Explanation</a>
+    <ul class="dropdown-menu">
+            
+<li>
+    <a href="../explanation/design-principles.html" class="dropdown-item">Design principles</a>
+</li>
+            
+<li>
+    <a href="../explanation/why-copier.html" class="dropdown-item">Why copier</a>
+</li>
+            
+<li>
+    <a href="../explanation/the-ci-tasks-architecture.html" class="dropdown-item">The CI tasks architecture</a>
+</li>
+            
+<li>
+    <a href="../explanation/history-and-lineage.html" class="dropdown-item">History and lineage</a>
+</li>
+    </ul>
+  </li>
+                                    
+  <li class="dropdown-submenu">
+    <a href="#" class="dropdown-item">Decisions</a>
+    <ul class="dropdown-menu">
+            
+<li>
+    <a href="index.html" class="dropdown-item">Decision records</a>
+</li>
+            
+<li>
+    <a href="0001-copier-is-the-delivery-mechanism.html" class="dropdown-item">ADR-0001 Copier is the delivery mechanism</a>
+</li>
+            
+<li>
+    <a href="0002-uv-is-the-only-tool-you-install.html" class="dropdown-item">ADR-0002 uv is the only tool you install</a>
+</li>
+            
+<li>
+    <a href="0003-vendored-invoke-behind-one-launcher.html" class="dropdown-item">ADR-0003 Vendored Invoke behind one launcher</a>
+</li>
+            
+<li>
+    <a href="0004-pipelines-run-template-commands-only.html" class="dropdown-item">ADR-0004 Pipelines run template commands only</a>
+</li>
+            
+<li>
+    <a href="0005-dependency-groups-not-extras.html" class="dropdown-item">ADR-0005 Dependency groups, not extras</a>
+</li>
+            
+<li>
+    <a href="0006-deliberate-non-goals.html" class="dropdown-item">ADR-0006 Deliberate non-goals</a>
+</li>
+            
+<li>
+    <a href="0007-diataxis-with-shipped-rationale-pages.html" class="dropdown-item">ADR-0007 Diátaxis with shipped rationale pages</a>
+</li>
+            
+<li>
+    <a href="0008-reproducibility-by-pin.html" class="dropdown-item">ADR-0008 Reproducibility by pin</a>
+</li>
+            
+<li>
+    <a href="0009-one-qa-gate.html" class="dropdown-item">ADR-0009 One QA gate</a>
+</li>
+            
+<li>
+    <a href="0010-verifying-is-the-default-writing-is-a-flag.html" class="dropdown-item">ADR-0010 Verifying is the default, writing is a flag</a>
+</li>
+            
+<li>
+    <a href="0011-report-names-carry-a-scope.html" class="dropdown-item active" aria-current="page">ADR-0011 Report names carry a scope</a>
+</li>
+            
+<li>
+    <a href="0012-the-sbom-ships-inside-the-wheel.html" class="dropdown-item">ADR-0012 The SBOM ships inside the wheel</a>
+</li>
+            
+<li>
+    <a href="0013-the-audit-runs-on-a-schedule-and-the-dependency-surface.html" class="dropdown-item">ADR-0013 The audit runs on a schedule and the dependency surface</a>
+</li>
+            
+<li>
+    <a href="0014-a-release-is-the-version-bump-arriving-on-the-default-branch.html" class="dropdown-item">ADR-0014 A release is the version bump arriving on the default branch</a>
+</li>
+            
+<li>
+    <a href="0015-local-py-is-the-projects-module.html" class="dropdown-item">ADR-0015 local.py is the project's module</a>
+</li>
+    </ul>
+  </li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#properdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="0010-verifying-is-the-default-writing-is-a-flag.html" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" href="0012-the-sbom-ships-inside-the-wheel.html" class="nav-link">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="https://github.com/schubergphilis/paleofuturistic_python/blob/main/docs/maintaining/decisions/0011-report-names-carry-a-scope.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                              <button id="theme-menu" aria-expanded="false" data-bs-toggle="dropdown" data-bs-display="static" aria-label="Toggle theme" class="nav-link dropdown-toggle">
+                                <i class="fa-solid fa-circle-half-stroke fa-fw"></i>
+                                <span class="d-lg-none ms-2">Toggle theme</span>
+                              </button>
+                              <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                  <button class="dropdown-item d-flex align-items-center" data-bs-theme-value="light" aria-pressed="false">
+                                    <i class="fa-solid fa-sun fa-fw"></i>
+                                    <span class="ms-2">Light</span>
+                                    <i class="fa-solid fa-check ms-auto d-none"></i>
+                                  </button>
+                                </li>
+                                <li>
+                                  <button class="dropdown-item d-flex align-items-center" data-bs-theme-value="dark" aria-pressed="false">
+                                    <i class="fa-solid fa-moon fa-fw"></i>
+                                    <span class="ms-2">Dark</span>
+                                    <i class="fa-solid fa-check ms-auto d-none"></i>
+                                  </button>
+                                </li>
+                                <li>
+                                  <button class="dropdown-item d-flex align-items-center" data-bs-theme-value="auto" aria-pressed="true">
+                                    <i class="fa-solid fa-circle-half-stroke fa-fw"></i>
+                                    <span class="ms-2">Auto</span>
+                                    <i class="fa-solid fa-check ms-auto"></i>
+                                  </button>
+                                </li>
+                              </ul>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <script src="../../js/darkmode.js"></script>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <style>
+            /* The theme styles bare <details> as admonition boxes; undo that inside the sidebar. */
+            .bs-sidebar .sitenav-section details {
+                padding: 0; margin: 0; border: 0; border-radius: 0;
+                background: transparent; text-align: inherit;
+            }
+            .bs-sidebar #toc-collapse .nav-link { padding: 2px 10px; }
+            .sitenav-section > details > summary { cursor: pointer; list-style: none; }
+            .sitenav-section > details > summary::-webkit-details-marker { display: none; }
+            .sitenav-section > details > summary::before { content: "\25B8"; display: inline-block; width: 1em; }
+            .sitenav-section > details[open] > summary::before { content: "\25BE"; }
+            .bs-sidebar .sitenav-section ul { margin-left: 0.9em; }
+            .bs-sidebar .nav .nav .nav { margin-left: 0; }
+            .bs-sidebar .sitenav-title {
+                font-weight: 600; font-size: 0.85em; text-transform: uppercase;
+                letter-spacing: 0.05em; opacity: 0.6; padding: 0.5rem 10px 0.15rem;
+            }
+        </style>
+        <div class="sitenav-title">Navigation</div>
+        <ul class="nav flex-column">
+            
+            <li class="nav-item">
+                <a href="../../index.html" class="nav-link">Home</a>
+            </li>
+            
+            <li class="nav-item sitenav-section">
+                <details >
+                    <summary class="nav-link">Using the template</summary>
+                    <ul class="nav flex-column">
+            <li class="nav-item sitenav-section">
+                <details >
+                    <summary class="nav-link">Tutorials</summary>
+                    <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="../../using/tutorials/generate-your-first-project.html" class="nav-link">Generate your first project</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../using/tutorials/from-zero-to-published-package.html" class="nav-link">From zero to a published package</a>
+            </li>
+                    </ul>
+                </details>
+            </li>
+            <li class="nav-item sitenav-section">
+                <details >
+                    <summary class="nav-link">How-to</summary>
+                    <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="../../using/how-to/update-existing-project-with-copier.html" class="nav-link">Update an existing project with copier</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../using/how-to/choose-a-git-host.html" class="nav-link">Choose a git host</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../using/how-to/harden-github-repository.html" class="nav-link">Harden the GitHub repository</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../using/how-to/convert-library-to-cli.html" class="nav-link">Convert the library into a CLI</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../using/how-to/choose-python-version-range.html" class="nav-link">Choose the Python version range</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../using/how-to/publish-docs-to-github-pages.html" class="nav-link">Publish docs to GitHub Pages</a>
+            </li>
+                    </ul>
+                </details>
+            </li>
+            <li class="nav-item sitenav-section">
+                <details >
+                    <summary class="nav-link">Reference</summary>
+                    <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="../../using/reference/copier-questions.html" class="nav-link">Copier questions</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../using/reference/generated-project-tree.html" class="nav-link">Generated project tree</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../using/reference/license-options.html" class="nav-link">License options</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../using/reference/packaging-specifications.html" class="nav-link">Packaging specifications</a>
+            </li>
+                    </ul>
+                </details>
+            </li>
+            <li class="nav-item sitenav-section">
+                <details >
+                    <summary class="nav-link">Explanation</summary>
+                    <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="../../using/explanation/how-uv-is-used.html" class="nav-link">How uv is used</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../using/explanation/sbom-and-security-model.html" class="nav-link">SBOM and security model</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../using/explanation/packaging-conformance.html" class="nav-link">Packaging conformance</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../using/explanation/testing-strategy.html" class="nav-link">Testing strategy</a>
+            </li>
+                    </ul>
+                </details>
+            </li>
+                    </ul>
+                </details>
+            </li>
+            
+            <li class="nav-item sitenav-section">
+                <details open>
+                    <summary class="nav-link">Maintaining the template</summary>
+                    <ul class="nav flex-column">
+            <li class="nav-item sitenav-section">
+                <details >
+                    <summary class="nav-link">Tutorials</summary>
+                    <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="../tutorials/make-your-first-template-change.html" class="nav-link">Make your first template change</a>
+            </li>
+                    </ul>
+                </details>
+            </li>
+            <li class="nav-item sitenav-section">
+                <details >
+                    <summary class="nav-link">How-to</summary>
+                    <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="../how-to/test-the-template.html" class="nav-link">Test the template</a>
+            </li>
+            <li class="nav-item">
+                <a href="../how-to/extend-the-template-tasks.html" class="nav-link">Extend the template workflow tasks</a>
+            </li>
+            <li class="nav-item">
+                <a href="../how-to/sync-shipped-docs.html" class="nav-link">Keep shipped docs in sync</a>
+            </li>
+            <li class="nav-item">
+                <a href="../how-to/bump-the-uv-pin.html" class="nav-link">Bump the uv pin</a>
+            </li>
+            <li class="nav-item">
+                <a href="../how-to/refresh-the-vendored-invoke.html" class="nav-link">Refresh the vendored invoke</a>
+            </li>
+                    </ul>
+                </details>
+            </li>
+            <li class="nav-item sitenav-section">
+                <details >
+                    <summary class="nav-link">Reference</summary>
+                    <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="../reference/generation-internals.html" class="nav-link">Generation internals</a>
+            </li>
+                    </ul>
+                </details>
+            </li>
+            <li class="nav-item sitenav-section">
+                <details >
+                    <summary class="nav-link">Explanation</summary>
+                    <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="../explanation/design-principles.html" class="nav-link">Design principles</a>
+            </li>
+            <li class="nav-item">
+                <a href="../explanation/why-copier.html" class="nav-link">Why copier</a>
+            </li>
+            <li class="nav-item">
+                <a href="../explanation/the-ci-tasks-architecture.html" class="nav-link">The CI tasks architecture</a>
+            </li>
+            <li class="nav-item">
+                <a href="../explanation/history-and-lineage.html" class="nav-link">History and lineage</a>
+            </li>
+                    </ul>
+                </details>
+            </li>
+            <li class="nav-item sitenav-section">
+                <details open>
+                    <summary class="nav-link">Decisions</summary>
+                    <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="index.html" class="nav-link">Decision records</a>
+            </li>
+            <li class="nav-item">
+                <a href="0001-copier-is-the-delivery-mechanism.html" class="nav-link">ADR-0001 Copier is the delivery mechanism</a>
+            </li>
+            <li class="nav-item">
+                <a href="0002-uv-is-the-only-tool-you-install.html" class="nav-link">ADR-0002 uv is the only tool you install</a>
+            </li>
+            <li class="nav-item">
+                <a href="0003-vendored-invoke-behind-one-launcher.html" class="nav-link">ADR-0003 Vendored Invoke behind one launcher</a>
+            </li>
+            <li class="nav-item">
+                <a href="0004-pipelines-run-template-commands-only.html" class="nav-link">ADR-0004 Pipelines run template commands only</a>
+            </li>
+            <li class="nav-item">
+                <a href="0005-dependency-groups-not-extras.html" class="nav-link">ADR-0005 Dependency groups, not extras</a>
+            </li>
+            <li class="nav-item">
+                <a href="0006-deliberate-non-goals.html" class="nav-link">ADR-0006 Deliberate non-goals</a>
+            </li>
+            <li class="nav-item">
+                <a href="0007-diataxis-with-shipped-rationale-pages.html" class="nav-link">ADR-0007 Diátaxis with shipped rationale pages</a>
+            </li>
+            <li class="nav-item">
+                <a href="0008-reproducibility-by-pin.html" class="nav-link">ADR-0008 Reproducibility by pin</a>
+            </li>
+            <li class="nav-item">
+                <a href="0009-one-qa-gate.html" class="nav-link">ADR-0009 One QA gate</a>
+            </li>
+            <li class="nav-item">
+                <a href="0010-verifying-is-the-default-writing-is-a-flag.html" class="nav-link">ADR-0010 Verifying is the default, writing is a flag</a>
+            </li>
+            <li class="nav-item">
+                <a href="0011-report-names-carry-a-scope.html" class="nav-link active fw-bold">ADR-0011 Report names carry a scope</a>
+            </li>
+            <li class="nav-item">
+                <a href="0012-the-sbom-ships-inside-the-wheel.html" class="nav-link">ADR-0012 The SBOM ships inside the wheel</a>
+            </li>
+            <li class="nav-item">
+                <a href="0013-the-audit-runs-on-a-schedule-and-the-dependency-surface.html" class="nav-link">ADR-0013 The audit runs on a schedule and the dependency surface</a>
+            </li>
+            <li class="nav-item">
+                <a href="0014-a-release-is-the-version-bump-arriving-on-the-default-branch.html" class="nav-link">ADR-0014 A release is the version bump arriving on the default branch</a>
+            </li>
+            <li class="nav-item">
+                <a href="0015-local-py-is-the-projects-module.html" class="nav-link">ADR-0015 local.py is the project's module</a>
+            </li>
+                    </ul>
+                </details>
+            </li>
+                    </ul>
+                </details>
+            </li>
+        </ul>
+        <div class="sitenav-title">On this page</div>
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#adr-0011-report-names-carry-a-scope" class="nav-link">ADR-0011: Report names carry a scope</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#context" class="nav-link">Context</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#decision" class="nav-link">Decision</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#consequences" class="nav-link">Consequences</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#references" class="nav-link">References</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<h1 id="adr-0011-report-names-carry-a-scope">ADR-0011: Report names carry a scope</h1>
+<ul>
+<li><strong>Status</strong>: accepted</li>
+<li><strong>Date</strong>: 2026-09-09, after the per-env split of 2026-09-02</li>
+<li><strong>Record written</strong>: 2026-11-11 (backfilled)</li>
+</ul>
+<h2 id="context">Context</h2>
+<p>Coverage across a version matrix is a union: a line counts as covered if any interpreter ran
+it, and version-gated code is covered by no single interpreter. Three bugs came from readers not
+knowing which scope a file held:</p>
+<ul>
+<li>Under <code>tox run-parallel</code>, five environments wrote one <code>reports/coverage.json</code> at once, and the
+  badge read whichever finished last, possibly mid-write.</li>
+<li><code>test.pytest</code> outside tox wrote the same file with one interpreter's number, overwriting the
+  union the badge and the ratchet had read.</li>
+<li><code>fail_under</code>, set by the ratchet from the union, was enforced by pytest-cov per interpreter,
+  and no single interpreter can clear a floor only the union reaches.</li>
+</ul>
+<p>It took three passes to find every writer.</p>
+<h2 id="decision">Decision</h2>
+<p>A report's name says what scope produced it, and whatever writes a name must run at that scope:</p>
+<ul>
+<li><code>reports/coverage.json</code> means the union across <code>env_list</code>, and is written only by
+  <code>combine_coverage</code> after the whole matrix.</li>
+<li><code>reports/coverage.&lt;env&gt;.json</code> is one environment's report; <code>coverage.local.json</code> is whatever a
+  bare <code>pytest</code> happened to use. Nothing reads either.</li>
+<li>Each environment measures into its own <code>.coverage.&lt;env&gt;</code> data file.</li>
+<li><code>fail_under</code> is enforced once, against the union; every other coverage command passes
+  <code>--fail-under=0</code>, <code>addopts</code> included.</li>
+<li><code>test.tox --env=&lt;one&gt;</code> writes under that environment's name and refuses <code>--write</code>, because one
+  interpreter's coverage is not what the badge means.</li>
+</ul>
+<p>The same rule covers the CI badge: its value is a fact about a clone, so no run is at the right
+scope to judge it, and it is written but never verified (ADR-0010).</p>
+<h2 id="consequences">Consequences</h2>
+<ul>
+<li>The badge and the ratchet read a filename, not a provenance, and the filename is now enough.</li>
+<li><code>coverage erase</code> leaves per-env data alone, so the matrix task deletes <code>.coverage.*</code> and the
+  per-env reports by hand before each run, or a dropped environment would inflate the union.</li>
+<li>Trimming <code>env_list</code> can lower the measured union and fail the next run. That is the ratchet
+  working.</li>
+</ul>
+<h2 id="references">References</h2>
+<ul>
+<li>Commits <code>a706f2e</code> (per-env data and combine), <code>10011e5</code> (the local report renamed).</li>
+<li><a href="../../using/explanation/testing-strategy.html">Testing strategy</a>, the module docstring of <code>template/_CI/tasks/preflight.py</code>.</li>
+</ul></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+                <p>Copyright &copy; 2024 <a href="https://schubergphilis.com/">Schuberg Philis</a></p>
+            <p>Documentation built with <a href="https://properdocs.org/">ProperDocs</a>.</p>
+        </footer>
+        <script src="../../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "../..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../../js/base.js"></script>
+        <script src="../../search/main.js"></script>
+
+        <div class="modal" id="properdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="properdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="properdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="properdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>
