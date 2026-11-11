@@ -52,3 +52,27 @@ anywhere in the repository resolves to a file.
 | [ADR-0013](0013-the-audit-runs-on-a-schedule-and-the-dependency-surface.md) | The audit runs on a schedule and on the dependency surface |
 | [ADR-0014](0014-a-release-is-the-version-bump-arriving-on-the-default-branch.md) | A release is the version bump arriving on the default branch |
 | [ADR-0015](0015-local-py-is-the-projects-module.md) | `local.py` is the project's module |
+| [ADR-0016](0016-ruff-replaces-black-isort-and-flake8.md) | Ruff replaces Black, isort and flake8; pylint stays for what Ruff lacks |
+| [ADR-0017](0017-ty-replaces-mypy.md) | ty replaces mypy |
+| [ADR-0018](0018-pytest-replaces-unittest.md) | pytest replaces unittest, with xdist at a fixed worker count |
+| [ADR-0019](0019-conventional-commits-drive-the-changelog.md) | Conventional Commits drive the changelog, not the version |
+| [ADR-0020](0020-properdocs-with-mkdocstrings.md) | properdocs with mkdocstrings |
+| [ADR-0021](0021-trusted-publishing-with-attestations.md) | Trusted Publishing with PEP 740 attestations by default |
+| [ADR-0022](0022-one-commit-stage-hook-and-no-filter-on-pre-push.md) | One commit-stage hook, and no `files:` filter on pre-push |
+| [ADR-0023](0023-staged-paths-with-shell-characters-are-refused.md) | Staged paths with spaces or shell characters are refused |
+| [ADR-0024](0024-commit-messages-are-checked-over-the-unpushed-range.md) | Commit messages are checked over the unpushed range only |
+| [ADR-0025](0025-coverage-is-a-union-and-the-ratchet-starts-dormant.md) | Coverage is a union, `fail_under` is enforced once, and the ratchet starts dormant |
+| [ADR-0026](0026-pyscn-json-in-the-gate-html-on-demand.md) | pyscn produces JSON in the gate and HTML on demand |
+| [ADR-0027](0027-heavy-imports-stay-out-of-launcher-startup.md) | Heavy imports stay out of launcher startup |
+| [ADR-0028](0028-the-audit-reads-the-lockfile-and-retries-without-a-verdict.md) | The audit reads `uv.lock` directly and retries a run with no verdict |
+| [ADR-0029](0029-suppressions-from-three-sources-two-of-them-must-expire.md) | Suppressions come from three sources, and the two outside the repository must expire |
+| [ADR-0030](0030-task-commits-follow-the-signing-configuration.md) | Task commits follow the signing configuration |
+| [ADR-0031](0031-the-changelog-is-the-page-the-nav-shows.md) | The changelog lives at `docs/reference/changelog.md` |
+| [ADR-0032](0032-dependency-track-upload-removed.md) | Dependency-Track upload removed |
+| [ADR-0033](0033-the-deps-image-is-content-addressed-and-handed-on-by-digest.md) | The deps image is content-addressed and handed on by digest |
+| [ADR-0034](0034-the-deps-image-runs-as-uid-1001.md) | The deps image runs as uid 1001 |
+| [ADR-0035](0035-github-reuses-a-deps-tag-gitlab-builds-with-kaniko.md) | GitHub reuses an existing deps tag; GitLab's pipeline job builds with kaniko |
+| [ADR-0036](0036-checkouts-persist-no-credentials.md) | Checkouts persist no credentials |
+| [ADR-0037](0037-docs-deploy-on-release-through-gh-deploy.md) | Docs deploy on release through `gh-deploy` |
+| [ADR-0038](0038-template-tests-snapshot-pin-and-mature.md) | Template tests generate from a snapshot, pin the uv version, and run one matured cell |
+| [ADR-0039](0039-repository-url-renders-well-known-project-urls-or-nothing.md) | `repository_url` renders well-known `[project.urls]`, or nothing |

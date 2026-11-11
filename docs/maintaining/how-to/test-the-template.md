@@ -48,5 +48,6 @@ Structural assertions live in `tests/test_template_invariants.py`; each test rec
 
 ## See also
 
+- [ADR-0038](../decisions/0038-template-tests-snapshot-pin-and-mature.md) — why the snapshot, the pinned uv and the matured cell are shaped this way.
 - [Testing strategy](../../using/explanation/testing-strategy.md) — the test layers inside a *generated* project.
 - [Make your first template change](../tutorials/make-your-first-template-change.md) — the edit-test loop, end to end.

@@ -70,5 +70,29 @@ nav:
       - ADR-0013 The audit runs on a schedule and the dependency surface: maintaining/decisions/0013-the-audit-runs-on-a-schedule-and-the-dependency-surface.md
       - ADR-0014 A release is the version bump arriving on the default branch: maintaining/decisions/0014-a-release-is-the-version-bump-arriving-on-the-default-branch.md
       - ADR-0015 local.py is the project's module: maintaining/decisions/0015-local-py-is-the-projects-module.md
+      - ADR-0016 Ruff replaces Black, isort and flake8: maintaining/decisions/0016-ruff-replaces-black-isort-and-flake8.md
+      - ADR-0017 ty replaces mypy: maintaining/decisions/0017-ty-replaces-mypy.md
+      - ADR-0018 pytest replaces unittest: maintaining/decisions/0018-pytest-replaces-unittest.md
+      - ADR-0019 Conventional Commits drive the changelog: maintaining/decisions/0019-conventional-commits-drive-the-changelog.md
+      - ADR-0020 properdocs with mkdocstrings: maintaining/decisions/0020-properdocs-with-mkdocstrings.md
+      - ADR-0021 Trusted Publishing with attestations: maintaining/decisions/0021-trusted-publishing-with-attestations.md
+      - ADR-0022 One commit-stage hook, no filter on pre-push: maintaining/decisions/0022-one-commit-stage-hook-and-no-filter-on-pre-push.md
+      - ADR-0023 Staged paths with shell characters are refused: maintaining/decisions/0023-staged-paths-with-shell-characters-are-refused.md
+      - ADR-0024 Commit messages are checked over the unpushed range: maintaining/decisions/0024-commit-messages-are-checked-over-the-unpushed-range.md
+      - ADR-0025 Coverage is a union and the ratchet starts dormant: maintaining/decisions/0025-coverage-is-a-union-and-the-ratchet-starts-dormant.md
+      - ADR-0026 pyscn JSON in the gate, HTML on demand: maintaining/decisions/0026-pyscn-json-in-the-gate-html-on-demand.md
+      - ADR-0027 Heavy imports stay out of launcher startup: maintaining/decisions/0027-heavy-imports-stay-out-of-launcher-startup.md
+      - ADR-0028 The audit reads the lockfile and retries without a verdict: maintaining/decisions/0028-the-audit-reads-the-lockfile-and-retries-without-a-verdict.md
+      - ADR-0029 Suppressions from three sources, two must expire: maintaining/decisions/0029-suppressions-from-three-sources-two-of-them-must-expire.md
+      - ADR-0030 Task commits follow the signing configuration: maintaining/decisions/0030-task-commits-follow-the-signing-configuration.md
+      - ADR-0031 The changelog is the page the nav shows: maintaining/decisions/0031-the-changelog-is-the-page-the-nav-shows.md
+      - ADR-0032 Dependency-Track upload removed: maintaining/decisions/0032-dependency-track-upload-removed.md
+      - ADR-0033 The deps image is content-addressed and handed on by digest: maintaining/decisions/0033-the-deps-image-is-content-addressed-and-handed-on-by-digest.md
+      - ADR-0034 The deps image runs as uid 1001: maintaining/decisions/0034-the-deps-image-runs-as-uid-1001.md
+      - ADR-0035 GitHub reuses a deps tag, GitLab builds with kaniko: maintaining/decisions/0035-github-reuses-a-deps-tag-gitlab-builds-with-kaniko.md
+      - ADR-0036 Checkouts persist no credentials: maintaining/decisions/0036-checkouts-persist-no-credentials.md
+      - ADR-0037 Docs deploy on release through gh-deploy: maintaining/decisions/0037-docs-deploy-on-release-through-gh-deploy.md
+      - ADR-0038 Template tests snapshot, pin and mature: maintaining/decisions/0038-template-tests-snapshot-pin-and-mature.md
+      - ADR-0039 repository_url renders well-known project URLs: maintaining/decisions/0039-repository-url-renders-well-known-project-urls-or-nothing.md
 
 copyright: Copyright &copy; 2024 <a href="https://schubergphilis.com/">Schuberg Philis</a>

@@ -4,7 +4,7 @@ The template is opinionated. The choices below were made deliberately, not by ac
 
 ## Pipelines run template commands only
 
-Record: [ADR-0004](../decisions/0004-pipelines-run-template-commands-only.md).
+Records: [ADR-0004](../decisions/0004-pipelines-run-template-commands-only.md), [ADR-0033](../decisions/0033-the-deps-image-is-content-addressed-and-handed-on-by-digest.md), [ADR-0034](../decisions/0034-the-deps-image-runs-as-uid-1001.md), [ADR-0035](../decisions/0035-github-reuses-a-deps-tag-gitlab-builds-with-kaniko.md), [ADR-0036](../decisions/0036-checkouts-persist-no-credentials.md).
 
 Every CI step is a `./workflow.cmd <task>` call — no inline `uv …`, `pip install …`, ad-hoc `properdocs …`, or other business logic in YAML. Behaviour changes happen in `_CI/tasks/`; workflow files are glue.
 
@@ -16,7 +16,7 @@ Two side-effects of this rule earn the rule a section of its own:
 
 ## The QA gate
 
-Records: [ADR-0009](../decisions/0009-one-qa-gate.md), [ADR-0010](../decisions/0010-verifying-is-the-default-writing-is-a-flag.md), [ADR-0011](../decisions/0011-report-names-carry-a-scope.md).
+Records: [ADR-0009](../decisions/0009-one-qa-gate.md), [ADR-0010](../decisions/0010-verifying-is-the-default-writing-is-a-flag.md), [ADR-0011](../decisions/0011-report-names-carry-a-scope.md), [ADR-0022](../decisions/0022-one-commit-stage-hook-and-no-filter-on-pre-push.md), [ADR-0023](../decisions/0023-staged-paths-with-shell-characters-are-refused.md), [ADR-0024](../decisions/0024-commit-messages-are-checked-over-the-unpushed-range.md), [ADR-0026](../decisions/0026-pyscn-json-in-the-gate-html-on-demand.md), [ADR-0027](../decisions/0027-heavy-imports-stay-out-of-launcher-startup.md).
 
 The **QA gate** is not a command; it is the role a command plays. `preflight` with no flags is the gate: it
 runs every check, compares every derived value against what the tools just measured, writes nothing,
@@ -106,19 +106,25 @@ The template used to put dev tools under `[project.optional-dependencies]` (PEP 
 
 ## Ruff replaces Black + isort + flake8 (and most of pylint)
 
+Record: [ADR-0016](../decisions/0016-ruff-replaces-black-isort-and-flake8.md).
+
 One tool, one config block, one cache. Ruff doesn't yet cover everything pylint does — so pylint stays, but only for the checks Ruff doesn't have. We expect pylint's role to shrink as Ruff grows.
 
 ## ty replaces mypy
+
+Record: [ADR-0017](../decisions/0017-ty-replaces-mypy.md).
 
 [ty](https://github.com/astral-sh/ty) is Astral's type checker, written in Rust. It's faster than mypy and shares the Ruff/uv codebase's quality bar. Mypy compatibility issues still surface occasionally; we accept that trade for the speed and consistency.
 
 ## pytest, not unittest
 
+Records: [ADR-0018](../decisions/0018-pytest-replaces-unittest.md), [ADR-0025](../decisions/0025-coverage-is-a-union-and-the-ratchet-starts-dormant.md).
+
 The original lineage used `python -m unittest`. We moved to pytest for fixtures, parametrization, coverage integration, and parallel execution via xdist. Unittest test classes still work — pytest discovers them.
 
 ## Conventional Commits drive the release notes
 
-Record: [ADR-0014](../decisions/0014-a-release-is-the-version-bump-arriving-on-the-default-branch.md) for how a release reaches the default branch.
+Records: [ADR-0019](../decisions/0019-conventional-commits-drive-the-changelog.md), and [ADR-0014](../decisions/0014-a-release-is-the-version-bump-arriving-on-the-default-branch.md) for how a release reaches the default branch.
 
 Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) — the lint step rejects anything that doesn't parse. We use them for **automatic release notes**: [commitizen](https://commitizen-tools.github.io/commitizen/) reads the commits since the last tag and groups them by prefix (`feat:`, `fix:`, etc.) into a generated changelog.
 
@@ -126,11 +132,13 @@ We do **not** use commitizen's autorelease mode. The version bump is an explicit
 
 ## properdocs (not vanilla mkdocs), with mkdocstrings for API docs
 
+Records: [ADR-0020](../decisions/0020-properdocs-with-mkdocstrings.md), [ADR-0037](../decisions/0037-docs-deploy-on-release-through-gh-deploy.md).
+
 properdocs is mkdocs with a curated plugin set. mkdocstrings reads the source directly — no `.rst` files in the middle. Sphinx is more capable; we don't need that capability here.
 
 ## SBOMs ship inside the wheel
 
-Records: [ADR-0012](../decisions/0012-the-sbom-ships-inside-the-wheel.md), [ADR-0013](../decisions/0013-the-audit-runs-on-a-schedule-and-the-dependency-surface.md).
+Records: [ADR-0012](../decisions/0012-the-sbom-ships-inside-the-wheel.md), [ADR-0013](../decisions/0013-the-audit-runs-on-a-schedule-and-the-dependency-surface.md), [ADR-0021](../decisions/0021-trusted-publishing-with-attestations.md), [ADR-0028](../decisions/0028-the-audit-reads-the-lockfile-and-retries-without-a-verdict.md), [ADR-0029](../decisions/0029-suppressions-from-three-sources-two-of-them-must-expire.md), [ADR-0032](../decisions/0032-dependency-track-upload-removed.md).
 
 Every release composes a CycloneDX 1.7 SBOM covering four sources — runtime dependencies (from `uv export --no-dev` against the lockfile), dev / build / develop / lint / test / docs / quality / security groups (the lockfile minus the runtime set), vendored CI tooling (every package in `_CI/lib/vendor.txt`), and the chosen host's pipeline components (GitHub Actions `uses:` refs or GitLab CI `image:` refs). Each component carries an SPDX-identified licence, a SHA-256 hash where the lockfile provides one, and an external_reference pointing at its upstream page. CycloneDX `scope` (`required` / `optional` / `excluded`) distinguishes what ships in the wheel from what builds it. A two-level dependency graph (project → runtime + dev + a synthetic `build-environment` → vendored + pipeline) makes "what's in the wheel" vs "what built the wheel" walkable from the root bom-ref.
 
