@@ -571,7 +571,7 @@ project-specific tasks belong in <code>local.py</code> — <code>__init__.py</co
 <p>The <code>@logged</code> decorator wraps a task to print a clean status line:</p>
 <pre><code>    ✅ lint.ruff passed 👍
 </code></pre>
-<p>For tasks that call other tasks (a "workflow task" like <code>release</code> that calls <code>validate</code>, <code>bump</code>, <code>changelog</code>, <code>push</code>), nested output is indented under the parent banner via the <code>IndentingStream</code> class in <code>shared.py</code>. The indent is applied at the stdout/stderr layer, so even commands invoked through <code>context.run()</code> get their output indented.</p>
+<p>For tasks that call other tasks (a "workflow task" like <code>release</code> that calls <code>validate</code>, <code>bump</code> and <code>changelog</code>), nested output is indented under the parent banner via the <code>IndentingStream</code> class in <code>shared.py</code>. The indent is applied at the stdout/stderr layer, so even commands invoked through <code>context.run()</code> get their output indented.</p>
 <p>This single design choice does a lot of heavy lifting — terminal output for <code>./workflow.cmd release</code> is hierarchical and scannable instead of a flat dump.</p>
 <h2 id="bootstrap-as-a-pre-task">Bootstrap as a pre-task</h2>
 <p>Every top-level task has <code>bootstrap_task</code> inserted as its first <code>pre</code>. This means the first run of <em>any</em> workflow command triggers the bootstrap; subsequent runs see the sentinel file (<code>_CI/.bootstrapped</code>) and skip.</p>

@@ -544,7 +544,7 @@
 <p>Updating changes:</p>
 <ul>
 <li><code>.github/workflows/publish.yaml</code> or <code>.gitlab-ci.yml</code>: the publish job runs <code>release.ship</code> and, on GitHub, holds <code>contents: write</code> so <code>GITHUB_TOKEN</code> can create the tag. <code>detect-release-tag.yaml</code> is gone; <code>pages.yaml</code> runs <code>release.detect</code> itself.</li>
-<li><code>release.bump</code> commits the version files itself; <code>release.push</code> pushes no tags; <code>release.changelog</code> takes <code>--version</code>.</li>
+<li><code>release.bump</code> commits the version files itself; <code>release.changelog</code> takes <code>--version</code>; <code>release.push</code>, which had become a bare <code>git push</code> once tags were CI's to create, is gone.</li>
 </ul>
 <p>After the update:</p>
 <ol>

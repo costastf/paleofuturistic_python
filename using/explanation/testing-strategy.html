@@ -513,7 +513,7 @@ around, or one that added a module faster than its tests. The run names the numb
 and the floor it missed. Two honest ways out: cover the new code, or lower <code>fail_under</code> in the
 same commit, where a reviewer sees the bar move. Nothing in the workflow lowers it for you.</p>
 <h3 id="dormant-during-scaffold">Dormant during scaffold</h3>
-<p>The ratchet starts <strong>dormant</strong>. The smoke test (<code>def test_sanity</code> in <code>tests/test_&lt;slug&gt;.py</code>) drives the scaffolded project to 100% coverage on its very first run; if the ratchet engaged on that signal, the first real change would crash the build at a 100% floor. So the test task checks for the presence of <code>def test_sanity</code> and, while it's still there, prints a status line on every run explaining the dormant state and how to engage:</p>
+<p>The ratchet starts <strong>dormant</strong>. The smoke test (<code>def test_sanity</code> in <code>tests/test_&lt;slug&gt;.py</code>) drives the scaffolded project to 100% coverage on its very first run; if the ratchet engaged on that signal, the first real change would crash the build at a 100% floor. So the ratchet (run by <code>preflight</code> and <code>test.tox</code>) checks for the presence of <code>def test_sanity</code> and, while it's still there, prints a status line on every run explaining the dormant state and how to engage:</p>
 <pre><code>[ratchet] coverage=100% — scaffold still pristine (test_sanity present); ratchet dormant
 [ratchet]   ratchet engages when you remove `test_sanity` in tests/test_&lt;slug&gt;.py
 [ratchet]   to engage immediately, set [tool.test-ratchet] mode = &quot;strict&quot; in pyproject.toml

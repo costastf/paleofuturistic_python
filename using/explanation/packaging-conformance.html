@@ -546,8 +546,8 @@ tree, so they run on push with the rest of <code>build</code>.</p>
 <h2 id="why-the-version-is-not-dynamic">Why the version is not <code>dynamic</code></h2>
 <p><code>[project] dynamic</code> lets the build backend compute a field, typically the version from a git tag.
 Generated projects do not use it: <code>./workflow.cmd release</code> has commitizen write the new version
-into <code>pyproject.toml</code> and tag the commit, so the version in the file is the released one and
-every field is static. Static metadata is what validate-pyproject, twine and anything else that
+into <code>pyproject.toml</code>, and CI tags that version once it lands on <code>main</code>, so the version in the
+file is the released one and every field is static. Static metadata is what validate-pyproject, twine and anything else that
 reads <code>pyproject.toml</code> without running a build can see.</p>
 <h2 id="where-provenance-fits">Where provenance fits</h2>
 <p>Conformance says the files are well-formed. It says nothing about who built them.

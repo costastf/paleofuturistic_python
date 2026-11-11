@@ -516,7 +516,7 @@
 <p><code>License: None</code> at generation time, then deciding later:</p>
 <ol>
 <li>Add a <code>LICENSE</code> file at the project root.</li>
-<li>Set <code>pyproject.toml</code>'s <code>license = "&lt;SPDX-ID&gt;"</code> (or <code>license-file = "LICENSE"</code>).</li>
+<li>Set <code>pyproject.toml</code>'s <code>license = "&lt;SPDX-ID&gt;"</code> and <code>license-files = ["LICENSE"]</code>, the two fields a generated project ships when a licence was chosen.</li>
 </ol>
 <h2 id="pypi-classifiers">PyPI classifiers</h2>
 <p>If you want PyPI to display a license badge, add the matching classifier to <code>pyproject.toml</code>'s <code>[project] classifiers</code> list. Recognized strings are listed at <a href="https://pypi.org/classifiers/">pypi.org/classifiers/</a> — look under <code>License :: OSI Approved</code>.</p>

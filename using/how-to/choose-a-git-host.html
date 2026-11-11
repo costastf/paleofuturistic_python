@@ -505,7 +505,7 @@
 <td>absent</td>
 </tr>
 <tr>
-<td><code>_CI/tasks/gitlab.py</code> (registry creds, kaniko publish, release-MR API)</td>
+<td><code>_CI/tasks/gitlab.py</code> (registry creds, docker publish, release-MR API)</td>
 <td>absent</td>
 <td>shipped</td>
 </tr>
@@ -516,8 +516,8 @@
 </tr>
 <tr>
 <td>Container registry</td>
-<td><code>ghcr.io</code> (push via docker)</td>
-<td>GitLab Container Registry (push via kaniko)</td>
+<td><code>ghcr.io</code> (push via docker, from the pipeline and by hand)</td>
+<td>GitLab Container Registry (the pipeline job pushes via kaniko, <code>container.publish</code> via docker)</td>
 </tr>
 <tr>
 <td>Release PR/MR</td>

@@ -547,7 +547,7 @@ It runs the same preflight as before, this time where everyone can see its outco
 <li>Creates a <code>release/&lt;version&gt;</code> branch off <code>main</code>.</li>
 <li>Bumps the version, writes the changelog, updates the version badge, commits all.</li>
 <li>Pushes the branch. No tag yet: CI creates <code>vX.Y.Z</code> on <code>main</code> once the release is merged.</li>
-<li>Opens a release pull request on your git host (GitHub: via API if <code>GITHUB_TOKEN</code> is set, otherwise prints a manual URL; GitLab: prints a manual URL).</li>
+<li>Opens a release pull request on your git host through its API when a token is set (<code>GITHUB_TOKEN</code> on GitHub, <code>GITLAB_TOKEN</code> on GitLab), otherwise prints a URL to open it yourself.</li>
 </ol>
 <p>Note that the security audit pipeline now does run.
 That is because a commit edited <code>uv.lock</code>.
