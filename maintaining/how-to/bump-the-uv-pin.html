@@ -163,6 +163,10 @@
 <li>
     <a href="bump-the-uv-pin.html" class="dropdown-item active" aria-current="page">Bump the uv pin</a>
 </li>
+            
+<li>
+    <a href="refresh-the-vendored-invoke.html" class="dropdown-item">Refresh the vendored invoke</a>
+</li>
     </ul>
   </li>
                                     
@@ -213,7 +217,7 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a rel="next" href="../reference/generation-internals.html" class="nav-link">
+                                <a rel="next" href="refresh-the-vendored-invoke.html" class="nav-link">
                                     Next <i class="fa fa-arrow-right"></i>
                                 </a>
                             </li>
@@ -406,6 +410,9 @@
             <li class="nav-item">
                 <a href="bump-the-uv-pin.html" class="nav-link active fw-bold">Bump the uv pin</a>
             </li>
+            <li class="nav-item">
+                <a href="refresh-the-vendored-invoke.html" class="nav-link">Refresh the vendored invoke</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -518,7 +525,7 @@ published the same version, re-fetches a digest for <strong>every</strong> Pytho
 choices, and writes all ten together. Nothing is written unless every substitution succeeds, so
 a failure leaves the tree clean rather than half-bumped.</p>
 <p>To take a specific version, ignoring the cool-down:</p>
-<pre><code class="language-bash">./workflow.cmd maintain.bump-uv --version=0.12.1
+<pre><code class="language-bash">./workflow.cmd maintain.bump-uv --version=0.13.7
 </code></pre>
 <h2 id="why-the-digests-matter-more-than-they-look">Why the digests matter more than they look</h2>
 <p><code>base-image</code> carries a tag <em>and</em> a digest, and such a reference resolves to the <strong>digest</strong>. Bump

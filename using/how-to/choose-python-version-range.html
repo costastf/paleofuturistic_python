@@ -163,6 +163,10 @@
 <li>
     <a href="../../maintaining/how-to/bump-the-uv-pin.html" class="dropdown-item">Bump the uv pin</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/how-to/refresh-the-vendored-invoke.html" class="dropdown-item">Refresh the vendored invoke</a>
+</li>
     </ul>
   </li>
                                     
@@ -406,6 +410,9 @@
             <li class="nav-item">
                 <a href="../../maintaining/how-to/bump-the-uv-pin.html" class="nav-link">Bump the uv pin</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/how-to/refresh-the-vendored-invoke.html" class="nav-link">Refresh the vendored invoke</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -478,7 +485,7 @@
 <p>The questionnaire asks for <code>min_python_version</code> and <code>max_python_version</code>. They drive everything Python-version-related in the generated project.</p>
 <h2 id="what-they-control">What they control</h2>
 <ul>
-<li><strong><code>requires-python</code></strong> in <code>pyproject.toml</code> is set to <code>&gt;=&lt;min&gt;,&lt;&lt;next-major&gt;</code>.</li>
+<li><strong><code>requires-python</code></strong> in <code>pyproject.toml</code> is set to <code>&gt;=&lt;min&gt;</code>.</li>
 <li><strong><code>tool.tox</code> envs</strong> are generated for each minor version from <code>&lt;min&gt;</code> to <code>&lt;max&gt;</code> inclusive.</li>
 <li><strong>CI</strong> in <code>.github/workflows/</code> or <code>.gitlab-ci.yml</code> runs <code>preflight</code>, whose tox step covers the same range. Trimming <code>env_list</code> shortens it locally and in CI together.</li>
 <li><strong>PyPI classifiers</strong> (<code>Programming Language :: Python :: 3.X</code>) match the range.</li>
@@ -495,11 +502,10 @@
 <p>To support additional minor versions after generation:</p>
 <ol>
 <li>Update <code>pyproject.toml</code>'s <code>requires-python</code> and the classifier list.</li>
-<li>Add a new <code>tox</code> env in <code>pyproject.toml</code>'s <code>[tool.tox]</code> section.</li>
-<li>Add the new version to the CI matrix (the host-specific workflow file).</li>
-<li>Run <code>./workflow.cmd test</code> against each version to catch incompatibilities.</li>
+<li>Add a new <code>tox</code> env in <code>pyproject.toml</code>'s <code>[tool.tox]</code> section. CI needs nothing: its <code>preflight</code> job follows <code>env_list</code>.</li>
+<li>Run <code>./workflow.cmd test.tox --env=py3XX</code> against the new version to catch incompatibilities.</li>
 </ol>
-<p>For a cleaner re-derivation, <code>uvx copier update --trust</code> after the template's choices list expands will regenerate all four locations in lockstep — see <a href="update-existing-project-with-copier.html">Update an existing project with copier</a>.</p>
+<p>For a cleaner re-derivation, <code>uvx copier update --trust</code> after the template's choices list expands will regenerate all three locations in lockstep — see <a href="update-existing-project-with-copier.html">Update an existing project with copier</a>.</p>
 <h2 id="picking-a-sensible-minimum">Picking a sensible minimum</h2>
 <p>The template's floor is 3.11+ for a reason: it relies on <code>tomllib</code>, <code>ExceptionGroup</code>, and PEP 604 type unions. Older floors would require shims; the template doesn't ship them.</p>
 <p>If you need to support 3.10 or earlier for downstream consumers, generate at the template's minimum and patch the generated <code>pyproject.toml</code> manually — you're then off the template's update path for that file.</p>

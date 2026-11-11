@@ -163,6 +163,10 @@
 <li>
     <a href="../../maintaining/how-to/bump-the-uv-pin.html" class="dropdown-item">Bump the uv pin</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/how-to/refresh-the-vendored-invoke.html" class="dropdown-item">Refresh the vendored invoke</a>
+</li>
     </ul>
   </li>
                                     
@@ -406,6 +410,9 @@
             <li class="nav-item">
                 <a href="../../maintaining/how-to/bump-the-uv-pin.html" class="nav-link">Bump the uv pin</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/how-to/refresh-the-vendored-invoke.html" class="nav-link">Refresh the vendored invoke</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -541,9 +548,9 @@
 </code></pre>
 <p>When prompted, change <code>git_hosting_service</code> to the other value. Copier performs a three-way merge against your project that:</p>
 <ul>
-<li>Adds the new host's CI config + submodule.</li>
-<li>Removes the old host's CI config + submodule.</li>
-<li>Flips the import line in <code>_CI/tasks/container.py</code> (and <code>release.py</code>) from <code>.github</code> to <code>.gitlab</code> (or back).</li>
+<li>Adds the new host's CI config and <code>_CI/tasks/&lt;host&gt;.py</code> module.</li>
+<li>Removes the old host's CI config and module.</li>
+<li>Flips the import line in <code>_CI/tasks/container.py</code>, <code>release.py</code>, <code>document.py</code> and <code>sbom.py</code> from <code>.github</code> to <code>.gitlab</code> (or back).</li>
 </ul>
 <p>Review the result carefully — if you've already customised the host-specific CI files, your changes will need manual reconciliation.</p>
 <h2 id="gitlab-specifics-to-be-aware-of">GitLab specifics to be aware of</h2>

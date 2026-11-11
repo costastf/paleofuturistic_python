@@ -163,6 +163,10 @@
 <li>
     <a href="../../maintaining/how-to/bump-the-uv-pin.html" class="dropdown-item">Bump the uv pin</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/how-to/refresh-the-vendored-invoke.html" class="dropdown-item">Refresh the vendored invoke</a>
+</li>
     </ul>
   </li>
                                     
@@ -406,6 +410,9 @@
             <li class="nav-item">
                 <a href="../../maintaining/how-to/bump-the-uv-pin.html" class="nav-link">Bump the uv pin</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/how-to/refresh-the-vendored-invoke.html" class="nav-link">Refresh the vendored invoke</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -463,6 +470,10 @@
               <ul class="nav flex-column">
               </ul>
             </li>
+            <li class="nav-item" data-bs-level="2"><a href="#upgrading-past-the-gitlab-publish-gate" class="nav-link">Upgrading past the GitLab publish gate</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
             <li class="nav-item" data-bs-level="2"><a href="#upgrading-past-the-changelog-move" class="nav-link">Upgrading past the changelog move</a>
               <ul class="nav flex-column">
               </ul>
@@ -503,7 +514,7 @@
 <li>Performs a three-way merge against your current files.</li>
 <li>Applies the result, flagging conflicts for manual resolution.</li>
 </ol>
-<p>Review the changes with <code>git diff</code>, run the dev cycle (<code>./workflow.cmd format &amp;&amp; lint &amp;&amp; test &amp;&amp; build</code>), and commit when happy.</p>
+<p>Review the changes with <code>git diff</code>, run <code>./workflow.cmd format &amp;&amp; ./workflow.cmd preflight</code>, and commit when happy.</p>
 <h2 id="when-questions-have-changed">When questions have changed</h2>
 <p>If the new template version added or renamed a question (for example <code>git_hosting_service</code> was added in an earlier revision), copier will prompt for any missing answers during the update. Provide them — your <code>.copier-answers.yml</code> is updated in place.</p>
 <h2 id="upgrading-past-the-dependency-track-removal">Upgrading past the Dependency-Track removal</h2>
@@ -528,6 +539,9 @@
 <li><strong>New dependency group</strong> <code>build</code>, and new pins in <code>lint</code> and <code>security</code>. Run <code>uv lock</code> after the update and commit <code>uv.lock</code> with it.</li>
 <li><strong>Publishing.</strong> The publish job now signs PEP 740 attestations. On GitLab it also requests <code>id_tokens:</code>, and PyPI needs a Trusted Publisher registered for the project (the new <em>Set up Trusted Publishing</em> how-to). If you publish with <code>UV_PUBLISH_*</code> credentials, nothing changes: that path uploads without attestations.</li>
 </ul>
+<h2 id="upgrading-past-the-gitlab-publish-gate">Upgrading past the GitLab publish gate</h2>
+<p>The GitLab <code>publish</code> job used to run on every <code>v</code>-tag push. <code>release</code> pushes the tag from the release branch before the MR merges, so that published a version nobody had reviewed. The job now runs on pushes to the default branch and hands the push to <code>release.ship</code>, which publishes only if the pushed commits carry a <code>v</code>-tag, from that commit. Merge release MRs with a merge commit: a squash writes a new commit the tag does not point at, and nothing publishes.</p>
+<p>If you registered the PyPI Trusted Publisher, nothing changes: the job, pipeline file and <code>pypi</code> environment are the same. GitHub projects already worked this way through <code>detect-release-tag.yaml</code>.</p>
 <h2 id="upgrading-past-the-changelog-move">Upgrading past the changelog move</h2>
 <p>Releases used to write the changelog to <code>docs/changelog.md</code>, a page missing from the docs nav, while <em>Reference → Changelog</em> showed a placeholder that never changed. They now write <code>docs/reference/changelog.md</code>, the page the nav shows.</p>
 <p>Nothing is lost: the new page has no releases in it yet, so the first <code>release.changelog</code> after the update writes your full history into it from the tags, below the page's header. Later releases add their entries on top. Delete <code>docs/changelog.md</code> in that release, or any time after. If you hand-edited entries there, copy them across before deleting it, since the history is rebuilt from commit messages.</p>

@@ -163,6 +163,10 @@
 <li>
     <a href="bump-the-uv-pin.html" class="dropdown-item">Bump the uv pin</a>
 </li>
+            
+<li>
+    <a href="refresh-the-vendored-invoke.html" class="dropdown-item">Refresh the vendored invoke</a>
+</li>
     </ul>
   </li>
                                     
@@ -406,6 +410,9 @@
             <li class="nav-item">
                 <a href="bump-the-uv-pin.html" class="nav-link">Bump the uv pin</a>
             </li>
+            <li class="nav-item">
+                <a href="refresh-the-vendored-invoke.html" class="nav-link">Refresh the vendored invoke</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -505,7 +512,7 @@
 <h2 id="the-contract">The contract</h2>
 <ul>
 <li><strong>Edit the canonical page first</strong>, then propagate the change to the shipped copy.</li>
-<li>The shipped copies are <em>adaptations</em>, not byte copies: they address the generated project's developer ("your scaffold", "your project"), drop template-repo-only material, and may knob-gate sections with jinja (the SBOM page wraps its build-provenance layer in <code>{% if git_hosting_service == 'github' %}</code>).</li>
+<li>The shipped copies are <em>adaptations</em>, not byte copies: they address the generated project's developer ("your scaffold", "your project"), drop template-repo-only material, and may knob-gate passages with jinja (the SBOM page gates its GitHub-attestation paragraph on <code>{% if git_hosting_service == 'github' %}</code>).</li>
 <li>Every shipped copy opens with a <code>&lt;!-- canonical: ... --&gt;</code> HTML comment naming its source page. Keep it.</li>
 <li>Section structure must stay aligned: the shipped copy's <code>##</code> headings must be a subset of the canonical page's. <code>tests/test_template_invariants.py::test_shipped_rationale_pages_match_canonical</code> enforces both the marker and the heading subset, so a canonical edit that renames or removes a section fails <code>test.invariants</code> until the shipped copy follows.</li>
 </ul>

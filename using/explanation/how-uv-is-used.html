@@ -163,6 +163,10 @@
 <li>
     <a href="../../maintaining/how-to/bump-the-uv-pin.html" class="dropdown-item">Bump the uv pin</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/how-to/refresh-the-vendored-invoke.html" class="dropdown-item">Refresh the vendored invoke</a>
+</li>
     </ul>
   </li>
                                     
@@ -406,6 +410,9 @@
             <li class="nav-item">
                 <a href="../../maintaining/how-to/bump-the-uv-pin.html" class="nav-link">Bump the uv pin</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/how-to/refresh-the-vendored-invoke.html" class="nav-link">Refresh the vendored invoke</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -481,20 +488,20 @@
 <h1 id="how-uv-is-used">How uv is used</h1>
 <p>This template uses <a href="https://docs.astral.sh/uv/">uv</a> for every Python operation in a generated project: creating virtualenvs, installing dependencies, resolving the lockfile, publishing to PyPI, even fetching Python interpreters. This page explains why, and what the template gives up to get there.</p>
 <h2 id="what-uv-replaces">What uv replaces</h2>
-<p>In an older lineage of this template, a fresh checkout required: a system Python, pipx, virtualenv, pipenv, pip-tools, tox-uv, and twine. Each had its own configuration surface, its own caching behaviour, and its own update cadence.</p>
+<p>In an older lineage of this template, a fresh checkout required: a system Python, pipx, virtualenv, pipenv and pip-tools. Each had its own configuration surface, its own caching behaviour, and its own update cadence.</p>
 <p>uv replaces all of them with a single Rust binary that:</p>
 <ul>
 <li>Installs and pins Python interpreters per project (no system-Python dependency).</li>
 <li>Resolves and locks dependencies (no <code>pip-compile</code>, no <code>pipenv</code>).</li>
 <li>Creates and manages virtualenvs (no <code>python -m venv</code>).</li>
-<li>Publishes to PyPI (no <code>twine</code>).</li>
+<li>Publishes to PyPI (<code>uv publish</code>; twine remains only for <code>twine check</code> on the built files).</li>
 <li>Runs tools in ephemeral environments (<code>uvx</code>, no global <code>pipx</code>).</li>
 </ul>
 <h2 id="why-this-is-worth-the-lock-in">Why this is worth the lock-in</h2>
 <p><strong>Speed.</strong> uv resolves a typical lockfile in under a second. pipenv took tens of seconds — sometimes minutes on large dependency graphs. The dev loop genuinely feels different.</p>
 <p><strong>One config surface.</strong> <code>pyproject.toml</code> plus <code>uv.lock</code>. Two files. No <code>requirements.in</code>, no <code>requirements.txt</code>, no <code>Pipfile</code>, no <code>Pipfile.lock</code>.</p>
 <p><strong>Reproducibility by default.</strong> uv's lockfile is platform-portable and hash-locked. CI and a contributor's laptop get bit-identical environments without opt-in flags.</p>
-<p><strong>Dependency groups, not extras-abuse.</strong> uv first-classed PEP 735 dependency groups, which are exactly what's needed for the dev/lint/test/document/security split. The template previously used <code>[project.optional-dependencies]</code> and had to explain that those aren't really "optional," they're internal grouping. See <a href="../../maintaining/explanation/design-principles.html#why-groups-not-extras">Design principles</a> for the full rationale.</p>
+<p><strong>Dependency groups, not extras-abuse.</strong> uv first-classed PEP 735 dependency groups, which are exactly what's needed for the build/develop/lint/test/document/quality/security split. The template previously used <code>[project.optional-dependencies]</code> and had to explain that those aren't really "optional," they're internal grouping. See <a href="../../maintaining/explanation/design-principles.html#why-groups-not-extras">Design principles</a> for the full rationale.</p>
 <h2 id="what-the-template-gives-up">What the template gives up</h2>
 <p><strong>Tool risk.</strong> uv is one company's project (Astral). If they pivot or the project stalls, a project built on it is more exposed than one that stuck with the pip/build/twine stack maintained by the PyPA. The template mitigates by:</p>
 <ul>

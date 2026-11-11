@@ -163,6 +163,10 @@
 <li>
     <a href="bump-the-uv-pin.html" class="dropdown-item">Bump the uv pin</a>
 </li>
+            
+<li>
+    <a href="refresh-the-vendored-invoke.html" class="dropdown-item">Refresh the vendored invoke</a>
+</li>
     </ul>
   </li>
                                     
@@ -406,6 +410,9 @@
             <li class="nav-item">
                 <a href="bump-the-uv-pin.html" class="nav-link">Bump the uv pin</a>
             </li>
+            <li class="nav-item">
+                <a href="refresh-the-vendored-invoke.html" class="nav-link">Refresh the vendored invoke</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -499,7 +506,7 @@
 </tr>
 <tr>
 <td><code>./workflow.cmd test</code></td>
-<td>Generate the template with default context and run the full inner QA cycle (<code>format</code>, <code>lint</code>, <code>test.tox</code>, <code>build</code>, <code>document</code>).</td>
+<td>Generate the template with default context and run the inner QA cycle: <code>preflight --write</code>, then the bare <code>preflight</code> to prove the tree it wrote passes the read-only gate.</td>
 </tr>
 <tr>
 <td><code>./workflow.cmd test.combo --git-hosting-service &lt;github\|gitlab&gt; [--no-integrate-pages] [--mature]</code></td>
@@ -520,19 +527,19 @@
 <li><strong>Before a release or a risky refactor</strong>, run <code>test.matrix</code> and check <code>reports/matrix/</code> for per-cell logs.</li>
 </ul>
 <h2 id="what-ci-runs">What CI runs</h2>
-<p><code>.github/workflows/template-matrix.yaml</code> runs <code>test.invariants</code> plus a fanned-out <code>test.combo</code> per cell of <code>test.list-combos --as-json</code> (the same five cells <code>test.matrix</code> runs, matured one included) on every push to <code>main</code> and every pull request. Each cell runs the generated project's full QA cycle, so the generated docs build (including nav/link integrity) is verified for every knob combination.</p>
+<p><code>.github/workflows/template-matrix.yaml</code> runs the repository's own <code>lint</code>, <code>test.invariants</code>, plus a fanned-out <code>test.combo</code> per cell of <code>test.list-combos --as-json</code> (the same five cells <code>test.matrix</code> runs, matured one included) on every push to <code>main</code> and every pull request. Each cell runs the generated project's full QA cycle, so the generated docs build (including nav/link integrity) is verified for every knob combination.</p>
 <h2 id="why-a-matured-cell">Why a matured cell</h2>
 <p>A freshly generated project is a day-one project: the scaffolded smoke test keeps coverage at 100% and the ratchet dormant, and there is no git remote for the CI badge to name. The four cartesian cells all generate that same day-one shape — they differ only in what copier renders — so none of them ever exercises:</p>
 <ul>
 <li>the coverage ratchet leaving dormancy and engaging for real,</li>
 <li>the deadlock the coverage union exists to prevent (see <a href="../../using/explanation/testing-strategy.html">Testing strategy</a>), since a dormant or 100%-coverage ratchet can't reach it,</li>
 <li>the CI badge's origin-carrying slug, and</li>
-<li>the dependency audit (<code>secure.audit</code>), which rides with this one cell rather than every cell, so a transient advisory-service error fails one job instead of nine.</li>
+<li>the dependency audit (<code>secure.audit</code>), which rides with this one cell rather than every cell, so a transient advisory-service error fails one job instead of five.</li>
 </ul>
 <p><code>test.matrix</code> runs this cell alongside the four ordinary ones; <code>test.combo --mature</code> reproduces it alone. See <code>qa_cells()</code> in <code>_CI/tasks/configuration.py</code> for the authoritative reasoning on why it's one extra cell rather than a third combo axis.</p>
 <h2 id="skipping-a-known-cve">Skipping a known CVE</h2>
-<p>The inner <code>build</code> step runs a security audit that can fail on a freshly published CVE unrelated to your change. To skip known CVEs during template testing:</p>
-<pre><code class="language-bash">TEMPLATE_SECURITY_OVERRIDE=&quot;CVE-2025-71176&quot; ./workflow.cmd test
+<p>The matured cell's <code>secure.audit</code> can fail on a freshly published CVE unrelated to your change. To skip known CVEs during template testing:</p>
+<pre><code class="language-bash">TEMPLATE_SECURITY_OVERRIDE=&quot;CVE-2025-71176&quot; ./workflow.cmd test.combo --mature
 </code></pre>
 <h2 id="adding-a-new-invariant">Adding a new invariant</h2>
 <p>Structural assertions live in <code>tests/test_template_invariants.py</code>; each test receives one generated project per matrix cell via the <code>generated_project</code> fixture. Adding an assertion is one new <code>test_*</code> function. Adding a new combo axis means editing <code>matrix_combos()</code> in <code>_CI/tasks/configuration.py</code> — both the pytest suite and the Invoke matrix runner pick it up automatically.</p>

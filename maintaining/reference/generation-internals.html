@@ -163,6 +163,10 @@
 <li>
     <a href="../how-to/bump-the-uv-pin.html" class="dropdown-item">Bump the uv pin</a>
 </li>
+            
+<li>
+    <a href="../how-to/refresh-the-vendored-invoke.html" class="dropdown-item">Refresh the vendored invoke</a>
+</li>
     </ul>
   </li>
                                     
@@ -208,7 +212,7 @@
                             </a>
                         </li>
                             <li class="nav-item">
-                                <a rel="prev" href="../how-to/bump-the-uv-pin.html" class="nav-link">
+                                <a rel="prev" href="../how-to/refresh-the-vendored-invoke.html" class="nav-link">
                                     <i class="fa fa-arrow-left"></i> Previous
                                 </a>
                             </li>
@@ -406,6 +410,9 @@
             <li class="nav-item">
                 <a href="../how-to/bump-the-uv-pin.html" class="nav-link">Bump the uv pin</a>
             </li>
+            <li class="nav-item">
+                <a href="../how-to/refresh-the-vendored-invoke.html" class="nav-link">Refresh the vendored invoke</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -447,7 +454,7 @@
             
             <li class="nav-item" data-bs-level="1"><a href="#generation-internals" class="nav-link">Generation internals</a>
               <ul class="nav flex-column">
-            <li class="nav-item" data-bs-level="2"><a href="#stage-1-python-version-validation-copier-validator" class="nav-link">Stage 1. Python-version validation (copier validator)</a>
+            <li class="nav-item" data-bs-level="2"><a href="#stage-1-answer-validation-copier-validators" class="nav-link">Stage 1. Answer validation (copier validators)</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -476,8 +483,8 @@
 
 <h1 id="generation-internals">Generation internals</h1>
 <p>What happens between answering the questionnaire and receiving a finished project directory. The work that was previously a single <code>hooks/post_gen_project.py</code> script is now split three ways across copier's own mechanisms and a dedicated copy-time script.</p>
-<h2 id="stage-1-python-version-validation-copier-validator">Stage 1. Python-version validation (copier validator)</h2>
-<p>A <code>validator</code> expression on the <code>max_python_version</code> question in <code>copier.yml</code> runs before any files are written. It checks:</p>
+<h2 id="stage-1-answer-validation-copier-validators">Stage 1. Answer validation (copier validators)</h2>
+<p><code>validator</code> expressions in <code>copier.yml</code> run before any files are written. <code>project_slug</code> must be a valid Python identifier and PyPI name (lowercase letters, digits and inner underscores, starting with a letter); <code>repository_url</code> must be empty or an https URL with a path. The <code>max_python_version</code> validator checks:</p>
 <ul>
 <li><code>max_python_version &gt;= min_python_version</code></li>
 <li>Both values share the same major version (no cross-major ranges).</li>
@@ -512,7 +519,7 @@
 <td><code>_CI/tasks/github.py</code> absent for GitLab projects</td>
 </tr>
 <tr>
-<td><code>template/_CI/tasks/{% if git_hosting_service == 'gitlab' %}gitlab.py{% endif %}.jinja</code></td>
+<td><code>template/_CI/tasks/{% if git_hosting_service == 'gitlab' %}gitlab.py{% endif %}</code></td>
 <td><code>git_hosting_service != 'gitlab'</code> → name is <code>''</code></td>
 <td><code>_CI/tasks/gitlab.py</code> absent for GitHub projects</td>
 </tr>
@@ -523,16 +530,20 @@
 </tr>
 </tbody>
 </table>
-<p>The <code>from .{{ git_hosting_service }} import …</code> line in <code>_CI/tasks/container.py</code> and <code>_CI/tasks/release.py</code> is Jinja-substituted at copy time to name the surviving module — exactly one code path remains, no runtime branching.</p>
+<p>The <code>from .{{ git_hosting_service }} import …</code> line in <code>_CI/tasks/container.py</code>, <code>release.py</code>, <code>document.py</code> and <code>sbom.py</code> is Jinja-substituted at copy time to name the surviving module — exactly one code path remains, no runtime branching.</p>
 <h2 id="stage-3-copy-time-script-tasks_renderpy">Stage 3. Copy-time script (<code>tasks_render.py</code>)</h2>
 <p><code>tasks_render.py</code> at the repo root is run via copier's <code>_tasks</code> configuration. It is <strong>gated to the copy operation only</strong> — <code>copier update</code> does not re-run it, so re-generation side-effects (like stamping the copyright year) don't fire on every update.</p>
-<p>It performs two actions, in order:</p>
+<p>It performs four actions, in order:</p>
 <h3 id="install-the-chosen-license">Install the chosen license</h3>
 <ul>
 <li>Copies <code>licenses/&lt;chosen-license&gt;</code> to <code>LICENSE</code> in the project root, interpolating <code>{year}</code> (current calendar year) and <code>{author}</code> (<code>full_name</code> answer). Skipped if the answer was <code>None</code>.</li>
 <li>Deletes the <code>licenses/</code> directory entirely.</li>
 </ul>
 <p>No license header or dunder metadata is added to individual source files. The main module (<code>src/&lt;slug&gt;/&lt;slug&gt;.py</code>) ships its <code>import logging</code> + <code>LOGGER</code> setup directly from the template, so it needs no copy-time injection.</p>
+<h3 id="stamp-the-quarantine-date">Stamp the quarantine date</h3>
+<p>Sets <code>[tool.uv] exclude-newer</code> in the generated <code>pyproject.toml</code> to the generation date, so the new project's resolutions are frozen at the day it was made rather than inheriting the template's own boundary.</p>
+<h3 id="stamp-the-uv-pin">Stamp the uv pin</h3>
+<p>Resolves the newest uv release that has cleared its cool-down and writes it to every pin in <code>pyproject.toml</code>, digest included. <code>TEMPLATE_UV_VERSION</code> forces a version (the matrix sets it to the template's own pin so generation is deterministic), and an unreachable PyPI falls back to that pin too.</p>
 <h3 id="make-workflowcmd-executable">Make <code>workflow.cmd</code> executable</h3>
 <p>Sets the executable bit on <code>workflow.cmd</code>. On Windows the <code>.cmd</code> extension is sufficient; on Unix this step is what lets <code>./workflow.cmd …</code> work.</p>
 <h2 id="rendering-model">Rendering model</h2>

@@ -163,6 +163,10 @@
 <li>
     <a href="bump-the-uv-pin.html" class="dropdown-item">Bump the uv pin</a>
 </li>
+            
+<li>
+    <a href="refresh-the-vendored-invoke.html" class="dropdown-item">Refresh the vendored invoke</a>
+</li>
     </ul>
   </li>
                                     
@@ -406,6 +410,9 @@
             <li class="nav-item">
                 <a href="bump-the-uv-pin.html" class="nav-link">Bump the uv pin</a>
             </li>
+            <li class="nav-item">
+                <a href="refresh-the-vendored-invoke.html" class="nav-link">Refresh the vendored invoke</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -476,7 +483,7 @@
 <h2 id="steps">Steps</h2>
 <ol>
 <li>
-<p><strong>Edit the template module.</strong> Follow the same conventions the generated framework documents for its own users: tasks wear <code>@task</code> + <code>@logged('&lt;namespace&gt;.&lt;name&gt;')</code>, side effects go through <code>execute(context, '...')</code>, registration happens in the module's <code>namespace = Collection(...)</code> block and, for new modules, in <code>template/_CI/tasks/__init__.py.jinja</code>'s bootstrap-pre-task loop.</p>
+<p><strong>Edit the template module.</strong> Follow the same conventions the generated framework documents for its own users: tasks wear <code>@task</code> + <code>@logged('&lt;namespace&gt;.&lt;name&gt;')</code>, side effects go through <code>execute(context, '...')</code>, registration happens in the module's <code>namespace = Collection(...)</code> block and, for new modules, in the <code>modules</code> list of <code>template/_CI/tasks/__init__.py</code>, whose loop wires bootstrap as a pre-task.</p>
 </li>
 <li>
 <p><strong>Gate on knobs with jinja where needed.</strong> Wrap host- or feature-specific code in the corresponding copier answer, following the existing patterns:</p>

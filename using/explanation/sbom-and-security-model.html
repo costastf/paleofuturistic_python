@@ -163,6 +163,10 @@
 <li>
     <a href="../../maintaining/how-to/bump-the-uv-pin.html" class="dropdown-item">Bump the uv pin</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/how-to/refresh-the-vendored-invoke.html" class="dropdown-item">Refresh the vendored invoke</a>
+</li>
     </ul>
   </li>
                                     
@@ -406,6 +410,9 @@
             <li class="nav-item">
                 <a href="../../maintaining/how-to/bump-the-uv-pin.html" class="nav-link">Bump the uv pin</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/how-to/refresh-the-vendored-invoke.html" class="nav-link">Refresh the vendored invoke</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -518,7 +525,9 @@ ignore. It is triggered on the axes it varies along instead:</p>
 <li><strong>On pushes that change the dependency surface</strong> — <code>uv.lock</code>, <code>_CI/lib/vendor.txt</code>, the
   vendored tree and its patches, and <code>.security-overrides</code>. Change what you depend on and you
   own the result. A release lands here too: <code>version_provider = "uv"</code> re-locks, so the bump
-  commit carries <code>uv.lock</code>, and the commit that publishes is worth auditing anyway.</li>
+  commit carries <code>uv.lock</code>, and the commit that publishes is worth auditing anyway. Pushes
+  only: a pull request from a fork triggers nothing here, so the audit that covers a fork's
+  dependencies is the scheduled one, after the merge.</li>
 <li><strong>A hand-edited vendored file is watched, not audited.</strong> A push touching <code>_CI/lib/vendor/</code>
   fires the job so the diff reaches a human. No scanner can say anything about a patched
   vendored source: <code>vendor.txt</code> is what pip-audit reads, and it describes the packages that
@@ -562,7 +571,7 @@ impossible to build a wheel from code that built yesterday. <code>./workflow.cmd
 <td><code>uv export --no-dev</code> against <code>uv.lock</code> — exactly what ships in the wheel</td>
 </tr>
 <tr>
-<td>Dev / lint / test / docs / quality / security groups</td>
+<td>Dev / build / develop / lint / test / docs / quality / security groups</td>
 <td><code>optional</code></td>
 <td>full lockfile via <code>uv export --all-groups</code>, minus the runtime set</td>
 </tr>
@@ -588,12 +597,12 @@ impossible to build a wheel from code that built yesterday. <code>./workflow.cmd
 <h3 id="per-component-enrichment">Per-component enrichment</h3>
 <p>Each PyPI component (runtime, dev, vendored) carries:</p>
 <ul>
-<li><strong><code>licenses</code></strong> — declared SPDX expression. The lookup walks <code>PEP 639 License-Expression → legacy License header → LICENSE-File text → Trove classifier mapping</code>. Vendored entries first try text-detection over the <code>_CI/lib/vendor/&lt;name&gt;/LICENSE*</code> files (the vendoring tool drops dist-info but keeps the LICENSE), then defer to the venv-installed copy when the same package is also a transitive dev dep. A handful of packages with no licence-bearing file locally end up with <code>licenses: []</code> — graceful degradation rather than failure.</li>
+<li><strong><code>licenses</code></strong> — declared SPDX expression. The lookup walks <code>PEP 639 License-Expression → legacy License header → LICENSE-File text → Trove classifier mapping</code>. Vendored entries first try text-detection over the <code>_CI/lib/vendor/&lt;name&gt;/LICENSE*</code> files (the vendored tree carries no dist-info but keeps the LICENSE), then defer to the venv-installed copy when the same package is also a transitive dev dep. A handful of packages with no licence-bearing file locally end up with <code>licenses: []</code> — graceful degradation rather than failure.</li>
 <li><strong><code>hashes</code></strong> — SHA-256 from <code>uv.lock</code>'s <code>wheels[*].hash</code> (or <code>sdist.hash</code> fallback). Pipeline and vendored components carry no hash here — the GitHub-Action PURL already encodes the commit SHA, and vendored entries aren't in the lockfile.</li>
 <li><strong><code>external_references</code></strong> — every PyPI component points at its PyPI project page (<code>type=website</code>); GitHub Actions point at their repo (<code>type=vcs</code>); GitLab images point at their registry (<code>type=distribution</code>).</li>
 </ul>
 <h3 id="validation">Validation</h3>
-<p><code>./workflow.cmd secure.sbom-validate</code> runs the CycloneDX 1.7 JSON-schema validator in a clean <code>uv run python</code> subprocess (so the venv-installed validator wins over the older vendored <code>jsonschema</code> that the workflow.cmd launcher places earlier on <code>sys.path</code>). The aggregate <code>./workflow.cmd secure</code> runs all three sub-steps; a clean run means: no known vulns, a fresh SBOM written, validated against the schema.</p>
+<p><code>./workflow.cmd secure.sbom-validate</code> runs the CycloneDX 1.7 JSON-schema validator from the project venv. The aggregate <code>./workflow.cmd secure</code> runs all three sub-steps; a clean run means: no known vulns, a fresh SBOM written, validated against the schema.</p>
 <h3 id="what-this-enables">What this enables</h3>
 <ul>
 <li>A downstream consumer can extract the SBOM from the wheel with <code>unzip -p &lt;wheel&gt; &lt;your_package&gt;/sbom.cdx.json</code> or <code>importlib.resources</code> — no separate artefact to track.</li>
@@ -611,8 +620,8 @@ impossible to build a wheel from code that built yesterday. <code>./workflow.cmd
 <p>Order matters in the publish job: <code>release.dist</code> builds into <code>dist/</code>, the attestations are taken over those files, and <code>release.publish --prebuilt</code> uploads them <em>without</em> rebuilding. Rebuilding in between would publish files that no attestation refers to, and verification would then fail — reading as tampering rather than as a fresh build.</p>
 <p>PyPI accepts attestations only through <a href="https://docs.pypi.org/trusted-publishers/">Trusted Publishing</a>. A project that publishes with <code>UV_PUBLISH_*</code> credentials instead (a private index, say) uploads none: <code>release.publish</code> passes <code>--no-attestations</code> on that path, because indexes that do not support attestations may reject the upload.</p>
 <h2 id="what-about-overrides">What about overrides?</h2>
-<p><code>.security-overrides</code> is a project-local allow-list with mandatory expiry dates. It applies to <code>pip-audit</code>. It does <strong>not</strong> suppress findings in the SBOM, which continues to show the world the full truth. Override = "we accept this locally for now," not "make this invisible."</p>
-<p>The expiry dates are load-bearing: a stale override is a security regression hidden in plain sight. The template's lint config doesn't enforce this; treat it as a code-review convention.</p>
+<p><code>.security-overrides</code> is a project-local allow-list for <code>pip-audit</code>: one vulnerability id per line, with an optional expiry date (<code>CVE-2024-1234::2026-12-31</code>). It does <strong>not</strong> suppress findings in the SBOM, which continues to show the world the full truth. Override = "we accept this locally for now," not "make this invisible."</p>
+<p>The expiry date is what makes an acceptance temporary: on that date the audit reports the finding again, and the scheduled run is what brings the date round with nobody pushing. <code>secure.validate-overrides</code> checks every entry's format and date, as a commit hook whenever the file is staged. Whether an entry carries a date at all is a code-review call; only suppressions passed in from outside the repository, through the <code>&lt;PROJECT&gt;_SECURITY_OVERRIDE</code> variable, must carry one.</p>
 <h2 id="whats-deliberately-out-of-scope">What's deliberately out of scope</h2>
 <ul>
 <li><strong>SAST</strong>: Bandit / Semgrep / pyright security rules are not shipped. Add them as a <code>secure.*</code> task if needed.</li>

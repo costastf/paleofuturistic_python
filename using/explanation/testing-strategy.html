@@ -163,6 +163,10 @@
 <li>
     <a href="../../maintaining/how-to/bump-the-uv-pin.html" class="dropdown-item">Bump the uv pin</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/how-to/refresh-the-vendored-invoke.html" class="dropdown-item">Refresh the vendored invoke</a>
+</li>
     </ul>
   </li>
                                     
@@ -406,6 +410,9 @@
             <li class="nav-item">
                 <a href="../../maintaining/how-to/bump-the-uv-pin.html" class="nav-link">Bump the uv pin</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/how-to/refresh-the-vendored-invoke.html" class="nav-link">Refresh the vendored invoke</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -498,8 +505,13 @@
 </ul>
 <p>The template ships pytest + a small set of plugins (coverage, xdist, html, env, metadata). Discover the registered markers with <code>./workflow.cmd test.pytest --args="--markers"</code> after bootstrap.</p>
 <h2 id="layer-2-coverage">Layer 2 — Coverage</h2>
-<p><code>pytest-cov</code> runs alongside pytest. The template tracks branch coverage (not just line coverage) and writes HTML + JSON reports under <code>reports/</code>.</p>
-<p><code>pyproject.toml</code>'s <code>[tool.coverage.report]</code> has <code>fail_under</code> set, and the test task <strong>ratchets</strong> this value upward after each green run: if the latest coverage run was 87% and <code>fail_under</code> was 80%, the task bumps <code>fail_under</code> to 87%. Once engaged, the bar only goes up — lowering <code>fail_under</code> is a deliberate, reviewable change that shows up in the diff.</p>
+<p><code>pytest-cov</code> runs alongside pytest. The template tracks branch coverage (not just line coverage) and writes the JSON report the badge and the ratchet read to <code>reports/</code>. <code>./workflow.cmd test.coverage</code> renders the browsable HTML when you want it.</p>
+<p><code>pyproject.toml</code>'s <code>[tool.coverage.report]</code> has <code>fail_under</code> set, and <code>preflight --write</code> (or <code>test.tox --write</code>) <strong>ratchets</strong> this value upward after a green matrix run: if the run measured 87% and <code>fail_under</code> was 80%, it bumps <code>fail_under</code> to 87%. The bare <code>preflight</code>, the pre-push hook and CI only compare. Once engaged, the bar only goes up — lowering <code>fail_under</code> is a deliberate, reviewable change that shows up in the diff.</p>
+<p><strong>What a raised bar looks like when it stops you.</strong> The floor is a property of the tree, so
+<code>preflight</code> fails a push whose coverage sits below it — including a push that only moved code
+around, or one that added a module faster than its tests. The run names the number it measured
+and the floor it missed. Two honest ways out: cover the new code, or lower <code>fail_under</code> in the
+same commit, where a reviewer sees the bar move. Nothing in the workflow lowers it for you.</p>
 <h3 id="dormant-during-scaffold">Dormant during scaffold</h3>
 <p>The ratchet starts <strong>dormant</strong>. The smoke test (<code>def test_sanity</code> in <code>tests/test_&lt;slug&gt;.py</code>) drives the scaffolded project to 100% coverage on its very first run; if the ratchet engaged on that signal, the first real change would crash the build at a 100% floor. So the test task checks for the presence of <code>def test_sanity</code> and, while it's still there, prints a status line on every run explaining the dormant state and how to engage:</p>
 <pre><code>[ratchet] coverage=100% — scaffold still pristine (test_sanity present); ratchet dormant
@@ -511,7 +523,7 @@
 <p>Coverage regressions still can't slip in silently — they just can't slip in <em>or out</em> during the scaffold phase.</p>
 <h2 id="layer-3-tox">Layer 3 — tox</h2>
 <p>tox + tox-uv runs the test suite against every Python version in the project's range. Configured in <code>pyproject.toml</code>'s <code>[tool.tox]</code>, generated from <code>min_python_version</code> / <code>max_python_version</code> at template-render time.</p>
-<p><strong>Coverage across the matrix is a union, not an average.</strong> Each env writes its own coverage data (<code>.coverage.&lt;envname&gt;</code>, consumed by the combine) and its own reports (<code>reports/coverage.&lt;envname&gt;.json</code>, <code>reports/tests.&lt;envname&gt;.html</code>); <code>test.tox</code> then runs <code>coverage combine</code> to produce the single <code>reports/coverage.json</code> the badge and the ratchet read. A line counts as covered if <em>any</em> interpreter executed it.</p>
+<p><strong>Coverage across the matrix is a union, not an average.</strong> Each env writes its own coverage data (<code>.coverage.&lt;envname&gt;</code>, consumed by the combine) and its own report (<code>reports/coverage.&lt;envname&gt;.json</code>); <code>test.tox</code> then runs <code>coverage combine</code> to produce the single <code>reports/coverage.json</code> the badge and the ratchet read. A line counts as covered if <em>any</em> interpreter executed it.</p>
 <p>The <a href="../../maintaining/explanation/design-principles.html#the-qa-gate">QA gate</a> stops at that JSON:
 <code>preflight</code> produces what it consumes and nothing else, so it
 renders no browsable report — the same reason it asks pyscn for JSON only. <code>./workflow.cmd
@@ -537,7 +549,7 @@ else:
 <h2 id="smoke-tests-vs-real-tests">Smoke tests vs. real tests</h2>
 <p>The template generates one smoke test per project — a <code>tests/test_&lt;slug&gt;.py</code> that exercises the example <code>hello()</code> function with two functions: <code>test_sanity</code> (an <code>assert True</code> placeholder) and <code>test_integration</code> (the actual call). Keep them or delete them; either is fine, but <code>test_sanity</code> doubles as the <a href="#dormant-during-scaffold">ratchet dormancy marker</a>, so removing it engages the ratchet.</p>
 <h2 id="parallel-execution">Parallel execution</h2>
-<p><code>pytest-xdist</code> runs tests across CPU cores by default (<code>-n auto</code> in the template's pytest config). Some tests don't play well with parallelism — anything touching the filesystem in a fixed location, or relying on shared global state.</p>
+<p><code>pytest-xdist</code> runs tests across CPU cores by default (<code>-n 4</code> in the template's pytest config). Some tests don't play well with parallelism — anything touching the filesystem in a fixed location, or relying on shared global state.</p>
 <p>For those, add <code>@pytest.mark.serial</code> and a corresponding <code>-m "not serial"</code> / <code>-m serial</code> two-pass setup. The template doesn't ship this scaffolding because most projects don't need it.</p>
 <h2 id="coverage-of-_ci">Coverage of <code>_CI/</code></h2>
 <p>The template treats <code>_CI/</code> as part of the codebase for linting purposes but <strong>not</strong> for test coverage. The CI tooling isn't reasonably unit-testable — its job is to glue together external commands. Coverage of <code>_CI/</code> is implicitly via the workflow tasks running successfully end-to-end on every commit.</p>

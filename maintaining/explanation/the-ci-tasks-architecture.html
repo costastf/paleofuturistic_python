@@ -163,6 +163,10 @@
 <li>
     <a href="../how-to/bump-the-uv-pin.html" class="dropdown-item">Bump the uv pin</a>
 </li>
+            
+<li>
+    <a href="../how-to/refresh-the-vendored-invoke.html" class="dropdown-item">Refresh the vendored invoke</a>
+</li>
     </ul>
   </li>
                                     
@@ -406,6 +410,9 @@
             <li class="nav-item">
                 <a href="../how-to/bump-the-uv-pin.html" class="nav-link">Bump the uv pin</a>
             </li>
+            <li class="nav-item">
+                <a href="../how-to/refresh-the-vendored-invoke.html" class="nav-link">Refresh the vendored invoke</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -546,9 +553,12 @@ launcher to keep in step.</p>
 ├── configuration.py     # Shared constants (paths, env vars, registry settings)
 ├── shared.py            # @logged, @run, execute, run_steps, apply_badge, IndentingStream
 ├── github.py / gitlab.py  # Host-specific helpers (only one is present)
+├── local.py             # The project's own tasks. Never overwritten by `copier update`
 └── &lt;feature&gt;.py         # build, container, develop, document, format_, lint,
-                         #   preflight, quality, release, secure, test
+                         #   preflight, quality, release, sbom, secure, test
 </code></pre>
+<p>Everything there except <code>local.py</code> is template-owned and replaced on update, which is why
+project-specific tasks belong in <code>local.py</code> — <code>__init__.py</code> picks it up automatically.</p>
 <p>Each feature module:</p>
 <ul>
 <li>Imports <code>Collection</code>, <code>task</code> from invoke.</li>
@@ -573,7 +583,7 @@ for module in (build, container, develop, ...):
 </code></pre>
 <p>This is why a fresh clone "just works" — <code>./workflow.cmd test</code> on day one is bootstrap-then-test; on day two it's just test.</p>
 <h2 id="run_steps-fail-last-no-short-circuiting"><code>run_steps</code>: fail-last, no short-circuiting</h2>
-<p>A workflow task that runs N steps (e.g. <code>lint</code> runs ruff + pylint + ty + complexipy + commitizen) doesn't short-circuit on the first failure. The <code>run_steps()</code> helper in <code>shared.py</code> runs every step, accumulates failures, and raises <code>SystemExit(1)</code> at the end with all the failures reported.</p>
+<p>A workflow task that runs N steps (e.g. <code>lint</code> runs ruff + the format check + validate-pyproject + pylint + ty + complexipy + commitizen) doesn't short-circuit on the first failure. The <code>run_steps()</code> helper in <code>shared.py</code> runs every step, accumulates failures, and raises <code>SystemExit(1)</code> at the end with all the failures reported.</p>
 <p>This makes CI runs informative — you see every issue per run instead of fixing one at a time.</p>
 <h2 id="host-specific-code-isolation">Host-specific code isolation</h2>
 <p>Whichever host was chosen at generation time — GitHub or GitLab — determines whether <code>_CI/tasks/github.py</code> or <code>_CI/tasks/gitlab.py</code> ships in the generated project. Both expose the same contract:</p>
@@ -582,8 +592,10 @@ for module in (build, container, develop, ...):
 <li><code>publish_deps_image(context, tag) -&gt; str</code></li>
 <li><code>create_release_pr(context, branch, version) -&gt; str</code></li>
 <li><code>pr_create_url(context, branch) -&gt; str</code></li>
+<li><code>pipeline_badge(context) -&gt; str</code></li>
+<li><code>iter_pipeline_components() -&gt; Iterator[PipelineComponent]</code></li>
 </ul>
-<p><code>container.py</code> and <code>release.py</code> import whichever module survived generation via a relative import that's rendered concrete at copy time: a GitHub project ends up with <code>from .github import …</code>, a GitLab project with <code>from .gitlab import …</code>. Because the unchosen module is omitted entirely at generation time via a copier conditional filename (its rendered name is empty when not selected), the generated project has exactly one code path and no runtime branching between hosts.</p>
+<p><code>container.py</code>, <code>release.py</code>, <code>document.py</code> and <code>sbom.py</code> import whichever module survived generation via a relative import that's rendered concrete at copy time: a GitHub project ends up with <code>from .github import …</code>, a GitLab project with <code>from .gitlab import …</code>. Because the unchosen module is omitted entirely at generation time via a copier conditional filename (its rendered name is empty when not selected), the generated project has exactly one code path and no runtime branching between hosts.</p>
 <h2 id="see-also">See also</h2>
 <ul>
 <li><a href="../how-to/extend-the-template-tasks.html">Extend the template workflow tasks</a> — how a maintainer changes or adds tasks (the user-facing recipe, <em>Add a workflow task</em>, ships inside every generated project under its docs's Developer section).</li>

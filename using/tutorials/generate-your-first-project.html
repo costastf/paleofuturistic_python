@@ -163,6 +163,10 @@
 <li>
     <a href="../../maintaining/how-to/bump-the-uv-pin.html" class="dropdown-item">Bump the uv pin</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/how-to/refresh-the-vendored-invoke.html" class="dropdown-item">Refresh the vendored invoke</a>
+</li>
     </ul>
   </li>
                                     
@@ -406,6 +410,9 @@
             <li class="nav-item">
                 <a href="../../maintaining/how-to/bump-the-uv-pin.html" class="nav-link">Bump the uv pin</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/how-to/refresh-the-vendored-invoke.html" class="nav-link">Refresh the vendored invoke</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -510,14 +517,14 @@ git add --all
 git commit -m &quot;chore: initial commit&quot;
 ./workflow.cmd bootstrap
 </code></pre>
-<p>The bootstrap command installs uv-managed virtualenvs for every dependency group and registers pre-commit hooks (if you select yes, which we highly recommend).
+<p>The bootstrap command initialises git if needed and registers the pre-commit hooks (if you select yes, which we highly recommend). Dependencies need no step of their own: every task runs through <code>uv run</code>, which syncs <code>.venv</code> from <code>uv.lock</code> the first time.
 The command is idempotent — running it again is a no-op until you pass <code>--force</code>.
 We let you commit the scaffold before bootstrapping, because otherwise the pre-commit hook would validate the whole scaffold.
 This is time consuming and not necessary, which you can validate by running <code>git status</code> after bootstrapping.</p>
 <h2 id="step-3-run-the-qa-checks">Step 3 — Run the QA checks</h2>
 <p>These commands are the heartbeat of every project this template generates:</p>
 <pre><code class="language-bash">./workflow.cmd format    # format with Ruff (also sort imports, otherwise a normal ruff format)
-./workflow.cmd lint      # lint with Ruff check, pylint, ty (type checker), complexipy, commitizen
+./workflow.cmd lint      # lint with Ruff check, validate-pyproject, pylint, ty (type checker), complexipy, commitizen
 ./workflow.cmd test      # test with pytest (in parallel with xdist using the active Python interpreter)
 ./workflow.cmd quality   # scan code quality with pyscn
 ./workflow.cmd build     # produce a wheel + sdist in dist/ and export an SBOM
@@ -525,7 +532,7 @@ This is time consuming and not necessary, which you can validate by running <cod
 </code></pre>
 <p>You should see a passing test for the example <code>hello()</code> function and a wheel appear under <code>dist/</code>.
 Some of the other QA tools also produce output you can look into later.</p>
-<p>The really fast checks (ruff format/check, pylint, complexipy) which can run on only files git-staged are bundled in a one handy command: <code>./workflow.cmd develop.pre-commit</code>.
+<p>The really fast checks (ruff format/check, validate-pyproject, pylint, complexipy) which can run on only files git-staged are bundled in a one handy command: <code>./workflow.cmd develop.pre-commit</code>.
 You are probably not surprised to hear these commands are already set to run before every commit with pre-commit.
 With the pre-commit check (both CLI and hook) format will not edit your files as it does when you invoke it stand-alone.
 Your commit message and SBOM security overrides are also checked before landing a commit.</p>
