@@ -53,8 +53,8 @@ To run them yourself:
 
 `[project] dynamic` lets the build backend compute a field, typically the version from a git tag.
 This project does not use it: `./workflow.cmd release` has commitizen write the new version into
-`pyproject.toml` and tag the commit, so the version in the file is the released one and every
-field is static. Static metadata is what validate-pyproject, twine and anything else that reads
+`pyproject.toml`, and CI tags that version once it lands on `main`, so the version in the file is
+the released one and every field is static. Static metadata is what validate-pyproject, twine and anything else that reads
 `pyproject.toml` without running a build can see.
 
 ## Where provenance fits

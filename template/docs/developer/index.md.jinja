@@ -66,8 +66,8 @@ Publishing, with a PEP 740 attestation per file that anyone can verify. See
 
 The project ships a {% if git_hosting_service == 'github' %}GitHub Actions workflow{% else %}GitLab CI pipeline{% endif %}
 that runs one job, `./workflow.cmd preflight`, the same command the pre-push hook runs — format,
-lint, ty, the docs build, pyscn, the tox matrix over your Python version range, the wheel and
-the derived files — so CI and your machine never disagree.
+lint, ty, the commit messages, the docs build, pyscn, the tox matrix over your Python version
+range, the wheel and the derived files — so CI and your machine never disagree.
 
 → Full rationale: [Testing strategy](explanation/testing-strategy.md)
 

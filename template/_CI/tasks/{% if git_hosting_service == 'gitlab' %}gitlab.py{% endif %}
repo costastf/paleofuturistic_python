@@ -163,7 +163,8 @@ def create_release_pr(context: Context, release_branch: str, new_version: str) -
             'title': f'chore(release): v{new_version}',
             'description': (
                 f'Release v{new_version} prepared by `./workflow.cmd release`. '
-                'Merge this MR so the tag lands on main and publish fires in CI.'
+                'Merge it any way; the version bump arriving on main is what makes '
+                'CI create the tag and publish.'
             ),
         }
     ).encode('utf-8')

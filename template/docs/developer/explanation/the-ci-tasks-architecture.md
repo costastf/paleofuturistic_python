@@ -48,7 +48,7 @@ _CI/tasks/
 ├── github.py / gitlab.py  # Host-specific helpers (only one is present)
 ├── local.py             # Yours. Never overwritten by `copier update`
 └── <feature>.py         # build, container, develop, document, format_, lint,
-                         #   preflight, quality, release, secure, test
+                         #   preflight, quality, release, sbom, secure, test
 ```
 
 Everything there except `local.py` is template-owned and replaced on update, which is why
@@ -71,7 +71,7 @@ The `@logged` decorator wraps a task to print a clean status line:
     ✅ lint.ruff passed 👍
 ```
 
-For tasks that call other tasks (a "workflow task" like `release` that calls `validate`, `bump`, `changelog`, `push`), nested output is indented under the parent banner via the `IndentingStream` class in `shared.py`. The indent is applied at the stdout/stderr layer, so even commands invoked through `context.run()` get their output indented.
+For tasks that call other tasks (a "workflow task" like `release` that calls `validate`, `bump` and `changelog`), nested output is indented under the parent banner via the `IndentingStream` class in `shared.py`. The indent is applied at the stdout/stderr layer, so even commands invoked through `context.run()` get their output indented.
 
 This single design choice does a lot of heavy lifting — terminal output for `./workflow.cmd release` is hierarchical and scannable instead of a flat dump.
 
@@ -92,7 +92,7 @@ This is why a fresh clone "just works" — `./workflow.cmd test` on day one is b
 
 ## `run_steps`: fail-last, no short-circuiting
 
-A workflow task that runs N steps (e.g. `lint` runs ruff + pylint + ty + complexipy + commitizen) doesn't short-circuit on the first failure. The `run_steps()` helper in `shared.py` runs every step, accumulates failures, and raises `SystemExit(1)` at the end with all the failures reported.
+A workflow task that runs N steps (e.g. `lint` runs ruff + the format check + validate-pyproject + pylint + ty + complexipy + commitizen) doesn't short-circuit on the first failure. The `run_steps()` helper in `shared.py` runs every step, accumulates failures, and raises `SystemExit(1)` at the end with all the failures reported.
 
 This makes CI runs informative — you see every issue per run instead of fixing one at a time.
 
@@ -106,8 +106,10 @@ Whichever host was chosen at generation time — GitHub or GitLab — determines
 - `pr_create_url(context, branch) -> str`
 - `release_tag_commit(context, tag) -> str`
 - `create_release(context, tag, sha) -> str`
+- `pipeline_badge(context) -> str`
+- `iter_pipeline_components() -> Iterator[PipelineComponent]`
 
-`container.py` and `release.py` import whichever module survived generation via a relative import that was rendered concrete at copy time. Because the unchosen module is omitted entirely at generation time via a copier conditional filename, this project has exactly one code path and no runtime branching between hosts.
+`container.py`, `release.py`, `document.py` and `sbom.py` import whichever module survived generation via a relative import that was rendered concrete at copy time. Because the unchosen module is omitted entirely at generation time via a copier conditional filename, this project has exactly one code path and no runtime branching between hosts.
 
 ## See also
 

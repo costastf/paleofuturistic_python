@@ -22,7 +22,7 @@ Then it deletes the `licenses/` directory regardless of choice. For `None`, only
 `License: None` at generation time, then deciding later:
 
 1. Add a `LICENSE` file at the project root.
-2. Set `pyproject.toml`'s `license = "<SPDX-ID>"` (or `license-file = "LICENSE"`).
+2. Set `pyproject.toml`'s `license = "<SPDX-ID>"` and `license-files = ["LICENSE"]`, the two fields a generated project ships when a licence was chosen.
 
 ## PyPI classifiers
 

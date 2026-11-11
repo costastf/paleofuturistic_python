@@ -44,8 +44,8 @@ interpreters `env_list` names and how loaded the machine is.
 The [QA gate](../explanation/design-principles.md#the-qa-gate) — `preflight` run read-only — is
 what the hooks and the pipeline below invoke; "the gate" here means that.
 
-**The commit stage is one hook, one invocation.** Four hooks would have pre-commit partition
-the staged files and run them concurrently, so a commit would get four verdicts about four
+**The commit stage is one hook, one invocation.** Five hooks would have pre-commit partition
+the staged files and run them concurrently, so a commit would get five verdicts about five
 subsets of itself. One hook is one verdict about one file list, in the order the registry
 declares — cheapest first, so a formatting slip is not something you wait for pylint to hear
 about.
@@ -113,7 +113,7 @@ so a file of that name in the tree is a password about to be committed.
 
 ## `Dockerfile.deps`
 
-Single-stage build for the dependency-cache image. Reads `[tool.docker-versions]` from `pyproject.toml`. See [Build and push a container](../how-to/build-and-push-a-container.md).
+Single-stage build for the dependency-cache image. It takes the base image as a `BASE_IMAGE` build argument, which `container.build`, `container.publish` and the pipeline's deps job read out of `[tool.docker-versions]` in `pyproject.toml`. See [Build and push a container](../how-to/build-and-push-a-container.md).
 
 ## `properdocs.yml`
 

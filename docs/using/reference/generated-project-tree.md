@@ -40,7 +40,7 @@ example_project/
 │       ├── local.py             Your own tasks; never overwritten by copier update
 │       ├── preflight.py         Step registry; preflight + preflight.staged
 │       ├── quality.py           pyscn
-│       ├── release.py           Validate, bump, changelog, push, attest, publish, ship
+│       ├── release.py           Validate, bump, changelog, dist, attest, publish, detect, tag, ship
 │       ├── sbom.py              CycloneDX SBOM composition
 │       ├── secure.py            pip-audit, SBOM extract and validate
 │       ├── shared.py            @logged, @run, execute(), run_steps(), apply_badge()

@@ -54,7 +54,7 @@ has the details.
 
 `.github/workflows/publish.yaml` already has what Trusted Publishing needs: `id-token: write` on
 the publish job, and `environment: pypi`. GitHub injects `ACTIONS_ID_TOKEN_REQUEST_URL` and
-`ACTIONS_ID_TOKEN_REQUEST_TOKEN`; `release.publish` sees them and runs
+`ACTIONS_ID_TOKEN_REQUEST_TOKEN`; the upload step of `release.ship` sees them and runs
 `uv publish --trusted-publishing always`.
 {%- else %}
 
@@ -78,14 +78,14 @@ id_tokens:
 
 uv reads `PYPI_ID_TOKEN` and exchanges it for a PyPI upload token; `pypi-attestations` reads
 `SIGSTORE_ID_TOKEN` to sign. Both names are fixed by their audiences (`<AUDIENCE>_ID_TOKEN`), so
-do not rename them. `release.publish` sees `PYPI_ID_TOKEN` and runs
+do not rename them. The upload step of `release.ship` sees `PYPI_ID_TOKEN` and runs
 `uv publish --trusted-publishing always`.
 {%- endif %}
 
 ## 4. Check it worked
 
 Make a release ([Make your first release](../tutorials/make-your-first-release.md)). In the
-publish job's log, `release.publish` prints:
+publish job's log, `release.ship` prints:
 
 ```console
 OIDC token present — publishing through PyPI Trusted Publishing.
@@ -105,8 +105,8 @@ all three of `UV_PUBLISH_URL`, `UV_PUBLISH_USERNAME` and `UV_PUBLISH_PASSWORD` a
 {% if git_hosting_service == 'github' %}secrets on the `pypi` environment{% else %}CI/CD variables scoped to the `pypi` environment{% endif %}. For PyPI with an API token, the
 username is `__token__` and the URL `https://upload.pypi.org/legacy/`.
 
-When all three are set, `release.publish` uploads with them and passes `--no-attestations`, and
-`release.attest` signs nothing. PyPI accepts attestations only through Trusted Publishing, and
+When all three are set, the upload (`release.ship` in the pipeline, `release.publish` by hand)
+uses them and passes `--no-attestations`, and `release.attest` signs nothing. PyPI accepts attestations only through Trusted Publishing, and
 other indexes may reject an upload that carries them. [Publish to a private index](publish-to-a-private-index.md)
 covers the rest.
 

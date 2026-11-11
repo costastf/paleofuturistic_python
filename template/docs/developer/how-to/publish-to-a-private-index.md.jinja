@@ -27,7 +27,8 @@ job declares, and renaming it means renaming it there too.
 
 ## 2. Release as usual
 
-`release.publish` sees all three `UV_PUBLISH_*` variables set and runs:
+The upload — `release.ship` in the pipeline, `release.publish` by hand — sees all three
+`UV_PUBLISH_*` variables set and runs:
 
 ```bash
 uv publish --trusted-publishing never --no-attestations

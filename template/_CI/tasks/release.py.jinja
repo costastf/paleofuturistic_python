@@ -16,6 +16,11 @@ from .{{ git_hosting_service }} import create_release, create_release_pr, pr_cre
 from .secure import audit
 from .shared import commit, execute, logged, note
 
+# `cz bump` takes these as `--prerelease` values on top of a patch increment; the three semver
+# increments are passed through as `--increment`.
+PRERELEASE_TYPES = ('alpha', 'beta', 'rc')
+SEMVER_TYPES = ('major', 'minor', 'patch')
+
 
 @task
 @logged('release.validate')
@@ -96,12 +101,11 @@ def bump(context: Context, increment: str = '') -> None:
         increment: Version increment type — major, minor, patch, alpha, beta, or rc.
 
     """
-    prerelease_types = ('alpha', 'beta', 'rc')
     current = project_version()
     new_version = resolve_next_version(context, increment)
     note(update_package_version_badge(version=new_version))
     try:
-        if increment in prerelease_types:
+        if increment in PRERELEASE_TYPES:
             execute(context, f'uv run cz bump --increment patch --prerelease {increment} --version-files-only --yes')
         else:
             execute(context, f'uv run cz bump --increment {increment} --version-files-only --yes')
@@ -154,13 +158,6 @@ def changelog(context: Context, write: bool = False, version: str = '') -> None:
         commit(context, 'docs: update changelog')
     else:
         execute(context, f'uv run cz changelog --dry-run{unreleased}')
-
-
-@task
-@logged('release.push')
-def push(context: Context) -> None:
-    """Push the current branch to the remote. Tags are CI's to create, so none are pushed."""
-    execute(context, 'git push')
 
 
 @task
@@ -426,14 +423,12 @@ def resolve_next_version(context: Context, increment: str) -> str:
 
     Raises SystemExit if the increment is invalid or cz output cannot be parsed.
     """
-    prerelease_types = ('alpha', 'beta', 'rc')
-    semver_types = ('major', 'minor', 'patch')
-    valid = semver_types + prerelease_types
+    valid = SEMVER_TYPES + PRERELEASE_TYPES
     if increment not in valid:
         print('Usage: ./workflow.cmd release -i <increment>')
         print(f'  increment: {", ".join(valid)}')
         raise SystemExit(1)
-    if increment in prerelease_types:
+    if increment in PRERELEASE_TYPES:
         cmd = f'uv run cz bump --increment patch --prerelease {increment} --allow-no-commit --yes --dry-run'
     else:
         cmd = f'uv run cz bump --increment {increment} --allow-no-commit --yes --dry-run'
@@ -528,7 +523,7 @@ def release(context: Context, increment: str = '', no_push: bool = False) -> Non
     Args:
         context: Invoke context.
         increment: Version increment type — major, minor, patch, alpha, beta, or rc.
-        no_push: Skip the push step (branch + tag stay local).
+        no_push: Skip the push step, so the release branch stays local.
 
     """
     validate(context)
@@ -584,7 +579,6 @@ namespace.add_task(cast(Task, release), default=True, name='all')
 namespace.add_task(cast(Task, validate))
 namespace.add_task(cast(Task, bump))
 namespace.add_task(cast(Task, changelog))
-namespace.add_task(cast(Task, push))
 namespace.add_task(cast(Task, dist))
 namespace.add_task(cast(Task, attest))
 namespace.add_task(cast(Task, publish))

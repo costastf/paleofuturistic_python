@@ -40,13 +40,13 @@ Nothing here needs setting for local work. Every one has a default or a reason t
 
 | Variable | Read by | What it does |
 | --- | --- | --- |
-| `CI` | `shared.is_ci()` | When `true`, suppresses anything that wants a human: the bootstrap's prompts, and opening a report in a browser. Set by GitHub Actions and GitLab CI themselves. |
-| `INVOKE_SHELL` | `shared.execute()` | Overrides the shell Invoke spawns. Needed on minimal images that ship `busybox sh` but no bash — the kaniko job is why it exists. |
+| `CI` | `shared.is_ci()` | When `true`, suppresses anything that wants a human — the bootstrap's prompts, and opening a report in a browser — and switches `container.publish` from a local build to a registry push. Set by GitHub Actions and GitLab CI themselves. |
+| `INVOKE_SHELL` | `shared.execute()` | Overrides the shell Invoke spawns, for a minimal image that ships `busybox sh` but no bash. The shipped pipelines run in the deps image, which has bash, so nothing sets it by default. |
 | `{{ project_slug | upper }}_SECURITY_OVERRIDE` | `secure.audit` | Comma-separated pip-audit suppressions, each `<VULN_ID>::<YYYY-MM-DD>`. An expiry is **required** here, unlike in the file: a suppression that leaves no trace in the repository must not be able to last forever. |
 | `COVERAGE_FILE` | tox, per env | Set to `.coverage.{envname}` by `[tool.tox.env_run_base]` so the matrix's envs do not race one data file. Not yours to set. |
 {%- if git_hosting_service == 'github' %}
 | `GITHUB_REPOSITORY`, `GITHUB_ACTOR` | `container.publish`, in CI | Where to push the dependency image and who is pushing it, both injected by GitHub Actions. The image path is lowercased on the way through, ghcr.io rejecting uppercase while these preserve the repository's case. |
-| `GITHUB_TOKEN` | `release`, `release.tag`, `document.deploy-github` | Opens the release pull request, creates the release tag and its Release entry (the publish job passes the workflow token, which needs `contents: write`), and pushes the docs to `gh-pages`. Locally you need a PAT only if you run those tasks by hand. |
+| `GITHUB_TOKEN` | `release`, `release.tag`, `document.deploy-github`, `container.publish` in CI | Opens the release pull request, creates the release tag and its Release entry (the publish job passes the workflow token, which needs `contents: write`), requests the Pages build after pushing the docs to `gh-pages`, and logs in to ghcr.io for the deps image. Locally you need a PAT only if you run those tasks by hand. |
 {%- else %}
 | `GITLAB_TOKEN` | `release`, `release.tag` by hand | Opens the release merge request, and creates the release tag when `release.tag` runs outside the pipeline. GitLab injects no such variable: set a project or personal access token with `api` scope before running either. |
 | `CI_JOB_TOKEN` | `release.tag`, in the pipeline | Injected by GitLab. The Releases API accepts it, so the publish job creates the tag and its Release entry with no token of its own. |

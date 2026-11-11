@@ -28,7 +28,7 @@ same commit, where a reviewer sees the bar move. Nothing in the workflow lowers 
 
 ### Dormant during scaffold
 
-The ratchet starts **dormant**. The smoke test (`def test_sanity` in `tests/test_<slug>.py`) drives the scaffolded project to 100% coverage on its very first run; if the ratchet engaged on that signal, the first real change would crash the build at a 100% floor. So the test task checks for the presence of `def test_sanity` and, while it's still there, prints a status line on every run explaining the dormant state and how to engage:
+The ratchet starts **dormant**. The smoke test (`def test_sanity` in `tests/test_<slug>.py`) drives the scaffolded project to 100% coverage on its very first run; if the ratchet engaged on that signal, the first real change would crash the build at a 100% floor. So the ratchet (run by `preflight` and `test.tox`) checks for the presence of `def test_sanity` and, while it's still there, prints a status line on every run explaining the dormant state and how to engage:
 
 ```
 [ratchet] coverage=100% — scaffold still pristine (test_sanity present); ratchet dormant

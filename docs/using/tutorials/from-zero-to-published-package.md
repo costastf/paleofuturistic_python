@@ -82,7 +82,7 @@ This task:
 2. Creates a `release/<version>` branch off `main`.
 3. Bumps the version, writes the changelog, updates the version badge, commits all.
 4. Pushes the branch. No tag yet: CI creates `vX.Y.Z` on `main` once the release is merged.
-5. Opens a release pull request on your git host (GitHub: via API if `GITHUB_TOKEN` is set, otherwise prints a manual URL; GitLab: prints a manual URL).
+5. Opens a release pull request on your git host through its API when a token is set (`GITHUB_TOKEN` on GitHub, `GITLAB_TOKEN` on GitLab), otherwise prints a URL to open it yourself.
 
 Note that the security audit pipeline now does run.
 That is because a commit edited `uv.lock`.

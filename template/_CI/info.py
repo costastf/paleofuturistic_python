@@ -1,31 +1,30 @@
-"""Stdlib-only project info commands.
+"""Stdlib-only readers for the `pyproject.toml` values the tasks need before anything is installed.
 
-Runnable without uv/invoke/bootstrap: exposes pyproject.toml values for
-pipeline bootstrap and local inspection.
+`info.base-image` feeds the deps-image build and its content-addressed tag, `info.python-version`
+the uv image digest `develop.bump-uv` resolves. Kept outside `_CI/tasks/` because nothing here
+imports invoke, so it can be read by code that runs before the environment exists.
 """
 
 import re
-import sys
 import tomllib
 from pathlib import Path
 
-ROOT = next(
-    parent for parent in Path(__file__).resolve().parents if (parent / '_CI').is_dir()
-)
+ROOT = next(parent for parent in Path(__file__).resolve().parents if (parent / '_CI').is_dir())
 PYPROJECT = ROOT / 'pyproject.toml'
 
 
 def load() -> dict:
+    """Return the parsed `pyproject.toml`."""
     return tomllib.loads(PYPROJECT.read_text(encoding='utf-8'))
 
 
-def walk(cfg: dict, path: tuple[str, ...]) -> str:
-    for part in path:
-        cfg = cfg[part]
-    return cfg
-
-
 def python_version(cfg: dict) -> str:
+    """Return the minimum Python version `requires-python` declares, e.g. `3.11`.
+
+    Raises:
+        KeyError: if `requires-python` is absent or not a `>=` bound.
+
+    """
     requires = cfg['project']['requires-python']
     match = re.search(r'>=\s*(\d+\.\d+)', requires)
     if not match:
@@ -34,20 +33,13 @@ def python_version(cfg: dict) -> str:
     return match.group(1)
 
 
-def uv_version(cfg: dict) -> str:
-    required = cfg['tool']['uv']['required-version']
-    match = re.search(r'(\d+\.\d+(?:\.\d+)?)', required)
-    if not match:
-        msg = f'cannot parse [tool.uv] required-version: {required!r}'
-        raise KeyError(msg)
-    return match.group(1)
+def base_image(cfg: dict) -> str:
+    """Return the `[tool.docker-versions] base-image` reference `Dockerfile.deps` builds on."""
+    return cfg['tool']['docker-versions']['base-image']
 
 
 DISPATCH = {
-    'info.uv-version': uv_version,
-    'info.base-image': lambda c: walk(c, ('tool', 'docker-versions', 'base-image')),
-    'info.project-name': lambda c: walk(c, ('project', 'name')),
-    'info.project-version': lambda c: walk(c, ('project', 'version')),
+    'info.base-image': base_image,
     'info.python-version': python_version,
 }
 
@@ -57,24 +49,8 @@ def read(command: str) -> str:
 
     Raises:
         KeyError: if the command is unknown or the backing pyproject key is missing.
+
     """
     if command not in DISPATCH:
         raise KeyError(command)
     return DISPATCH[command](load())
-
-
-def main(argv: list[str]) -> None:
-    """Dispatch a single info.<key> CLI invocation to stdout."""
-    if len(argv) != 2 or argv[1] not in DISPATCH:
-        sys.stderr.write('Usage: info.<command>\n')
-        sys.stderr.write('Available: ' + ', '.join(sorted(DISPATCH)) + '\n')
-        sys.exit(2)
-    try:
-        sys.stdout.write(read(argv[1]) + '\n')
-    except KeyError as exc:
-        sys.stderr.write(f'missing key in pyproject.toml: {exc}\n')
-        sys.exit(1)
-
-
-if __name__ == '__main__':
-    main(sys.argv)

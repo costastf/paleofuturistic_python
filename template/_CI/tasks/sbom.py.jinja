@@ -454,6 +454,7 @@ def build_metadata_tools() -> ToolRepository:
             return 'unknown'
 
     cyclonedx_version = safe_pkg_version('cyclonedx-python-lib')
+    uv = uv_version()
     return ToolRepository(
         components=[
             Component(
@@ -464,9 +465,9 @@ def build_metadata_tools() -> ToolRepository:
             ),
             Component(
                 name='uv',
-                version=uv_version(),
+                version=uv,
                 type=ComponentType.APPLICATION,
-                purl=PackageURL(type='generic', name='uv', version=uv_version()),
+                purl=PackageURL(type='generic', name='uv', version=uv),
             ),
             Component(
                 name=f'{PROJECT_NAME}-sbom-generator',

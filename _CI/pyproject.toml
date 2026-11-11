@@ -13,9 +13,8 @@ requires-python = ">=3.12"
 vendor = ['invoke']
 
 [tool.ruff]
-# Kept at 120 to match the template's `_CI/pyproject.toml`, the root ruff `line-length` and the
-# root pylint `max-line-length`. A higher value here only creates lines that ruff accepts and
-# the real lint gate rejects.
+# Kept at 120 to match the template's `_CI/pyproject.toml` and the root ruff `line-length`, so
+# the two trees are judged by one width.
 line-length = 120
 
 [tool.ruff.lint]
@@ -37,8 +36,7 @@ ignore = [
     "N999",    # invalid-module-name — `_CI` is a project-wide convention, not a per-file choice
     "FBT001",  # boolean-type-hint-positional-argument — every `@task` option is `name: bool = False`
     "FBT002",  # boolean-default-value-positional-argument — same shape, same reason
-    "TC006",   # runtime-cast-value — `cast(Task, …)` sites never defer `Task` to TYPE_CHECKING;
-               # quoting satisfies ruff but reads as an unused import to pylint
+    "TC006",   # runtime-cast-value — mirrors the template's `_CI/pyproject.toml`, which explains why
 ]
 
 [tool.ruff.lint.flake8-quotes]

@@ -5,7 +5,7 @@ Change or add a `./workflow.cmd` task that generated projects ship with. This is
 ## Where the code lives
 
 - `template/_CI/tasks/<module>.py` or `.py.jinja` — the task modules copied into generated projects. A file needs the `.jinja` suffix only if its content depends on copier answers.
-- `_CI/tasks/` — this repo's *own* task modules (`configuration.py`, `document.py`, `test.py`). They are a separate, smaller set: the template repo is not a generated project.
+- `_CI/tasks/` — this repo's *own* task modules (`configuration.py`, `document.py`, `lint.py`, `maintain.py`, `test.py`). They are a separate, smaller set: the template repo is not a generated project.
 
 ## Steps
 

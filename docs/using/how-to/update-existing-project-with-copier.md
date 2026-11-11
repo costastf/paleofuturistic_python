@@ -57,7 +57,7 @@ This change adds a question and three checks:
 Updating changes:
 
 - `.github/workflows/publish.yaml` or `.gitlab-ci.yml`: the publish job runs `release.ship` and, on GitHub, holds `contents: write` so `GITHUB_TOKEN` can create the tag. `detect-release-tag.yaml` is gone; `pages.yaml` runs `release.detect` itself.
-- `release.bump` commits the version files itself; `release.push` pushes no tags; `release.changelog` takes `--version`.
+- `release.bump` commits the version files itself; `release.changelog` takes `--version`; `release.push`, which had become a bare `git push` once tags were CI's to create, is gone.
 
 After the update:
 

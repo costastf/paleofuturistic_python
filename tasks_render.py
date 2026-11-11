@@ -9,8 +9,8 @@ steps that cannot be expressed declaratively:
 * stamp a fresh uv pin, so a project is current on the day it is created,
 * ensure ``workflow.cmd`` keeps its executable bit.
 
-Version validation moved to the ``copier.yml`` validator; host/pages pruning moved to
-conditional file/directory names. Copier passes the answers this task needs as CLI args.
+Answer validation lives in the ``copier.yml`` validators and host/pages pruning in conditional
+file names, so this script only receives the two answers it needs, as CLI arguments.
 """
 
 import argparse

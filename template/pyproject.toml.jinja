@@ -95,7 +95,7 @@ quality = [
     "pyscn==1.33.2",
 ]
 security = [
-    "cyclonedx-bom==8.0.1",
+    # The library `_CI/tasks/sbom.py` composes the SBOM with; the `cyclonedx-bom` CLI is not used.
     "cyclonedx-python-lib[json-validation]==11.12.0",
     "pip-audit==2.10.1",
     # Signs PEP 740 attestations for the release artifacts (`release.attest`).
@@ -472,8 +472,8 @@ commands = [
 [tool.docker-versions]
 # The container image `Dockerfile.deps` builds on, used by both hosts: `container.py` passes
 # it as a build arg{% if git_hosting_service == 'gitlab' %} and the kaniko job in `.gitlab-ci.yml` reads it straight out of this
-# file{% endif %}. The uv version lives in [tool.uv] required-version above — `info.uv-version` parses it
-# from there — and is repeated in the tag below by hand.
+# file{% endif %}. The uv version in the tag below repeats [tool.uv] required-version above, and
+# `develop.bump-uv` is what moves the two together.
 #
 # It carries a tag *and* a digest. The tag stays for readability; the digest is what actually
 # resolves, so an upstream retag cannot change what this project builds on. The digest is also

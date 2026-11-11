@@ -17,8 +17,8 @@ BootstrapStep(
 | --- | --- |
 | `name` | Display label in the bootstrap output. |
 | `action` | Callable invoked when the step runs. Receives the Invoke `Context`. |
-| `prompt` | Shown interactively if `CI` env var is unset. Empty string means run unconditionally. |
-| `ci_behavior` | `'run'` or `'skip'` — what to do under `CI=1`. |
+| `prompt` | Shown when a human can answer: `CI` is not `true` and stdin is a terminal. Empty string means run unconditionally. |
+| `ci_behavior` | `'run'` or `'skip'` — what to do when there is nobody to ask: `CI=true`, or no terminal on stdin. |
 
 ## Adding a step
 

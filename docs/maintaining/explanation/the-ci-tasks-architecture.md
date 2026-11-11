@@ -70,7 +70,7 @@ The `@logged` decorator wraps a task to print a clean status line:
     ✅ lint.ruff passed 👍
 ```
 
-For tasks that call other tasks (a "workflow task" like `release` that calls `validate`, `bump`, `changelog`, `push`), nested output is indented under the parent banner via the `IndentingStream` class in `shared.py`. The indent is applied at the stdout/stderr layer, so even commands invoked through `context.run()` get their output indented.
+For tasks that call other tasks (a "workflow task" like `release` that calls `validate`, `bump` and `changelog`), nested output is indented under the parent banner via the `IndentingStream` class in `shared.py`. The indent is applied at the stdout/stderr layer, so even commands invoked through `context.run()` get their output indented.
 
 This single design choice does a lot of heavy lifting — terminal output for `./workflow.cmd release` is hierarchical and scannable instead of a flat dump.
 
