@@ -61,4 +61,4 @@ Most one-time interactive setup (pre-commit hooks, certificate install, IDE conf
 ## See also
 
 - [The _CI tasks architecture](../explanation/the-ci-tasks-architecture.md) — why bootstrap is wired as a pre-task on every other task.
-- [Generated project tree](../reference/ci-framework.md) — the full `_CI/` directory layout and shared utilities.
+- [CI framework](../reference/ci-framework.md) — the full `_CI/` directory layout and shared utilities.

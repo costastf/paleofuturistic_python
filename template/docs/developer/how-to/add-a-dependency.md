@@ -18,7 +18,7 @@ uv add --group lint flake8-bugbear
 uv add --group document mkdocs-glightbox
 ```
 
-Use the group whose workflow task will actually run the package. A dep used only during `lint` should not be in `test`; the bootstrap will install it either way, but CI matrices and container layers will not.
+Use the group whose workflow task will actually run the package. A dep used only during `lint` should not be in `test`: `uv run` syncs every group into one `.venv` either way, but the SBOM, the dependency audit and anyone reading `pyproject.toml` take the groups at their word.
 
 ## Pin or constrain a version
 
@@ -37,13 +37,7 @@ uv remove --group lint flake8-bugbear
 
 ## After any change
 
-Re-run the bootstrap so every group's venv is in sync:
-
-```bash
-./workflow.cmd bootstrap --force
-```
-
-And re-run the affected stage:
+Nothing to install by hand: the next `./workflow.cmd` task syncs `.venv` from the updated `uv.lock`. Re-run the affected stage:
 
 ```bash
 ./workflow.cmd lint    # if you changed lint or dev deps

@@ -15,9 +15,15 @@ The template ships pytest + a small set of plugins (coverage, xdist, html, env, 
 
 ## Layer 2 — Coverage
 
-`pytest-cov` runs alongside pytest. The template tracks branch coverage (not just line coverage) and writes HTML + JSON reports under `reports/`.
+`pytest-cov` runs alongside pytest. The template tracks branch coverage (not just line coverage) and writes the JSON report the badge and the ratchet read to `reports/`. `./workflow.cmd test.coverage` renders the browsable HTML when you want it.
 
-`pyproject.toml`'s `[tool.coverage.report]` has `fail_under` set, and the test task **ratchets** this value upward after each green run: if the latest coverage run was 87% and `fail_under` was 80%, the task bumps `fail_under` to 87%. Once engaged, the bar only goes up — lowering `fail_under` is a deliberate, reviewable change that shows up in the diff.
+`pyproject.toml`'s `[tool.coverage.report]` has `fail_under` set, and `preflight --write` (or `test.tox --write`) **ratchets** this value upward after a green matrix run: if the run measured 87% and `fail_under` was 80%, it bumps `fail_under` to 87%. The bare `preflight`, the pre-push hook and CI only compare. Once engaged, the bar only goes up — lowering `fail_under` is a deliberate, reviewable change that shows up in the diff.
+
+**What a raised bar looks like when it stops you.** The floor is a property of the tree, so
+`preflight` fails a push whose coverage sits below it — including a push that only moved code
+around, or one that added a module faster than its tests. The run names the number it measured
+and the floor it missed. Two honest ways out: cover the new code, or lower `fail_under` in the
+same commit, where a reviewer sees the bar move. Nothing in the workflow lowers it for you.
 
 ### Dormant during scaffold
 
@@ -39,7 +45,7 @@ Coverage regressions still can't slip in silently — they just can't slip in *o
 
 tox + tox-uv runs the test suite against every Python version in the project's range. Configured in `pyproject.toml`'s `[tool.tox]`, generated from `min_python_version` / `max_python_version` at template-render time.
 
-**Coverage across the matrix is a union, not an average.** Each env writes its own coverage data (`.coverage.<envname>`, consumed by the combine) and its own reports (`reports/coverage.<envname>.json`, `reports/tests.<envname>.html`); `test.tox` then runs `coverage combine` to produce the single `reports/coverage.json` the badge and the ratchet read. A line counts as covered if *any* interpreter executed it.
+**Coverage across the matrix is a union, not an average.** Each env writes its own coverage data (`.coverage.<envname>`, consumed by the combine) and its own report (`reports/coverage.<envname>.json`); `test.tox` then runs `coverage combine` to produce the single `reports/coverage.json` the badge and the ratchet read. A line counts as covered if *any* interpreter executed it.
 
 The [QA gate](../../maintaining/explanation/design-principles.md#the-qa-gate) stops at that JSON:
 `preflight` produces what it consumes and nothing else, so it
@@ -77,7 +83,7 @@ The template generates one smoke test per project — a `tests/test_<slug>.py` t
 
 ## Parallel execution
 
-`pytest-xdist` runs tests across CPU cores by default (`-n auto` in the template's pytest config). Some tests don't play well with parallelism — anything touching the filesystem in a fixed location, or relying on shared global state.
+`pytest-xdist` runs tests across CPU cores by default (`-n 4` in the template's pytest config). Some tests don't play well with parallelism — anything touching the filesystem in a fixed location, or relying on shared global state.
 
 For those, add `@pytest.mark.serial` and a corresponding `-m "not serial"` / `-m serial` two-pass setup. The template doesn't ship this scaffolding because most projects don't need it.
 

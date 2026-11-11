@@ -41,9 +41,9 @@ This uses whichever Python version uv resolved for the project, slicing by file,
 
 ## In CI
 
-The shipped CI matrix runs each Python version in parallel. To restrict locally what CI runs, edit the
-`matrix` block in `.github/workflows/continuous-integration.yaml` or the `parallel:` block in
-`.gitlab-ci.yml`.
+CI runs `preflight`, whose tox step covers every interpreter in `env_list`. There is no matrix
+block in the pipeline file to edit: trim `env_list` in `pyproject.toml`'s `[tool.tox]` and CI
+follows.
 
 ## When you need a version uv hasn't fetched yet
 

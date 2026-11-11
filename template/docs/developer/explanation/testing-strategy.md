@@ -18,7 +18,7 @@ The scaffold ships pytest + a small set of plugins (coverage, xdist, html, env, 
 
 `pytest-cov` runs alongside pytest. The scaffold tracks branch coverage (not just line coverage) and writes the JSON report the badge and the ratchet read to `reports/`. `./workflow.cmd test.coverage` renders the browsable HTML when you want it.
 
-`pyproject.toml`'s `[tool.coverage.report]` has `fail_under` set, and the test task **ratchets** this value upward after each green run: if the latest coverage run was 87% and `fail_under` was 80%, the task bumps `fail_under` to 87%. Once engaged, the bar only goes up — lowering `fail_under` is a deliberate, reviewable change that shows up in the diff.
+`pyproject.toml`'s `[tool.coverage.report]` has `fail_under` set, and `preflight --write` (or `test.tox --write`) **ratchets** this value upward after a green matrix run: if the run measured 87% and `fail_under` was 80%, it bumps `fail_under` to 87%. The bare `preflight`, the pre-push hook and CI only compare. Once engaged, the bar only goes up — lowering `fail_under` is a deliberate, reviewable change that shows up in the diff.
 
 **What a raised bar looks like when it stops you.** The floor is a property of the tree, so
 `preflight` fails a push whose coverage sits below it — including a push that only moved code

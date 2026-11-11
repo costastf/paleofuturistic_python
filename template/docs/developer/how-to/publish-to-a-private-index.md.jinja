@@ -18,7 +18,9 @@ Set three variables as masked {% if git_hosting_service == 'github' %}secrets on
 Optionally add `UV_PUBLISH_CHECK_URL` with the index's **simple** URL (the one you would install
 from, e.g. `https://pkgs.example.com/api/pypi/internal/simple/`). uv then skips files the index
 already has, so re-running a publish that failed halfway does not fail on the half that
-succeeded.
+succeeded.{% if git_hosting_service == 'github' %} The publish workflow passes only the three
+`UV_PUBLISH_*` secrets above into the step's `env:`, so add this one there too or it never
+reaches uv.{% endif %}
 
 The environment name stays `pypi` even when the index is not PyPI: it is the name the publish
 job declares, and renaming it means renaming it there too.

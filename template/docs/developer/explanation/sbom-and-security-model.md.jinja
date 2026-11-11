@@ -79,7 +79,7 @@ impossible to build a wheel from code that built yesterday. `./workflow.cmd pref
 | --- | --- | --- |
 | Project itself (root) | `required` | `[project]` block in pyproject.toml; root carries the project's licence and a `vcs` external_reference pointing at the git remote when present |
 | Runtime dependencies | `required` | `uv export --no-dev` against `uv.lock` — exactly what ships in the wheel |
-| Dev / lint / test / docs / quality / security groups | `optional` | full lockfile via `uv export --all-groups`, minus the runtime set |
+| Dev / build / develop / lint / test / docs / quality / security groups | `optional` | full lockfile via `uv export --all-groups`, minus the runtime set |
 | Vendored CI tooling | `excluded` | every package in `_CI/lib/vendor.txt` |
 | Pipeline components | `excluded` | {% if git_hosting_service == 'github' %}GitHub Actions (`uses:`){% else %}GitLab CI images{% endif %}, sourced from `_CI/tasks/{{ git_hosting_service }}.py`'s `iter_pipeline_components()` |
 
@@ -96,13 +96,13 @@ Reading top-down: "the project depends on these runtime + dev components for its
 
 Each PyPI component (runtime, dev, vendored) carries:
 
-- **`licenses`** — declared SPDX expression. The lookup walks `PEP 639 License-Expression → legacy License header → LICENSE-File text → Trove classifier mapping`. Vendored entries first try text-detection over the `_CI/lib/vendor/<name>/LICENSE*` files (the vendoring tool drops dist-info but keeps the LICENSE), then defer to the venv-installed copy when the same package is also a transitive dev dep. A handful of packages with no licence-bearing file locally end up with `licenses: []` — graceful degradation rather than failure.
+- **`licenses`** — declared SPDX expression. The lookup walks `PEP 639 License-Expression → legacy License header → LICENSE-File text → Trove classifier mapping`. Vendored entries first try text-detection over the `_CI/lib/vendor/<name>/LICENSE*` files (the vendored tree carries no dist-info but keeps the LICENSE), then defer to the venv-installed copy when the same package is also a transitive dev dep. A handful of packages with no licence-bearing file locally end up with `licenses: []` — graceful degradation rather than failure.
 - **`hashes`** — SHA-256 from `uv.lock`'s `wheels[*].hash` (or `sdist.hash` fallback). Pipeline and vendored components carry no hash here.
 - **`external_references`** — every PyPI component points at its PyPI project page (`type=website`); {% if git_hosting_service == 'github' %}GitHub Actions point at their repo (`type=vcs`){% else %}GitLab images point at their registry (`type=distribution`){% endif %}.
 
 ### Validation
 
-`./workflow.cmd secure.sbom-validate` runs the CycloneDX 1.7 JSON-schema validator in a clean `uv run python` subprocess (so the venv-installed validator wins over the older vendored `jsonschema` that the workflow.cmd launcher places earlier on `sys.path`). The aggregate `./workflow.cmd secure` runs all sub-steps; a clean run means: no known vulns, a fresh SBOM written, validated against the schema.
+`./workflow.cmd secure.sbom-validate` runs the CycloneDX 1.7 JSON-schema validator from the project venv. The aggregate `./workflow.cmd secure` runs all sub-steps; a clean run means: no known vulns, a fresh SBOM written, validated against the schema.
 
 ### What this enables
 
@@ -140,9 +140,9 @@ PyPI accepts attestations only through [Trusted Publishing](../how-to/set-up-tru
 
 ## What about overrides?
 
-`.security-overrides` is a project-local allow-list with mandatory expiry dates. It applies to `pip-audit`. It does **not** suppress findings in the SBOM, which continues to show the world the full truth. Override = "we accept this locally for now," not "make this invisible."
+`.security-overrides` is a project-local allow-list for `pip-audit`: one vulnerability id per line, with an optional expiry date (`CVE-2024-1234::2026-12-31`). It does **not** suppress findings in the SBOM, which continues to show the world the full truth. Override = "we accept this locally for now," not "make this invisible."
 
-The expiry dates are load-bearing: a stale override is a security regression hidden in plain sight. The lint config doesn't enforce this; treat it as a code-review convention.
+The expiry date is what makes an acceptance temporary: on that date the audit reports the finding again, and the scheduled run is what brings the date round with nobody pushing. `secure.validate-overrides` checks every entry's format and date, as a commit hook whenever the file is staged. Whether an entry carries a date at all is a code-review call; only suppressions passed in from outside the repository, through the `<PROJECT>_SECURITY_OVERRIDE` variable, must carry one.
 
 ## What's deliberately out of scope
 

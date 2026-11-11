@@ -45,9 +45,13 @@ _CI/tasks/
 ├── configuration.py     # Shared constants (paths, env vars, registry settings)
 ├── shared.py            # @logged, @run, execute, run_steps, apply_badge, IndentingStream
 ├── github.py / gitlab.py  # Host-specific helpers (only one is present)
+├── local.py             # The project's own tasks. Never overwritten by `copier update`
 └── <feature>.py         # build, container, develop, document, format_, lint,
-                         #   preflight, quality, release, secure, test
+                         #   preflight, quality, release, sbom, secure, test
 ```
+
+Everything there except `local.py` is template-owned and replaced on update, which is why
+project-specific tasks belong in `local.py` — `__init__.py` picks it up automatically.
 
 Each feature module:
 
@@ -87,7 +91,7 @@ This is why a fresh clone "just works" — `./workflow.cmd test` on day one is b
 
 ## `run_steps`: fail-last, no short-circuiting
 
-A workflow task that runs N steps (e.g. `lint` runs ruff + pylint + ty + complexipy + commitizen) doesn't short-circuit on the first failure. The `run_steps()` helper in `shared.py` runs every step, accumulates failures, and raises `SystemExit(1)` at the end with all the failures reported.
+A workflow task that runs N steps (e.g. `lint` runs ruff + the format check + validate-pyproject + pylint + ty + complexipy + commitizen) doesn't short-circuit on the first failure. The `run_steps()` helper in `shared.py` runs every step, accumulates failures, and raises `SystemExit(1)` at the end with all the failures reported.
 
 This makes CI runs informative — you see every issue per run instead of fixing one at a time.
 
@@ -99,8 +103,10 @@ Whichever host was chosen at generation time — GitHub or GitLab — determines
 - `publish_deps_image(context, tag) -> str`
 - `create_release_pr(context, branch, version) -> str`
 - `pr_create_url(context, branch) -> str`
+- `pipeline_badge(context) -> str`
+- `iter_pipeline_components() -> Iterator[PipelineComponent]`
 
-`container.py` and `release.py` import whichever module survived generation via a relative import that's rendered concrete at copy time: a GitHub project ends up with `from .github import …`, a GitLab project with `from .gitlab import …`. Because the unchosen module is omitted entirely at generation time via a copier conditional filename (its rendered name is empty when not selected), the generated project has exactly one code path and no runtime branching between hosts.
+`container.py`, `release.py`, `document.py` and `sbom.py` import whichever module survived generation via a relative import that's rendered concrete at copy time: a GitHub project ends up with `from .github import …`, a GitLab project with `from .gitlab import …`. Because the unchosen module is omitted entirely at generation time via a copier conditional filename (its rendered name is empty when not selected), the generated project has exactly one code path and no runtime branching between hosts.
 
 ## See also
 

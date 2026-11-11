@@ -5,14 +5,14 @@ This project uses [uv](https://docs.astral.sh/uv/) for every Python operation: c
 
 ## What uv replaces
 
-In an older lineage of the template, a fresh checkout required: a system Python, pipx, virtualenv, pipenv, pip-tools, tox-uv, and twine. Each had its own configuration surface, its own caching behaviour, and its own update cadence.
+In an older lineage of the template, a fresh checkout required: a system Python, pipx, virtualenv, pipenv and pip-tools. Each had its own configuration surface, its own caching behaviour, and its own update cadence.
 
 uv replaces all of them with a single Rust binary that:
 
 - Installs and pins Python interpreters per project (no system-Python dependency).
 - Resolves and locks dependencies (no `pip-compile`, no `pipenv`).
 - Creates and manages virtualenvs (no `python -m venv`).
-- Publishes to PyPI (no `twine`).
+- Publishes to PyPI (`uv publish`; twine remains only for `twine check` on the built files).
 - Runs tools in ephemeral environments (`uvx`, no global `pipx`).
 
 ## Why this is worth the lock-in
@@ -23,7 +23,7 @@ uv replaces all of them with a single Rust binary that:
 
 **Reproducibility by default.** uv's lockfile is platform-portable and hash-locked. CI and a contributor's laptop get bit-identical environments without opt-in flags.
 
-**Dependency groups, not extras-abuse.** uv first-classed PEP 735 dependency groups, which are exactly what's needed for the dev/lint/test/document/security split. The template previously used `[project.optional-dependencies]` and had to explain that those aren't really "optional," they're internal grouping. See [Design principles](design-principles.md#why-groups-not-extras) for the full rationale.
+**Dependency groups, not extras-abuse.** uv first-classed PEP 735 dependency groups, which are exactly what's needed for the build/develop/lint/test/document/quality/security split. The template previously used `[project.optional-dependencies]` and had to explain that those aren't really "optional," they're internal grouping. See [Design principles](design-principles.md#why-groups-not-extras) for the full rationale.
 
 ## What the template gives up
 

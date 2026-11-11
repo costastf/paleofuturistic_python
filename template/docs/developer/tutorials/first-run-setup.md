@@ -19,9 +19,11 @@ You do *not* need to pre-install Python — uv will fetch the versions declared 
 
 This:
 
-1. Creates uv-managed virtualenvs for the `dev`, `lint`, `test`, `document`, `quality`, and `security` dependency groups (see [Reference: dependency groups](../reference/dependency-groups.md)).
+1. Initialises a git repository if the directory is not one yet.
 2. Asks to install pre-commit hooks into `.git/hooks/`.
 3. Drops a sentinel file (`_CI/.bootstrapped`) so re-runs are no-ops.
+
+Nothing installs dependencies here: every task runs through `uv run`, which syncs `.venv` from `uv.lock` on demand (see [Reference: dependency groups](../reference/dependency-groups.md)).
 
 Re-running is safe and fast. Pass `--force` to repeat the setup.
 
@@ -32,7 +34,7 @@ Re-running is safe and fast. Pass `--force` to repeat the setup.
 ./workflow.cmd lint
 ```
 
-`format` runs `ruff format` and `ruff check --select I --fix` (import sort). `lint` runs ruff, pylint, ty (the type checker), complexipy, and commitizen. On a freshly-generated project all checks should be clean and pylint should rate the codebase 10.00/10.
+`format` runs `ruff format` and `ruff check --select I --fix` (import sort). `lint` runs ruff, validate-pyproject, pylint, ty (the type checker), complexipy, and commitizen, and checks the formatting without rewriting it. On a freshly-generated project all checks should be clean and pylint should rate the codebase 10.00/10.
 
 ## Step 3 — Test
 

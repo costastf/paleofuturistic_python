@@ -27,7 +27,7 @@ uv run pypi-attestations verify pypi \
   pypi:{{ project_slug }}-<version>-py3-none-any.whl
 ```
 
-`<repository URL>` is the https URL of this repository{% if repository_url %} (`{{ repository_url | trim | regex_replace('(\\\\.git)?/*$', '') }}`){% endif %}.
+`<repository URL>` is the https URL of this repository{% if repository_url %} (`{{ repository_url | trim | regex_replace('(\\.git)?/*$', '') }}`){% endif %}.
 It downloads the file and its attestation from PyPI and checks that the signature is valid, that
 it covers this exact file, and that the signer is a workflow in that repository. Success prints
 `OK:` and the file name; any mismatch fails with the reason.

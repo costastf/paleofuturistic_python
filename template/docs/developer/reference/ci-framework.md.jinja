@@ -63,8 +63,8 @@ starts with a warm environment instead of resolving from scratch. `container.pub
 builds and publishes it; `.deps-image` records the reference downstream jobs consume.
 
 **The tag is content-addressed.** `deps_image_tag()` hashes the lockfile, `Dockerfile.deps`
-and the resolved base-image string together (length-prefixed, so no combination of
-inputs can collide with another). Change any one of them and you get a new tag — which
+and the resolved base-image string together (each input reduced to a fixed-width digest
+first, so no combination of inputs can collide with another). Change any one of them and you get a new tag — which
 is what stops CI from silently reusing an image built from a stale Dockerfile or base.
 
 **The reference is digest-pinned.** `container.publish` resolves the published image to
@@ -105,12 +105,12 @@ tagged commit out, and runs the three steps; with no tag it exits 0.{% endif %} 
 PR/MR with a merge commit, not a squash: a squash writes a new commit the tag does not point at.
 
 {% if git_hosting_service == 'github' -%}
-1. `release.dist` — audit, clean, build, and run the distribution checks.
+1. `release.dist` — clean, audit, build, and run the distribution checks.
 2. `actions/attest-build-provenance` — GitHub's provenance attestation over `dist/*`.
 3. `release.attest` — a PEP 740 attestation per wheel and sdist, `<file>.publish.attestation`.
 4. `release.publish --prebuilt` — `uv publish` uploads the files and their attestations.
 {%- else -%}
-1. `release.dist` — audit, clean, build, and run the distribution checks.
+1. `release.dist` — clean, audit, build, and run the distribution checks.
 2. `release.attest` — a PEP 740 attestation per wheel and sdist, `<file>.publish.attestation`,
    signed with the job's `SIGSTORE_ID_TOKEN`.
 3. `release.publish --prebuilt` — `uv publish` exchanges `PYPI_ID_TOKEN` for a PyPI token and
@@ -157,13 +157,15 @@ _CI/
     preflight.py       The step registry: every check, its scope, and its tier
     quality.py         pyscn analysis
     release.py         Version bump, changelog, PEP 740 attestations, publish
-    secure.py          pip-audit, CycloneDX SBOM
+    sbom.py            CycloneDX SBOM composition
+    secure.py          pip-audit, SBOM extract and validate
     test.py            pytest
     {{ git_hosting_service }}.py          Host-specific helpers (registry, release PR/MR)
     local.py           YOUR tasks — never overwritten by `copier update`
   lib/
-    vendor/            Vendored Invoke + dependencies (committed — don't hand-edit)
+    vendor/            Vendored Invoke (committed — don't hand-edit)
     vendor.txt         Pinned dependency list
+    patches/           The two hand-maintained edits to the vendored tree
 ```
 
 Everything in that tree is template-owned and replaced on `copier update` — **except

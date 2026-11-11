@@ -71,10 +71,10 @@ setting has three doors — a file, an environment variable and a flag — when 
 
 {%- if git_hosting_service == 'github' %}
 - **Daily on a schedule** — `.github/workflows/security-audit.yaml`. A dependency can turn out to be vulnerable, and an override can expire, with nobody pushing a commit; without the scheduled run a quiet repository would stop being checked and expiry dates would never come due. Trigger it by hand from the Actions tab (`workflow_dispatch`) to re-check on demand.
-- **On pushes that change what you depend on** — the same workflow, triggered by `on.push.paths` for `uv.lock`, `pyproject.toml` and `.security-overrides`.
+- **On pushes that change what you depend on** — the same workflow, triggered by `on.push.paths` for `uv.lock`, `_CI/lib/vendor.txt`, the vendored tree and its patches, and `.security-overrides`. Not `pyproject.toml`: the project runs `--frozen`, so an edit there that changes what is installed changes `uv.lock` with it.
 {%- else %}
 - **On a schedule** — the `secure` job's `rules:` include `$CI_PIPELINE_SOURCE == "schedule"`. Create a schedule under **Build → Pipeline schedules**; without it a quiet repository stops being checked and the expiry dates never come due.
-- **On pushes that change what you depend on** — the same job's `changes:` rule covers `uv.lock`, `pyproject.toml` and `.security-overrides`.
+- **On pushes that change what you depend on** — the same job's `changes:` rule covers `uv.lock`, `_CI/lib/vendor.txt`, the vendored tree and its patches, and `.security-overrides`. Not `pyproject.toml`: the project runs `--frozen`, so an edit there that changes what is installed changes `uv.lock` with it.
 {%- endif %}
 - **Before publishing** — `release.dist` audits before it builds. This is the gate that matters: publishing is when the outside world is exposed to these dependencies.
 - **Pre-commit** — only `secure.validate-overrides`, and only when `.security-overrides` itself changes. That checks the file's syntax, not your dependencies.

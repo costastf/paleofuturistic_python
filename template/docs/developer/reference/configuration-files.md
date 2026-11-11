@@ -16,7 +16,7 @@ The single source of truth for project metadata and tool configuration. Sections
 | `[tool.ruff]` | Template (rule list), you (line-length etc.) | Rule selection is opinionated; ad-hoc disables go in code with `# noqa`. |
 | `[tool.pylint]` | Template | Strict-by-default. Per-message disables go in code. |
 | `[tool.pytest.ini_options]` | Template (framework), you (markers) | Don't disable coverage; add markers as needed. |
-| `[tool.coverage]` | Template | `fail_under` is ratcheted upward automatically once the ratchet engages. Don't lower it. |
+| `[tool.coverage]` | Template | `fail_under` is ratcheted upward by `preflight --write` once the ratchet engages. Don't lower it. |
 | `[tool.test-ratchet]` | Template (knob), you (mode) | `mode = "auto-detect"` (default) keeps the coverage ratchet dormant while the scaffolded `test_sanity` is in place; `mode = "strict"` engages it on run #1. See [Testing strategy](../explanation/testing-strategy.md#dormant-during-scaffold). |
 | `[tool.tox]` | Template (framework), you (`env_list`) | Generated from `min_python_version` / `max_python_version`. Each env writes its own reports and coverage data, which `test.tox` then combines — see [Testing strategy](../explanation/testing-strategy.md#layer-3-tox). Trimming `env_list` shortens the gate locally *and* in CI, which is why it is the only supported way to make the matrix cheaper. |
 | `[tool.commitizen]` | Template | Conventional-Commits parser config used by `cz changelog` and the lint hook. The template does **not** use commitizen's autorelease — the bump is chosen explicitly via `./workflow.cmd release -i <type>`. |
@@ -113,7 +113,7 @@ so a file of that name in the tree is a password about to be committed.
 
 ## `Dockerfile.deps`
 
-Multi-stage build for the dependency-cache image. Reads `[tool.docker-versions]` from `pyproject.toml`. See [Build and push a container](../how-to/build-and-push-a-container.md).
+Single-stage build for the dependency-cache image. Reads `[tool.docker-versions]` from `pyproject.toml`. See [Build and push a container](../how-to/build-and-push-a-container.md).
 
 ## `properdocs.yml`
 

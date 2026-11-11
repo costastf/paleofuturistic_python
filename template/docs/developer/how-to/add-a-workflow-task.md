@@ -92,9 +92,9 @@ def my_thing(context):
 - One module per concern. Lint covers all linters; security covers all security tools. Don't sprawl.
 - Side effects via `execute(context, '...')` so failures abort the run cleanly.
 - Don't catch `SystemExit` — let the `run_steps()` runner accumulate failures.
-- Don't use leading underscores on module-level function names; the project's pylint config disallows it.
+- Don't use leading underscores on module-level names; this project's convention is that module privacy is expressed by what callers import, and a leading underscore is reserved for methods.
 
 ## See also
 
-- [Generated project tree](../reference/ci-framework.md) — the full `_CI/` directory layout and shared utilities.
+- [CI framework](../reference/ci-framework.md) — the full `_CI/` directory layout and shared utilities.
 - [The _CI tasks architecture](../explanation/the-ci-tasks-architecture.md) — design rationale for the `@logged` + `IndentingStream` plumbing.

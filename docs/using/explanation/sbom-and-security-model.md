@@ -43,7 +43,9 @@ ignore. It is triggered on the axes it varies along instead:
 - **On pushes that change the dependency surface** — `uv.lock`, `_CI/lib/vendor.txt`, the
   vendored tree and its patches, and `.security-overrides`. Change what you depend on and you
   own the result. A release lands here too: `version_provider = "uv"` re-locks, so the bump
-  commit carries `uv.lock`, and the commit that publishes is worth auditing anyway.
+  commit carries `uv.lock`, and the commit that publishes is worth auditing anyway. Pushes
+  only: a pull request from a fork triggers nothing here, so the audit that covers a fork's
+  dependencies is the scheduled one, after the merge.
 - **A hand-edited vendored file is watched, not audited.** A push touching `_CI/lib/vendor/`
   fires the job so the diff reaches a human. No scanner can say anything about a patched
   vendored source: `vendor.txt` is what pip-audit reads, and it describes the packages that
@@ -76,7 +78,7 @@ impossible to build a wheel from code that built yesterday. `./workflow.cmd pref
 | --- | --- | --- |
 | Project itself (root) | `required` | `[project]` block in pyproject.toml; root carries the project's licence and a `vcs` external_reference pointing at the git remote when present |
 | Runtime dependencies | `required` | `uv export --no-dev` against `uv.lock` — exactly what ships in the wheel |
-| Dev / lint / test / docs / quality / security groups | `optional` | full lockfile via `uv export --all-groups`, minus the runtime set |
+| Dev / build / develop / lint / test / docs / quality / security groups | `optional` | full lockfile via `uv export --all-groups`, minus the runtime set |
 | Vendored CI tooling | `excluded` | every package in `_CI/lib/vendor.txt` |
 | Pipeline components | `excluded` | GitHub Actions (`uses:`) or GitLab CI images, sourced from `_CI/tasks/<host>.py`'s `iter_pipeline_components()` |
 
@@ -93,13 +95,13 @@ Reading top-down: "the project depends on these runtime + dev components for its
 
 Each PyPI component (runtime, dev, vendored) carries:
 
-- **`licenses`** — declared SPDX expression. The lookup walks `PEP 639 License-Expression → legacy License header → LICENSE-File text → Trove classifier mapping`. Vendored entries first try text-detection over the `_CI/lib/vendor/<name>/LICENSE*` files (the vendoring tool drops dist-info but keeps the LICENSE), then defer to the venv-installed copy when the same package is also a transitive dev dep. A handful of packages with no licence-bearing file locally end up with `licenses: []` — graceful degradation rather than failure.
+- **`licenses`** — declared SPDX expression. The lookup walks `PEP 639 License-Expression → legacy License header → LICENSE-File text → Trove classifier mapping`. Vendored entries first try text-detection over the `_CI/lib/vendor/<name>/LICENSE*` files (the vendored tree carries no dist-info but keeps the LICENSE), then defer to the venv-installed copy when the same package is also a transitive dev dep. A handful of packages with no licence-bearing file locally end up with `licenses: []` — graceful degradation rather than failure.
 - **`hashes`** — SHA-256 from `uv.lock`'s `wheels[*].hash` (or `sdist.hash` fallback). Pipeline and vendored components carry no hash here — the GitHub-Action PURL already encodes the commit SHA, and vendored entries aren't in the lockfile.
 - **`external_references`** — every PyPI component points at its PyPI project page (`type=website`); GitHub Actions point at their repo (`type=vcs`); GitLab images point at their registry (`type=distribution`).
 
 ### Validation
 
-`./workflow.cmd secure.sbom-validate` runs the CycloneDX 1.7 JSON-schema validator in a clean `uv run python` subprocess (so the venv-installed validator wins over the older vendored `jsonschema` that the workflow.cmd launcher places earlier on `sys.path`). The aggregate `./workflow.cmd secure` runs all three sub-steps; a clean run means: no known vulns, a fresh SBOM written, validated against the schema.
+`./workflow.cmd secure.sbom-validate` runs the CycloneDX 1.7 JSON-schema validator from the project venv. The aggregate `./workflow.cmd secure` runs all three sub-steps; a clean run means: no known vulns, a fresh SBOM written, validated against the schema.
 
 ### What this enables
 
@@ -129,9 +131,9 @@ PyPI accepts attestations only through [Trusted Publishing](https://docs.pypi.or
 
 ## What about overrides?
 
-`.security-overrides` is a project-local allow-list with mandatory expiry dates. It applies to `pip-audit`. It does **not** suppress findings in the SBOM, which continues to show the world the full truth. Override = "we accept this locally for now," not "make this invisible."
+`.security-overrides` is a project-local allow-list for `pip-audit`: one vulnerability id per line, with an optional expiry date (`CVE-2024-1234::2026-12-31`). It does **not** suppress findings in the SBOM, which continues to show the world the full truth. Override = "we accept this locally for now," not "make this invisible."
 
-The expiry dates are load-bearing: a stale override is a security regression hidden in plain sight. The template's lint config doesn't enforce this; treat it as a code-review convention.
+The expiry date is what makes an acceptance temporary: on that date the audit reports the finding again, and the scheduled run is what brings the date round with nobody pushing. `secure.validate-overrides` checks every entry's format and date, as a commit hook whenever the file is staged. Whether an entry carries a date at all is a code-review call; only suppressions passed in from outside the repository, through the `<PROJECT>_SECURITY_OVERRIDE` variable, must carry one.
 
 ## What's deliberately out of scope
 

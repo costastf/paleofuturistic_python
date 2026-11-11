@@ -14,7 +14,7 @@ Six explanation pages exist twice: the canonical copy in this repo's docs and a 
 ## The contract
 
 - **Edit the canonical page first**, then propagate the change to the shipped copy.
-- The shipped copies are *adaptations*, not byte copies: they address the generated project's developer ("your scaffold", "your project"), drop template-repo-only material, and may knob-gate sections with jinja (the SBOM page wraps its build-provenance layer in `{% if git_hosting_service == 'github' %}`).
+- The shipped copies are *adaptations*, not byte copies: they address the generated project's developer ("your scaffold", "your project"), drop template-repo-only material, and may knob-gate passages with jinja (the SBOM page gates its GitHub-attestation paragraph on `{% if git_hosting_service == 'github' %}`).
 - Every shipped copy opens with a `<!-- canonical: ... -->` HTML comment naming its source page. Keep it.
 - Section structure must stay aligned: the shipped copy's `##` headings must be a subset of the canonical page's. `tests/test_template_invariants.py::test_shipped_rationale_pages_match_canonical` enforces both the marker and the heading subset, so a canonical edit that renames or removes a section fails `test.invariants` until the shipped copy follows.
 
