@@ -125,7 +125,7 @@ pypi-attestations verify pypi --repository https://github.com/<owner>/<repo> pyp
 
 GitHub projects also get GitHub's own provenance attestation from `actions/attest-build-provenance`, stored with the repository and checked with `gh attestation verify <file> --repo <owner>/<repo>`. The two answer the same question for different audiences: the PEP 740 one travels with the package to PyPI, the GitHub one stays where the source is.
 
-Order matters in the publish job: `release.dist` builds into `dist/`, the attestations are taken over those files, and `release.publish --prebuilt` uploads them *without* rebuilding. Rebuilding in between would publish files that no attestation refers to, and verification would then fail — reading as tampering rather than as a fresh build.
+Order matters in the publish job, and `release.ship` fixes it: `release.dist` builds into `dist/`, `release.attest` signs those files, and the upload sends them *without* rebuilding. Rebuilding in between would publish files that no attestation refers to, and verification would then fail — reading as tampering rather than as a fresh build. GitHub's provenance step runs after the upload over the same files, still in `dist/`; a statement about file contents proves the same thing whichever side of the upload it is taken on.
 
 PyPI accepts attestations only through [Trusted Publishing](https://docs.pypi.org/trusted-publishers/). A project that publishes with `UV_PUBLISH_*` credentials instead (a private index, say) uploads none: `release.publish` passes `--no-attestations` on that path, because indexes that do not support attestations may reject the upload.
 

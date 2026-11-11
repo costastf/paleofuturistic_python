@@ -1,13 +1,13 @@
 # Harden the GitHub repository
 
-After generating with `git_hosting_service=github`, you have six workflow files under `.github/workflows/` (five without Pages) and a release pipeline that wants to publish to PyPI. This page lists the GitHub-side settings worth applying before that pipeline ever fires.
+After generating with `git_hosting_service=github`, you have five workflow files under `.github/workflows/` (four without Pages) and a release pipeline that wants to publish to PyPI. This page lists the GitHub-side settings worth applying before that pipeline ever fires.
 
 ## Prerequisite security
 
 These are non-negotiable for any repository connected to CI/CD:
 
 - **Branch protection on `main`.** Require pull requests, require status checks, require a linear history. Block force pushes and deletions. Require only checks that run on every pull request — and today that is none of the shipped ones. **Do not require `Preflight`**: the workflows trigger on `push`, so a pull request from a fork runs nothing in this repository and a required check would sit pending forever, leaving the repository unable to merge an external contribution. `security-audit` is filtered by `on.push.paths` on top of that. Require them once the workflows gain a `pull_request` trigger, which is a decision the template has not taken yet.
-- **Tag protection for `v*`.** Forbid deleting and editing release tags.
+- **Tag protection for `v*`.** Forbid deleting and editing release tags. Creation must stay open to the publish workflow: `release.tag` creates each `v*` tag through the API with the workflow's `GITHUB_TOKEN`, so a ruleset that restricts who may create tags needs a bypass for GitHub Actions, or releases fail at that step.
 - **Required approvals.** At least one reviewer per PR.
 
 ## PyPI trusted publishing
@@ -20,7 +20,7 @@ The shipped `.github/workflows/publish.yaml` is configured for [PyPI trusted pub
 
 The workflow grants `id-token: write` on the publish job — that's what makes the OIDC handshake possible. Don't set `UV_PUBLISH_*` secrets alongside: when all three are present `release.publish` uploads with them instead, and without attestations.
 
-The same OIDC identity signs two attestations over the wheel and sdist before they are uploaded. `actions/attest-build-provenance` records GitHub's own (needs `attestations: write`, already granted), verified with `gh attestation verify`. `release.attest` signs a [PEP 740](https://packaging.python.org/en/latest/specifications/index-hosted-attestations/) attestation per file that `uv publish` uploads to PyPI, where it shows as *Provenance* on each file and is verified with `pypi-attestations verify pypi`. PyPI takes the second kind only through Trusted Publishing, which is one more reason to keep the credential path unused. See [SBOM and security model](../explanation/sbom-and-security-model.md#layer-3-build-provenance).
+The same OIDC identity signs two attestations over the wheel and sdist, one before they are uploaded and one after. `actions/attest-build-provenance` records GitHub's own (needs `attestations: write`, already granted), verified with `gh attestation verify`. `release.attest` signs a [PEP 740](https://packaging.python.org/en/latest/specifications/index-hosted-attestations/) attestation per file that `uv publish` uploads to PyPI, where it shows as *Provenance* on each file and is verified with `pypi-attestations verify pypi`. PyPI takes the second kind only through Trusted Publishing, which is one more reason to keep the credential path unused. See [SBOM and security model](../explanation/sbom-and-security-model.md#layer-3-build-provenance).
 
 ## Hardening against external contributors
 

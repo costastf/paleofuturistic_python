@@ -7,6 +7,7 @@ import re
 import urllib.error
 import urllib.request
 from collections.abc import Iterator
+from http import HTTPStatus
 from pathlib import Path
 from typing import NamedTuple
 from urllib.parse import quote
@@ -186,6 +187,94 @@ def create_release_pr(context: Context, release_branch: str, new_version: str) -
         print(f'GitLab API request failed: {exc}')
         return ''
     return data.get('web_url', '')
+
+
+def release_api(context: Context) -> tuple[str, dict[str, str]]:
+    """Return the Releases API prefix for this project and the auth header to call it with.
+
+    In a pipeline the job token is enough: the Releases API is one of the few that accept it,
+    which is how GitLab's own release-cli creates tags. By hand, ``GITLAB_TOKEN`` (``api``
+    scope) is used instead. Aborts when neither is set.
+    """
+    if token := os.environ.get('GITLAB_TOKEN', '').strip():
+        headers = {'PRIVATE-TOKEN': token}
+    elif job_token := os.environ.get('CI_JOB_TOKEN', '').strip():
+        headers = {'JOB-TOKEN': job_token}
+    else:
+        print('Neither GITLAB_TOKEN nor CI_JOB_TOKEN is set: creating the release tag needs one.')
+        raise SystemExit(1)
+    base = os.environ.get('CI_API_V4_URL', '').strip()
+    project = os.environ.get('CI_PROJECT_ID', '').strip()
+    if not base or not project:
+        origin = origin_ref(context)
+        if not origin.host or not origin.path:
+            print('Could not read a host and project path from the origin remote; cannot reach the API.')
+            raise SystemExit(1)
+        base = base or f'https://{origin.host}/api/v4'
+        project = project or quote(origin.path, safe='')
+    return f'{base}/projects/{project}/releases', headers
+
+
+def gitlab_api(url: str, headers: dict[str, str], payload: dict | None = None) -> tuple[int, dict]:
+    """Call the GitLab API. Return the status and the decoded body (``{}`` on failure).
+
+    A ``404`` comes back as a status rather than an error, because "is there a release of this
+    name" is a question with no as its answer. Every other failure prints what the API said
+    and returns ``0``, so the caller decides whether that is fatal.
+    """
+    if not url.startswith('https://'):
+        print(f'Refusing to call a non-https API URL: {url}')
+        raise SystemExit(1)
+    request = urllib.request.Request(  # noqa: S310 — https only, checked above
+        url,
+        data=json.dumps(payload).encode('utf-8') if payload is not None else None,
+        method='POST' if payload is not None else 'GET',
+        headers={'Content-Type': 'application/json', **headers},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
+            return response.status, json.loads(response.read().decode('utf-8') or '{}')
+    except urllib.error.HTTPError as exc:
+        if exc.code == HTTPStatus.NOT_FOUND:
+            return exc.code, {}
+        detail = exc.read().decode('utf-8', errors='replace')[:500]
+        print(f'GitLab API returned {exc.code}: {detail}')
+        return 0, {}
+    except OSError as exc:
+        print(f'GitLab API request failed: {exc}')
+        return 0, {}
+
+
+def release_tag_commit(context: Context, tag: str) -> str:
+    """Return the commit the release named `tag` marks, or '' when there is no such release."""
+    releases, headers = release_api(context)
+    status, data = gitlab_api(f'{releases}/{quote(tag, safe="")}', headers)
+    if status == HTTPStatus.NOT_FOUND:
+        return ''
+    if not status:
+        raise SystemExit(1)
+    return data.get('commit', {}).get('id', '')
+
+
+def create_release(context: Context, tag: str, sha: str) -> str:
+    """Create a GitLab Release for `tag` at `sha`, which creates the tag. Return its URL, or ''.
+
+    One API call does both: a release whose tag does not exist yet is created from ``ref``.
+    The job token is accepted here, so the pipeline needs no project access token and no
+    push access to the repository.
+    """
+    releases, headers = release_api(context)
+    status, data = gitlab_api(
+        releases,
+        headers,
+        {
+            'name': tag,
+            'tag_name': tag,
+            'ref': sha,
+            'description': f'Release {tag}, published by the publish job. Changelog: `docs/reference/changelog.md`.',
+        },
+    )
+    return data.get('_links', {}).get('self', '') if status else ''
 
 
 def iter_pipeline_components() -> Iterator[PipelineComponent]:

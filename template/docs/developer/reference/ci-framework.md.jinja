@@ -95,26 +95,21 @@ skip-if-the-tag-exists branch — so the image can only ever be what this pipeli
 
 ## The publish pipeline
 
-A release tag reaching `main` runs one job that builds once and uploads exactly what it built.
-The trigger is the push to `main`, not the tag: `release` pushes the tag from the release
-branch before the PR/MR merges, so a tag trigger would publish an unreviewed version.
-{% if git_hosting_service == 'github' %}`detect-release-tag.yaml` walks the pushed commits for a
-`v`-tag and hands the tagged commit to this workflow and to `pages.yaml`.{% else %}`release.ship`
-walks the pushed commits (`CI_COMMIT_BEFORE_SHA..CI_COMMIT_SHA`) for a `v`-tag, checks the
-tagged commit out, and runs the three steps; with no tag it exits 0.{% endif %} Merge the release
-PR/MR with a merge commit, not a squash: a squash writes a new commit the tag does not point at.
+Every push to `main` runs one job, and the job publishes when the push carried a release: a
+change of `[project].version` between the previous tip and the new one. `release` creates no
+tag; `release.ship` creates it on the new tip of `main` through the host's Release API, once
+the release has been reviewed and merged, so the merge method (merge commit, squash, rebase)
+does not matter. The job then builds once and uploads exactly what it built. With no version
+bump it prints so and exits 0.{% if git_hosting_service == 'github' %} `pages.yaml` asks the same
+question through `release.detect` before deploying the docs.{% endif %}
 
-{% if git_hosting_service == 'github' -%}
-1. `release.dist` — clean, audit, build, and run the distribution checks.
-2. `actions/attest-build-provenance` — GitHub's provenance attestation over `dist/*`.
-3. `release.attest` — a PEP 740 attestation per wheel and sdist, `<file>.publish.attestation`.
-4. `release.publish --prebuilt` — `uv publish` uploads the files and their attestations.
-{%- else -%}
-1. `release.dist` — clean, audit, build, and run the distribution checks.
-2. `release.attest` — a PEP 740 attestation per wheel and sdist, `<file>.publish.attestation`,
-   signed with the job's `SIGSTORE_ID_TOKEN`.
-3. `release.publish --prebuilt` — `uv publish` exchanges `PYPI_ID_TOKEN` for a PyPI token and
-   uploads the files and their attestations.
+1. `release.tag` — `v<version>` on the new tip, with a Release entry.
+2. `release.dist` — clean, audit, build, and run the distribution checks.
+3. `release.attest` — a PEP 740 attestation per wheel and sdist, `<file>.publish.attestation`{% if git_hosting_service == 'gitlab' %},
+   signed with the job's `SIGSTORE_ID_TOKEN`{% endif %}.
+4. the upload — `uv publish` {% if git_hosting_service == 'gitlab' %}exchanges `PYPI_ID_TOKEN` for a PyPI token and {% endif %}sends the files and their attestations.
+{%- if git_hosting_service == 'github' %}
+5. `actions/attest-build-provenance` — GitHub's provenance attestation over the uploaded wheel and sdist.
 {%- endif %}
 
 Nothing rebuilds between the steps, so every attestation refers to a file that is uploaded.

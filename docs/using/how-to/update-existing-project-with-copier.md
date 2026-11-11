@@ -50,11 +50,20 @@ This change adds a question and three checks:
 - **New dependency group** `build`, and new pins in `lint` and `security`. Run `uv lock` after the update and commit `uv.lock` with it.
 - **Publishing.** The publish job now signs PEP 740 attestations. On GitLab it also requests `id_tokens:`, and PyPI needs a Trusted Publisher registered for the project (the new *Set up Trusted Publishing* how-to). If you publish with `UV_PUBLISH_*` credentials, nothing changes: that path uploads without attestations.
 
-## Upgrading past the GitLab publish gate
+## Upgrading past the tag-on-main release flow
 
-The GitLab `publish` job used to run on every `v`-tag push. `release` pushes the tag from the release branch before the MR merges, so that published a version nobody had reviewed. The job now runs on pushes to the default branch and hands the push to `release.ship`, which publishes only if the pushed commits carry a `v`-tag, from that commit. Merge release MRs with a merge commit: a squash writes a new commit the tag does not point at, and nothing publishes.
+`release` used to create the tag on the release branch and push it with the branch. On GitLab that published the version before the MR was reviewed; on both hosts a squash merge left the tag pointing at a commit `main` never saw, and nothing published. Now `release` creates no tag. The publish job runs on every push to the default branch and hands it to `release.ship`, which publishes when `[project].version` changed between the previous tip and the new one: it creates the tag on the new tip through the host's Release API (a Release entry appears on the releases page), then builds, signs and uploads. Merge release PRs/MRs any way you like.
 
-If you registered the PyPI Trusted Publisher, nothing changes: the job, pipeline file and `pypi` environment are the same. GitHub projects already worked this way through `detect-release-tag.yaml`.
+Updating changes:
+
+- `.github/workflows/publish.yaml` or `.gitlab-ci.yml`: the publish job runs `release.ship` and, on GitHub, holds `contents: write` so `GITHUB_TOKEN` can create the tag. `detect-release-tag.yaml` is gone; `pages.yaml` runs `release.detect` itself.
+- `release.bump` commits the version files itself; `release.push` pushes no tags; `release.changelog` takes `--version`.
+
+After the update:
+
+1. If the `pypi` environment has required reviewers or approvers, remove them and restrict the environment to the default branch instead; the job now runs on every push to it. The PyPI Trusted Publisher registration itself is unchanged.
+2. On GitHub, if a ruleset restricts who may create `v*` tags, add a bypass for GitHub Actions, or `release.tag` fails.
+3. A release branch opened before the update carries a tag on its bump commit. Delete that tag everywhere (`git tag -d vX.Y.Z && git push origin :refs/tags/vX.Y.Z`) before merging, or `release.tag` refuses to create it on `main` because it exists on another commit.
 
 ## Upgrading past the changelog move
 

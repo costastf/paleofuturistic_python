@@ -3,6 +3,7 @@
 import os
 import re
 import shutil
+import tomllib
 from pathlib import Path
 from typing import cast
 
@@ -11,7 +12,7 @@ from invoke import Collection, Context, Task, task
 from .build import build
 from .configuration import CHANGELOG_FILE, DIST_DIR, OIDC_ENV_VARS, SBOM_FILE, UV_PUBLISH_SETTINGS
 from .document import update_package_version_badge
-from .{{ git_hosting_service }} import create_release_pr, pr_create_url
+from .{{ git_hosting_service }} import create_release, create_release_pr, pr_create_url, release_tag_commit
 from .secure import audit
 from .shared import commit, execute, logged, note
 
@@ -71,18 +72,24 @@ def validate(context: Context) -> None:
 @task
 @logged('release.bump')
 def bump(context: Context, increment: str = '') -> None:
-    """Bump the version, refresh the version badge, and create a git tag.
+    """Bump the version, refresh the version badge, and commit both. No tag.
 
-    The badge is refreshed *before* `cz bump`, so it lands in the commit the release tag points
-    at: `cz bump` commits every modified tracked file — verified, a README edited beforehand is
-    swept into its commit — which is also why `release` runs `validate` first to insist on a
-    clean tree. Otherwise the release would land a README contradicting the version it
-    released, and the next `preflight` on main would fail on the stale badge.
+    `cz bump --version-files-only` moves `pyproject.toml` and `uv.lock` through the uv version
+    provider and stops there; this task commits the result with the message `cz bump` would
+    have used. The tag is deliberately not created here: it is created on the default branch by
+    CI once the release lands there (`release.tag`), so the way the pull request is merged —
+    merge commit, squash, rebase — cannot leave a tag pointing at a commit `main` never saw.
+
+    The badge is refreshed *before* the bump, so it lands in the same commit as the version it
+    announces: the commit stages every modified tracked file, which is also why `release`
+    runs `validate` first to insist on a clean tree. Otherwise the release would land a README
+    contradicting the version it released, and the next `preflight` on main would fail on the
+    stale badge.
 
     Writing before the step that can fail means putting the badge back when it does. `cz bump`
-    refuses on a dirty tree, an unparseable history or a hook it cannot satisfy, and a badge
-    announcing a version nobody released is worse than the failure that caused it. The restore
-    reads the version from pyproject.toml, which a failed bump has not touched.
+    refuses on an unparseable history or an invalid increment, and a badge announcing a version
+    nobody released is worse than the failure that caused it. The restore reads the version
+    from pyproject.toml, which a failed bump has not touched.
 
     Args:
         context: Invoke context.
@@ -90,12 +97,14 @@ def bump(context: Context, increment: str = '') -> None:
 
     """
     prerelease_types = ('alpha', 'beta', 'rc')
-    note(update_package_version_badge(version=resolve_next_version(context, increment)))
+    current = project_version()
+    new_version = resolve_next_version(context, increment)
+    note(update_package_version_badge(version=new_version))
     try:
         if increment in prerelease_types:
-            execute(context, f'uv run cz bump --increment patch --prerelease {increment} --allow-no-commit --yes')
+            execute(context, f'uv run cz bump --increment patch --prerelease {increment} --version-files-only --yes')
         else:
-            execute(context, f'uv run cz bump --increment {increment} --allow-no-commit --yes')
+            execute(context, f'uv run cz bump --increment {increment} --version-files-only --yes')
     except SystemExit:
         # A failed bump leaves the version in pyproject.toml alone, so writing the badge from
         # pyproject.toml puts back exactly what was there — through the same substitution that
@@ -103,16 +112,22 @@ def bump(context: Context, increment: str = '') -> None:
         note(update_package_version_badge())
         print('Version badge restored: the bump it announced did not happen.')
         raise
+    execute(context, 'git add --update')
+    commit(context, f'bump: version {current} → {new_version}')
 
 
 @task
 @logged('release.changelog')
-def changelog(context: Context, write: bool = False) -> None:
-    """Generate the changelog from all tags.
+def changelog(context: Context, write: bool = False, version: str = '') -> None:
+    """Generate the changelog from the tags, plus the release being prepared.
 
     By default prints the changelog to stdout. With --write, adds the new releases to
     ``CHANGELOG_FILE`` (docs/reference/changelog.md, the docs site's changelog page), below its
     header, and commits the result. A file with no releases in it yet gets the whole history.
+
+    The tag for a release in preparation does not exist yet — CI creates it on the default
+    branch after the merge — so ``--version`` names it, and the commits since the last tag are
+    listed under that heading instead of "Unreleased".
 
     The commit is signed when ``commit.gpgsign`` is set and a signing key is available, and
     made unsigned with a warning when signing is configured but no key can be reached — which
@@ -121,10 +136,13 @@ def changelog(context: Context, write: bool = False) -> None:
     Args:
         context: Invoke context.
         write: Write changelog to file and commit instead of printing to stdout.
+        version: The version being released, without the ``v``; its section is generated as
+            if the tag existed.
 
     """
+    unreleased = f' --unreleased-version v{version}' if version else ''
     if write:
-        execute(context, 'uv run cz changelog')
+        execute(context, f'uv run cz changelog{unreleased}')
         execute(context, f'git add {CHANGELOG_FILE}')
         # `git diff --cached --quiet` exits 0 when nothing is staged. Regenerating an
         # already-current changelog is a no-op, not a failure, so this returns rather than
@@ -135,15 +153,14 @@ def changelog(context: Context, write: bool = False) -> None:
             return
         commit(context, 'docs: update changelog')
     else:
-        execute(context, 'uv run cz changelog --dry-run')
+        execute(context, f'uv run cz changelog --dry-run{unreleased}')
 
 
 @task
 @logged('release.push')
 def push(context: Context) -> None:
-    """Push the bump commit and tag to the remote."""
+    """Push the current branch to the remote. Tags are CI's to create, so none are pushed."""
     execute(context, 'git push')
-    execute(context, 'git push --tags')
 
 
 @task
@@ -234,6 +251,17 @@ def publish(context: Context, prebuilt: bool = False) -> None:
             upload files that no attestation, checksum or signature refers to.
 
     """
+    if not prebuilt:
+        dist(context)
+    elif not distribution_files():
+        print('--prebuilt was given but dist/ is empty; run `./workflow.cmd release.dist` first.')
+        raise SystemExit(1)
+    upload(context)
+    clean(context)
+
+
+def upload(context: Context) -> None:
+    """Run `uv publish` over `dist/`, in the mode the credentials select. See `publish`."""
     if publishes_with_credentials():
         print('UV_PUBLISH_* credentials set — publishing with them, without attestations.')
         command = 'uv publish --trusted-publishing never --no-attestations'
@@ -247,80 +275,150 @@ def publish(context: Context, prebuilt: bool = False) -> None:
             'See docs/developer/how-to/set-up-trusted-publishing.md.'
         )
         raise SystemExit(1)
-    if not prebuilt:
-        dist(context)
-    elif not distribution_files():
-        print('--prebuilt was given but dist/ is empty; run `./workflow.cmd release.dist` first.')
-        raise SystemExit(1)
     execute(context, command)
-    clean(context)
 
 
 NO_PREVIOUS_TIP = '0' * 40
 
 
-def released_tag(context: Context, before: str, after: str) -> tuple[str, str] | None:
-    """Return the first v-prefixed tag on the commits ``before..after``, with the commit it marks.
+def project_version(pyproject: str = '') -> str:
+    """Return `[project].version` from `pyproject`'s text, or from the working tree's file."""
+    text = pyproject or Path('pyproject.toml').read_text(encoding='utf-8')
+    return tomllib.loads(text)['project']['version']
 
-    ``before`` all zeros is a push that created the branch, so everything reachable from
-    ``after`` is arriving with it. ``before`` empty means there is no previous tip to diff
-    against, and only ``after`` itself is checked: walking from the tip with no lower bound
-    would sweep in every release the branch has ever carried and report the newest one as
-    arriving now.
-    """
-    after = after or 'HEAD'
-    if before == NO_PREVIOUS_TIP:
-        revisions = after
-    elif before:
-        revisions = f'{before}..{after}'
-    else:
-        revisions = f'--max-count=1 {after}'
-    # Tags are not part of what a runner fetches for a branch pipeline.
-    context.run('git fetch --tags --quiet origin', hide=True, warn=True)
-    log = context.run(f'git log --format=%H {revisions}', hide=True, warn=True)
-    if log.failed:
-        print(f'Could not list the commits {revisions}:\n{log.stderr.strip()}')
+
+def version_at(context: Context, revision: str) -> str:
+    """Return `[project].version` as committed at `revision`."""
+    shown = context.run(f'git show {revision}:pyproject.toml', hide=True, warn=True)
+    if shown.failed:
+        print(f'Could not read pyproject.toml at {revision}:\n{shown.stderr.strip()}')
         raise SystemExit(1)
-    for sha in log.stdout.split():
-        tags = context.run(f'git tag --points-at {sha}', hide=True, warn=True)
-        for tag in tags.stdout.split():
-            if re.match(r'v\d', tag):
-                return tag, sha
-    return None
+    return project_version(shown.stdout)
+
+
+def commit_sha(context: Context, revision: str = 'HEAD') -> str:
+    """Return the full sha `revision` resolves to."""
+    resolved = context.run(f'git rev-list --max-count=1 {revision}', hide=True, warn=True)
+    if resolved.failed:
+        print(f'Could not resolve {revision}:\n{resolved.stderr.strip()}')
+        raise SystemExit(1)
+    return resolved.stdout.strip()
+
+
+def released_version(context: Context, before: str, after: str) -> tuple[str, str] | None:
+    """Return the release tag and commit if the push ``before..after`` bumped the version.
+
+    A release is a change of `[project].version` between the branch tip before the push and
+    the tip after it; the tag is derived from the new version and the release is the new tip
+    itself, whichever way the release branch was merged. ``before`` all zeros is a push that
+    created the branch, which carries no release: there is no earlier version to have bumped
+    from. ``before`` empty means there is no previous tip to diff against (a manual run), and
+    the tip is compared with its own parent.
+    """
+    after_sha = commit_sha(context, after or 'HEAD')
+    if before == NO_PREVIOUS_TIP:
+        return None
+    old = version_at(context, before or f'{after_sha}^')
+    new = version_at(context, after_sha)
+    if old == new:
+        return None
+    return f'v{new}', after_sha
+
+
+def record_outputs(output: str, tag: str, sha: str) -> None:
+    """Append ``tag=`` and ``sha=`` lines to ``output``, the file a pipeline reads outputs from."""
+    if output:
+        with Path(output).open('a', encoding='utf-8') as handle:
+            handle.write(f'tag={tag}\nsha={sha}\n')
+
+
+@task
+@logged('release.detect')
+def detect(context: Context, before: str = '', after: str = '', output: str = '') -> None:
+    """Report whether the push ``before..after`` carried a release, and which commit it is.
+
+    What the pipeline asks before deploying anything that should only follow a release, such
+    as the documentation site. Always exits 0: no release is an answer, not a failure.
+
+    Args:
+        context: Invoke context.
+        before: The branch tip before the push (``github.event.before``, ``CI_COMMIT_BEFORE_SHA``).
+        after: The branch tip after the push (``github.sha``, ``CI_COMMIT_SHA``); ``HEAD`` if empty.
+        output: A file to append ``tag=`` and ``sha=`` lines to (``$GITHUB_OUTPUT``), empty
+            values when there is no release, so a later step can read them either way.
+
+    """
+    found = released_version(context, before, after)
+    tag, sha = found or ('', '')
+    print(f'Release {tag} detected at {sha}.' if found else 'No version bump on the incoming commits.')
+    record_outputs(output, tag, sha)
+
+
+@task(name='tag')
+@logged('release.tag')
+def tag_release(context: Context, revision: str = '') -> None:
+    """Create the release tag for the committed version, through the host's Release API.
+
+    The tag is `v<version>` from `pyproject.toml` at ``revision`` (``HEAD`` by default), created
+    on the host with the token the pipeline already holds, so no job needs push access to the
+    repository. It arrives with a Release entry on the host's releases page.
+
+    Idempotent for a re-run: a tag already on this commit is reported and kept. A tag on a
+    different commit is an error, because moving it would change what an existing release
+    means.
+
+    Args:
+        context: Invoke context.
+        revision: The commit to tag; ``HEAD`` if empty.
+
+    """
+    sha = commit_sha(context, revision or 'HEAD')
+    tag = f'v{version_at(context, sha)}'
+    existing = release_tag_commit(context, tag)
+    if existing == sha:
+        print(f'{tag} already marks {sha}; nothing to create.')
+        return
+    if existing:
+        print(f'{tag} exists on {existing}, not on {sha}. A tag is never moved; delete it first if that is wrong.')
+        raise SystemExit(1)
+    url = create_release(context, tag, sha)
+    if not url:
+        raise SystemExit(1)
+    print(f'Created {tag} on {sha}: {url}')
 
 
 @task
 @logged('release.ship')
-def ship(context: Context, before: str = '', after: str = '') -> None:
-    """Publish from CI if the pushed commits ``before..after`` carry a release tag; else do nothing.
+def ship(context: Context, before: str = '', after: str = '', output: str = '') -> None:
+    """Publish from CI if the push ``before..after`` carried a release; otherwise do nothing.
 
-    A tag-triggered publish job would be simpler, but ``release`` pushes the tag from the
-    release branch before the pull request merges, so a tag pipeline publishes a version nobody
-    has reviewed. What marks a release is a v-prefixed tag reaching the default branch, which
-    is what this looks for on every push to it. With no tag it prints why and exits 0, so the
-    pipeline stays green. With one it checks out the tagged commit — the commit rather than the
-    tag name, a tag being a mutable pointer — and runs ``release.dist``, ``release.attest`` and
-    ``release.publish --prebuilt`` over it.
-
-    Merge the release request with a merge commit: a squash writes a new commit that carries
-    no tag, and nothing publishes.
+    The one command the publish job runs on every push to the default branch. A release is a
+    version bump arriving on that branch, so merging the release request any way — merge
+    commit, squash, rebase — publishes it. With no bump it prints why and exits 0, so the
+    pipeline stays green. With one it tags the new tip through the host's API, then runs
+    ``release.dist``, ``release.attest`` and the upload over it. ``dist/`` is left in place for
+    anything the pipeline attests afterwards.
 
     Args:
         context: Invoke context.
-        before: The branch tip before the push (``CI_COMMIT_BEFORE_SHA`` on GitLab).
-        after: The branch tip after the push (``CI_COMMIT_SHA`` on GitLab); ``HEAD`` if empty.
+        before: The branch tip before the push (``github.event.before``, ``CI_COMMIT_BEFORE_SHA``).
+        after: The branch tip after the push (``github.sha``, ``CI_COMMIT_SHA``); ``HEAD`` if empty.
+        output: As for ``release.detect``.
 
     """
-    found = released_tag(context, before, after)
+    found = released_version(context, before, after)
+    tag, sha = found or ('', '')
+    record_outputs(output, tag, sha)
     if found is None:
-        print('No v-prefixed tag on the incoming commits; nothing to publish.')
+        print('No version bump on the incoming commits; nothing to publish.')
         return
-    tag, sha = found
-    print(f'Release tag detected: {tag} ({sha})')
-    execute(context, f'git checkout --quiet {sha}')
+    print(f'Release {tag} detected at {sha}.')
+    if commit_sha(context) != sha:
+        execute(context, f'git checkout --quiet {sha}')
+    tag_release(context, revision=sha)
     dist(context)
     attest(context)
-    publish(context, prebuilt=True)
+    upload(context)
 
 
 def resolve_next_version(context: Context, increment: str) -> str:
@@ -385,9 +483,9 @@ def abort_if_ref_exists(
 def ensure_refs_are_free(context: Context, new_version: str, release_branch: str) -> None:
     """Abort before any git mutation if the target tag or branch already exists.
 
-    Checks both local and origin copies so a stale ref on either side halts
-    the release cleanly — rather than failing partway through and leaving a
-    bump commit behind without a tag.
+    Checks both local and origin copies so a stale ref on either side halts the release
+    cleanly. The tag is checked even though nothing here creates it: CI will, on the default
+    branch, and a tag that already exists elsewhere would make that step refuse.
     """
     tag_ref = f'v{new_version}'
     local_tag = context.run(f'git tag --list {tag_ref}', hide=True, warn=True)
@@ -422,10 +520,10 @@ def ensure_refs_are_free(context: Context, new_version: str, release_branch: str
 def release(context: Context, increment: str = '', no_push: bool = False) -> None:
     """Prepare a release on a new ``release/<version>`` branch.
 
-    Validates a clean tree on ``main``, branches off, bumps the version,
-    commits the changelog, and pushes both the branch and the new tag so
-    the resulting pull request carries the full release snapshot for review.
-    Publish fires from CI once the PR is merged into main.
+    Validates a clean tree on ``main``, branches off, bumps the version, commits the
+    changelog, and pushes the branch so the resulting pull request carries the full release
+    snapshot for review. No tag is created here: once the request is merged, CI sees the
+    version bump arrive on ``main``, creates the tag there, and publishes (``release.ship``).
 
     Args:
         context: Invoke context.
@@ -450,14 +548,13 @@ def release(context: Context, increment: str = '', no_push: bool = False) -> Non
 
     execute(context, f'git checkout -b {release_branch}')
     bump(context, increment=increment)
-    changelog(context, write=True)
+    changelog(context, write=True, version=new_version)
 
     if no_push:
-        print(f'Skipping push. Branch `{release_branch}` and tag `v{new_version}` stay local.')
+        print(f'Skipping push. Branch `{release_branch}` stays local.')
         return
 
     execute(context, f'git push -u origin {release_branch}')
-    execute(context, f'git push origin v{new_version}')
 
     pr_url = create_release_pr(context, release_branch, new_version)
     if pr_url:
@@ -491,5 +588,7 @@ namespace.add_task(cast(Task, push))
 namespace.add_task(cast(Task, dist))
 namespace.add_task(cast(Task, attest))
 namespace.add_task(cast(Task, publish))
+namespace.add_task(cast(Task, detect))
+namespace.add_task(cast(Task, tag_release), name='tag')
 namespace.add_task(cast(Task, ship))
 namespace.add_task(cast(Task, clean))

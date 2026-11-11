@@ -4,10 +4,10 @@ name: Pages
 # on main but in no release yet, so a reader following them can reach for something they cannot
 # install — the published site and the published package should describe the same thing.
 #
-# The trigger is a push to main, with `detect` deciding whether it carried a release tag: the
-# same rule `publish.yaml` uses, through the same reusable workflow, so the two cannot drift.
-# Not `push: tags: ['v*']`, which would fire when `release` pushes the tag from the release
-# branch — before the pull request merges — publishing docs for a version that has not landed.
+# The trigger is a push to main, with `release.detect` deciding whether it carried a release:
+# the same question `publish.yaml` asks through `release.ship`, answered by the same code, so
+# the two cannot drift. Not `push: tags:`: `release` creates no tag, the publish job does, once
+# the release has landed on main.
 #
 # `workflow_dispatch` is the escape hatch and earns its place: a project that has not released
 # yet would otherwise never publish its docs at all.
@@ -26,18 +26,37 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  detect:
-    uses: ./.github/workflows/detect-release-tag.yaml
-    permissions:
-      contents: read
-
   build-deps-image:
-    needs: detect
-    if: ${{ needs.detect.outputs.tag != '' || github.event_name == 'workflow_dispatch' }}
     permissions:
       contents: read
       packages: write
     uses: ./.github/workflows/build-deps-image.yaml
+
+  detect:
+    name: Detect release
+    needs: build-deps-image
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.build-deps-image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      tag: ${{ steps.find.outputs.tag }}
+      sha: ${{ steps.find.outputs.sha }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          # Full history: the task reads pyproject.toml at the previous tip.
+          fetch-depth: 0
+          persist-credentials: false
+      # On a manual run `github.event.before` is empty and the task compares the tip with its
+      # parent, so a dispatch republishes the current docs rather than finding an old release.
+      - id: find
+        run: ./workflow.cmd release.detect --before "${{ github.event.before }}" --after "${{ github.sha }}" --output "$GITHUB_OUTPUT"
 
   deploy:
     needs: [detect, build-deps-image]
@@ -61,9 +80,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
-          # The commit the release tag points at, so the site describes the version that was
-          # just released rather than whatever else has landed on main since. Empty when a
-          # manual run found no tag, which actions/checkout reads as the triggering ref.
+          # The commit the release is, so the site describes the version that was just
+          # released rather than whatever else has landed on main since. Empty when a manual
+          # run found no release, which actions/checkout reads as the triggering ref.
           ref: ${{ needs.detect.outputs.sha }}
           fetch-depth: 0
           # Deliberately left persisted, unlike every other checkout here: gh-deploy

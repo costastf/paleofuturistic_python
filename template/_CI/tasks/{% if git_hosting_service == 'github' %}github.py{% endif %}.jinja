@@ -6,6 +6,7 @@ import re
 import urllib.error
 import urllib.request
 from collections.abc import Iterator
+from http import HTTPStatus
 from pathlib import Path
 from typing import NamedTuple
 
@@ -168,6 +169,95 @@ def create_release_pr(context: Context, release_branch: str, new_version: str) -
         print(f'GitHub API request failed: {exc}')
         return ''
     return data.get('html_url', '')
+
+
+def github_api(token: str, path: str, payload: dict | None = None) -> tuple[int, dict]:
+    """Call the GitHub REST API. Return the status and the decoded body (``{}`` on failure).
+
+    A ``404`` comes back as a status rather than an error, because "is there a tag of this
+    name" is a question with no as its answer. Every other failure prints what the API said
+    and returns ``0``, so the caller decides whether that is fatal.
+    """
+    request = urllib.request.Request(
+        f'https://api.github.com{path}',
+        data=json.dumps(payload).encode('utf-8') if payload is not None else None,
+        method='POST' if payload is not None else 'GET',
+        headers={
+            'Accept': 'application/vnd.github+json',
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json',
+            'X-GitHub-Api-Version': '2022-11-28',
+            'User-Agent': '{{ project_slug }}-release',
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
+            return response.status, json.loads(response.read().decode('utf-8') or '{}')
+    except urllib.error.HTTPError as exc:
+        if exc.code == HTTPStatus.NOT_FOUND:
+            return exc.code, {}
+        detail = exc.read().decode('utf-8', errors='replace')[:500]
+        print(f'GitHub API returned {exc.code}: {detail}')
+        return 0, {}
+    except OSError as exc:
+        print(f'GitHub API request failed: {exc}')
+        return 0, {}
+
+
+def release_token(context: Context) -> tuple[str, str]:
+    """Return the token and repository slug the Release API calls need, or abort with why not."""
+    token = os.environ.get('GITHUB_TOKEN', '').strip()
+    if not token:
+        print('GITHUB_TOKEN not set: creating the release tag needs a token with Contents: write.')
+        raise SystemExit(1)
+    slug = origin_slug(context)
+    if not slug:
+        print('Origin remote is not GitHub; cannot create the release through the API.')
+        raise SystemExit(1)
+    return token, slug
+
+
+def release_tag_commit(context: Context, tag: str) -> str:
+    """Return the commit `tag` marks on GitHub, or '' when no such tag exists.
+
+    Asked through the API rather than `git ls-remote`, because the publish job checks out
+    without persisted credentials and a private repository would refuse the remote query.
+    """
+    token, slug = release_token(context)
+    status, data = github_api(token, f'/repos/{slug}/git/ref/tags/{tag}')
+    if status == HTTPStatus.NOT_FOUND:
+        return ''
+    if not status:
+        raise SystemExit(1)
+    target = data.get('object', {})
+    if target.get('type') == 'tag':
+        # An annotated tag points at a tag object; one more hop reaches the commit.
+        status, data = github_api(token, f'/repos/{slug}/git/tags/{target.get("sha", "")}')
+        if not status:
+            raise SystemExit(1)
+        target = data.get('object', {})
+    return target.get('sha', '')
+
+
+def create_release(context: Context, tag: str, sha: str) -> str:
+    """Create a GitHub Release for `tag` at `sha`, which creates the tag. Return its URL, or ''.
+
+    One API call does both: a Release whose tag does not exist yet is created on
+    ``target_commitish``. ``GITHUB_TOKEN`` with ``contents: write`` is enough, and a tag the
+    Actions token creates triggers no further workflow runs, so this cannot loop.
+    """
+    token, slug = release_token(context)
+    status, data = github_api(
+        token,
+        f'/repos/{slug}/releases',
+        {
+            'tag_name': tag,
+            'target_commitish': sha,
+            'name': tag,
+            'body': f'Release {tag}, published by the publish workflow. Changelog: `docs/reference/changelog.md`.',
+        },
+    )
+    return data.get('html_url', '') if status else ''
 {%- if integrate_pages %}
 
 

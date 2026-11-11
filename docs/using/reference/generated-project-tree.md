@@ -12,7 +12,6 @@ example_project/
 │   └── workflows/
 │       ├── build-deps-image.yaml
 │       ├── continuous-integration.yaml
-│       ├── detect-release-tag.yaml
 │       ├── pages.yaml           (Only if integrate_pages=true)
 │       ├── publish.yaml
 │       └── security-audit.yaml

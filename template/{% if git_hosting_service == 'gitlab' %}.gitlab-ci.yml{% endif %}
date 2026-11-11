@@ -123,9 +123,11 @@ secure:
   script:
     - ./workflow.cmd secure.audit
 
-# Runs on every push to the default branch and does nothing unless a release tag arrived with
-# it — `release.ship` walks the pushed commits and explains why a tag trigger would publish
-# before review. `rules:` cannot look at tags on a commit, so the gate is in the task.
+# Runs on every push to the default branch and publishes only when the push carried a release —
+# a change of `[project].version` — which `release.ship` decides. Not a tag rule: `release`
+# creates no tag; this job creates it, on main, once the release has been reviewed and merged,
+# so the merge method (merge commit, squash, rebase) cannot leave a tag pointing at a commit
+# main never saw. The workflow the GitHub template ships runs the same command the same way.
 publish:
   stage: publish
   image: $DEPS_IMAGE
@@ -135,9 +137,12 @@ publish:
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   variables:
-    # Full history: the task walks the pushed commits, and the default shallow clone stops
-    # twenty commits back.
+    # Full history: `release.ship` reads pyproject.toml at the previous tip to see whether the
+    # version moved, and the default shallow clone stops twenty commits back.
     GIT_DEPTH: 0
+  # Protect this environment by restricting it to the default branch, not by approvers: the
+  # job runs on every push to it and exits early without a release, so an approval gate would
+  # hold every push. The review that guards a release is the merge request's.
   environment: pypi
   # Two OIDC tokens, one per audience. uv reads `PYPI_ID_TOKEN` and exchanges it for a
   # short-lived PyPI token (Trusted Publishing — register this project, `.gitlab-ci.yml` and
@@ -152,8 +157,7 @@ publish:
       aud: sigstore
   before_script:
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
-  # Build, sign, upload — `release.ship` runs `release.dist`, `release.attest` and
-  # `release.publish --prebuilt` in that order, so the attestations are taken over the exact
-  # files the upload then sends without rebuilding.
+  # Detect, tag (through the Releases API with the job token), build, sign PEP 740
+  # attestations, upload — or print why not and exit 0.
   script:
     - ./workflow.cmd release.ship --before "$CI_COMMIT_BEFORE_SHA" --after "$CI_COMMIT_SHA"

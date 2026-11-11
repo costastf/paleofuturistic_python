@@ -103,6 +103,8 @@ Whichever host was chosen at generation time — GitHub or GitLab — determines
 - `publish_deps_image(context, tag) -> str`
 - `create_release_pr(context, branch, version) -> str`
 - `pr_create_url(context, branch) -> str`
+- `release_tag_commit(context, tag) -> str`
+- `create_release(context, tag, sha) -> str`
 - `pipeline_badge(context) -> str`
 - `iter_pipeline_components() -> Iterator[PipelineComponent]`
 

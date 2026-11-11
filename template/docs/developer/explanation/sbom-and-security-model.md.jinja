@@ -134,7 +134,7 @@ gh attestation verify {{ project_slug }}-<version>-py3-none-any.whl --repo <owne
 The two answer the same question for different audiences: the PEP 740 one travels with the package to PyPI, the GitHub one stays where the source is.
 {%- endif %}
 
-Order matters in the publish job: `release.dist` builds into `dist/`, the attestations are taken over those files, and `release.publish --prebuilt` uploads them *without* rebuilding. If you change that sequence so the artifacts are rebuilt after being attested, you will publish files no attestation refers to, and verification will fail — reading as tampering rather than as a fresh build.
+Order matters in the publish job, and `release.ship` fixes it: `release.dist` builds into `dist/`, `release.attest` signs those files, and the upload sends them *without* rebuilding. Rebuilding in between would publish files that no attestation refers to, and verification would then fail — reading as tampering rather than as a fresh build.{% if git_hosting_service == 'github' %} GitHub's provenance step runs after the upload over the same files, still in `dist/`; a statement about file contents proves the same thing whichever side of the upload it is taken on.{% endif %}
 
 PyPI accepts attestations only through [Trusted Publishing](../how-to/set-up-trusted-publishing.md). Publishing with `UV_PUBLISH_*` credentials instead uploads none: `release.publish` passes `--no-attestations` on that path. [Verify a release attestation](../how-to/verify-a-release-attestation.md) walks through checking one.
 

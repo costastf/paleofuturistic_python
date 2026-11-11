@@ -47,11 +47,12 @@ The workflow uses `concurrency: { group: pages, cancel-in-progress: false }`. If
 
 Docs built from `main` describe code that is in no release yet, so a reader following them can
 reach for a function they cannot install. The workflow triggers on a push to `main` and asks
-`detect-release-tag.yaml` whether it carried a v-prefixed tag — the same reusable workflow
-`publish.yaml` uses, so the site and the package cannot disagree about what counts as released.
+`./workflow.cmd release.detect` whether it carried a release — a change of `[project].version`
+— the same question `publish.yaml` asks through `release.ship`, so the site and the package
+cannot disagree about what counts as released.
 
-Not a `push: tags: ['v*']` trigger: `./workflow.cmd release` pushes the tag from the release
-branch before the pull request merges, so that would publish docs for a version yet to land.
+Not a `push: tags: ['v*']` trigger: `./workflow.cmd release` creates no tag. The publish job
+creates it on `main` once the release has merged, which is after the docs should go out.
 
 A site tracking `main` as well means versioned docs — a `stable` build plus a `dev` one — rather
 than a trigger change, which is more machinery than the template ships today.

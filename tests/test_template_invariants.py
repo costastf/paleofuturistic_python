@@ -63,74 +63,63 @@ def test_pages_workflow_matches_choice(generated_project):
     assert (project / '.github' / 'workflows' / 'pages.yaml').exists() == expected
 
 
-def test_docs_publish_on_release_not_on_every_push(generated_project):
-    """The site is published when a release lands, by the same rule the package uses.
+def test_pages_deploys_on_release_through_the_same_detection_as_publish(generated_project):
+    """Pages deploys when a push to main carried a release, decided by `release.detect`.
 
-    Built from every push to main, the docs describe code that is on main but in no release
-    yet, so a reader following them can reach for something they cannot install. And a
-    `push: tags:` trigger would be the same mistake mirrored: `release` pushes the tag from the
-    release branch before the pull request merges, so the site would go out for a version that
-    has not landed.
-
-    So both this and `publish.yaml` trigger on a push to main and ask one reusable workflow
-    whether it carried a v-prefixed tag — one copy of that question, so the package and its
-    documentation cannot disagree about what counts as released. `workflow_dispatch` stays,
-    because a project that has not released yet would otherwise never publish docs at all.
+    Not on a tag trigger: `release` creates no tag, the publish job does, on main. The pages
+    workflow asks `release.detect` the same question `publish.yaml` asks `release.ship`, with
+    the same arguments, so the package and its documentation cannot disagree about what counts
+    as released. `workflow_dispatch` stays, because a project that has not released yet would
+    otherwise never publish docs at all.
     """
     project, cell = generated_project
     # Pages ships for GitHub only, as `test_pages_workflow_matches_choice` asserts.
     if not cell['integrate_pages'] or cell['git_hosting_service'] != 'github':
         return
     workflows = project / '.github' / 'workflows'
-    shared = 'detect-release-tag.yaml'
-    assert (workflows / shared).is_file(), 'the shared release-tag detector does not ship'
+    assert not (workflows / 'detect-release-tag.yaml').exists(), 'the shell tag walk is back'
 
     pages = yaml.safe_load((workflows / 'pages.yaml').read_text(encoding='utf-8'))
     triggers = pages.get('on') or pages[True]
     assert 'tags' not in (triggers.get('push') or {}), 'a tag trigger fires before the release merges'
     assert 'workflow_dispatch' in triggers, 'a project that has not released yet could never publish docs'
-    assert pages['jobs']['detect']['uses'].endswith(shared), 'pages does not use the shared detector'
+
+    detect = pages['jobs']['detect']
+    commands = [step.get('run') for step in detect['steps'] if step.get('run')]
+    assert commands == [RELEASE_DETECTION.format(task='release.detect')], f'the detect job runs {commands}'
+    assert detect['outputs'] == {'tag': '${{ steps.find.outputs.tag }}', 'sha': '${{ steps.find.outputs.sha }}'}
     guard = pages['jobs']['deploy']['if']
-    assert "needs.detect.outputs.tag != ''" in guard, f'pages deploys without a release tag: {guard!r}'
+    assert "needs.detect.outputs.tag != ''" in guard, f'pages deploys without a release: {guard!r}'
     assert 'workflow_dispatch' in guard, f'a manual run could never deploy: {guard!r}'
 
-    publish = (workflows / 'publish.yaml').read_text(encoding='utf-8')
-    assert shared in publish, 'publish and pages no longer share one definition of "released"'
+    publish = yaml.safe_load((workflows / 'publish.yaml').read_text(encoding='utf-8'))
+    ship = [step for step in publish['jobs']['publish']['steps'] if step.get('id') == 'ship']
+    assert ship, 'the publish job has no ship step'
+    assert ship[0]['run'] == RELEASE_DETECTION.format(task='release.ship'), 'publish detects differently'
 
 
-def test_release_detection_pins_a_commit_and_bounds_its_search(generated_project):
-    """The detector reports the commit it found, and only looks at commits that arrived.
+# The one shape both GitHub jobs and the GitLab job hand the push to a release task in: the
+# previous and new tips, and where to write the answer. `$GITHUB_OUTPUT` is where a step's
+# outputs go; GitLab reads nothing back, so its job passes no `--output`.
+RELEASE_DETECTION = (
+    './workflow.cmd {task} --before "${{{{ github.event.before }}}}" --after "${{{{ github.sha }}}}"'
+    ' --output "$GITHUB_OUTPUT"'
+)
 
-    Callers check out `sha`, not `tag`: a tag is a mutable pointer, so a move between detection
-    and checkout would publish a different tree than was detected.
 
-    The search range comes from the event. Only a push has a previous tip to diff against; on a
-    manual run `github.event.before` is empty, and walking from the tip with no lower bound
-    would sweep in every release the branch ever carried and report the newest as arriving now
-    — publishing an old version's docs from a dispatch meant to republish the current ones.
+def test_release_detection_pins_the_commit_it_found(generated_project):
+    """Pages checks out the commit `release.detect` reported, never a tag name.
+
+    A tag is a mutable pointer, so a move between detection and checkout would publish a
+    different tree than was detected. The detected commit is the new tip of main, which is
+    what the publish job builds too.
     """
     project, cell = generated_project
-    if cell['git_hosting_service'] != 'github':
+    if cell['git_hosting_service'] != 'github' or not cell['integrate_pages']:
         return
-    workflows = project / '.github' / 'workflows'
-    detector = (workflows / 'detect-release-tag.yaml').read_text(encoding='utf-8')
-    parsed = yaml.safe_load(detector)
-
-    outputs = ((parsed.get('on') or parsed[True])['workflow_call'])['outputs']
-    assert 'sha' in outputs, 'the detector reports a mutable tag name and nothing else'
-    assert 'sha=${tag_sha}' in detector, 'the sha output is declared but never written'
-
-    assert 'github.event_name' in detector, 'the search range ignores how the workflow was triggered'
-    assert '--max-count=1' in detector, 'a non-push event walks the whole history for a tag'
-    assert '-z "${BEFORE}"' not in detector, 'an empty before-sha is still read as a new branch'
-
-    consumers = ['publish.yaml']
-    if cell['integrate_pages']:
-        consumers.append('pages.yaml')
-    for name in consumers:
-        body = (workflows / name).read_text(encoding='utf-8')
-        assert 'ref: ${{ needs.detect.outputs.tag }}' not in body, f'{name} checks out a mutable tag name'
-        assert 'ref: ${{ needs.detect.outputs.sha }}' in body, f'{name} does not check out the detected commit'
+    body = (project / '.github' / 'workflows' / 'pages.yaml').read_text(encoding='utf-8')
+    assert 'ref: ${{ needs.detect.outputs.tag }}' not in body, 'pages checks out a mutable tag name'
+    assert 'ref: ${{ needs.detect.outputs.sha }}' in body, 'pages does not check out the detected commit'
 
 
 def test_pages_task_definition_matches_choice(generated_project):
@@ -1023,16 +1012,25 @@ def test_every_github_job_declares_least_privilege_permissions(generated_project
             declared = job.get('permissions') or config.get('permissions')
             assert declared, f'{name}:{job_name} inherits default token permissions'
             # Only the image build (pushes to ghcr) and the docs deploy (pushes gh-pages)
-            # may mutate anything. Two write scopes are exempt everywhere because neither
+            # may mutate anything, and the publish job may write `contents` alone: that is
+            # the scope the Releases API checks when `release.tag` creates the tag, and the
+            # job's checkout persists no credential, so the scope reaches git only through
+            # that one API call. Two write scopes are exempt everywhere because neither
             # grants access to repository contents: `id-token` mints an OIDC token for PyPI
             # Trusted Publishing, and `attestations` records a signed build-provenance
             # statement. Both produce a signature; neither can change what is in the repo.
             signing_scopes = ('id-token', 'attestations')
-            if job_name not in ('build-deps-image', 'deploy'):
-                writes = [
-                    scope for scope, level in declared.items() if level == 'write' and scope not in signing_scopes
-                ]
-                assert not writes, f'{name}:{job_name} asks for write scopes {writes}'
+            allowed_writes = {'build-deps-image': None, 'deploy': None, 'publish': {'contents'}}
+            if job_name in allowed_writes and allowed_writes[job_name] is None:
+                continue
+            writes = [
+                scope
+                for scope, level in declared.items()
+                if level == 'write'
+                and scope not in signing_scopes
+                and scope not in (allowed_writes.get(job_name) or ())
+            ]
+            assert not writes, f'{name}:{job_name} asks for write scopes {writes}'
 
 
 def publish_steps(project):
@@ -1049,45 +1047,32 @@ def step_index(steps, needle):
     return -1
 
 
-def test_publish_attests_the_artifacts_it_uploads(generated_project):
-    """Provenance is taken between building and uploading, over the files actually published.
+def test_publish_is_one_task_plus_provenance_over_what_it_uploaded(generated_project):
+    """The GitHub publish job hands the push to `release.ship` and attests the files it uploaded.
 
-    The ordering is the whole guarantee. Attesting one build and uploading a different one
-    yields an attestation that fails verification, which reads to a consumer as tampering —
-    strictly worse than shipping no attestation at all. So this pins both the order and the
-    `--prebuilt` flag that stops the publish step rebuilding.
+    One workflow command carries the logic, the same one the GitLab job runs, so the two
+    pipelines cannot drift. `release.tag` inside it creates the tag through the API, which is
+    why the job holds `contents: write` and the step gets `GITHUB_TOKEN`. Provenance runs
+    afterwards, only when a release shipped, over the wheel and sdist still in `dist/` — not
+    `dist/*`, which would also attest the `.publish.attestation` files beside them.
     """
     project, cell = generated_project
     if cell['git_hosting_service'] != 'github':
         pytest.skip('GitHub-only workflow')
-    steps = publish_steps(project)
-    built = step_index(steps, 'release.dist')
-    attested = step_index(steps, 'attest-build-provenance')
-    published = step_index(steps, 'release.publish')
-    assert built >= 0, 'nothing builds the distribution before publishing'
-    assert attested >= 0, 'no build-provenance attestation step'
-    assert built < attested < published, f'wrong order: build={built}, attest={attested}, publish={published}'
-    assert '--prebuilt' in steps[published]['run'], 'the publish step rebuilds, orphaning the attestation'
-
-
-def test_github_publish_signs_pep740_attestations_over_the_uploaded_files(generated_project):
-    """`release.attest` runs after the build and provenance steps and before `--prebuilt` publish.
-
-    After provenance, so GitHub's attestation covers exactly the wheel and sdist rather than
-    the `.publish.attestation` files this step adds. Before publish, because `uv publish`
-    uploads whatever attestation files it finds beside each distribution and generates none.
-    """
-    project, cell = generated_project
-    if cell['git_hosting_service'] != 'github':
-        pytest.skip('GitHub-only workflow')
-    steps = publish_steps(project)
+    config = yaml.safe_load((project / '.github' / 'workflows' / 'publish.yaml').read_text(encoding='utf-8'))
+    job = config['jobs']['publish']
+    assert job['permissions']['contents'] == 'write', 'release.tag cannot create the tag without Contents: write'
+    steps = job['steps']
+    commands = [step.get('run') for step in steps if step.get('run')]
+    assert commands == [RELEASE_DETECTION.format(task='release.ship')], f'the publish job runs {commands}'
+    ship = step_index(steps, 'release.ship')
+    assert 'GITHUB_TOKEN' in steps[ship]['env'], 'the ship step has no token to create the tag with'
+    assert {'UV_PUBLISH_URL', 'UV_PUBLISH_USERNAME', 'UV_PUBLISH_PASSWORD'} <= set(steps[ship]['env'])
     provenance = step_index(steps, 'attest-build-provenance')
-    signed = step_index(steps, 'release.attest')
-    published = step_index(steps, 'release.publish')
-    assert signed >= 0, 'the publish job signs no PEP 740 attestations'
-    assert provenance < signed < published, (
-        f'wrong order: provenance={provenance}, pep740={signed}, publish={published}'
-    )
+    assert ship < provenance, 'provenance is taken before the files exist'
+    assert steps[provenance]['if'] == "${{ steps.ship.outputs.tag != '' }}", 'provenance runs with nothing to attest'
+    subjects = steps[provenance]['with']['subject-path'].split()
+    assert subjects == ['dist/*.whl', 'dist/*.tar.gz'], f'provenance covers {subjects}'
 
 
 def test_gitlab_publish_mints_both_tokens_and_ships(generated_project):
@@ -1111,10 +1096,10 @@ def test_gitlab_publish_mints_both_tokens_and_ships(generated_project):
 def test_gitlab_publishes_only_once_the_tag_reaches_the_default_branch(generated_project):
     """The GitLab publish job runs on default-branch pushes, never on the tag push itself.
 
-    `release` pushes the tag from the release branch before the merge request merges, so a
-    `CI_COMMIT_TAG` rule would publish a version nobody has reviewed. The job runs on every push
-    to the default branch with full history, and `release.ship` looks for the tag among the
-    pushed commits. GitHub's `detect-release-tag.yaml` answers the same question the same way.
+    `release` creates no tag, so a `CI_COMMIT_TAG` rule would never fire; and a tag pushed by
+    hand from a branch would publish a version nobody has reviewed. The job runs on every push
+    to the default branch with full history, and `release.ship` looks for a version bump among
+    the pushed commits, then creates the tag there. GitHub's `publish.yaml` runs the same task.
     """
     project, cell = generated_project
     if cell['git_hosting_service'] != 'gitlab':
@@ -1126,12 +1111,14 @@ def test_gitlab_publishes_only_once_the_tag_reaches_the_default_branch(generated
     assert job['variables']['GIT_DEPTH'] == 0, 'the tag walk needs the full history'
 
 
-def test_ship_publishes_a_tagged_push_and_skips_an_untagged_one(generated_project, tmp_path):
-    """`release.ship` publishes only when the pushed range carries a v-tag, from that commit.
+def test_ship_publishes_a_version_bump_however_it_was_merged(generated_project, tmp_path):
+    """`release.ship` publishes when the pushed range bumped the version, from the new tip.
 
-    Exercised against a real git history: a tagged release branch merged with a merge commit
-    is published from the tagged commit; the same branch squash-merged, or a push with no
-    release, publishes nothing and exits 0.
+    Exercised against a real git history: a release branch squash-merged into main — the case
+    a tag-on-branch design lost — is detected, tagged on the squash commit through the host
+    API, built, signed and uploaded, with `dist/` left for provenance. A push with no bump
+    publishes nothing and exits 0. The tag is created once: a re-run that finds the tag on the
+    same commit carries on without creating it again.
     """
     project, _ = generated_project
     repo = tmp_path / 'repo'
@@ -1143,15 +1130,20 @@ def test_ship_publishes_a_tagged_push_and_skips_an_untagged_one(generated_projec
             ['git', *identity, *args], cwd=repo, check=True, capture_output=True, text=True
         ).stdout.strip()
 
+    def set_version(version: str) -> None:
+        (repo / 'pyproject.toml').write_text(f'[project]\nname = "x"\nversion = "{version}"\n', encoding='utf-8')
+
     git('init', '-q', '-b', 'main')
-    git('commit', '-q', '--allow-empty', '-m', 'init')
+    set_version('0.1.0')
+    git('add', 'pyproject.toml')
+    git('commit', '-q', '-m', 'init')
     before = git('rev-parse', 'HEAD')
-    git('checkout', '-q', '-b', 'release/1.0.0')
-    git('commit', '-q', '--allow-empty', '-m', 'bump: 1.0.0')
-    git('tag', 'v1.0.0')
-    tagged = git('rev-parse', 'HEAD')
+    git('checkout', '-q', '-b', 'release/0.2.0')
+    set_version('0.2.0')
+    git('commit', '-q', '-am', 'bump: version 0.1.0 → 0.2.0')
     git('checkout', '-q', 'main')
-    git('merge', '-q', '--no-ff', '-m', 'merge', 'release/1.0.0')
+    git('merge', '-q', '--squash', 'release/0.2.0')
+    git('commit', '-q', '-m', 'chore(release): v0.2.0 (#1)')
     after = git('rev-parse', 'HEAD')
 
     class RepoContext:
@@ -1162,33 +1154,56 @@ def test_ship_publishes_a_tagged_push_and_skips_an_untagged_one(generated_projec
             return SimpleNamespace(failed=done.returncode != 0, stdout=done.stdout, stderr=done.stderr)
 
     ran: list[str] = []
+    created: list[tuple[str, str]] = []
+    tags: dict[str, str] = {}
+
+    def create_release(_context, tag, sha):
+        created.append((tag, sha))
+        tags[tag] = sha
+        return f'https://example.invalid/releases/{tag}'
+
     namespace = exec_from(
         (project / '_CI' / 'tasks' / 'release.py').read_text(encoding='utf-8'),
         'NO_PREVIOUS_TIP',
-        'released_tag',
+        'project_version',
+        'version_at',
+        'commit_sha',
+        'released_version',
+        'record_outputs',
+        'tag_release',
         'ship',
-        re=re,
+        tomllib=tomllib,
+        Path=Path,
         Context=object,
-        task=lambda fn: fn,
+        task=lambda *args, **_kwargs: args[0] if args else (lambda fn: fn),
         logged=lambda _name: lambda fn: fn,
         execute=lambda context, command: context.run(command),
         dist=lambda _context: ran.append('dist'),
         attest=lambda _context: ran.append('attest'),
-        publish=lambda _context, **_kwargs: ran.append('publish'),
+        upload=lambda _context: ran.append('upload'),
+        release_tag_commit=lambda _context, tag: tags.get(tag, ''),
+        create_release=create_release,
     )
-    released_tag, ship = namespace['released_tag'], namespace['ship']
+    released_version, ship = namespace['released_version'], namespace['ship']
     context = RepoContext()
 
-    assert released_tag(context, before, after) == ('v1.0.0', tagged)
-    assert released_tag(context, before, before) is None
-    assert released_tag(context, '0' * 40, after) == ('v1.0.0', tagged), 'a branch creation checks everything'
-    assert released_tag(context, '', after) is None, 'no lower bound checks the tip alone'
+    assert released_version(context, before, after) == ('v0.2.0', after), 'a squash-merged bump is not a release'
+    assert released_version(context, before, before) is None
+    assert released_version(context, '0' * 40, after) is None, 'a branch creation is not a release'
+    assert released_version(context, '', after) == ('v0.2.0', after), 'no lower bound compares the tip with its parent'
 
-    ship(context, before=before, after=before)
-    assert ran == [], 'an untagged push published'
+    outputs = tmp_path / 'outputs'
+    ship(context, before=before, after=before, output=str(outputs))
+    assert ran == [], 'a push with no bump published'
+    assert outputs.read_text(encoding='utf-8') == 'tag=\nsha=\n', 'outputs are not written when there is no release'
+
     ship(context, before=before, after=after)
-    assert ran == ['dist', 'attest', 'publish']
-    assert git('rev-parse', 'HEAD') == tagged, 'ship did not check out the tagged commit before building'
+    assert ran == ['dist', 'attest', 'upload'], 'ship does not build, sign and upload in that order'
+    assert created == [('v0.2.0', after)], 'the tag is not created on the new tip of main'
+
+    ship(context, before=before, after=after)
+    assert created == [('v0.2.0', after)], 'a re-run created the tag again'
+    assert ran == ['dist', 'attest', 'upload'] * 2, 'a re-run does not retry the upload'
 
 
 def test_oidc_detection_names_the_hosts_own_token(generated_project):

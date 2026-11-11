@@ -1,29 +1,21 @@
 name: Publish
 
+# Runs on every push to main and publishes only when the push carried a release — a change of
+# `[project].version` — which `release.ship` decides. Not `push: tags:`: `release` creates no
+# tag; this job creates it, on main, once the release has been reviewed and merged, so the
+# merge method (merge commit, squash, rebase) cannot leave a tag pointing at a commit main
+# never saw. The pipeline the GitLab template ships runs the same command the same way.
 on:
   push:
     branches:
       - main
 
 # Floor for the workflow; the publish job widens it to what Trusted Publishing needs.
-# Without this the tag-detection job would inherit the repository default token.
 permissions:
   contents: read
 
 jobs:
-  # Shared with `pages.yaml`, so the package and its documentation cannot disagree about what
-  # counts as released. See that file for why neither uses a `push: tags:` trigger.
-  detect:
-    uses: ./.github/workflows/detect-release-tag.yaml
-    permissions:
-      contents: read
-
   build-deps-image:
-    needs: detect
-    {#- Escape curly braces for Copier. -#}
-    {%- raw %}
-    if: ${{ needs.detect.outputs.tag != '' }}
-    {%- endraw %}
     uses: ./.github/workflows/build-deps-image.yaml
     permissions:
       contents: read
@@ -31,11 +23,7 @@ jobs:
 
   publish:
     name: Publish package
-    needs: [detect, build-deps-image]
-    {#- Escape curly braces for Copier. -#}
-    {%- raw %}
-    if: ${{ needs.detect.outputs.tag != '' }}
-    {%- endraw %}
+    needs: build-deps-image
     runs-on: ubuntu-latest
     permissions:
       # Required for PyPI Trusted Publishing. GitHub Actions only injects
@@ -44,10 +32,11 @@ jobs:
       # are set; without them it needs this token, and with neither it exits 1.
       id-token: write
       # Declaring any `permissions:` entry flips every other scope to `none`
-      # for this job. The checkout step needs read access to fetch the release
-      # tag — without this it 403s. Kept at `read` (not write) so a compromised
-      # build step cannot push back to the repo.
-      contents: read
+      # for this job. `write`, not `read`: `release.tag` creates the release
+      # tag and its Release entry through the API with GITHUB_TOKEN, which is
+      # the Contents scope. The checkout itself persists no credential, so a
+      # compromised build step still cannot push.
+      contents: write
       # The job runs inside the deps image from ghcr.io. Pulling that image
       # uses GITHUB_TOKEN via the `container.credentials` block; without
       # `packages: read` ghcr returns 403 on the manifest HEAD request.
@@ -65,59 +54,52 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
       {%- endraw %}
+    # Protect this environment by restricting it to the `main` branch, not by required
+    # reviewers: the job runs on every push to main and exits early without a release, so a
+    # reviewer gate would hold every push. The review that guards a release is the pull
+    # request's.
     environment: pypi
 
     steps:
-      - name: Checkout release tag
+      - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-        {#- Escape curly braces for Copier. -#}
-        {%- raw %}
         with:
-          # The commit the release tag points at, not the tag name — see detect-release-tag.yaml.
-          ref: ${{ needs.detect.outputs.sha }}
+          # Full history: `release.ship` reads pyproject.toml at the previous tip to see
+          # whether the version moved.
+          fetch-depth: 0
           # Critical in this job specifically: it builds the SBOM, whose VCS reference is
           # read from `origin` and ships inside the wheel to PyPI. A credential left in
           # the git config is the one that becomes permanent and public.
           persist-credentials: false
+
+      # Detect, tag, build, sign PEP 740 attestations, upload — or print why not and exit 0.
+      # `dist/` is left in place for the provenance step below. UV_PUBLISH_* select the
+      # credential path, and GITHUB_TOKEN is what creates the tag.
+      - name: Ship the release, if this push carried one
+        id: ship
+        env:
+          {%- raw %}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UV_PUBLISH_URL: ${{ secrets.UV_PUBLISH_URL }}
+          UV_PUBLISH_PASSWORD: ${{ secrets.UV_PUBLISH_PASSWORD }}
+          UV_PUBLISH_USERNAME: ${{ secrets.UV_PUBLISH_USERNAME }}
+          {%- endraw %}
+        {%- raw %}
+        run: ./workflow.cmd release.ship --before "${{ github.event.before }}" --after "${{ github.sha }}" --output "$GITHUB_OUTPUT"
         {%- endraw %}
 
-      - name: Build distribution
-        run: ./workflow.cmd release.dist
-
-      # Signs a provenance statement binding these exact files to this workflow, commit and
-      # runner, so a consumer can verify where the wheel on PyPI came from:
+      # Signs a provenance statement binding the files just uploaded to this workflow,
+      # commit and runner, so a consumer can verify where the wheel on PyPI came from:
       #   gh attestation verify <file> --repo <owner>/<repo>
-      # It must sit between building and publishing, and `release.publish --prebuilt` below
-      # must not rebuild — attesting one set of files and uploading another would produce an
-      # attestation that verifies nothing.
+      # Over the wheel and sdist only, not the `.publish.attestation` files beside them. The
+      # upload has already happened; the statement is about file contents, so the order does
+      # not change what it proves, and `release.ship` leaves `dist/` exactly as uploaded.
       - name: Attest build provenance
+        {%- raw %}
+        if: ${{ steps.ship.outputs.tag != '' }}
+        {%- endraw %}
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
         with:
-          subject-path: dist/*
-
-      # A second attestation, in the format PyPI stores (PEP 740): `uv publish` uploads each
-      # `dist/<file>.publish.attestation` with its file, and PyPI shows the workflow that
-      # published it on the release page. Verify with `pypi-attestations verify pypi`. The
-      # step above is GitHub's own record (`gh attestation verify`); this one travels with the
-      # package to PyPI. Same signing identity — the `id-token: write` this job already has.
-      # After the provenance step, so that one covers exactly the wheel and sdist.
-      # The same credentials as the publish step, so that signing is skipped exactly when
-      # the upload would send no attestations.
-      - name: Sign PEP 740 attestations
-        env:
-          {#- Escape curly braces for Copier. -#}
-          {%- raw %}
-          UV_PUBLISH_URL: ${{ secrets.UV_PUBLISH_URL }}
-          UV_PUBLISH_PASSWORD: ${{ secrets.UV_PUBLISH_PASSWORD }}
-          UV_PUBLISH_USERNAME: ${{ secrets.UV_PUBLISH_USERNAME }}
-          {%- endraw %}
-        run: ./workflow.cmd release.attest
-
-      - name: Publish package
-        env:
-          {%- raw %}
-          UV_PUBLISH_URL: ${{ secrets.UV_PUBLISH_URL }}
-          UV_PUBLISH_PASSWORD: ${{ secrets.UV_PUBLISH_PASSWORD }}
-          UV_PUBLISH_USERNAME: ${{ secrets.UV_PUBLISH_USERNAME }}
-          {%- endraw %}
-        run: ./workflow.cmd release.publish --prebuilt
+          subject-path: |
+            dist/*.whl
+            dist/*.tar.gz

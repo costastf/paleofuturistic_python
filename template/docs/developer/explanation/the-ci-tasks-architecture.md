@@ -104,6 +104,8 @@ Whichever host was chosen at generation time — GitHub or GitLab — determines
 - `publish_deps_image(context, tag) -> str`
 - `create_release_pr(context, branch, version) -> str`
 - `pr_create_url(context, branch) -> str`
+- `release_tag_commit(context, tag) -> str`
+- `create_release(context, tag, sha) -> str`
 
 `container.py` and `release.py` import whichever module survived generation via a relative import that was rendered concrete at copy time. Because the unchosen module is omitted entirely at generation time via a copier conditional filename, this project has exactly one code path and no runtime branching between hosts.
 
