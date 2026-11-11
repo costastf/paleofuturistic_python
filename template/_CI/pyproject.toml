@@ -10,44 +10,13 @@ description = 'A vendored version of invoke that can be used to construct portab
 # never newer than the oldest interpreter the generated tooling can run on.
 requires-python = ">=3.11"
 
-[build-system]
-requires = ['setuptools', 'wheel']
-build-backend = "setuptools.build_meta"
-
 [project.optional-dependencies]
-# Content: what ends up in lib/vendor/ and, for the template copy, ships to every generated
-# project. Nothing belongs here that the shipped `_CI/` code does not import.
+# Content: what `lib/vendor/` holds and, for the template copy, ships to every generated
+# project. The tree is built upstream in schubergphilis/vendored_invoke from this extra and
+# copied in verbatim by the template repository's `maintain.sync-vendor` task; the vendoring
+# toolchain itself runs there, never here. Nothing belongs in this extra that the shipped
+# `_CI/` code does not import.
 vendor = ['invoke']
-
-# Tooling: performs the vendoring, never gets vendored. Run on demand with `uvx`; see
-# `./workflow.cmd maintain.sync-vendor` and the upstream README. This used to sit in `vendor`
-# above, which made re-vendoring self-hosting at the cost of shipping ~5.8 MB of maintainer
-# tooling to every consumer. pip-tools is gone entirely: `uv pip compile` replaces it.
-maintenance = ['vendoring==1.2.0']
-
-[tool.vendoring]
-destination = './lib/vendor/'
-requirements = './lib/vendor.txt'
-namespace = 'lib.vendor'
-
-protected-files = ['__init__.py', 'vendor.txt']
-patches-dir = './lib/patches'
-
-[tool.setuptools]
-py-modules = []  # https://github.com/jazzband/pip-tools/issues/1711 :facepalm:
-
-[tool.vendoring.transformations]
-# Every rule this list used to hold rewrote imports for pygments, jsonschema, urllib3, rich,
-# wheel, build, packaging or referencing — all transitive dependencies of the vendoring
-# toolchain vendoring itself, and none of them vendored any more. Add one only if
-# `vendoring sync` leaves a module importing a bare top-level name.
-substitute = []
-
-drop = [
-    # invoke installs two console scripts, `inv` and `invoke`, and both are kept: each one has a
-    # hunk in path_inject.patch. Add an entry here for any console script a newly vendored
-    # library brings that is never run, otherwise it needs a patch hunk of its own.
-]
 
 [tool.ruff]
 # Must match the root pyproject's ruff `line-length` and pylint `max-line-length`, both 120.
@@ -89,9 +58,9 @@ ignore = [
     # block, so there is no forward reference for the quoting this rule wants to protect.
     # Tried it: ruff's own checker treats the quoted form as a use of the name, but pylint's
     # unused-import check does not, so quoting `cast('Task', …)` made every such import read
-    # as unused to the other tool this gate also runs. Cast targets that genuinely are
-    # TYPE_CHECKING-only (`cast('Message', …)` in `sbom.py`) are quoted regardless — this
-    # rule just cannot tell the two cases apart, so it is off rather than wrong half the time.
+    # as unused to the other tool this gate also runs. A cast target that genuinely is
+    # TYPE_CHECKING-only would be quoted regardless; this rule just cannot tell the two cases
+    # apart, so it is off rather than wrong half the time.
     "TC006",   # runtime-cast-value
 ]
 

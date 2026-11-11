@@ -4,44 +4,13 @@ version = '0.1.0'
 description = 'A vendored version of invoke that can be used to construct portable development workflows with no dependencies other than a recent version of python.'
 requires-python = ">=3.12"
 
-[build-system]
-requires = ['setuptools', 'wheel']
-build-backend = "setuptools.build_meta"
-
 [project.optional-dependencies]
-# Content: what ends up in lib/vendor/ and, for the template copy, ships to every generated
-# project. Nothing belongs here that the shipped `_CI/` code does not import.
+# Content: what `lib/vendor/` holds and, for the template copy, ships to every generated
+# project. The tree is built upstream in schubergphilis/vendored_invoke from this extra and
+# copied in verbatim by `./workflow.cmd maintain.sync-vendor`; the vendoring toolchain itself
+# runs there, never here. Nothing belongs in this extra that the shipped `_CI/` code does not
+# import.
 vendor = ['invoke']
-
-# Tooling: performs the vendoring, never gets vendored. Run on demand with `uvx`; see
-# `./workflow.cmd maintain.sync-vendor` and the upstream README. This used to sit in `vendor`
-# above, which made re-vendoring self-hosting at the cost of shipping ~5.8 MB of maintainer
-# tooling to every consumer. pip-tools is gone entirely: `uv pip compile` replaces it.
-maintenance = ['vendoring==1.2.0']
-
-[tool.vendoring]
-destination = './lib/vendor/'
-requirements = './lib/vendor.txt'
-namespace = 'lib.vendor'
-
-protected-files = ['__init__.py', 'vendor.txt']
-patches-dir = './lib/patches'
-
-[tool.setuptools]
-py-modules = []  # https://github.com/jazzband/pip-tools/issues/1711 :facepalm:
-
-[tool.vendoring.transformations]
-# Every rule this list used to hold rewrote imports for pygments, jsonschema, urllib3, rich,
-# wheel, build, packaging or referencing — all transitive dependencies of the vendoring
-# toolchain vendoring itself, and none of them vendored any more. Add one only if
-# `vendoring sync` leaves a module importing a bare top-level name.
-substitute = []
-
-drop = [
-    # invoke installs two console scripts, `inv` and `invoke`, and both are kept: each one has a
-    # hunk in path_inject.patch. Add an entry here for any console script a newly vendored
-    # library brings that is never run, otherwise it needs a patch hunk of its own.
-]
 
 [tool.ruff]
 # Kept at 120 to match the template's `_CI/pyproject.toml`, the root ruff `line-length` and the
