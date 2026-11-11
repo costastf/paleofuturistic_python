@@ -110,9 +110,9 @@ test = [
     # Pin uv to match [tool.uv] required-version — tox-uv depends on the uv
     # Python package, which installs a uv binary into .venv/bin that would
     # otherwise shadow the image's /usr/local/bin/uv and break the check.
-    # Bump with `./workflow.cmd develop.bump-uv`, never by hand: this is one of five
-    # places the uv version appears, and one of them carries an image digest that has
-    # to move with it.
+    # Bump with `./workflow.cmd develop.bump-uv`, never by hand: this is one of four
+    # places in this file the uv version appears, and the base image's tag carries a
+    # digest that has to move with it.
     "uv==0.13.4",
     "tox==4.67.13",
     "tox-uv==1.37.7",

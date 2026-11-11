@@ -14,12 +14,12 @@ from invoke import Context, task
 
 from _CI import PROJECT_ROOT_DIRECTORY, emojize_message, make_file_executable
 from _CI.tasks.configuration import (
-    copy_template_snapshot,
     PROJECT_SLUG,
     TEMPLATE_SECURITY_OVERRIDE_ENV,
     base_context,
     combo_context,
     combo_label,
+    copy_template_snapshot,
     generation_env,
     qa_cells,
     qa_sequence,
@@ -374,13 +374,13 @@ def matrix(context: Context, workers: int = 1) -> None:  # noqa: ARG001 — invo
             results = list(pool.map(worker, combos))
 
         print()
-        print(f'{"combo":<8} {"result":<7} duration')
+        print(f'{"combo":<18} {"result":<7} duration')
         any_failed = False
         for label, ok, duration in results:
             mins, secs = divmod(int(duration), 60)
             status = 'PASS' if ok else 'FAIL'
             log_hint = '' if ok else f'  (log: {REPORTS_DIR.relative_to(PROJECT_ROOT_DIRECTORY)}/{label}.log)'
-            print(f'{label:<8} {status:<7} {mins}m{secs:02d}s{log_hint}')
+            print(f'{label:<18} {status:<7} {mins}m{secs:02d}s{log_hint}')
             any_failed = any_failed or not ok
 
         if any_failed:
@@ -401,10 +401,7 @@ def list_combos(context: Context, as_json: bool = False) -> None:  # noqa: ARG00
     print(f'{"label":<24} {"host":<7} {"pages":<6} {"mature":<6}')
     for cell in combos:
         print(
-            f'{cell["label"]:<24} '
-            f'{cell["git_hosting_service"]:<7} '
-            f'{cell["integrate_pages"]!s:<6} '
-            f'{cell["mature"]!s:<6}'
+            f'{cell["label"]:<24} {cell["git_hosting_service"]:<7} {cell["integrate_pages"]!s:<6} {cell["mature"]!s:<6}'
         )
 
 

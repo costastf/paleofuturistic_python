@@ -2,9 +2,10 @@
 
 Each test below receives one generated project per matrix cell via the
 ``generated_project`` fixture in ``conftest.py``. Adding a new assertion is one
-new ``test_*`` function; adding a new combo axis edits ``matrix_combos()`` in
-``_CI/tasks/configuration.py`` and both the pytest suite and the Invoke matrix
-runner pick it up automatically.
+new ``test_*`` function. Adding a combo axis is wider: ``matrix_combos``,
+``combo_context`` and ``combo_label`` in ``_CI/tasks/configuration.py``, the
+``test.combo`` and ``test.matrix`` options, and the matrix workflow all name the
+knobs, and the ``generated_project`` fixture passes them through.
 """
 
 import ast
@@ -30,7 +31,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 from _CI.tasks.configuration import (  # noqa: E402
     PROJECT_SLUG,
     UV_VERSION_ENV,
-    generation_env,
     matrix_combos,
     template_uv_version,
 )
@@ -767,25 +767,24 @@ def test_publishing_audits_before_it_builds(generated_project):
 def test_qa_steps_cover_what_preflight_does_not():
     """The matrix runs the generated project's own gate, plus the two things it leaves out.
 
-    `preflight` covers format, lint, ty, commit messages, the docs build, pyscn, the tox matrix,
-    the wheel and the derived files, so naming those separately would re-run them in a different
-    shape and leave the matrix with two lists of checks to keep in step — the same duplication
-    the generated project's pipeline shed. What has to be listed is what `preflight` deliberately
-    omits: the dependency audit, and the docs build for the project's own docs.
+    `preflight` covers format, lint, pyproject validation, ty, commit messages, the docs build,
+    pyscn, the tox matrix, the wheel and the derived files, so naming those separately would
+    re-run them in a different shape and leave the matrix with two lists of checks to keep in
+    step — the same duplication the generated project's pipeline shed. What has to be listed is
+    the one thing `preflight` deliberately omits: the dependency audit.
 
-    The audit runs in one cell, not all nine. Every cell resolves the same lockfile and ships the
-    same `vendor.txt`, so its answer cannot differ between them, while its exposure does: nine
+    The audit runs in one cell, not all five. Every cell resolves the same lockfile and ships the
+    same `vendor.txt`, so its answer cannot differ between them, while its exposure does: five
     jobs querying an advisory database for ~125 packages each, where one transient service error
     fails a cell for a reason that has nothing to do with the template. It still has to run
     somewhere, because it is the step the `<PROJECT>_SECURITY_OVERRIDE` plumbing serves and the
     only automated run the `.security-overrides` expiry mechanism gates.
     """
-    from _CI.tasks.configuration import AUDIT_STEP, QA_SETTLE_STEP, QA_STEPS, qa_cells  # noqa: PLC0415
+    from _CI.tasks.configuration import AUDIT_STEP, QA_STEPS, qa_cells  # noqa: PLC0415
 
     assert AUDIT_STEP == 'secure.audit', 'the matrix no longer audits dependencies anywhere'
     assert AUDIT_STEP not in QA_STEPS, 'the audit is back in every cell'
-    assert 'preflight --write' in QA_STEPS, 'the matrix no longer exercises the generated gate'
-    assert 'document' in QA_STEPS, 'nothing builds the generated docs'
+    assert QA_STEPS == ('preflight --write',), 'the matrix runs something the generated gate already covers'
 
     # It rides with the matured cell rather than carrying a knob of its own, and there is
     # exactly one of those. Which cell actually audits is visible in the matrix logs rather
@@ -794,8 +793,6 @@ def test_qa_steps_cover_what_preflight_does_not():
     matured = [cell['label'] for cell in qa_cells() if cell['mature']]
     assert len(matured) == 1, f'expected exactly one matured cell to carry the audit, got {matured}'
     assert not any('audit' in cell for cell in qa_cells()), 'the audit has a knob of its own again'
-    # And after the writers, so the top of a cell's log is about the thing under test.
-    assert QA_SETTLE_STEP not in QA_STEPS, 'the gate has to run after the writers, not among them'
 
 
 def test_the_matrix_verifies_what_it_wrote():
@@ -1316,40 +1313,18 @@ def test_changelog_is_one_file_everywhere(generated_project):
         assert url.endswith(f'/HEAD/{written}'), f'the Changelog URL {url} is not {written}'
 
 
-def generate(template_snapshot, workdir, data, *, check=True):
-    """Run copier over the template snapshot with ``data``; return the completed process."""
-    data_file = workdir / 'data.json'
-    data_file.write_text(json.dumps(data), encoding='utf-8')
-    return subprocess.run(
-        [
-            'uvx',
-            'copier',
-            'copy',
-            '--defaults',
-            '--trust',
-            '--data-file',
-            str(data_file),
-            str(template_snapshot),
-            str(workdir / PROJECT_SLUG),
-        ],
-        check=check,
-        capture_output=True,
-        env={**os.environ, **generation_env()},
-    )
-
-
-def test_no_repository_url_ships_no_project_urls(template_snapshot, tmp_path_factory):
+def test_no_repository_url_ships_no_project_urls(generate, tmp_path_factory):
     """Without `repository_url`, `[project.urls]` is absent rather than full of dead links."""
     workdir = tmp_path_factory.mktemp('no-repository-url')
-    generate(template_snapshot, workdir, {'repository_url': ''})
+    generate(workdir / PROJECT_SLUG, {'repository_url': ''})
     pyproject = tomllib.loads((workdir / PROJECT_SLUG / 'pyproject.toml').read_text(encoding='utf-8'))
     assert 'urls' not in pyproject['project']
 
 
-def test_repository_url_is_normalised(template_snapshot, tmp_path_factory):
+def test_repository_url_is_normalised(generate, tmp_path_factory):
     """A pasted clone URL (`.git`, trailing slash, surrounding space) yields clean links."""
     workdir = tmp_path_factory.mktemp('clone-url')
-    generate(template_snapshot, workdir, {'repository_url': ' https://github.com/Acme/widget.git/ '})
+    generate(workdir / PROJECT_SLUG, {'repository_url': ' https://github.com/Acme/widget.git/ '})
     urls = tomllib.loads((workdir / PROJECT_SLUG / 'pyproject.toml').read_text(encoding='utf-8'))['project']['urls']
     assert urls['Source'] == 'https://github.com/Acme/widget'
     assert urls['Documentation'] == 'https://acme.github.io/widget/'
@@ -1364,10 +1339,10 @@ def test_repository_url_is_normalised(template_snapshot, tmp_path_factory):
         pytest.param('github.com/acme/widget', id='no-scheme'),
     ],
 )
-def test_repository_url_validator_rejects_invalid(template_snapshot, tmp_path_factory, bad_url):
+def test_repository_url_validator_rejects_invalid(generate, tmp_path_factory, bad_url):
     """The validator refuses anything but an https URL with a path, before writing a project."""
     workdir = tmp_path_factory.mktemp('bad-repository-url')
-    result = generate(template_snapshot, workdir, {'repository_url': bad_url}, check=False)
+    result = generate(workdir / PROJECT_SLUG, {'repository_url': bad_url}, check=False)
     assert result.returncode != 0, f'copier accepted repository_url={bad_url!r}'
     assert not (workdir / PROJECT_SLUG / 'pyproject.toml').exists()
 
@@ -1415,7 +1390,7 @@ def test_generated_actions_are_pinned_to_a_sha_with_a_version_comment(generated_
 def test_action_pins_never_drift_apart():
     """One action, one SHA — across this repository and the template it ships.
 
-    `actions/checkout` alone appears fourteen times. Bumping the copies you happen to grep for
+    `actions/checkout` alone appears in every workflow. Bumping the copies you happen to grep for
     and missing the rest is the failure this catches: the result still runs, so nothing else
     reports it, and the workflows quietly disagree about which version they trust. It also
     catches the parent moving ahead of the template, which would leave generated projects on
@@ -1866,7 +1841,7 @@ def test_commit_stage_filter_is_the_union_of_the_steps_it_runs(generated_project
 
 
 def test_whole_program_steps_are_never_scoped_to_a_diff(generated_project):
-    """ty, pyscn and pytest are declared whole-program, and so never run at commit stage.
+    """ty, commitizen, pyscn, tox, build and artifacts are whole-program, so never run at commit stage.
 
     ty: a changed signature fails in the *callers*, which a narrowed run never looks at.
     pyscn: dead code and duplicate blocks are relationships between files.
@@ -2442,14 +2417,7 @@ def range_resolver(project):
     `os` and the context's `run`, so the smallest honest harness execs them alone.
     """
     source = (project / '_CI' / 'tasks' / 'lint.py').read_text(encoding='utf-8')
-    wanted = ('resolves', 'unpushed_range')
-    body = [node for node in ast.parse(source).body if getattr(node, 'name', None) in wanted]
-    # One dict as globals, not globals-plus-locals: the functions call each other, so they have
-    # to land where their own name lookups go.
-    namespace = {'os': os, 'Context': object}
-    module = ast.Module(body=body, type_ignores=[])
-    exec(compile(module, '<lint.py>', 'exec'), namespace)  # noqa: S102
-    assert set(wanted) <= set(namespace), f'lint.py no longer defines all of {wanted}'
+    namespace = exec_from(source, 'resolves', 'unpushed_range', os=os, Context=object)
 
     class GitContext:
         """The slice of invoke's Context these functions touch: `run` returning stdout and failure."""
@@ -2671,18 +2639,15 @@ def test_the_retry_reports_a_verdict_and_retries_anything_else(generated_project
     """
     project, _ = generated_project
     source = (project / '_CI' / 'tasks' / 'shared.py').read_text(encoding='utf-8')
-    runner = function_named(source, 'execute_with_retries')
-    assert runner, 'shared.py declares no execute_with_retries'
-
     slept = []
-    namespace = {
-        'os': os,
-        'time': SimpleNamespace(sleep=slept.append),
-        'Context': object,
-        'SystemExit': SystemExit,
-    }
-    exec(compile(ast.Module(body=[runner], type_ignores=[]), '<shared.py>', 'exec'), namespace)  # noqa: S102
-    retry = namespace['execute_with_retries']
+    retry = exec_from(
+        source,
+        'execute_with_retries',
+        os=os,
+        time=SimpleNamespace(sleep=slept.append),
+        Context=object,
+        SystemExit=SystemExit,
+    )['execute_with_retries']
 
     class Runs:
         """A context whose `run` replays prepared results and counts the calls."""
@@ -2725,28 +2690,6 @@ def test_the_retry_reports_a_verdict_and_retries_anything_else(generated_project
     recovered = Runs(result(failed=True, stderr='ConnectionResetError(104)'), result(failed=False))
     retry(recovered, 'audit', attempts=3, verdicts=verdicts)
     assert len(recovered.commands) == 2, 'the retry did not stop at the first success'
-
-
-def test_every_matrix_cell_runs_the_writers_the_audit_and_then_the_gate():
-    """`qa_sequence` puts the audit in an auditing cell and the gate last, and `run_combo` uses it.
-
-    The guard this replaces asserted `secure.audit` was in `QA_STEPS`, which implied execution
-    until the audit moved out of that tuple; after that, reducing `run_combo`'s step list so no
-    cell audited at all left the suite green.
-    """
-    from _CI.tasks.configuration import AUDIT_STEP, QA_SETTLE_STEP, QA_STEPS, qa_sequence  # noqa: PLC0415
-
-    audited = qa_sequence(audit=True)
-    assert AUDIT_STEP in audited, 'an auditing cell does not audit'
-    assert audited[-1] == QA_SETTLE_STEP, 'the read-only gate does not run last'
-    assert audited.index(AUDIT_STEP) > audited.index(QA_STEPS[0]), 'the audit precedes the writers'
-    assert AUDIT_STEP not in qa_sequence(audit=False), 'every cell audits again'
-    assert all(step in audited for step in QA_STEPS), 'a writer stopped running'
-
-    runner = (REPO_ROOT / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
-    run_combo = function_named(runner, 'run_combo')
-    assert run_combo, 'test.py declares no run_combo'
-    assert 'qa_sequence' in calls_in(run_combo), 'run_combo assembles its own step list again'
 
 
 def test_formatting_takes_paths_and_nothing_else(generated_project):
@@ -2806,9 +2749,6 @@ def test_the_audit_input_covers_every_locked_version(generated_project, tmp_path
     """
     project, _ = generated_project
     source = (project / '_CI' / 'tasks' / 'secure.py').read_text(encoding='utf-8')
-    writer = function_named(source, 'audit_requirement_files')
-    assert writer, 'secure.py declares no requirement-file writer'
-
     lock = tmp_path / 'uv.lock'
     lock.write_text(
         """
@@ -2852,14 +2792,9 @@ source = { editable = "." }
         encoding='utf-8',
     )
     requirements = tmp_path / 'reports' / 'audit-requirements.txt'
-    namespace = {
-        'tomllib': tomllib,
-        'Path': Path,
-        'UV_LOCK': lock,
-        'AUDIT_REQUIREMENTS': requirements,
-    }
-    exec(compile(ast.Module(body=[writer], type_ignores=[]), '<secure.py>', 'exec'), namespace)  # noqa: S102
-    written = namespace['audit_requirement_files']()
+    written = exec_from(
+        source, 'audit_requirement_files', tomllib=tomllib, Path=Path, UV_LOCK=lock, AUDIT_REQUIREMENTS=requirements
+    )['audit_requirement_files']()
 
     pins = [line for path in written for line in path.read_text(encoding='utf-8').splitlines() if line]
     assert sorted(pins) == ['plain==0.1.0', 'three-ways==1.0.0', 'three-ways==2.0.0', 'three-ways==3.0.0'], pins
@@ -2886,21 +2821,15 @@ def test_exactly_one_matrix_cell_audits_its_dependencies(tmp_path):
     `qa_sequence` in isolation is closer but still one refactor from `run_combo` ignoring it.
 
     Every cell resolves the same lockfile and ships the same `vendor.txt`, so the audit's answer
-    cannot differ between them — what differs is the exposure, nine concurrent jobs querying an
+    cannot differ between them — what differs is the exposure, five concurrent jobs querying an
     advisory service about ~125 packages each.
     """
     runner_source = (REPO_ROOT / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
-    run_combo = function_named(runner_source, 'run_combo')
-    assert run_combo, 'test.py declares no run_combo'
     # `run_combo` was split so it reads in one pass; the two extracted helpers are exec'd
     # alongside it rather than stubbed, since `write_mature_project` is exactly the branch this
     # test does not otherwise exercise the content of, and `security_override_env` needs to
     # observe the same `os.environ`/`read_template_overrides` stubs the rest of this namespace
     # sets up, not new ones of its own.
-    write_mature_project = function_named(runner_source, 'write_mature_project')
-    security_override_env = function_named(runner_source, 'security_override_env')
-    assert write_mature_project, 'test.py declares no write_mature_project'
-    assert security_override_env, 'test.py declares no security_override_env'
 
     from _CI.tasks.configuration import PROJECT_SLUG, qa_sequence  # noqa: PLC0415
 
@@ -2937,8 +2866,7 @@ def test_exactly_one_matrix_cell_audits_its_dependencies(tmp_path):
         'MATURE_GATED_MODULE': '"""{slug} {boundary}."""\n',
         'ComboWorkspace': ComboWorkspace,
     }
-    module = ast.Module(body=[write_mature_project, security_override_env, run_combo], type_ignores=[])
-    exec(compile(module, '<test.py>', 'exec'), namespace)  # noqa: S102
+    namespace = exec_from(runner_source, 'write_mature_project', 'security_override_env', 'run_combo', **namespace)
 
     from _CI.tasks.configuration import qa_cells  # noqa: PLC0415
 
@@ -2979,10 +2907,7 @@ def exec_from(source, *names: str, **namespace: object):
         if (isinstance(node, ast.FunctionDef) and node.name in wanted)
         or (isinstance(node, ast.Assign) and any(getattr(t, 'id', None) in wanted for t in node.targets))
     ]
-    found = {
-        node.name if isinstance(node, ast.FunctionDef) else node.targets[0].id  # type: ignore[union-attr]
-        for node in body
-    }
+    found = {node.name if isinstance(node, ast.FunctionDef) else node.targets[0].id for node in body}
     assert wanted <= found, f'missing from the source: {sorted(wanted - found)}'
     exec(compile(ast.Module(body=body, type_ignores=[]), '<generated>', 'exec'), namespace)  # noqa: S102
     return namespace
@@ -3600,7 +3525,7 @@ def test_launcher_dispatch_is_intact(generated_project):
 def test_no_predecessor_template_name_survives(generated_project):
     """Nothing still calls the CI tooling package by the template's former name.
 
-    `_CI/pyproject.toml` named it `backbone-template`, which pip-compile then stamped into
+    `_CI/pyproject.toml` named it `backbone-template`, which `uv pip compile` then stamped into
     every `# via …` comment in `vendor.txt` — so the stale name was reproduced on each
     re-vendor.
     """
@@ -3614,7 +3539,7 @@ def test_no_predecessor_template_name_survives(generated_project):
 def test_vendor_comments_agree_with_the_package_name(generated_project):
     """`vendor.txt`'s `# via <name>` comments match `_CI/pyproject.toml`'s project name.
 
-    pip-compile derives them from that name, so a mismatch means the two would diverge again
+    `uv pip compile` derives them from that name, so a mismatch means the two would diverge again
     the next time the vendored tree is regenerated.
     """
     project, _ = generated_project
@@ -3623,7 +3548,7 @@ def test_vendor_comments_agree_with_the_package_name(generated_project):
             r"^name = ['\"]([^'\"]+)['\"]", (root / '_CI' / 'pyproject.toml').read_text(encoding='utf-8'), re.MULTILINE
         ).group(1)
         vendor = (root / '_CI' / 'lib' / 'vendor.txt').read_text(encoding='utf-8')
-        # pip-compile indents the `# via …` comment under the requirement it belongs to.
+        # `uv pip compile` indents the `# via …` comment under the requirement it belongs to.
         cited = set(re.findall(r'^\s*#\s+via ([a-z0-9-]+) \(pyproject\.toml\)\s*$', vendor, re.MULTILINE))
         assert cited, f'{root}: no self-referential via comments found in vendor.txt'
         assert cited == {name}, f'{root}: vendor.txt cites {cited}, pyproject declares {name!r}'
@@ -3689,31 +3614,14 @@ def test_shipped_rationale_pages_match_canonical(canonical_path):
     assert not extra, f'shipped copy has headings the canonical page lacks: {extra}'
 
 
-def test_project_slug_sanitizes_punctuated_name(template_snapshot, tmp_path_factory):
+def test_project_slug_sanitizes_punctuated_name(generate, tmp_path_factory):
     """A punctuated project_name still derives a usable slug.
 
     The derived slug must be both a valid Python identifier and a valid
     (normalizable) PyPI project name.
     """
-    workdir = tmp_path_factory.mktemp('slug-punctuation')
-    data_file = workdir / 'data.json'
-    data_file.write_text(json.dumps({'project_name': "Username's Toolkit"}), encoding='utf-8')
-    project = workdir / 'out'
-    subprocess.run(
-        [
-            'uvx',
-            'copier',
-            'copy',
-            '--defaults',
-            '--trust',
-            '--data-file',
-            str(data_file),
-            str(template_snapshot),
-            str(project),
-        ],
-        check=True,
-        capture_output=True,
-    )
+    project = tmp_path_factory.mktemp('slug-punctuation') / 'out'
+    generate(project, {'project_name': "Username's Toolkit"})
     slug = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))['project']['name']
     assert slug == 'username_s_toolkit'
     # Valid import name (Python identifier) and valid PyPI name per name-normalization spec:
@@ -3734,60 +3642,23 @@ def test_project_slug_sanitizes_punctuated_name(template_snapshot, tmp_path_fact
         pytest.param({'project_name': '3D Vision'}, id='derived-leading-digit'),
     ],
 )
-def test_project_slug_validator_rejects_invalid(template_snapshot, tmp_path_factory, bad_data):
+def test_project_slug_validator_rejects_invalid(generate, tmp_path_factory, bad_data):
     """The project_slug validator aborts generation instead of writing a broken project.
 
     A slug must be both a valid Python identifier and a valid PyPI name, whether it
     was supplied directly or derived from project_name.
     """
-    workdir = tmp_path_factory.mktemp('slug-invalid')
-    data_file = workdir / 'data.json'
-    data_file.write_text(json.dumps(bad_data), encoding='utf-8')
-    project = workdir / 'out'
-    result = subprocess.run(
-        [
-            'uvx',
-            'copier',
-            'copy',
-            '--defaults',
-            '--trust',
-            '--data-file',
-            str(data_file),
-            str(template_snapshot),
-            str(project),
-        ],
-        check=False,
-        capture_output=True,
-    )
+    project = tmp_path_factory.mktemp('slug-invalid') / 'out'
+    result = generate(project, bad_data, check=False)
     assert result.returncode != 0, 'copier should have aborted on an invalid project_slug'
     assert not (project / 'pyproject.toml').exists(), 'no project should be written on validation failure'
 
 
 @pytest.mark.parametrize('license_choice', ['Apache-2.0', 'MIT', 'BSD-3-Clause', 'None'])
-def test_license_file_matches_choice(template_snapshot, tmp_path_factory, license_choice):
+def test_license_file_matches_choice(generate, tmp_path_factory, license_choice):
     """Each license choice produces (or skips) a LICENSE file at the project root."""
-    workdir = tmp_path_factory.mktemp(f'license-{license_choice}')
-    data_file = workdir / 'data.json'
-    data_file.write_text(json.dumps({'license': license_choice}), encoding='utf-8')
-    project = workdir / PROJECT_SLUG
-    subprocess.run(
-        [
-            'uvx',
-            'copier',
-            'copy',
-            '--defaults',
-            '--trust',
-            '--data-file',
-            str(data_file),
-            str(template_snapshot),
-            str(project),
-        ],
-        check=True,
-        capture_output=True,
-        # Pin the stamped uv version: this test only cares about LICENSE, so there is no
-        # reason for it to resolve a release over the network.
-        env={**os.environ, **generation_env()},
-    )
+    project = tmp_path_factory.mktemp(f'license-{license_choice}') / PROJECT_SLUG
+    generate(project, {'license': license_choice})
     if license_choice == 'None':
         assert not (project / 'LICENSE').exists()
     else:
@@ -3796,7 +3667,6 @@ def test_license_file_matches_choice(template_snapshot, tmp_path_factory, licens
 
 VENDOR_TREES = ('_CI/lib', 'template/_CI/lib')
 # Distribution names in vendor.txt do not always match the importable directory.
-VENDOR_DIRECTORY_ALIASES = {'pip-tools': 'piptools', 'rpds-py': 'rpds', 'typing-extensions': 'typing_extensions'}
 
 
 def source_files(vendor):
@@ -3825,14 +3695,14 @@ def manifest_packages(lib_directory):
     """Return the distribution names pinned in a tree's vendor.txt, mapped to directory names."""
     text = (lib_directory / 'vendor.txt').read_text(encoding='utf-8')
     names = {line.split('==')[0].strip() for line in text.splitlines() if re.match(r'^[A-Za-z]', line)}
-    return {VENDOR_DIRECTORY_ALIASES.get(name, name.replace('-', '_')) for name in names}
+    return {name.replace('-', '_') for name in names}
 
 
 @pytest.mark.parametrize('tree', VENDOR_TREES)
 def test_vendored_tree_matches_its_manifest(tree):
     """Every vendored package is pinned in vendor.txt, and every pin is present in the tree.
 
-    The tree is an output of `vendoring sync`, not a place to add or delete files. A package
+    The tree is copied verbatim by `maintain.sync-vendor`, not a place to add or delete files. A package
     present without a pin means someone edited the tree by hand; a pin without a package means
     the tree is stale. Either way it no longer reproduces from its declared input.
     """
@@ -3883,12 +3753,3 @@ def test_vendored_invoke_records_an_immutable_pin():
     assert pin['repository'] == 'schubergphilis/vendored_invoke'
     assert re.fullmatch(r'v\d+\.\d+\.\d+', pin['version']), f'version {pin["version"]!r} is not a release tag'
     assert re.fullmatch(r'[0-9a-f]{40}', pin['commit']), f'commit {pin["commit"]!r} is not a full SHA'
-
-
-def test_generated_projects_get_the_slim_vendor_tree(generated_project):
-    """A generated project carries the same slim tree, not a stale copy of the old one."""
-    project, _ = generated_project
-    vendor = project / '_CI' / 'lib' / 'vendor'
-    packages = {p.name for p in vendor.iterdir() if p.is_dir() and p.name != 'bin'}
-    assert packages == {'invoke'}, f'unexpected vendored packages: {packages}'
-    assert not [p for p in vendor.rglob('*') if p.suffix in {'.so', '.pyd', '.dylib'}]

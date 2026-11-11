@@ -69,7 +69,7 @@ build-deps-image:
 # character. Verifying is that command's default and writing is opt-in, so there is no flag here
 # to keep in step with the hook. Splitting the work across lint, test and build jobs would mean
 # two lists of checks that can disagree; the cost of one job is the wall-clock their parallelism
-# bought, and `run_steps` still reports every failure in one pass.
+# bought, and `run_scope` still reports every failure in one pass.
 #
 # Anything failing here would have failed the push: format, lint, ty, the commit messages this
 # push adds, the docs build, pyscn, the tox matrix, the wheel, and the badges and coverage

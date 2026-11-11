@@ -15,7 +15,8 @@ from invoke import Context, task
 
 from _CI import PROJECT_ROOT_DIRECTORY, emojize_message
 
-TEMPLATE_PYPROJECT = PROJECT_ROOT_DIRECTORY / 'template' / 'pyproject.toml.jinja'
+from .configuration import TEMPLATE_PYPROJECT
+
 REPO_PYPROJECT = PROJECT_ROOT_DIRECTORY / 'pyproject.toml'
 COPIER_YML = PROJECT_ROOT_DIRECTORY / 'copier.yml'
 
@@ -107,7 +108,7 @@ def rewrite_repo_pin(text: str, version: str) -> str:
 def bump_uv(context: Context, version: str = '') -> None:  # noqa: ARG001
     """Move every uv pin in the template and this repo to the newest week-old release.
 
-    Ten values change together: four version literals plus the base image tag in the template,
+    Ten values change together: three version literals plus the base image tag in the template,
     one digest per supported Python version, and this repo's own pin. A tag carrying a digest
     resolves to the digest, so a bumped tag beside a stale digest would silently keep building
     the old image — which is why they are never written separately.
@@ -254,7 +255,7 @@ def sync_vendor(context: Context) -> None:
     with tempfile.TemporaryDirectory() as workspace:
         archive = Path(workspace) / 'vendored_invoke.tar.gz'
         try:
-            with urllib.request.urlopen(url, timeout=60) as response:  # noqa: S310
+            with urllib.request.urlopen(url, timeout=60) as response:
                 archive.write_bytes(response.read())
         except OSError as exc:
             print(emojize_message(f'Could not fetch {url}: {exc}', success=False))

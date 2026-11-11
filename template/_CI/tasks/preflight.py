@@ -367,8 +367,8 @@ def staged_files(context: Context) -> str:
 def staged(context: Context, paths: str = '') -> None:
     """Run the checks that can be judged from the staged files alone.
 
-    What the pre-commit hook calls, in a single invocation rather than one per tool: four
-    hooks would have pre-commit partition the staged files and report four verdicts about
+    What the pre-commit hook calls, in a single invocation rather than one per tool: five
+    hooks would have pre-commit partition the staged files and report five verdicts about
     different subsets of one commit.
 
     It reports rather than fixes, like every entry point here; `./workflow.cmd format` applies

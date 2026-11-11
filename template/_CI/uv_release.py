@@ -1,7 +1,7 @@
 """Stdlib-only helpers for resolving and applying a fresh uv pin.
 
 uv is pinned exactly (`[tool.uv] required-version = "==X"`), and that one version reaches
-five places in a project's `pyproject.toml`: the constraint itself, the `uv` entry in the
+four places in a project's `pyproject.toml`: the constraint itself, the `uv` entry in the
 `test` group, the `uv_build` upper bound, and the base image's tag — which also carries a
 digest that has to move with it. A reference carrying tag *and* digest resolves to the
 **digest**, so a bumped tag left beside a stale digest silently keeps building the old image.

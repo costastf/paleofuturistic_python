@@ -34,7 +34,7 @@ from packaging.utils import canonicalize_name, parse_sdist_filename, parse_wheel
 from packaging.version import Version
 from validate_pyproject import api as validate_pyproject_api
 
-from _CI.tasks.configuration import PROJECT_SLUG, combo_context, generation_env, template_uv_version
+from _CI.tasks.configuration import PROJECT_SLUG, combo_context, template_uv_version
 
 
 def uv(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -49,31 +49,10 @@ def uv(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
 
 
 @pytest.fixture(scope='module')
-def built_project(template_snapshot, tmp_path_factory):
+def built_project(generate, tmp_path_factory):
     """Generate one project, build it, and return ``(project, wheel, sdist)``."""
-    workdir = tmp_path_factory.mktemp('packaging-specs')
-    data_file = workdir / 'data.json'
-    data_file.write_text(
-        json.dumps(combo_context(git_hosting_service='github', integrate_pages=True)),
-        encoding='utf-8',
-    )
-    project = workdir / PROJECT_SLUG
-    subprocess.run(
-        [
-            'uvx',
-            'copier',
-            'copy',
-            '--defaults',
-            '--trust',
-            '--data-file',
-            str(data_file),
-            str(template_snapshot),
-            str(project),
-        ],
-        check=True,
-        capture_output=True,
-        env={**os.environ, **generation_env()},
-    )
+    project = tmp_path_factory.mktemp('packaging-specs') / PROJECT_SLUG
+    generate(project, combo_context(git_hosting_service='github', integrate_pages=True))
     uv('build', '--quiet', cwd=project)
     dist = project / 'dist'
     wheels = list(dist.glob('*.whl'))
@@ -107,11 +86,9 @@ def wheel_metadata(wheel):
     return Metadata.from_email(read_wheel_file(wheel, f'{dist_info(wheel)}/METADATA'), validate=True)
 
 
-def test_pyproject_validates_against_the_pypa_schemas(built_project):
+def test_pyproject_validates_against_the_pypa_schemas(pyproject):
     """pyproject.toml spec, dependency-groups spec, PyPA schemas: validate-pyproject accepts it."""
-    project, _, _ = built_project
-    document = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
-    validate_pyproject_api.Validator()(document)
+    validate_pyproject_api.Validator()(pyproject)
 
 
 def test_project_name_is_normalized_everywhere(built_project, pyproject):

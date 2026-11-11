@@ -40,8 +40,8 @@ jobs:
     permissions:
       # Required for PyPI Trusted Publishing. GitHub Actions only injects
       # ACTIONS_ID_TOKEN_REQUEST_URL / _TOKEN when the job can write OIDC
-      # tokens; without this, `uv publish` has nothing to exchange and
-      # `release.publish` falls back to legacy UV_PUBLISH_* credentials.
+      # tokens. `release.publish` uses UV_PUBLISH_* credentials whenever they
+      # are set; without them it needs this token, and with neither it exits 1.
       id-token: write
       # Declaring any `permissions:` entry flips every other scope to `none`
       # for this job. The checkout step needs read access to fetch the release
@@ -101,12 +101,20 @@ jobs:
       # step above is GitHub's own record (`gh attestation verify`); this one travels with the
       # package to PyPI. Same signing identity — the `id-token: write` this job already has.
       # After the provenance step, so that one covers exactly the wheel and sdist.
+      # The same credentials as the publish step, so that signing is skipped exactly when
+      # the upload would send no attestations.
       - name: Sign PEP 740 attestations
+        env:
+          {#- Escape curly braces for Copier. -#}
+          {%- raw %}
+          UV_PUBLISH_URL: ${{ secrets.UV_PUBLISH_URL }}
+          UV_PUBLISH_PASSWORD: ${{ secrets.UV_PUBLISH_PASSWORD }}
+          UV_PUBLISH_USERNAME: ${{ secrets.UV_PUBLISH_USERNAME }}
+          {%- endraw %}
         run: ./workflow.cmd release.attest
 
       - name: Publish package
         env:
-          {#- Escape curly braces for Copier. -#}
           {%- raw %}
           UV_PUBLISH_URL: ${{ secrets.UV_PUBLISH_URL }}
           UV_PUBLISH_PASSWORD: ${{ secrets.UV_PUBLISH_PASSWORD }}

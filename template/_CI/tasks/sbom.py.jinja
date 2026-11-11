@@ -101,7 +101,7 @@ def iter_dev_requirements() -> Iterator[PinnedRequirement]:
 
 
 def iter_vendored_requirements() -> Iterator[PinnedRequirement]:
-    """Yield vendored CI deps from `_CI/lib/vendor.txt` (pip-compile output)."""
+    """Yield vendored CI deps from `_CI/lib/vendor.txt` (`uv pip compile` output)."""
     if not VENDOR_TXT.exists():
         return
     yield from iter_requirements_lines(VENDOR_TXT.read_text(encoding='utf-8').splitlines())
@@ -248,13 +248,14 @@ def lookup_pypi_license(name: str) -> LicenseRepository | None:
 def vendor_directory_for(name: str) -> Path | None:
     """Find the on-disk vendored directory for `name`.
 
-    The vendoring tool stores packages under their importable Python module
-    name, not their PyPI distribution name. The two diverge in several common
-    ways: hyphens become underscores (``charset-normalizer`` →
-    ``charset_normalizer``); some package names lose their ``-py`` suffix
-    (``markdown-it-py`` → ``markdown_it``, ``rpds-py`` → ``rpds``); some lose
-    every hyphen entirely (``pip-tools`` → ``piptools``). Try each variant in
-    order.
+    The vendored tree stores packages under their importable Python module
+    name, not their PyPI distribution name. Only ``invoke`` is vendored today,
+    and its two names agree, but the two diverge in several common ways:
+    hyphens become underscores (``charset-normalizer`` → ``charset_normalizer``);
+    some package names lose their ``-py`` suffix (``markdown-it-py`` →
+    ``markdown_it``); some lose every hyphen entirely (``pip-tools`` →
+    ``piptools``). Try each variant in order, so a package vendored later is
+    still found.
     """
     candidates = []
     seen: set[str] = set()
@@ -282,11 +283,10 @@ def lookup_vendored_license(name: str) -> LicenseRepository | None:
     """SPDX identifier for a vendored package.
 
     Primary path: detect from any ``LICENSE*`` file in the vendored directory.
-    Fallback path: many vendored packages are also installed as transitive
-    dev/lint/test deps in the venv (e.g. ``referencing`` comes in through
-    ``cyclonedx-python-lib``'s json-validation extra). When the vendored
-    directory carries no LICENSE we defer to ``lookup_pypi_license`` — same
-    name + version are pinned identically in both worlds.
+    Fallback path: a vendored package may also be installed in the venv as a
+    transitive dev/lint/test dependency. When the vendored directory carries no
+    LICENSE we defer to ``lookup_pypi_license`` — the same name + version are
+    pinned identically in both worlds.
     """
     vendor_dir = vendor_directory_for(name)
     if vendor_dir is not None:

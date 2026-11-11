@@ -3,6 +3,8 @@
 import re
 from pathlib import Path
 
+# `_CI/info.py` and `_CI/uv_release.py` are outside: stdlib-only helpers the launcher and the
+# pipeline read before anything is installed, kept out of the gate on purpose.
 PATHS = 'src/ _CI/tasks/ tests/'
 # Which paths a per-file check accepts, and the same answer for anything else asking "is this
 # file ours?". These moved out of `.pre-commit-config.yaml`: with one hook for the whole bundle

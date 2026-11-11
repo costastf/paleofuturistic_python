@@ -24,10 +24,11 @@ PROJECT_SLUG = 'paleofuturistic_python_project'
 def snapshot_files() -> list[str]:
     """Return the repository files a template snapshot holds: what `git add -A` would commit.
 
-    That is the tracked files plus untracked ones `.gitignore` does not exclude, minus tracked
-    files deleted from the working tree. Uncommitted edits are tested, as they should be, while
-    caches, `.DS_Store` and editor or agent state stay out of the generated projects. Copier
-    renders a published template from git, so this is also what a user's project is built from.
+    That is the tracked files plus untracked ones git ignores nothing of, minus tracked files
+    deleted from the working tree. Uncommitted edits are tested, as they should be, while
+    whatever the repository's `.gitignore` names (caches, `.DS_Store`, agent state) stays out
+    of the generated projects. Copier renders a published template from git, so this is also
+    what a user's project is built from.
     """
     listing = subprocess.run(
         ['git', 'ls-files', '--cached', '--others', '--exclude-standard', '-z'],  # noqa: S607
@@ -47,9 +48,11 @@ def copy_template_snapshot(destination: Path) -> Path:
         shutil.copy2(PROJECT_ROOT_DIRECTORY / name, target)
     return destination
 
-# `preflight` covers format, lint, ty, pyscn, the tox matrix, the wheel and the derived files,
-# so what is left to list is what it deliberately does not do: the dependency audit, whose
-# answer depends on the advisory database rather than on the generated tree, and the docs build.
+
+# `preflight` covers format, lint, pyproject validation, ty, the commit messages, the docs build,
+# pyscn, the tox matrix, the wheel and the derived files, so it is the whole gate. What it
+# deliberately leaves out is the dependency audit, whose answer depends on the advisory
+# database rather than on the generated tree; that is `AUDIT_STEP` below.
 #
 # Every step runs even after one fails — `run_combo` accumulates, as the matrix already does
 # across cells. The feedback loop here is the slowest in the system, five cells at tens of
@@ -58,7 +61,7 @@ def copy_template_snapshot(destination: Path) -> Path:
 # `--write` because a freshly generated project's badges all read "unknown", and the matrix is
 # exercising the command that produces them. The pipeline the template ships runs the bare
 # `preflight`, which compares instead.
-QA_STEPS = ('preflight --write', 'document')
+QA_STEPS = ('preflight --write',)
 # The dependency audit, run in one cell rather than all of them. Every cell resolves the same
 # lockfile and ships the same `vendor.txt`, so the audit's answer cannot differ between them —
 # what differed was the exposure: one job per cell, each querying the advisory database for ~125
@@ -66,7 +69,8 @@ QA_STEPS = ('preflight --write', 'document')
 # with the template. It rides with the matured cell rather than carrying a knob of its own,
 # there being one of those and a dependency audit belonging to a day-two project anyway. It
 # still runs, so the `<PROJECT>_SECURITY_OVERRIDE` plumbing below and the `.security-overrides`
-# expiry mechanism are still exercised, and `test.test` audits its own project too.
+# expiry mechanism are still exercised. `test.test` runs the default cell without it;
+# `test.combo --mature` is the single-cell run that audits.
 #
 # Last, as in the generated project's own registry: it reports on the world rather than on this
 # tree, so the top of a cell's log should be about the thing under test.

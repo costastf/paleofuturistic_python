@@ -8,7 +8,7 @@ on:
 # no flag here to keep in step with the hook, and reproducing a failure from this log means
 # typing what you see. Splitting the work across lint, test and build jobs would mean two lists
 # of checks that can disagree; the cost of one job is the wall-clock their parallelism bought,
-# and `run_steps` still reports every failure in one pass, so it costs time, not diagnosis.
+# and `run_scope` still reports every failure in one pass, so it costs time, not diagnosis.
 #
 # What is deliberately *not* here: the dependency audit, which runs on a schedule and on
 # pushes that touch the dependency surface (see security-audit.yaml), because an advisory

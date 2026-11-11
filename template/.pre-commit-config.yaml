@@ -12,7 +12,7 @@ repos:
         pass_filenames: true
         stages: [commit-msg]
       # One hook, one invocation, for every check that can be judged from the staged files
-      # alone: formatting, ruff, pyproject validation, complexipy, pylint. Not four hooks, which pre-commit would
+      # alone: formatting, ruff, pyproject validation, complexipy, pylint. Not five hooks, which pre-commit would
       # partition and run concurrently: each partition prints its own banner, reads the index
       # again, and reports a verdict about a different subset of one commit. Launcher startup
       # is 0.12s since the SBOM composer stopped being imported eagerly, so the argument is one

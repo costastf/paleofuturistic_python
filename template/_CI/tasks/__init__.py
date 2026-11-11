@@ -49,7 +49,8 @@ if LOCAL_MODULE.is_file():
     namespace.add_collection(local.namespace)
     modules.append(local)
 
-# Wire bootstrap as a pre-task on all other top-level default tasks
+# Wire bootstrap as a pre-task on every task in every namespace, so first-run setup happens once
+# whatever is invoked first.
 bootstrap_task = bootstrap.bootstrap
 for module in modules:
     for task in module.namespace.tasks.values():

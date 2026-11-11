@@ -10,7 +10,6 @@ from _CI.tasks.lint import ruff as lint_ruff
 from _CI.tasks.maintain import bump_uv, sync_vendor
 from _CI.tasks.test import combo, invariants, list_combos, matrix, test
 
-
 test_collection = Collection('test')
 test_collection.add_task(test, default=True)
 test_collection.add_task(combo)

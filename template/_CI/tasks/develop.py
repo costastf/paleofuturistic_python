@@ -64,8 +64,8 @@ def pre_commit(context: Context) -> None:
 def bump_uv(context: Context, version: str = '') -> None:
     """Move every uv pin to the newest release that has been out for a week.
 
-    The pinned uv version reaches four places in `pyproject.toml` plus the base image's tag,
-    and that tag carries a digest that has to move with it — a reference holding both resolves
+    The pinned uv version reaches four places in `pyproject.toml`, the last the base image's
+    tag, and that tag carries a digest that has to move with it — a reference holding both resolves
     to the *digest*, so a bumped tag beside a stale digest silently keeps building the old
     image. This updates all of them together or none at all, then re-locks so `uv.lock` agrees.
 

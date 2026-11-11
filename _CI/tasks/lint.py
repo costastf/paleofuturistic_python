@@ -13,10 +13,11 @@ from invoke import Context, task
 
 from _CI import emojize_message
 
-# `_CI/tasks/` is deliberately absent: it resolves `_CI/pyproject.toml`, which keeps the
-# lighter rule set a generated project also applies to its own tooling. Adding it here would
-# lint it under this file's config instead and defeat that parity.
-PATHS = 'tasks_render.py tests/'
+# Ruff resolves the nearest config for each file, however it is invoked, so `_CI/` is judged by
+# `_CI/pyproject.toml` here — the same lighter rule set a generated project applies to its own
+# tooling — and the rest by the root config. Listing `_CI/` costs no parity; leaving it out
+# meant nothing linted it at all.
+PATHS = '_CI/__init__.py _CI/tasks/ tasks_render.py tests/'
 RUFF = 'uv run --group lint ruff'
 
 

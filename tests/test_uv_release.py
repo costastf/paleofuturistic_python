@@ -120,7 +120,7 @@ def test_nothing_eligible_raises(uv_release, monkeypatch):
         uv_release.latest_eligible(now=NOW)
 
 
-@pytest.mark.parametrize('releases', [{}, {'0.12.0': None}], ids=['empty', 'undated'])
+@pytest.mark.parametrize('releases', [[], ['0.12.0']], ids=['empty', 'undated'])
 def test_unusable_payloads_raise(uv_release, monkeypatch, releases):
     """An empty or undated payload is an error, never silently 'no update available'."""
     monkeypatch.setattr(
