@@ -76,7 +76,7 @@ first, so no combination of inputs can collide with another). Change any one of 
 is what stops CI from silently reusing an image built from a stale Dockerfile or base.
 
 **The reference is digest-pinned.** `container.publish` resolves the published image to
-`repository@sha256:…`{% if git_hosting_service == 'github' %} (via the local repo digest){% else %} (via kaniko's `--digest-file`){% endif %} rather than handing
+`repository@sha256:…` via the local repo digest{% if git_hosting_service == 'gitlab' %} (the pipeline's kaniko job reads kaniko's `--digest-file` instead){% endif %} rather than handing
 downstream jobs a mutable tag. A tag repointed between the build job and a consumer job
 therefore cannot change the container that consumer runs in.
 {%- if git_hosting_service == 'github' %}
@@ -97,8 +97,9 @@ Because the mitigation is an access-control one, keep it that way:
   image build per gated run.
 {%- else %}
 
-**No reuse path.** Every run builds from the repository via kaniko — there is no
-skip-if-the-tag-exists branch — so the image can only ever be what this pipeline produced.
+**No reuse path.** Every run builds from the repository — kaniko in the pipeline job, docker
+or podman from `container.publish` by hand — and there is no skip-if-the-tag-exists branch, so
+the image can only ever be what that run produced.
 {%- endif %}
 
 ## The publish pipeline

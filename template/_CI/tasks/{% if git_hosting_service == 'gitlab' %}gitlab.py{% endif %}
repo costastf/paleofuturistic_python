@@ -1,6 +1,5 @@
-"""GitLab-specific helpers: container registry publish (kaniko), release MR helpers, pipeline SBOM components."""
+"""GitLab-specific helpers: container registry publish, release MR helpers, pipeline SBOM components."""
 
-import base64
 import json
 import os
 import re
@@ -16,7 +15,14 @@ from invoke import Context
 
 from _CI.info import read as read_info
 
-from .shared import PipelineComponent, RemoteRef, execute, parse_remote_url
+from .shared import (
+    PipelineComponent,
+    RemoteRef,
+    container_engine,
+    execute,
+    image_digest_reference,
+    parse_remote_url,
+)
 
 CI_FILE = Path('.gitlab-ci.yml')
 # Matches inline `image: foo/bar:tag` and the `name: foo/bar:tag` line inside
@@ -52,41 +58,28 @@ def registry_settings() -> RegistrySettings:
 
 
 def publish_deps_image(context: Context, tag: str) -> str:
-    """Build and push the deps image via kaniko. Return a digest-pinned reference.
+    """Build and push the deps image with docker or podman. Return a digest-pinned reference.
 
-    kaniko is a daemonless builder that runs entirely in userspace — required
-    on GitLab runners that don't allow privileged docker-in-docker or user
-    namespaces (which rule out docker, buildah, and podman).
+    The by-hand path. The shipped ``build-deps-image`` job cannot run this: it builds with
+    kaniko, whose image has no Python, so the job carries the same steps in shell. Both push
+    the same reference, ``<project registry>:deps-<tag>`` — a ``-deps`` sub-path is denied on
+    registries that restrict deploy tokens to the project root — and both hand on a digest
+    rather than the tag, so the image a consumer runs in cannot be repointed afterwards.
 
-    Every run builds from the repository — there is no reuse-an-existing-tag path
-    here — so the image can only ever be what this pipeline just produced.
-    ``--digest-file`` reports the digest kaniko pushed, which is what downstream jobs
-    pin to; being daemonless, there is no local image to inspect for it afterwards.
-
-    The image is ``<project registry>:deps-<tag>``, the same reference the shipped
-    ``build-deps-image`` job builds: a ``-deps`` sub-path is denied on registries that
-    restrict deploy tokens to the project root.
+    Every run builds from the repository, as the pipeline job does: there is no
+    reuse-an-existing-tag path, so the image can only ever be what this run produced.
     """
     settings = registry_settings()
     image = f'{settings.image_prefix}:deps-{tag}'
-    password = os.environ[settings.password_env]
-    token = base64.b64encode(f'{settings.user}:{password}'.encode()).decode()
-    config = {'auths': {settings.url: {'auth': token}}}
-    config_path = Path('/kaniko/.docker/config.json')
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(json.dumps(config), encoding='utf-8')
-    base_image = read_info('info.base-image')
-    digest_file = Path('.deps-image-digest')
-    execute(
-        context,
-        f'/kaniko/executor --dockerfile=Dockerfile.deps --context=. '
-        f'--destination={image} --build-arg=BASE_IMAGE={base_image} --digest-file={digest_file}',
+    engine = container_engine()
+    context.run(
+        f'echo "${settings.password_env}" | {engine} login {settings.url} -u "{settings.user}" --password-stdin',
+        hide=True,
     )
-    digest = digest_file.read_text(encoding='utf-8').strip() if digest_file.exists() else ''
-    if not digest.startswith('sha256:'):
-        print(f'kaniko reported no digest for {image}; falling back to the tag.')
-        return image
-    return f'{image.rsplit(":", 1)[0]}@{digest}'
+    base_image = read_info('info.base-image')
+    execute(context, f'{engine} build --build-arg BASE_IMAGE={base_image} -f Dockerfile.deps -t {image} .')
+    execute(context, f'{engine} push {image}')
+    return image_digest_reference(context, engine, image)
 
 
 def origin_ref(context: Context) -> RemoteRef:

@@ -13,11 +13,12 @@ build-deps-image:
   # Declared so the registry credentials below can be scoped to this environment
   # instead of being readable by every job in the project.
   environment: deps
-  # kaniko:debug has no python/uv and its busybox binaries are static, which
-  # uv's libc probe refuses. This is the one pipeline job that can't go
-  # through ./workflow.cmd — the container.publish steps are inlined here so
-  # the bootstrap needs nothing beyond kaniko + busybox. Every other job
-  # runs inside $DEPS_IMAGE (built here) where ./workflow.cmd works normally.
+  # kaniko builds without a daemon, which is what a shared runner allows; docker and
+  # podman are not available there. kaniko:debug has no python/uv and its busybox
+  # binaries are static, which uv's libc probe refuses, so this is the one pipeline job
+  # that can't go through ./workflow.cmd: it repeats what `container.publish` does with
+  # docker or podman by hand, in shell. Every other job runs inside $DEPS_IMAGE (built
+  # here) where ./workflow.cmd works normally.
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [""]

@@ -226,5 +226,4 @@ cython_debug/
 
 ## Dependency image references written by `container.publish` and the pipeline's deps job
 .deps-image
-.deps-image-digest
 .deps-image.env

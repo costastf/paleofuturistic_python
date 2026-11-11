@@ -78,6 +78,19 @@ def update_pyscn_badge(*, write: bool = True) -> str | None:
     )
 
 
+def analyze(context: Context, *, write: bool) -> None:
+    """Run both pyscn analyses and report on the badge; the body `pyscn-analyze` and `pyscn` share.
+
+    Two analyses: pyscn refuses more than one output format per run — ``--html --json`` fails
+    with "only one output format flag can be specified" — so each format costs a full analysis
+    and prints its own summary table. ``pyscn_json_report`` is the path for callers needing one.
+    """
+    clear_pyscn_reports()
+    execute(context, ANALYZE_HTML)
+    execute(context, ANALYZE_JSON)
+    note(update_pyscn_badge(write=write))
+
+
 @task
 @logged('quality.pyscn-analyze')
 def pyscn_analyze(context: Context, write: bool = False) -> None:
@@ -92,10 +105,7 @@ def pyscn_analyze(context: Context, write: bool = False) -> None:
         write: Update the README's pyscn badge from this analysis.
 
     """
-    clear_pyscn_reports()
-    execute(context, ANALYZE_HTML)
-    execute(context, ANALYZE_JSON)
-    note(update_pyscn_badge(write=write))
+    analyze(context, write=write)
     if not is_ci():
         open_target(context, str(latest_pyscn_report()))
 
@@ -116,16 +126,8 @@ def pyscn_check(context: Context) -> None:
 
 @logged('quality.pyscn-analyze')
 def pyscn_analyze_only(context: Context, *, write: bool = False) -> None:
-    """Run pyscn analyze without opening the report.
-
-    Two analyses: pyscn refuses more than one output format per run — ``--html --json`` fails
-    with "only one output format flag can be specified" — so each format costs a full analysis
-    and prints its own summary table. ``pyscn_json_report`` is the path for callers needing one.
-    """
-    clear_pyscn_reports()
-    execute(context, ANALYZE_HTML)
-    execute(context, ANALYZE_JSON)
-    note(update_pyscn_badge(write=write))
+    """Run pyscn analyze without opening the report: what `quality.pyscn` runs."""
+    analyze(context, write=write)
 
 
 @logged('quality.pyscn-analyze')

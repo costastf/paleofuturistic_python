@@ -11,7 +11,7 @@ Three mechanisms, and they are not interchangeable:
 | --- | --- | --- |
 | **Sub-task** | a unit of work you might want to run *alone* | `lint.pylint`, `test.tox` |
 | **Flag** | a modifier *you* choose for one invocation | `--paths`, `--write`, `--env` |
-| **Environment variable** | something the *environment* supplies, not the operator | `CI`, `INVOKE_SHELL` |
+| **Environment variable** | something the *environment* supplies, not the operator | `CI`, `GITHUB_TOKEN` |
 
 So: a tool or step you might run on its own is a sub-task; something a person decides at the
 prompt is a flag; a secret, a detection, or a knob owned by a tool this workflow calls is an
@@ -41,7 +41,6 @@ Nothing here needs setting for local work. Every one has a default or a reason t
 | Variable | Read by | What it does |
 | --- | --- | --- |
 | `CI` | `shared.is_ci()` | When `true`, suppresses anything that wants a human — the bootstrap's prompts, and opening a report in a browser — and switches `container.publish` from a local build to a registry push. Set by GitHub Actions and GitLab CI themselves. |
-| `INVOKE_SHELL` | `shared.execute()` | Overrides the shell Invoke spawns, for a minimal image that ships `busybox sh` but no bash. The shipped pipelines run in the deps image, which has bash, so nothing sets it by default. |
 | `{{ project_slug | upper }}_SECURITY_OVERRIDE` | `secure.audit` | Comma-separated pip-audit suppressions, each `<VULN_ID>::<YYYY-MM-DD>`. An expiry is **required** here, unlike in the file: a suppression that leaves no trace in the repository must not be able to last forever. |
 | `COVERAGE_FILE` | tox, per env | Set to `.coverage.{envname}` by `[tool.tox.env_run_base]` so the matrix's envs do not race one data file. Not yours to set. |
 {%- if git_hosting_service == 'github' %}
@@ -51,7 +50,7 @@ Nothing here needs setting for local work. Every one has a default or a reason t
 | `GITLAB_TOKEN` | `release`, `release.tag` by hand | Opens the release merge request, and creates the release tag when `release.tag` runs outside the pipeline. GitLab injects no such variable: set a project or personal access token with `api` scope before running either. |
 | `CI_JOB_TOKEN` | `release.tag`, in the pipeline | Injected by GitLab. The Releases API accepts it, so the publish job creates the tag and its Release entry with no token of its own. |
 | `CI_API_V4_URL`, `CI_PROJECT_ID` | `release.tag`, in the pipeline | Injected by GitLab: where the API is and which project this is, so the Releases call needs no guessing from the remote URL. By hand both are derived from `origin` instead. |
-| `CI_REGISTRY`, `CI_REGISTRY_IMAGE` | `container.publish`, in CI | The registry and the project's image path, both injected by GitLab. The shipped pipeline builds the image in its own kaniko job; `container.publish` reads these only when you run the push yourself. |
+| `CI_REGISTRY`, `CI_REGISTRY_IMAGE` | `container.publish`, in CI | The registry and the project's image path, both injected by GitLab. The shipped pipeline builds the image in its own kaniko job; `container.publish` reads these only when you run the push yourself with docker or podman, so set them by hand then. |
 | `DEPS_IMAGE_USERNAME`, `DEPS_IMAGE_PASSWORD` | the `build-deps-image` job, `container.publish` | A project Deploy Token with `read_registry` + `write_registry`. Mark both Protected and Masked, and scope them to the `deps` environment — an unscoped variable is readable by every job in every pipeline, including one added by a fork's merge request. |
 | `UV_LINK_MODE` | every job | Set to `copy` in `.gitlab-ci.yml`: hardlinks cannot span GitLab's mount boundaries, so `uv run` needs copies. |
 {%- endif %}

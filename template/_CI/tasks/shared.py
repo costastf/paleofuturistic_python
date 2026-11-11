@@ -358,14 +358,8 @@ def note(reason: str | None) -> None:
 
 
 def execute(context: Context, cmd: str) -> None:
-    """Execute a shell command, raising SystemExit(1) on failure.
-
-    Honors ``INVOKE_SHELL`` to override the interpreter invoke spawns — needed
-    on minimal CI images like kaniko:debug that ship busybox sh but no bash.
-    """
-    shell = os.environ.get('INVOKE_SHELL')
-    kwargs: dict[str, object] = {'shell': shell} if shell else {}
-    result = context.run(cmd, echo=True, warn=True, **kwargs)
+    """Execute a shell command, raising SystemExit(1) on failure."""
+    result = context.run(cmd, echo=True, warn=True)
     if result.failed:
         raise SystemExit(1)
 
@@ -393,10 +387,8 @@ def execute_with_retries(context: Context, cmd: str, *, attempts: int, verdicts:
         SystemExit: If the command reported a verdict, or ran out of attempts.
 
     """
-    shell = os.environ.get('INVOKE_SHELL')
-    kwargs: dict[str, object] = {'shell': shell} if shell else {}
     for attempt in range(1, attempts + 1):
-        result = context.run(cmd, echo=True, warn=True, **kwargs)
+        result = context.run(cmd, echo=True, warn=True)
         if not result.failed:
             return
         output = f'{result.stdout}{result.stderr}'

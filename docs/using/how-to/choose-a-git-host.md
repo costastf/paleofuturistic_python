@@ -9,9 +9,9 @@ The copier questionnaire asks `git_hosting_service` with two choices: `github` (
 | `.github/workflows/*.yaml` | shipped | absent |
 | `.gitlab-ci.yml` | absent | shipped |
 | `_CI/tasks/github.py` (registry creds, docker publish, release-PR API) | shipped | absent |
-| `_CI/tasks/gitlab.py` (registry creds, kaniko publish, release-MR API) | absent | shipped |
+| `_CI/tasks/gitlab.py` (registry creds, docker publish, release-MR API) | absent | shipped |
 | Build badge in `README.md` | GitHub Actions | GitLab Pipelines |
-| Container registry | `ghcr.io` (push via docker) | GitLab Container Registry (push via kaniko) |
+| Container registry | `ghcr.io` (push via docker, from the pipeline and by hand) | GitLab Container Registry (the pipeline job pushes via kaniko, `container.publish` via docker) |
 | Release PR/MR | auto-opened via GitHub API when `GITHUB_TOKEN` is set | auto-opened via GitLab API when `GITLAB_TOKEN` is set |
 | PyPI Trusted Publishing | `id-token: write` on the publish job; uv reads `ACTIONS_ID_TOKEN_*` | `id_tokens:` on the publish job (`PYPI_ID_TOKEN`, audience `pypi`); **gitlab.com only** — PyPI does not trust self-managed instances |
 | PEP 740 attestations | `release.attest` signs with the job's OIDC identity | `release.attest` signs with `SIGSTORE_ID_TOKEN` (audience `sigstore`); gitlab.com only, for the same reason |

@@ -297,8 +297,8 @@ def test_every_environment_variable_the_workflow_reads_is_documented(generated_p
 
     # Set by the runner, not read by us, and covered in prose rather than the table.
     ignored = {'PATH', 'HOME', 'COMSPEC', 'PAGER'}
-    # As a code span, not a substring: `INVOKE_SHELL` must not be satisfied by a page that
-    # happens to mention `INVOKE_SHELL_SOMETHING_ELSE`.
+    # As a code span, not a substring: `GITHUB_TOKEN` must not be satisfied by a page that
+    # happens to mention `GITHUB_TOKEN_SOMETHING_ELSE`.
     documented = set(re.findall(r'`([A-Z][A-Z0-9_]+)`', page))
     undocumented = sorted(literal - ignored - documented)
     assert not undocumented, f'variables the workflow reads but nobody documented: {undocumented}'
@@ -652,18 +652,15 @@ def test_deps_image_reference_is_digest_pinned(generated_project):
     project, cell = generated_project
     host = cell['git_hosting_service']
     host_py = (project / '_CI' / 'tasks' / f'{host}.py').read_text(encoding='utf-8')
-    if host == 'github':
-        # Daemon-based build: resolve the repo digest of the local image.
-        assert 'image_digest_reference' in host_py
-        shared = load_generated_shared(project)
-        resolver = inspect.getsource(shared.image_digest_reference)
-        assert 'RepoDigests' in resolver
-        # Parsed as JSON rather than via a Go --format template, which docker and
-        # podman expose differently and which needs brace quoting in a shell command.
-        assert 'json.loads' in resolver
-    else:
-        # kaniko is daemonless, so there is no local image to inspect afterwards.
-        assert '--digest-file' in host_py
+    # Both hosts build with a daemon-based engine by hand, so both resolve the repo digest of
+    # the local image. GitLab's pipeline job is the exception, and has its own test above.
+    assert 'image_digest_reference' in host_py
+    shared = load_generated_shared(project)
+    resolver = inspect.getsource(shared.image_digest_reference)
+    assert 'RepoDigests' in resolver
+    # Parsed as JSON rather than via a Go --format template, which docker and
+    # podman expose differently and which needs brace quoting in a shell command.
+    assert 'json.loads' in resolver
 
 
 def test_security_audit_is_automated_without_failing_unrelated_changes(generated_project):
@@ -2238,9 +2235,13 @@ def test_a_report_a_reader_would_misread_is_cleared_first(generated_project):
     """
     project, _ = generated_project
     quality = (project / '_CI' / 'tasks' / 'quality.py').read_text(encoding='utf-8')
-    for name in ('pyscn_analyze', 'pyscn_analyze_only', 'pyscn_json_report'):
-        body = quality.split(f'def {name}', 1)[1].split('\ndef ', 1)[0]
+    for name in ('analyze', 'pyscn_json_report'):
+        body = quality.split(f'\ndef {name}(', 1)[1].split('\ndef ', 1)[0]
         assert 'clear_pyscn_reports()' in body, f'{name} can read a report from a previous run'
+    # The two analysis tasks share `analyze`, so the clearing above covers both.
+    for name in ('pyscn_analyze', 'pyscn_analyze_only'):
+        body = quality.split(f'\ndef {name}(', 1)[1].split('\ndef ', 1)[0]
+        assert 'analyze(context, write=write)' in body, f'{name} no longer runs the shared analysis'
     test_py = (project / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
     erase = test_py.split('def erase_coverage_data', 1)[1].split('\ndef ', 1)[0]
     assert "Path('reports').glob('coverage.*.json')" in erase, 'a retired env keeps its report'
@@ -2942,7 +2943,7 @@ def failing(*, failed: bool = True):
     return Context()
 
 
-def test_a_tool_that_fails_ends_the_run(generated_project, monkeypatch):
+def test_a_tool_that_fails_ends_the_run(generated_project):
     """`execute` raises `SystemExit` when the command it ran failed.
 
     Every task in the workflow runs every tool through this one function, so without the raise
@@ -2959,16 +2960,9 @@ def test_a_tool_that_fails_ends_the_run(generated_project, monkeypatch):
     source = (project / '_CI' / 'tasks' / 'shared.py').read_text(encoding='utf-8')
     execute = exec_from(source, 'execute', os=os, Context=object)['execute']
 
-    monkeypatch.delenv('INVOKE_SHELL', raising=False)
     with pytest.raises(SystemExit):
         execute(failing(), 'ruff check')
     execute(failing(failed=False), 'ruff check')
-
-    # And the documented `INVOKE_SHELL` override reaches invoke, for images with no bash.
-    monkeypatch.setenv('INVOKE_SHELL', '/bin/sh')
-    context = failing(failed=False)
-    execute(context, 'ruff check')
-    assert context.calls[0][1].get('shell') == '/bin/sh', context.calls
 
 
 def test_the_gate_exits_non_zero_when_any_step_failed(generated_project):
