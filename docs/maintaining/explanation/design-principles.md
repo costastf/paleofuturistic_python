@@ -1,8 +1,10 @@
 # Design principles
 
-The template is opinionated. The choices below were made deliberately, not by accumulation — each replaces something an earlier revision relied on.
+The template is opinionated. The choices below were made deliberately, not by accumulation — each replaces something an earlier revision relied on. This page is the overview; each principle has a dated [decision record](../decisions/index.md) with the situation it was made in and what it cost.
 
 ## Pipelines run template commands only
+
+Record: [ADR-0004](../decisions/0004-pipelines-run-template-commands-only.md).
 
 Every CI step is a `./workflow.cmd <task>` call — no inline `uv …`, `pip install …`, ad-hoc `properdocs …`, or other business logic in YAML. Behaviour changes happen in `_CI/tasks/`; workflow files are glue.
 
@@ -13,6 +15,8 @@ Two side-effects of this rule earn the rule a section of its own:
 **And those commands lean on tracked dependencies.** When a `properdocs` / `uv` / `pytest` invocation can do a CI step, we prefer it over a GitHub Action, because every Python dependency is pinned in `uv.lock` and surfaces in the project SBOM. Action dependencies are hidden inside `uses:` references and never appear in the supply-chain picture. Concretely: `properdocs gh-deploy` over `actions/upload-pages-artifact` + `actions/deploy-pages`; `./workflow.cmd test` over inline `pytest` invocations; and so on. Three actions are unavoidable: `actions/checkout` to fetch the repo, `astral-sh/setup-uv` to bootstrap the toolchain itself when the deps image isn't used, and `actions/attest-build-provenance`, since GitHub's own provenance attestation can only be recorded by GitHub — beyond those, prefer commands.
 
 ## The QA gate
+
+Records: [ADR-0009](../decisions/0009-one-qa-gate.md), [ADR-0010](../decisions/0010-verifying-is-the-default-writing-is-a-flag.md), [ADR-0011](../decisions/0011-report-names-carry-a-scope.md).
 
 The **QA gate** is not a command; it is the role a command plays. `preflight` with no flags is the gate: it
 runs every check, compares every derived value against what the tools just measured, writes nothing,
@@ -83,11 +87,15 @@ Together these are what make one command mean the same thing in three places.
 
 ## uv is the only tool you install
 
+Records: [ADR-0002](../decisions/0002-uv-is-the-only-tool-you-install.md), [ADR-0008](../decisions/0008-reproducibility-by-pin.md).
+
 Earlier revisions asked users to install Python, then `pipx`, then `tox`, then `pre-commit`, then `commitizen`. Today, every one of those is a uv-managed dependency group inside the generated project. You install uv; uv installs the rest.
 
 **Tradeoff:** the template is now bound to uv's lifecycle. If uv goes away or changes lock format incompatibly, the template needs work. We accept that risk because uv has compressed the toolchain to a single binary that's fast enough to run on every commit.
 
 ## Why groups, not extras
+
+Record: [ADR-0005](../decisions/0005-dependency-groups-not-extras.md).
 
 The template used to put dev tools under `[project.optional-dependencies]` (PEP 621 extras). Those work but they conflate two ideas:
 
@@ -110,6 +118,8 @@ The original lineage used `python -m unittest`. We moved to pytest for fixtures,
 
 ## Conventional Commits drive the release notes
 
+Record: [ADR-0014](../decisions/0014-a-release-is-the-version-bump-arriving-on-the-default-branch.md) for how a release reaches the default branch.
+
 Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) — the lint step rejects anything that doesn't parse. We use them for **automatic release notes**: [commitizen](https://commitizen-tools.github.io/commitizen/) reads the commits since the last tag and groups them by prefix (`feat:`, `fix:`, etc.) into a generated changelog.
 
 We do **not** use commitizen's autorelease mode. The version bump is an explicit choice you make at release time: `./workflow.cmd release -i <major|minor|patch|…>`. Commit prefixes inform changelog structure, not the version number.
@@ -120,6 +130,8 @@ properdocs is mkdocs with a curated plugin set. mkdocstrings reads the source di
 
 ## SBOMs ship inside the wheel
 
+Records: [ADR-0012](../decisions/0012-the-sbom-ships-inside-the-wheel.md), [ADR-0013](../decisions/0013-the-audit-runs-on-a-schedule-and-the-dependency-surface.md).
+
 Every release composes a CycloneDX 1.7 SBOM covering four sources — runtime dependencies (from `uv export --no-dev` against the lockfile), dev / build / develop / lint / test / docs / quality / security groups (the lockfile minus the runtime set), vendored CI tooling (every package in `_CI/lib/vendor.txt`), and the chosen host's pipeline components (GitHub Actions `uses:` refs or GitLab CI `image:` refs). Each component carries an SPDX-identified licence, a SHA-256 hash where the lockfile provides one, and an external_reference pointing at its upstream page. CycloneDX `scope` (`required` / `optional` / `excluded`) distinguishes what ships in the wheel from what builds it. A two-level dependency graph (project → runtime + dev + a synthetic `build-environment` → vendored + pipeline) makes "what's in the wheel" vs "what built the wheel" walkable from the root bom-ref.
 
 The SBOM is validated against the CycloneDX 1.7 JSON schema and written to `src/<project_slug>/sbom.cdx.json`, which `uv build` automatically ships **inside the wheel** rather than next to it. A downstream consumer extracts it with `unzip -p <wheel> <project_slug>/sbom.cdx.json` or `importlib.resources` — the SBOM travels with the artefact instead of needing to be re-correlated post-release.
@@ -128,13 +140,19 @@ The cost is one Python module (`_CI/tasks/sbom.py`) and one extra build step; th
 
 ## Vendored CI tooling
 
+Records: [ADR-0003](../decisions/0003-vendored-invoke-behind-one-launcher.md), [ADR-0015](../decisions/0015-local-py-is-the-projects-module.md).
+
 `_CI/lib/vendor/` ships Invoke + its dependencies committed to the repo. `./workflow.cmd` works on a fresh clone with only uv installed — no `pip install invoke` step, no version drift between contributor machines. The vendoring cost is bytes in the repo; the benefit is that the dev cycle is the same on day one as on day one thousand.
 
 ## Diátaxis for our own docs
 
+Record: [ADR-0007](../decisions/0007-diataxis-with-shipped-rationale-pages.md).
+
 The four sections — Tutorials, How-to, Reference, Explanation — exist because the template's documentation has historically conflated "I want to start" with "I want to understand", and readers got annoyed at both. Diátaxis splits the audiences. This page is in *Explanation* because it tells you *why*; it won't show you *how* to change anything.
 
 ## What we deliberately do not do
+
+Record: [ADR-0006](../decisions/0006-deliberate-non-goals.md).
 
 - **No framework choice.** This is a library scaffold. It does not know about FastAPI, Django, or Click. Add what you need.
 - **No monorepo support.** One package, one repo. If you want a monorepo, use a different template.

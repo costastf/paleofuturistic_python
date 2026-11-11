@@ -1,7 +1,7 @@
 <!-- canonical: synced from docs/maintaining/explanation/design-principles.md in the paleofuturistic_python template repo. Edit there first. -->
 # Design principles
 
-The scaffold this project inherited is opinionated. The choices below were made deliberately, not by accumulation — each replaces something an earlier revision of the template relied on.
+The scaffold this project inherited is opinionated. The choices below were made deliberately, not by accumulation — each replaces something an earlier revision of the template relied on. The dated decision records behind them, with the situation each was made in, are published with the template at [Decision records](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/index.html).
 
 ## Pipelines run template commands only
 

@@ -3755,3 +3755,85 @@ def test_vendored_invoke_records_an_immutable_pin():
     assert pin['repository'] == 'schubergphilis/vendored_invoke'
     assert re.fullmatch(r'v\d+\.\d+\.\d+', pin['version']), f'version {pin["version"]!r} is not a release tag'
     assert re.fullmatch(r'[0-9a-f]{40}', pin['commit']), f'commit {pin["commit"]!r} is not a full SHA'
+
+
+# ---------------------------------------------------------------------------------------------
+# Decision records. The log in docs/maintaining/decisions/ is where the reasoning behind the
+# template lives; these keep it well-formed so a record is never half-written or unreachable.
+# ---------------------------------------------------------------------------------------------
+
+DECISIONS_DIR = REPO_ROOT / 'docs' / 'maintaining' / 'decisions'
+DECISION_STATUSES = {'accepted', 'superseded', 'deprecated'}
+DECISION_REFERENCE = re.compile(r'\bADR-(\d{4})\b')
+# Where a record may be named from: every text file this repository ships or reads.
+DECISION_REFERENCE_ROOTS = ('docs', 'template', '_CI', 'tests')
+DECISION_REFERENCE_SUFFIXES = {'.md', '.jinja', '.py', '.toml', '.yaml', '.yml', '.txt', '.cfg'}
+
+
+def decision_records():
+    """Return the numbered records, in order."""
+    return sorted(DECISIONS_DIR.glob('[0-9][0-9][0-9][0-9]-*.md'))
+
+
+def test_decision_records_are_numbered_without_gaps():
+    """Records are numbered from 0001 with no gap and no duplicate, so a reference is unambiguous."""
+    numbers = [int(record.name[:4]) for record in decision_records()]
+    assert numbers == list(range(1, len(numbers) + 1)), f'record numbers are {numbers}'
+
+
+@pytest.mark.parametrize('record', decision_records(), ids=lambda record: record.stem)
+def test_decision_record_has_the_agreed_shape(record):
+    """A record carries a title naming its number, a status, a date, and the three sections.
+
+    The shape is what makes the log readable as a log: a reader opening any record finds the
+    same questions answered in the same order, and a superseded one says what replaced it.
+    """
+    text = record.read_text(encoding='utf-8')
+    number = record.name[:4]
+    assert text.startswith(f'# ADR-{number}: '), f'{record.name} does not open with its own number'
+    status = re.search(r'^- \*\*Status\*\*: (\w+)(.*)$', text, re.MULTILINE)
+    assert status, f'{record.name} has no Status line'
+    assert status.group(1) in DECISION_STATUSES, f'{record.name} has status {status.group(1)!r}'
+    if status.group(1) == 'superseded':
+        assert DECISION_REFERENCE.search(status.group(2)), f'{record.name} is superseded but names no successor'
+    assert re.search(r'^- \*\*Date\*\*: \d{4}-\d{2}-\d{2}', text, re.MULTILINE), f'{record.name} has no dated Date line'
+    for heading in ('## Context', '## Decision', '## Consequences'):
+        assert f'\n{heading}\n' in text, f'{record.name} lacks the {heading!r} section'
+
+
+def test_decision_records_are_listed_in_the_nav_and_the_index():
+    """Every record is reachable from the nav and from the index page, and nothing else is listed.
+
+    A record outside the nav fails `properdocs build --strict` only once something links to
+    it; one missing from the index is simply invisible. Both lists are kept by hand, so both
+    are checked against the directory.
+    """
+    expected = {record.name for record in decision_records()}
+    nav = set(
+        re.findall(
+            r'maintaining/decisions/(\d{4}-[a-z0-9-]+\.md)', (REPO_ROOT / 'properdocs.yml').read_text(encoding='utf-8')
+        )
+    )
+    assert nav == expected, f'nav lists {sorted(nav ^ expected)} differently from the directory'
+    index = set(re.findall(r'\]\((\d{4}-[a-z0-9-]+\.md)\)', (DECISIONS_DIR / 'index.md').read_text(encoding='utf-8')))
+    assert index == expected, f'index.md lists {sorted(index ^ expected)} differently from the directory'
+
+
+def test_every_decision_reference_resolves():
+    """An `ADR-NNNN` named anywhere in the repository is a record that exists.
+
+    The point of naming a record from a docstring or a page is that the reader can open it.
+    A reference to a number nobody wrote, or one renumbered away, is worse than no reference.
+    """
+    known = {record.name[:4] for record in decision_records()}
+    dangling = []
+    for root in DECISION_REFERENCE_ROOTS:
+        for path in (REPO_ROOT / root).rglob('*'):
+            if not path.is_file() or path.suffix not in DECISION_REFERENCE_SUFFIXES or 'lib/vendor' in str(path):
+                continue
+            dangling.extend(
+                f'{path.relative_to(REPO_ROOT)}: ADR-{number}'
+                for number in DECISION_REFERENCE.findall(path.read_text(encoding='utf-8'))
+                if number not in known
+            )
+    assert not dangling, f'references to records that do not exist: {dangling}'

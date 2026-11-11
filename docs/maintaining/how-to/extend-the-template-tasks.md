@@ -34,6 +34,8 @@ Change or add a `./workflow.cmd` task that generated projects ship with. This is
    ./workflow.cmd test
    ```
 
+7. **Record the decision, if there was one.** A change that settles a question a future maintainer could reopen — why this tool, why this tier, why not the obvious alternative — gets a [decision record](../decisions/index.md). The docstring keeps one sentence stating the rule and names the record; the reasoning lives there.
+
 ## See also
 
 - [The CI tasks architecture](../explanation/the-ci-tasks-architecture.md) — why the framework is shaped the way it is.

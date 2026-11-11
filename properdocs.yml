@@ -53,5 +53,22 @@ nav:
       - Why copier: maintaining/explanation/why-copier.md
       - The CI tasks architecture: maintaining/explanation/the-ci-tasks-architecture.md
       - History and lineage: maintaining/explanation/history-and-lineage.md
+    - Decisions:
+      - Decision records: maintaining/decisions/index.md
+      - ADR-0001 Copier is the delivery mechanism: maintaining/decisions/0001-copier-is-the-delivery-mechanism.md
+      - ADR-0002 uv is the only tool you install: maintaining/decisions/0002-uv-is-the-only-tool-you-install.md
+      - ADR-0003 Vendored Invoke behind one launcher: maintaining/decisions/0003-vendored-invoke-behind-one-launcher.md
+      - ADR-0004 Pipelines run template commands only: maintaining/decisions/0004-pipelines-run-template-commands-only.md
+      - ADR-0005 Dependency groups, not extras: maintaining/decisions/0005-dependency-groups-not-extras.md
+      - ADR-0006 Deliberate non-goals: maintaining/decisions/0006-deliberate-non-goals.md
+      - ADR-0007 Diátaxis with shipped rationale pages: maintaining/decisions/0007-diataxis-with-shipped-rationale-pages.md
+      - ADR-0008 Reproducibility by pin: maintaining/decisions/0008-reproducibility-by-pin.md
+      - ADR-0009 One QA gate: maintaining/decisions/0009-one-qa-gate.md
+      - ADR-0010 Verifying is the default, writing is a flag: maintaining/decisions/0010-verifying-is-the-default-writing-is-a-flag.md
+      - ADR-0011 Report names carry a scope: maintaining/decisions/0011-report-names-carry-a-scope.md
+      - ADR-0012 The SBOM ships inside the wheel: maintaining/decisions/0012-the-sbom-ships-inside-the-wheel.md
+      - ADR-0013 The audit runs on a schedule and the dependency surface: maintaining/decisions/0013-the-audit-runs-on-a-schedule-and-the-dependency-surface.md
+      - ADR-0014 A release is the version bump arriving on the default branch: maintaining/decisions/0014-a-release-is-the-version-bump-arriving-on-the-default-branch.md
+      - ADR-0015 local.py is the project's module: maintaining/decisions/0015-local-py-is-the-projects-module.md
 
 copyright: Copyright &copy; 2024 <a href="https://schubergphilis.com/">Schuberg Philis</a>

@@ -24,4 +24,4 @@ Once your project exists, its **own docs ship with it**: the scaffold manual (da
 
 You want to change what this template generates.
 
-Start with [Make your first template change](maintaining/tutorials/make-your-first-template-change.md) for the edit-test loop, [Test the template](maintaining/how-to/test-the-template.md) for the four test entry points, and [Design principles](maintaining/explanation/design-principles.md) for the constraints every change should respect.
+Start with [Make your first template change](maintaining/tutorials/make-your-first-template-change.md) for the edit-test loop, [Test the template](maintaining/how-to/test-the-template.md) for the four test entry points, and [Design principles](maintaining/explanation/design-principles.md) for the constraints every change should respect. The [decision records](maintaining/decisions/index.md) hold the dated history behind those constraints, and a change that settles a new question adds one.
