@@ -32,7 +32,7 @@ git commit -m "feat: greet someone with a specific word"
 
 Reminders:
 
-- All relevant checks for pre-commit run on staged files (Ruff format/check, pylint, complexipy, conventional commit messages).
+- All relevant checks for pre-commit run on staged files (Ruff format/check, validate-pyproject, pylint, complexipy, conventional commit messages).
 - Commit messages drive the release notes, not the version bump.
 
 ## Step 2 — Integrate
@@ -91,10 +91,8 @@ You would not want to release a package with known vulnerabilities (that have no
 
 ## Step 4 — Publish to PyPI
 
-The publish job builds the wheel and sdist (the SBOM rides inside the wheel), checks both with `twine check --strict` and `check-wheel-contents`, signs a [PEP 740](https://packaging.python.org/en/latest/specifications/index-hosted-attestations/) attestation per file, and uploads files and attestations together. The recommended path is CI-driven [PyPI trusted publishing](https://docs.pypi.org/trusted-publishers/) — no long-lived tokens, and the only way PyPI accepts the attestations. Wire it up once for the project (your generated project's *Set up Trusted Publishing* how-to has the PyPI form for your host; [Harden the GitHub repository](../how-to/harden-github-repository.md) covers the GitHub side), then:
-
-Approve and merge the resulting PR.
-The tag and bump land on `main`.
+The publish job builds the wheel and sdist (the SBOM rides inside the wheel), checks both with `twine check --strict` and `check-wheel-contents`, signs a [PEP 740](https://packaging.python.org/en/latest/specifications/index-hosted-attestations/) attestation per file, and uploads files and attestations together. The recommended path is CI-driven [PyPI trusted publishing](https://docs.pypi.org/trusted-publishers/) — no long-lived tokens, and the only way PyPI accepts the attestations. Wire it up once for the project (your generated project's *Set up Trusted Publishing* how-to has the PyPI form for your host; [Harden the GitHub repository](../how-to/harden-github-repository.md) covers the GitHub side), then approve and merge the release PR from Step 3 with a merge commit.
+The tag and bump land on `main`, which is what triggers the publish job.
 
 After all the pipelines ran you should see your project published on PyPI. Each file's details show a *Provenance* section naming your repository; if you answered `repository_url`, the sidebar shows its links.
 

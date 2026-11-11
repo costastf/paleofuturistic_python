@@ -27,7 +27,7 @@ Paleofuturistic Python added the infrastructure that turns a starter into an ent
 
 - **The license menu.** Apache-2.0 default, MIT/BSD-3/None as alternatives.
 - **The python-version range model.** Min/max prompts, validated to share a major.
-- **Headers prepended to every source file.** Dunder metadata + license boilerplate.
+- **The licence as one file.** `LICENSE` at the root, no per-file headers or dunder metadata.
 
 ## What the name means
 

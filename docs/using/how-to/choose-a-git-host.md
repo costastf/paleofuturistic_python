@@ -29,9 +29,9 @@ uvx copier update --trust
 
 When prompted, change `git_hosting_service` to the other value. Copier performs a three-way merge against your project that:
 
-- Adds the new host's CI config + submodule.
-- Removes the old host's CI config + submodule.
-- Flips the import line in `_CI/tasks/container.py` (and `release.py`) from `.github` to `.gitlab` (or back).
+- Adds the new host's CI config and `_CI/tasks/<host>.py` module.
+- Removes the old host's CI config and module.
+- Flips the import line in `_CI/tasks/container.py`, `release.py`, `document.py` and `sbom.py` from `.github` to `.gitlab` (or back).
 
 Review the result carefully — if you've already customised the host-specific CI files, your changes will need manual reconciliation.
 

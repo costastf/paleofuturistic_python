@@ -12,7 +12,7 @@ uv add <package>
 
 ## Dev-time groups
 
-Listed under `[dependency-groups]` in `pyproject.toml`. They're installed by `bootstrap` and on demand by individual workflow tasks, but never end up in the wheel.
+Listed under `[dependency-groups]` in `pyproject.toml`. `uv run` syncs them into `.venv` on demand, so the first task you run installs them; they never end up in the wheel.
 
 | Group | Packages | Used by |
 | --- | --- | --- |
@@ -59,9 +59,9 @@ The consequence is that **upgrades are deliberate**. To take newer versions:
 3. Commit the date, the pin bumps and `uv.lock` **together** — a boundary that disagrees
    with the pins is the confusing state this setup exists to prevent.
 
-`[tool.docker-versions]` is pinned the same way, by tag *and* digest. When bumping uv,
-change the version in the tag and the digest together: a reference carrying both resolves
-to the digest, so a bumped tag with a stale digest silently keeps the old image.
+`[tool.docker-versions]` is pinned the same way, by tag *and* digest. A reference carrying
+both resolves to the digest, so a bumped tag with a stale digest silently keeps the old image;
+`develop.bump-uv` below moves the two together.
 
 ## The uv pin, and the one command that moves it
 
@@ -97,17 +97,15 @@ version, because uv is pre-1.0 and minor releases may break behaviour.
 To take a specific version, including one newer than the cool-down allows:
 
 ```bash
-./workflow.cmd develop.bump-uv --version=0.12.1
+./workflow.cmd develop.bump-uv --version=0.13.7
 ```
 
-**Editing any of those five by hand is the failure this command exists to avoid** — most of all
+**Editing any of those four by hand is the failure this command exists to avoid** — most of all
 the tag, whose digest has to be re-resolved with it.
 
 ## How CI picks them up
 
-The CI workflow installs only the group it needs for each job — `lint` job installs the `lint` group, `test` job installs `test`. This keeps job containers small and parallel-safe.
-
-The container images built by `./workflow.cmd container.publish` cache the `dev` group's resolution so subsequent CI runs skip the install step.
+CI runs one `preflight` job inside the dependency image, which `Dockerfile.deps` builds with every group synced (`uv sync --all-extras --dev`). The job therefore installs nothing; the image is rebuilt only when `uv.lock`, `Dockerfile.deps` or the base image changes.
 
 ## See also
 

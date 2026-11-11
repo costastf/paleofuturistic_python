@@ -4,7 +4,7 @@ The questionnaire asks for `min_python_version` and `max_python_version`. They d
 
 ## What they control
 
-- **`requires-python`** in `pyproject.toml` is set to `>=<min>,<<next-major>`.
+- **`requires-python`** in `pyproject.toml` is set to `>=<min>`.
 - **`tool.tox` envs** are generated for each minor version from `<min>` to `<max>` inclusive.
 - **CI** in `.github/workflows/` or `.gitlab-ci.yml` runs `preflight`, whose tox step covers the same range. Trimming `env_list` shortens it locally and in CI together.
 - **PyPI classifiers** (`Programming Language :: Python :: 3.X`) match the range.
@@ -24,11 +24,10 @@ A violation aborts generation immediately with a clear error message. No partial
 To support additional minor versions after generation:
 
 1. Update `pyproject.toml`'s `requires-python` and the classifier list.
-2. Add a new `tox` env in `pyproject.toml`'s `[tool.tox]` section.
-3. Add the new version to the CI matrix (the host-specific workflow file).
-4. Run `./workflow.cmd test` against each version to catch incompatibilities.
+2. Add a new `tox` env in `pyproject.toml`'s `[tool.tox]` section. CI needs nothing: its `preflight` job follows `env_list`.
+3. Run `./workflow.cmd test.tox --env=py3XX` against the new version to catch incompatibilities.
 
-For a cleaner re-derivation, `uvx copier update --trust` after the template's choices list expands will regenerate all four locations in lockstep — see [Update an existing project with copier](update-existing-project-with-copier.md).
+For a cleaner re-derivation, `uvx copier update --trust` after the template's choices list expands will regenerate all three locations in lockstep — see [Update an existing project with copier](update-existing-project-with-copier.md).
 
 ## Picking a sensible minimum
 

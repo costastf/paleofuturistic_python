@@ -6,20 +6,26 @@ An annotated tour of what copier creates. Tree is for a project named `example_p
 example_project/
 ├── .copier-answers.yml          Copier state — template URL + answers + revision
 ├── .gitignore                   Includes .pypirc, dist/, reports/
-├── .pre-commit-config.yaml      Hooks: ruff, pylint, commitizen
+├── .pre-commit-config.yaml      Hooks: lint-commit, staged, preflight (pre-push), security-overrides
 ├── .security-overrides          pip-audit allow-list (vuln id → expiry)
 ├── .github/                     GitHub Actions workflows (absent if gitlab)
 │   └── workflows/
 │       ├── build-deps-image.yaml
 │       ├── continuous-integration.yaml
-│       └── publish.yaml
+│       ├── detect-release-tag.yaml
+│       ├── pages.yaml           (Only if integrate_pages=true)
+│       ├── publish.yaml
+│       └── security-audit.yaml
 ├── .gitlab-ci.yml               (Only present if git_hosting_service=gitlab)
 ├── _CI/                         Portable CI tooling — vendored Invoke + tasks
 │   ├── README.md                Tooling design doc
-│   ├── bootstrap.py             First-run setup framework
-│   ├── info.py                  Reader for [tool.docker-versions] in pyproject
+│   ├── info.py                  Stdlib-only reader of pyproject values for the deps image
+│   ├── uv_release.py            Stdlib-only uv release resolver behind develop.bump-uv
+│   ├── pyproject.toml           Ruff config for _CI/ and the vendored extra
 │   ├── lib/
-│   │   └── vendor/              Vendored Invoke + dependencies (committed)
+│   │   ├── patches/             The two hand-maintained edits to the vendored tree
+│   │   ├── vendor.txt           Pinned vendored dependency list
+│   │   └── vendor/              Vendored Invoke (committed)
 │   └── tasks/
 │       ├── __init__.py          Namespace aggregation + bootstrap wiring
 │       ├── bootstrap.py         bootstrap task (first-run setup)
@@ -32,13 +38,15 @@ example_project/
 │       ├── github.py            (Only if git_hosting_service=github)
 │       ├── gitlab.py            (Only if git_hosting_service=gitlab)
 │       ├── lint.py              ruff/validate-pyproject/pylint/ty/complexipy/commitizen
+│       ├── local.py             Your own tasks; never overwritten by copier update
 │       ├── preflight.py         Step registry; preflight + preflight.staged
 │       ├── quality.py           pyscn
-│       ├── release.py           Validate, bump, changelog, push, attest, publish
-│       ├── secure.py            pip-audit, SBOM
+│       ├── release.py           Validate, bump, changelog, push, attest, publish, ship
+│       ├── sbom.py              CycloneDX SBOM composition
+│       ├── secure.py            pip-audit, SBOM extract and validate
 │       ├── shared.py            @logged, @run, execute(), run_steps(), apply_badge()
 │       └── test.py              pytest + coverage
-├── Dockerfile.deps              Multi-stage deps-cache image
+├── Dockerfile.deps              Single-stage deps-cache image
 ├── LICENSE                      Selected at generation time
 ├── README.md
 ├── docs/                        Diátaxis-structured properdocs site

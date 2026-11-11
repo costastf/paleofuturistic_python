@@ -41,7 +41,7 @@ git commit -m "chore: initial commit"
 ./workflow.cmd bootstrap
 ```
 
-The bootstrap command installs uv-managed virtualenvs for every dependency group and registers pre-commit hooks (if you select yes, which we highly recommend).
+The bootstrap command initialises git if needed and registers the pre-commit hooks (if you select yes, which we highly recommend). Dependencies need no step of their own: every task runs through `uv run`, which syncs `.venv` from `uv.lock` the first time.
 The command is idempotent — running it again is a no-op until you pass `--force`.
 We let you commit the scaffold before bootstrapping, because otherwise the pre-commit hook would validate the whole scaffold.
 This is time consuming and not necessary, which you can validate by running `git status` after bootstrapping.
@@ -52,7 +52,7 @@ These commands are the heartbeat of every project this template generates:
 
 ```bash
 ./workflow.cmd format    # format with Ruff (also sort imports, otherwise a normal ruff format)
-./workflow.cmd lint      # lint with Ruff check, pylint, ty (type checker), complexipy, commitizen
+./workflow.cmd lint      # lint with Ruff check, validate-pyproject, pylint, ty (type checker), complexipy, commitizen
 ./workflow.cmd test      # test with pytest (in parallel with xdist using the active Python interpreter)
 ./workflow.cmd quality   # scan code quality with pyscn
 ./workflow.cmd build     # produce a wheel + sdist in dist/ and export an SBOM
@@ -62,7 +62,7 @@ These commands are the heartbeat of every project this template generates:
 You should see a passing test for the example `hello()` function and a wheel appear under `dist/`.
 Some of the other QA tools also produce output you can look into later.
 
-The really fast checks (ruff format/check, pylint, complexipy) which can run on only files git-staged are bundled in a one handy command: `./workflow.cmd develop.pre-commit`.
+The really fast checks (ruff format/check, validate-pyproject, pylint, complexipy) which can run on only files git-staged are bundled in a one handy command: `./workflow.cmd develop.pre-commit`.
 You are probably not surprised to hear these commands are already set to run before every commit with pre-commit.
 With the pre-commit check (both CLI and hook) format will not edit your files as it does when you invoke it stand-alone.
 Your commit message and SBOM security overrides are also checked before landing a commit.

@@ -72,5 +72,5 @@ For GitLab-hosted projects, the equivalent is a `pages:` job in `.gitlab-ci.yml`
 
 ## See also
 
-- [The shipped workflow](https://github.com/schubergphilis/paleofuturistic_python/blob/main/template/.github/workflows/pages.yaml.jinja) — the actual YAML, kept short on purpose.
+- [The shipped workflows](https://github.com/schubergphilis/paleofuturistic_python/tree/main/template) — `pages.yaml` lives under the conditionally named `.github/workflows/` directory; the YAML is kept short on purpose.
 - [Design principles](../../maintaining/explanation/design-principles.md) — the two rules behind the workflow's shape.

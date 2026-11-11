@@ -24,7 +24,7 @@ a failure leaves the tree clean rather than half-bumped.
 To take a specific version, ignoring the cool-down:
 
 ```bash
-./workflow.cmd maintain.bump-uv --version=0.12.1
+./workflow.cmd maintain.bump-uv --version=0.13.7
 ```
 
 ## Why the digests matter more than they look

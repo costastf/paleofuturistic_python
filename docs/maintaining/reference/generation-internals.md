@@ -2,9 +2,9 @@
 
 What happens between answering the questionnaire and receiving a finished project directory. The work that was previously a single `hooks/post_gen_project.py` script is now split three ways across copier's own mechanisms and a dedicated copy-time script.
 
-## Stage 1. Python-version validation (copier validator)
+## Stage 1. Answer validation (copier validators)
 
-A `validator` expression on the `max_python_version` question in `copier.yml` runs before any files are written. It checks:
+`validator` expressions in `copier.yml` run before any files are written. `project_slug` must be a valid Python identifier and PyPI name (lowercase letters, digits and inner underscores, starting with a letter); `repository_url` must be empty or an https URL with a path. The `max_python_version` validator checks:
 
 - `max_python_version >= min_python_version`
 - Both values share the same major version (no cross-major ranges).
@@ -23,16 +23,16 @@ Examples currently used:
 | `template/{% if git_hosting_service == 'github' %}.github{% endif %}/` | `git_hosting_service != 'github'` → name is `''` | Entire `.github/` tree absent for GitLab projects |
 | `template/{% if git_hosting_service == 'gitlab' %}.gitlab-ci.yml{% endif %}` | `git_hosting_service != 'gitlab'` → name is `''` | `.gitlab-ci.yml` absent for GitHub projects |
 | `template/_CI/tasks/{% if git_hosting_service == 'github' %}github.py{% endif %}.jinja` | `git_hosting_service != 'github'` → name is `''` | `_CI/tasks/github.py` absent for GitLab projects |
-| `template/_CI/tasks/{% if git_hosting_service == 'gitlab' %}gitlab.py{% endif %}.jinja` | `git_hosting_service != 'gitlab'` → name is `''` | `_CI/tasks/gitlab.py` absent for GitHub projects |
+| `template/_CI/tasks/{% if git_hosting_service == 'gitlab' %}gitlab.py{% endif %}` | `git_hosting_service != 'gitlab'` → name is `''` | `_CI/tasks/gitlab.py` absent for GitHub projects |
 | `template/{% if git_hosting_service == 'github' %}.github{% endif %}/workflows/{% if integrate_pages %}pages.yaml{% endif %}` | either condition false → name is `''` | Pages workflow absent when not GitHub or pages disabled |
 
-The `from .{{ git_hosting_service }} import …` line in `_CI/tasks/container.py` and `_CI/tasks/release.py` is Jinja-substituted at copy time to name the surviving module — exactly one code path remains, no runtime branching.
+The `from .{{ git_hosting_service }} import …` line in `_CI/tasks/container.py`, `release.py`, `document.py` and `sbom.py` is Jinja-substituted at copy time to name the surviving module — exactly one code path remains, no runtime branching.
 
 ## Stage 3. Copy-time script (`tasks_render.py`)
 
 `tasks_render.py` at the repo root is run via copier's `_tasks` configuration. It is **gated to the copy operation only** — `copier update` does not re-run it, so re-generation side-effects (like stamping the copyright year) don't fire on every update.
 
-It performs two actions, in order:
+It performs four actions, in order:
 
 ### Install the chosen license
 
@@ -40,6 +40,14 @@ It performs two actions, in order:
 - Deletes the `licenses/` directory entirely.
 
 No license header or dunder metadata is added to individual source files. The main module (`src/<slug>/<slug>.py`) ships its `import logging` + `LOGGER` setup directly from the template, so it needs no copy-time injection.
+
+### Stamp the quarantine date
+
+Sets `[tool.uv] exclude-newer` in the generated `pyproject.toml` to the generation date, so the new project's resolutions are frozen at the day it was made rather than inheriting the template's own boundary.
+
+### Stamp the uv pin
+
+Resolves the newest uv release that has cleared its cool-down and writes it to every pin in `pyproject.toml`, digest included. `TEMPLATE_UV_VERSION` forces a version (the matrix sets it to the template's own pin so generation is deterministic), and an unreachable PyPI falls back to that pin too.
 
 ### Make `workflow.cmd` executable
 

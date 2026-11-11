@@ -23,7 +23,7 @@ Pick something harmless: open `template/README.md.jinja` and adjust a sentence, 
 ./workflow.cmd test.invariants
 ```
 
-This generates a project for each of the five matrix cells once: the four-way cartesian product of git host × Pages, plus one "matured" day-two cell. It then asserts structural invariants over the results — the right files exist, conditional content matches the chosen knobs, nothing forbidden ships. It's the best signal-per-second check and should be your default while iterating.
+This generates a project for each of the four knob cells once, the cartesian product of git host × Pages, and asserts structural invariants over the results — the right files exist, conditional content matches the chosen knobs, nothing forbidden ships. It's the best signal-per-second check and should be your default while iterating.
 
 ## Step 4. Run one full cell
 
@@ -31,7 +31,7 @@ This generates a project for each of the five matrix cells once: the four-way ca
 ./workflow.cmd test
 ```
 
-This generates a project with the default answers and runs the generated project's *own* full QA cycle inside it — `format`, `lint`, `test.tox`, `build`, `document`. If your change breaks the generated project's linters or docs build, this is where it surfaces.
+This generates a project with the default answers and runs the generated project's *own* gate inside it — `preflight --write`, then the bare `preflight` on the tree it wrote. If your change breaks the generated project's linters or docs build, this is where it surfaces.
 
 To reproduce a specific CI matrix cell instead, use `test.combo`:
 
@@ -43,7 +43,7 @@ If your change touches the coverage ratchet, the CI badge, or the dependency aud
 
 ## Step 5. Commit and open a pull request
 
-Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) — `feat(template): …`, `fix(ci): …` — the lint step rejects anything else.
+Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) — `feat(template): …`, `fix(ci): …` — by review convention; this repository ships no commit-message hook.
 
 ```bash
 git checkout -b feat/my-first-change
@@ -51,7 +51,7 @@ git commit -am "feat(template): clarify the generated README wording"
 git push -u origin feat/my-first-change
 ```
 
-CI runs `test.invariants` plus a fanned-out `test.combo` per matrix cell, matured cell included, on every pull request, so a green local run of steps 3–4 is a good predictor of a green PR.
+CI runs the repository's `lint`, `test.invariants` and a fanned-out `test.combo` per matrix cell, matured cell included, on every pull request, so a green local run of `./workflow.cmd lint` and steps 3–4 is a good predictor of a green PR.
 
 ## Where to go next
 

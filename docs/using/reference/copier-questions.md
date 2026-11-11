@@ -9,7 +9,7 @@ Every question in `copier.yml`, what it does, and how it's validated. The templa
 - **Type**: string
 - **Default**: `Paleofuturistic Python Project`
 
-Human-readable name. Appears in `pyproject.toml`'s `name` field, the README title, and the docs `site_name`.
+Human-readable name. Appears as the README title and the docs `site_name`; `pyproject.toml`'s `name` is `project_slug`.
 
 ### `project_slug`
 

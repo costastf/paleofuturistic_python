@@ -9,7 +9,7 @@ Change or add a `./workflow.cmd` task that generated projects ship with. This is
 
 ## Steps
 
-1. **Edit the template module.** Follow the same conventions the generated framework documents for its own users: tasks wear `@task` + `@logged('<namespace>.<name>')`, side effects go through `execute(context, '...')`, registration happens in the module's `namespace = Collection(...)` block and, for new modules, in `template/_CI/tasks/__init__.py.jinja`'s bootstrap-pre-task loop.
+1. **Edit the template module.** Follow the same conventions the generated framework documents for its own users: tasks wear `@task` + `@logged('<namespace>.<name>')`, side effects go through `execute(context, '...')`, registration happens in the module's `namespace = Collection(...)` block and, for new modules, in the `modules` list of `template/_CI/tasks/__init__.py`, whose loop wires bootstrap as a pre-task.
 
 2. **Gate on knobs with jinja where needed.** Wrap host- or feature-specific code in the corresponding copier answer, following the existing patterns:
 

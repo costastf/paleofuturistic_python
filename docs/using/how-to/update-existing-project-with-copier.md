@@ -18,7 +18,7 @@ copier:
 2. Performs a three-way merge against your current files.
 3. Applies the result, flagging conflicts for manual resolution.
 
-Review the changes with `git diff`, run the dev cycle (`./workflow.cmd format && lint && test && build`), and commit when happy.
+Review the changes with `git diff`, run `./workflow.cmd format && ./workflow.cmd preflight`, and commit when happy.
 
 ## When questions have changed
 
