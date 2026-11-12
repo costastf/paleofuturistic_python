@@ -369,6 +369,10 @@
 <li>
     <a href="../../maintaining/decisions/0040-the-default-branch-is-a-copier-answer.html" class="dropdown-item">ADR-0040 The default branch is a copier answer</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/decisions/0041-fork-pull-requests-run-the-gate-on-the-runners-image.html" class="dropdown-item">ADR-0041 Fork pull requests run the gate on the runner's image</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -742,6 +746,9 @@
             <li class="nav-item">
                 <a href="../../maintaining/decisions/0040-the-default-branch-is-a-copier-answer.html" class="nav-link">ADR-0040 The default branch is a copier answer</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0041-fork-pull-requests-run-the-gate-on-the-runners-image.html" class="nav-link">ADR-0041 Fork pull requests run the gate on the runner's image</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -767,6 +774,10 @@
               </ul>
             </li>
             <li class="nav-item" data-bs-level="2"><a href="#upgrading-past-the-packaging-conformance-change" class="nav-link">Upgrading past the packaging-conformance change</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#upgrading-past-the-fork-pull-request-coverage" class="nav-link">Upgrading past the fork pull-request coverage</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -843,6 +854,8 @@
 <li><strong>New dependency group</strong> <code>build</code>, and new pins in <code>lint</code> and <code>security</code>. Run <code>uv lock</code> after the update and commit <code>uv.lock</code> with it.</li>
 <li><strong>Publishing.</strong> The publish job now signs PEP 740 attestations. On GitLab it also requests <code>id_tokens:</code>, and PyPI needs a Trusted Publisher registered for the project (the new <em>Set up Trusted Publishing</em> how-to). If you publish with <code>UV_PUBLISH_*</code> credentials, nothing changes: that path uploads without attestations.</li>
 </ul>
+<h2 id="upgrading-past-the-fork-pull-request-coverage">Upgrading past the fork pull-request coverage</h2>
+<p>On GitHub, <code>continuous-integration.yaml</code> and <code>security-audit.yaml</code> now trigger on <code>pull_request</code> as well as <code>push</code>. A pull request from a fork runs the gate, and the audit when it touches the dependency surface, in a job that installs the dependencies with uv on the runner because a fork's token cannot push the deps image. Pull requests from your own branches run nothing on the new trigger, since the push already did. After updating, require the <code>Preflight</code> check in branch protection; the <a href="harden-github-repository.html">hardening how-to</a> has the details. See <a href="../../maintaining/decisions/0041-fork-pull-requests-run-the-gate-on-the-runners-image.html">ADR-0041</a>.</p>
 <h2 id="upgrading-past-the-default-branch-question">Upgrading past the default-branch question</h2>
 <p><code>copier update</code> asks <code>default_branch</code>, with <code>main</code> as the default. Accept it if your default branch is <code>main</code> and nothing changes. Answer with your branch's name otherwise: the publish and Pages workflows start triggering on it, <code>release</code> starts from it, release pull or merge requests target it, and the CI badge reads it. Before the question, all of those spelled <code>main</code>, so a project on another branch had to edit each by hand after every update. See <a href="../../maintaining/decisions/0040-the-default-branch-is-a-copier-answer.html">ADR-0040</a>.</p>
 <h2 id="upgrading-past-the-tag-on-main-release-flow">Upgrading past the tag-on-main release flow</h2>

@@ -369,6 +369,10 @@
 <li>
     <a href="../../maintaining/decisions/0040-the-default-branch-is-a-copier-answer.html" class="dropdown-item">ADR-0040 The default branch is a copier answer</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/decisions/0041-fork-pull-requests-run-the-gate-on-the-runners-image.html" class="dropdown-item">ADR-0041 Fork pull requests run the gate on the runner's image</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -742,6 +746,9 @@
             <li class="nav-item">
                 <a href="../../maintaining/decisions/0040-the-default-branch-is-a-copier-answer.html" class="nav-link">ADR-0040 The default branch is a copier answer</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0041-fork-pull-requests-run-the-gate-on-the-runners-image.html" class="nav-link">ADR-0041 Fork pull requests run the gate on the runner's image</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -825,9 +832,9 @@ ignore. It is triggered on the axes it varies along instead:</p>
 <li><strong>On pushes that change the dependency surface</strong> — <code>uv.lock</code>, <code>_CI/lib/vendor.txt</code>, the
   vendored tree and its patches, and <code>.security-overrides</code>. Change what you depend on and you
   own the result. A release lands here too: <code>version_provider = "uv"</code> re-locks, so the bump
-  commit carries <code>uv.lock</code>, and the commit that publishes is worth auditing anyway. Pushes
-  only: a pull request from a fork triggers nothing here, so the audit that covers a fork's
-  dependencies is the scheduled one, after the merge.</li>
+  commit carries <code>uv.lock</code>, and the commit that publishes is worth auditing anyway. A pull
+  request from a fork that touches the same files runs it too, on the runner's own image since
+  its token cannot push a deps image.</li>
 <li><strong>A hand-edited vendored file is watched, not audited.</strong> A push touching <code>_CI/lib/vendor/</code>
   fires the job so the diff reaches a human. No scanner can say anything about a patched
   vendored source: <code>vendor.txt</code> is what pip-audit reads, and it describes the packages that

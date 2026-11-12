@@ -369,6 +369,10 @@
 <li>
     <a href="0040-the-default-branch-is-a-copier-answer.html" class="dropdown-item">ADR-0040 The default branch is a copier answer</a>
 </li>
+            
+<li>
+    <a href="0041-fork-pull-requests-run-the-gate-on-the-runners-image.html" class="dropdown-item">ADR-0041 Fork pull requests run the gate on the runner's image</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -742,6 +746,9 @@
             <li class="nav-item">
                 <a href="0040-the-default-branch-is-a-copier-answer.html" class="nav-link">ADR-0040 The default branch is a copier answer</a>
             </li>
+            <li class="nav-item">
+                <a href="0041-fork-pull-requests-run-the-gate-on-the-runners-image.html" class="nav-link">ADR-0041 Fork pull requests run the gate on the runner's image</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -811,7 +818,8 @@ the bare gate never runs it. In this repository's own matrix the audit rides wit
 cell only, so a transient advisory-service error fails one job instead of five.</p>
 <h2 id="consequences">Consequences</h2>
 <ul>
-<li>A pull request from a fork triggers no audit; the scheduled run after the merge covers it.</li>
+<li>A pull request from a fork triggered no audit until ADR-0041; the scheduled run after the
+  merge covered it.</li>
 <li>A hand-edited vendored file is watched, not audited: no scanner can read a patched source, so
   the push fires the job to put the diff in front of a human.</li>
 <li><code>secure</code> remains the human-facing aggregator; nothing automated calls it.</li>

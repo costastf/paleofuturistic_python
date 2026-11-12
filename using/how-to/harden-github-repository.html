@@ -369,6 +369,10 @@
 <li>
     <a href="../../maintaining/decisions/0040-the-default-branch-is-a-copier-answer.html" class="dropdown-item">ADR-0040 The default branch is a copier answer</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/decisions/0041-fork-pull-requests-run-the-gate-on-the-runners-image.html" class="dropdown-item">ADR-0041 Fork pull requests run the gate on the runner's image</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -742,6 +746,9 @@
             <li class="nav-item">
                 <a href="../../maintaining/decisions/0040-the-default-branch-is-a-copier-answer.html" class="nav-link">ADR-0040 The default branch is a copier answer</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0041-fork-pull-requests-run-the-gate-on-the-runners-image.html" class="nav-link">ADR-0041 Fork pull requests run the gate on the runner's image</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -790,7 +797,7 @@
 <h2 id="prerequisite-security">Prerequisite security</h2>
 <p>These are non-negotiable for any repository connected to CI/CD:</p>
 <ul>
-<li><strong>Branch protection on the default branch</strong> (<code>main</code>, or whatever <code>default_branch</code> was answered). Require pull requests, require status checks, require a linear history. Block force pushes and deletions. Require only checks that run on every pull request — and today that is none of the shipped ones. <strong>Do not require <code>Preflight</code></strong>: the workflows trigger on <code>push</code>, so a pull request from a fork runs nothing in this repository and a required check would sit pending forever, leaving the repository unable to merge an external contribution. <code>security-audit</code> is filtered by <code>on.push.paths</code> on top of that. Require them once the workflows gain a <code>pull_request</code> trigger, which is a decision the template has not taken yet.</li>
+<li><strong>Branch protection on the default branch</strong> (<code>main</code>, or whatever <code>default_branch</code> was answered). Require pull requests, require status checks, require a linear history. Block force pushes and deletions. <strong>Require <code>Preflight</code></strong>: it runs on every push to a branch of the repository and, through a second job of the same name, on every pull request from a fork, so no pull request is left without it. Whichever of the two jobs did not run is skipped, which a branch rule reads as passed. Do not require <code>Security audit</code>: it runs only when the dependency surface changes, so on most pull requests it would sit pending forever. See <a href="../../maintaining/decisions/0041-fork-pull-requests-run-the-gate-on-the-runners-image.html">ADR-0041</a>.</li>
 <li><strong>Tag protection for <code>v*</code>.</strong> A ruleset on <code>refs/tags/v*</code> with <em>Restrict updates</em> and <em>Restrict deletions</em> ticked, and <em>Restrict creations</em> left off. Creation must stay unrestricted: <code>release.tag</code> creates each release tag from the publish job through the Releases API with the workflow's <code>GITHUB_TOKEN</code>, an identity no ruleset bypass list is guaranteed to accept, and a creation restriction makes that call fail with <code>422</code> before anything is built. Updates and deletions are what rewrite release history, and those two rules stop them. Do not use the legacy <em>Tag protection rules</em>, which restrict creation to admins and maintainers with no way round.</li>
 <li><strong>Required approvals.</strong> At least one reviewer per PR.</li>
 </ul>
@@ -805,7 +812,7 @@
 <p>The same OIDC identity signs two attestations over the wheel and sdist, one before they are uploaded and one after. <code>actions/attest-build-provenance</code> records GitHub's own (needs <code>attestations: write</code>, already granted), verified with <code>gh attestation verify</code>. <code>release.attest</code> signs a <a href="https://packaging.python.org/en/latest/specifications/index-hosted-attestations/">PEP 740</a> attestation per file that <code>uv publish</code> uploads to PyPI, where it shows as <em>Provenance</em> on each file and is verified with <code>pypi-attestations verify pypi</code>. PyPI takes the second kind only through Trusted Publishing, which is one more reason to keep the credential path unused. See <a href="../explanation/sbom-and-security-model.html#layer-3-build-provenance">SBOM and security model</a>.</p>
 <h2 id="hardening-against-external-contributors">Hardening against external contributors</h2>
 <ul>
-<li>Set <strong>Settings → Actions → Fork pull request workflows → Require approval for all external contributors</strong>.</li>
+<li>Set <strong>Settings → Actions → Fork pull request workflows → Require approval for all external contributors</strong>. The fork jobs run the project's own task code from the pull request, so a maintainer reads the diff before a workflow runs it.</li>
 <li>Enable <strong>Settings → Code review limits → Limit to users explicitly granted read or higher access</strong>.</li>
 <li>Consider <strong>Temporary interaction limits</strong> if the repo gets brigaded.</li>
 </ul>
