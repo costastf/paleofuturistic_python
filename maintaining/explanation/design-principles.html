@@ -373,6 +373,10 @@
 <li>
     <a href="../decisions/0041-fork-pull-requests-run-the-gate-on-the-runners-image.html" class="dropdown-item">ADR-0041 Fork pull requests run the gate on the runner's image</a>
 </li>
+            
+<li>
+    <a href="../decisions/0042-refresh-deps-moves-the-boundary-and-the-pins-together.html" class="dropdown-item">ADR-0042 refresh-deps moves the boundary and the pins together</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -749,6 +753,9 @@
             <li class="nav-item">
                 <a href="../decisions/0041-fork-pull-requests-run-the-gate-on-the-runners-image.html" class="nav-link">ADR-0041 Fork pull requests run the gate on the runner's image</a>
             </li>
+            <li class="nav-item">
+                <a href="../decisions/0042-refresh-deps-moves-the-boundary-and-the-pins-together.html" class="nav-link">ADR-0042 refresh-deps moves the boundary and the pins together</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -887,7 +894,7 @@ failed, in either mode. A badge computed from a tree that just failed its checks
 untrue about it, so there is nothing for <code>--write</code> to write and nothing for the gate to compare.</p>
 <p>Together these are what make one command mean the same thing in three places.</p>
 <h2 id="uv-is-the-only-tool-you-install">uv is the only tool you install</h2>
-<p>Records: <a href="../decisions/0002-uv-is-the-only-tool-you-install.html">ADR-0002</a>, <a href="../decisions/0008-reproducibility-by-pin.html">ADR-0008</a>.</p>
+<p>Records: <a href="../decisions/0002-uv-is-the-only-tool-you-install.html">ADR-0002</a>, <a href="../decisions/0008-reproducibility-by-pin.html">ADR-0008</a>, <a href="../decisions/0042-refresh-deps-moves-the-boundary-and-the-pins-together.html">ADR-0042</a>.</p>
 <p>Earlier revisions asked users to install Python, then <code>pipx</code>, then <code>tox</code>, then <code>pre-commit</code>, then <code>commitizen</code>. Today, every one of those is a uv-managed dependency group inside the generated project. You install uv; uv installs the rest.</p>
 <p><strong>Tradeoff:</strong> the template is now bound to uv's lifecycle. If uv goes away or changes lock format incompatibly, the template needs work. We accept that risk because uv has compressed the toolchain to a single binary that's fast enough to run on every commit.</p>
 <h2 id="why-groups-not-extras">Why groups, not extras</h2>

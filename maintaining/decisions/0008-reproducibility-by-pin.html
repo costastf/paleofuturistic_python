@@ -373,6 +373,10 @@
 <li>
     <a href="0041-fork-pull-requests-run-the-gate-on-the-runners-image.html" class="dropdown-item">ADR-0041 Fork pull requests run the gate on the runner's image</a>
 </li>
+            
+<li>
+    <a href="0042-refresh-deps-moves-the-boundary-and-the-pins-together.html" class="dropdown-item">ADR-0042 refresh-deps moves the boundary and the pins together</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -749,6 +753,9 @@
             <li class="nav-item">
                 <a href="0041-fork-pull-requests-run-the-gate-on-the-runners-image.html" class="nav-link">ADR-0041 Fork pull requests run the gate on the runner's image</a>
             </li>
+            <li class="nav-item">
+                <a href="0042-refresh-deps-moves-the-boundary-and-the-pins-together.html" class="nav-link">ADR-0042 refresh-deps moves the boundary and the pins together</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -824,8 +831,8 @@
   from the committed literal.</li>
 <li>The seven-day cool-down is also what keeps a stamped uv pin resolvable under a quarantine date
   stamped the same day.</li>
-<li>Raising the quarantine date is still a three-step manual flow; a <code>develop.refresh-deps</code> task is
-  the open follow-up.</li>
+<li>Raising the quarantine date was a three-step manual flow until ADR-0042 added
+  <code>develop.refresh-deps</code>.</li>
 </ul>
 <h2 id="references">References</h2>
 <ul>
