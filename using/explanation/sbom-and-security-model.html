@@ -389,6 +389,10 @@
 <li>
     <a href="../../maintaining/decisions/0045-one-home-per-rationale.html" class="dropdown-item">ADR-0045 One home per rationale</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/decisions/0046-shipped-pages-are-rendered-from-directives.html" class="dropdown-item">ADR-0046 Shipped pages are rendered from directives</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -777,6 +781,9 @@
             <li class="nav-item">
                 <a href="../../maintaining/decisions/0045-one-home-per-rationale.html" class="nav-link">ADR-0045 One home per rationale</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0046-shipped-pages-are-rendered-from-directives.html" class="nav-link">ADR-0046 Shipped pages are rendered from directives</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -922,6 +929,8 @@ impossible to build a wheel from code that built yesterday. <code>./workflow.cmd
 </tr>
 </tbody>
 </table>
+<!-- shipped-line: | Pipeline components | `excluded` | {% if git_hosting_service == 'github' %}GitHub Actions (`uses:`){% else %}GitLab CI images{% endif %}, sourced from `_CI/tasks/{{ git_hosting_service }}.py`'s `iter_pipeline_components()` | -->
+
 <p>Plus one <strong>synthetic build-environment component</strong> (type <code>platform</code>, scope <code>excluded</code>) that groups the vendored + pipeline material into a single sub-graph.</p>
 <p><strong>Dependencies</strong> form a two-level graph:</p>
 <ul>
@@ -936,6 +945,8 @@ impossible to build a wheel from code that built yesterday. <code>./workflow.cmd
 <li><strong><code>hashes</code></strong> — SHA-256 from <code>uv.lock</code>'s <code>wheels[*].hash</code> (or <code>sdist.hash</code> fallback). Pipeline and vendored components carry no hash here — the GitHub-Action PURL already encodes the commit SHA, and vendored entries aren't in the lockfile.</li>
 <li><strong><code>external_references</code></strong> — every PyPI component points at its PyPI project page (<code>type=website</code>); GitHub Actions point at their repo (<code>type=vcs</code>); GitLab images point at their registry (<code>type=distribution</code>).</li>
 </ul>
+<!-- shipped-line: - **`external_references`** — every PyPI component points at its PyPI project page (`type=website`); {% if git_hosting_service == 'github' %}GitHub Actions point at their repo (`type=vcs`){% else %}GitLab images point at their registry (`type=distribution`){% endif %}. -->
+
 <h3 id="validation">Validation</h3>
 <p><code>./workflow.cmd secure.sbom-validate</code> runs the CycloneDX 1.7 JSON-schema validator from the project venv. The aggregate <code>./workflow.cmd secure</code> runs all three sub-steps; a clean run means: no known vulns, a fresh SBOM written, validated against the schema.</p>
 <h3 id="what-this-enables">What this enables</h3>
@@ -947,6 +958,7 @@ impossible to build a wheel from code that built yesterday. <code>./workflow.cmd
 <p>The SBOM is part of every release.</p>
 <p>Watching a released version for advisories published after the release is outside the template. The scheduled audit re-checks <code>uv.lock</code> on the default branch every day, but that is the code as it is now, not the versions already on PyPI. To track those, point your organisation's software composition analysis platform (OWASP Dependency-Track, the GitHub dependency graph, or similar) at the SBOM inside each wheel. Which platform, and the credentials to reach it, are your organisation's call, so the template ships no upload step.</p>
 <h2 id="layer-3-build-provenance">Layer 3 — build provenance</h2>
+<!-- template-only -->
 <p>The SBOM says what is <em>inside</em> an artifact. Provenance says where the artifact <em>came from</em>, and unlike the SBOM it is not self-reported. On both hosts, <code>release.attest</code> signs a <a href="https://packaging.python.org/en/latest/specifications/index-hosted-attestations/">PEP 740</a> attestation for every wheel and sdist: a statement binding the file's digest to the repository, workflow and commit that published it. The signing identity is the CI job's own OIDC token, the signature chains to Sigstore's public instance, and the signing event lands in Sigstore's transparency log, so nothing the project controls can mint one after the fact. A forged SBOM is a text edit; a forged attestation is not.</p>
 <p><code>uv publish</code> uploads each <code>&lt;file&gt;.publish.attestation</code> with its file, and PyPI shows the publishing repository and workflow on the release page. A consumer verifies a release on PyPI with:</p>
 <pre><code class="language-bash">pypi-attestations verify pypi --repository https://github.com/&lt;owner&gt;/&lt;repo&gt; pypi:&lt;package&gt;-&lt;version&gt;-py3-none-any.whl
@@ -954,6 +966,33 @@ impossible to build a wheel from code that built yesterday. <code>./workflow.cmd
 <p>GitHub projects also get GitHub's own provenance attestation from <code>actions/attest-build-provenance</code>, stored with the repository and checked with <code>gh attestation verify &lt;file&gt; --repo &lt;owner&gt;/&lt;repo&gt;</code>. The two answer the same question for different audiences: the PEP 740 one travels with the package to PyPI, the GitHub one stays where the source is.</p>
 <p>Order matters in the publish job, and <code>release.ship</code> fixes it: <code>release.dist</code> builds into <code>dist/</code>, <code>release.attest</code> signs those files, and the upload sends them <em>without</em> rebuilding. Rebuilding in between would publish files that no attestation refers to, and verification would then fail — reading as tampering rather than as a fresh build. GitHub's provenance step runs after the upload over the same files, still in <code>dist/</code>; a statement about file contents proves the same thing whichever side of the upload it is taken on.</p>
 <p>PyPI accepts attestations only through <a href="https://docs.pypi.org/trusted-publishers/">Trusted Publishing</a>. A project that publishes with <code>UV_PUBLISH_*</code> credentials instead (a private index, say) uploads none: <code>release.publish</code> passes <code>--no-attestations</code> on that path, because indexes that do not support attestations may reject the upload.</p>
+<!-- /template-only -->
+<!-- shipped-only
+The SBOM says what is *inside* your artifact. Provenance says where it *came from*, and unlike the SBOM it is not self-reported. `release.attest` signs a [PEP 740](https://packaging.python.org/en/latest/specifications/index-hosted-attestations/) attestation for every wheel and sdist: a statement binding the file's digest to this repository, the publish workflow and the commit. The signing identity is the CI job's own OIDC token{% if git_hosting_service == 'gitlab' %} (`SIGSTORE_ID_TOKEN`, from the publish job's `id_tokens:`){% endif %}, the signature chains to Sigstore's public instance, and the signing event lands in Sigstore's transparency log, so nothing this project controls can mint one after the fact. A forged SBOM is a text edit; a forged attestation is not.
+
+`uv publish` uploads each `<file>.publish.attestation` with its file, and PyPI shows the publishing repository and workflow on the release page. Anyone who downloads a release can verify it:
+
+
+<pre><code class="language-bash">pypi-attestations verify pypi --repository &lt;repository URL&gt; pypi:{{ project_slug }}-&lt;version&gt;-py3-none-any.whl
+</code></pre>
+
+{%- if git_hosting_service == 'github' %}
+
+The publish job also records GitHub's own provenance attestation (`actions/attest-build-provenance`), stored with the repository:
+
+
+<pre><code class="language-bash">gh attestation verify {{ project_slug }}-&lt;version&gt;-py3-none-any.whl --repo &lt;owner&gt;/&lt;repo&gt;
+</code></pre>
+
+
+The two answer the same question for different audiences: the PEP 740 one travels with the package to PyPI, the GitHub one stays where the source is.
+{%- endif %}
+
+Order matters in the publish job, and `release.ship` fixes it: `release.dist` builds into `dist/`, `release.attest` signs those files, and the upload sends them *without* rebuilding. Rebuilding in between would publish files that no attestation refers to, and verification would then fail — reading as tampering rather than as a fresh build.{% if git_hosting_service == 'github' %} GitHub's provenance step runs after the upload over the same files, still in `dist/`; a statement about file contents proves the same thing whichever side of the upload it is taken on.{% endif %}
+
+PyPI accepts attestations only through [Trusted Publishing](../how-to/set-up-trusted-publishing.md). Publishing with `UV_PUBLISH_*` credentials instead uploads none: `release.publish` passes `--no-attestations` on that path. [Verify a release attestation](../how-to/verify-a-release-attestation.md) walks through checking one.
+-->
+
 <h2 id="what-about-overrides">What about overrides?</h2>
 <p><code>.security-overrides</code> is a project-local allow-list for <code>pip-audit</code>: one vulnerability id per line, with an optional expiry date (<code>CVE-2024-1234::2026-12-31</code>). It does <strong>not</strong> suppress findings in the SBOM, which continues to show the world the full truth. Override = "we accept this locally for now," not "make this invisible."</p>
 <p>The expiry date is what makes an acceptance temporary: on that date the audit reports the finding again, and the scheduled run is what brings the date round with nobody pushing. <code>secure.validate-overrides</code> checks every entry's format and date, as a commit hook whenever the file is staged. Whether an entry carries a date at all is a code-review call; only suppressions passed in from outside the repository, through the <code>&lt;PROJECT&gt;_SECURITY_OVERRIDE</code> variable, must carry one.</p>
@@ -964,8 +1003,16 @@ impossible to build a wheel from code that built yesterday. <code>./workflow.cmd
 <li><strong>License compliance</strong>: SBOM includes license metadata, but the template doesn't enforce license policies. An SCA platform reading the SBOM can.</li>
 </ul>
 <h2 id="see-also">See also</h2>
+<!-- template-only -->
 <ul>
 <li><a href="../how-to/harden-github-repository.html">Harden the GitHub repository</a> — the repository settings the publish job, and so the provenance layer, depends on.</li>
+</ul>
+<!-- /template-only -->
+<!-- shipped-only
+- [Triage a security finding](../how-to/triage-a-security-finding.md) — what to do when pip-audit flags something.
+- [Verify a release attestation](../how-to/verify-a-release-attestation.md) — checking layer 3 on a published release.
+-->
+<ul>
 <li><a href="../reference/packaging-specifications.html">Packaging specifications</a> — every PyPA spec, and how a generated project meets it.</li>
 </ul></div>
             </div>

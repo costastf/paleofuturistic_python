@@ -389,6 +389,10 @@
 <li>
     <a href="../../maintaining/decisions/0045-one-home-per-rationale.html" class="dropdown-item">ADR-0045 One home per rationale</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/decisions/0046-shipped-pages-are-rendered-from-directives.html" class="dropdown-item">ADR-0046 Shipped pages are rendered from directives</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -777,6 +781,9 @@
             <li class="nav-item">
                 <a href="../../maintaining/decisions/0045-one-home-per-rationale.html" class="nav-link">ADR-0045 One home per rationale</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0046-shipped-pages-are-rendered-from-directives.html" class="nav-link">ADR-0046 Shipped pages are rendered from directives</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -822,6 +829,8 @@
 
 <h1 id="how-uv-is-used">How uv is used</h1>
 <p>This template uses <a href="https://docs.astral.sh/uv/">uv</a> for every Python operation in a generated project: creating virtualenvs, installing dependencies, resolving the lockfile, publishing to PyPI, even fetching Python interpreters. This page explains why, and what the template gives up to get there.</p>
+<!-- shipped: This project uses [uv](https://docs.astral.sh/uv/) for every Python operation: creating virtualenvs, installing dependencies, resolving the lockfile, publishing to PyPI, even fetching Python interpreters. This page explains why, and what the template gives up to get there. -->
+
 <h2 id="what-uv-replaces">What uv replaces</h2>
 <p>In an older lineage of this template, a fresh checkout required: a system Python, pipx, virtualenv, pipenv and pip-tools. Each had its own configuration surface, its own caching behaviour, and its own update cadence.</p>
 <p>uv replaces all of them with a single Rust binary that:</p>
@@ -845,6 +854,9 @@
 </ul>
 <p><strong>Older Python support.</strong> uv itself supports far older interpreters than the template targets, so the project's chosen <code>min_python_version</code> (as low as 3.11) isn't a constraint uv adds — if a generated project wanted to support 3.8, uv wouldn't stop it; that configuration just isn't one the template tests.</p>
 <p><strong>Familiarity.</strong> Some contributors will arrive expecting <code>pip install -r requirements.txt</code>. The generated README points them to <code>./workflow.cmd bootstrap</code> and the <a href="../tutorials/generate-your-first-project.html">tutorial that walks through generating a first project</a>.</p>
+<!-- shipped: **Familiarity.** Some contributors will arrive expecting `pip install -r requirements.txt`. The README points them at `./workflow.cmd`, and [First-run setup](../tutorials/first-run-setup.md) walks the whole loop. -->
+
+<!-- template-only -->
 <h2 id="which-uv-version-a-new-project-gets">Which uv version a new project gets</h2>
 <p>Because <code>[tool.uv] required-version</code> is an <strong>exact</strong> pin, a stale uv version does not merely
 lag — it refuses to run. A literal carried in the template would age between bumps, so a
@@ -868,6 +880,7 @@ project moves all five together whenever its developers choose to.</p>
 <li><strong>Generate offline.</strong> If PyPI cannot be reached, generation keeps the version the template
   committed and says so. It never fails for want of a network, and never falls back silently.</li>
 </ul>
+<!-- /template-only -->
 <h2 id="when-this-decision-could-be-revisited">When this decision could be revisited</h2>
 <p>If two of these became true together:</p>
 <ol>
@@ -878,7 +891,10 @@ project moves all five together whenever its developers choose to.</p>
 <h2 id="see-also">See also</h2>
 <ul>
 <li><a href="../../maintaining/explanation/design-principles.html">Design principles</a> — why dependency groups replaced extras.</li>
-</ul></div>
+</ul>
+<!-- shipped-only
+- [Dependency groups](../reference/dependency-groups.md) — the groups this project ships with, and the uv pin.
+--></div>
             </div>
         </div>
 

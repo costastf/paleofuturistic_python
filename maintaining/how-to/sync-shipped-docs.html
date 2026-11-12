@@ -389,6 +389,10 @@
 <li>
     <a href="../decisions/0045-one-home-per-rationale.html" class="dropdown-item">ADR-0045 One home per rationale</a>
 </li>
+            
+<li>
+    <a href="../decisions/0046-shipped-pages-are-rendered-from-directives.html" class="dropdown-item">ADR-0046 Shipped pages are rendered from directives</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -777,6 +781,9 @@
             <li class="nav-item">
                 <a href="../decisions/0045-one-home-per-rationale.html" class="nav-link">ADR-0045 One home per rationale</a>
             </li>
+            <li class="nav-item">
+                <a href="../decisions/0046-shipped-pages-are-rendered-from-directives.html" class="nav-link">ADR-0046 Shipped pages are rendered from directives</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -789,7 +796,15 @@
             
             <li class="nav-item" data-bs-level="1"><a href="#keep-shipped-docs-in-sync" class="nav-link">Keep shipped docs in sync</a>
               <ul class="nav flex-column">
-            <li class="nav-item" data-bs-level="2"><a href="#the-contract" class="nav-link">The contract</a>
+            <li class="nav-item" data-bs-level="2"><a href="#the-loop" class="nav-link">The loop</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#what-the-render-does" class="nav-link">What the render does</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#the-directives" class="nav-link">The directives</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -809,7 +824,7 @@
                     <div class="col-md-9" role="main">
 
 <h1 id="keep-shipped-docs-in-sync">Keep shipped docs in sync</h1>
-<p>Six explanation pages exist twice: the canonical copy in this repo's docs and a shipped copy that lands in every generated project's <em>Developer → Explanation</em> section, so project developers can read the rationale behind their scaffold offline.</p>
+<p>Six explanation pages exist twice: the canonical copy in this repo's docs and a shipped copy that lands in every generated project's <em>Developer → Explanation</em> section, so project developers can read the rationale behind their scaffold offline. The shipped copy is rendered from the canonical page by <code>./workflow.cmd maintain.sync-docs</code>; it is never edited by hand.</p>
 <table>
 <thead>
 <tr>
@@ -844,15 +859,54 @@
 </tr>
 </tbody>
 </table>
-<h2 id="the-contract">The contract</h2>
+<p>The mapping is <code>SHIPPED_RATIONALE_PAGES</code> in <code>_CI/tasks/configuration.py</code>.</p>
+<h2 id="the-loop">The loop</h2>
+<ol>
+<li>Edit the canonical page.</li>
+<li>Run <code>./workflow.cmd maintain.sync-docs --write</code>.</li>
+<li>Commit both files together.</li>
+</ol>
+<p><code>./workflow.cmd maintain.sync-docs</code> without <code>--write</code> names the shipped pages that differ from their render and exits 1. <code>tests/test_template_invariants.py::test_shipped_rationale_pages_are_rendered_from_canonical</code> asserts the same equality, so a canonical edit that was not rendered fails <code>test.invariants</code> until it is.</p>
+<h2 id="what-the-render-does">What the render does</h2>
+<p>The shipped copy is the canonical page with:</p>
 <ul>
-<li><strong>Edit the canonical page first</strong>, then propagate the change to the shipped copy.</li>
-<li>The shipped copies are <em>adaptations</em>, not byte copies: they address the generated project's developer ("your scaffold", "your project"), drop template-repo-only material, and may knob-gate passages with jinja (the SBOM page gates its GitHub-attestation paragraph on <code>{% if git_hosting_service == 'github' %}</code>).</li>
-<li>Every shipped copy opens with a <code>&lt;!-- canonical: ... --&gt;</code> HTML comment naming its source page. Keep it.</li>
-<li>Section structure must stay aligned: the shipped copy's <code>##</code> headings must be a subset of the canonical page's. <code>tests/test_template_invariants.py::test_shipped_rationale_pages_match_canonical</code> enforces both the marker and the heading subset, so a canonical edit that renames or removes a section fails <code>test.invariants</code> until the shipped copy follows.</li>
+<li>a <code>&lt;!-- canonical: … --&gt;</code> marker as its first line, naming the page it was rendered from;</li>
+<li>every <code>](../decisions/NNNN-slug.md)</code> link pointed at the published record, since the records do not ship;</li>
+<li><code>](../../maintaining/explanation/</code> links made relative, since both pages live in one directory in a generated project;</li>
+<li>the audience rewording in <code>SHIPPED_WORDING</code> in <code>_CI/tasks/maintain.py</code>: "a generated project" becomes "this project", <code>&lt;your_package&gt;</code> becomes <code>{{ project_slug }}</code>, and so on;</li>
+<li>the directives below applied.</li>
 </ul>
+<h2 id="the-directives">The directives</h2>
+<p>All four are HTML comments, so this repo's site renders none of them.</p>
+<table>
+<thead>
+<tr>
+<th>Directive</th>
+<th>Effect in the shipped copy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>&lt;!-- template-only --&gt;</code> … <code>&lt;!-- /template-only --&gt;</code> on their own lines</td>
+<td>The lines between are dropped. For sections and links that only make sense in this repo.</td>
+</tr>
+<tr>
+<td><code>&lt;!-- shipped-only</code> … <code>--&gt;</code>, body on the lines between</td>
+<td>The body is inserted. For passages only a project developer needs, including ones that knob-gate with jinja.</td>
+</tr>
+<tr>
+<td><code>&lt;!-- shipped: … --&gt;</code> directly under a paragraph, list or code block</td>
+<td>Replaces that whole block. Multi-line form: <code>&lt;!-- shipped:</code> on its own line, the body, then <code>--&gt;</code>.</td>
+</tr>
+<tr>
+<td><code>&lt;!-- shipped-line: … --&gt;</code> directly under one line</td>
+<td>Replaces that one line. For a table row or a list item.</td>
+</tr>
+</tbody>
+</table>
+<p>A directive body may hold jinja; the shipped copy of the security page is a <code>.jinja</code> file for that reason. An HTML comment cannot contain <code>--</code>, so a body may not either.</p>
 <h2 id="why-duplication-instead-of-links">Why duplication instead of links</h2>
-<p>The shipped pages used to be links to this repo's published site. That made generated projects' docs break offline and pinned them to a URL the template doesn't control forever. Two hand-maintained copies with a drift ratchet is the pragmatic middle: copier has no mechanism to include one source file in both sites, and the adaptation step (reframing, knob-gating) is genuine work a blind include couldn't do.</p>
+<p>The shipped pages used to be links to this repo's published site. That made generated projects' docs break offline and pinned them to a URL the template doesn't control forever. Copier has no mechanism to include one source file in both sites, and the adaptation step (reframing, knob-gating) is work a blind include could not do. Rendering from directives keeps one source and makes the adaptation explicit. See <a href="../decisions/0046-shipped-pages-are-rendered-from-directives.html">ADR-0046</a>.</p>
 <h2 id="see-also">See also</h2>
 <ul>
 <li><a href="../explanation/design-principles.html">Design principles</a> — the largest of the synced pages.</li>

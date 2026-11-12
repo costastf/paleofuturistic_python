@@ -389,6 +389,10 @@
 <li>
     <a href="../decisions/0045-one-home-per-rationale.html" class="dropdown-item">ADR-0045 One home per rationale</a>
 </li>
+            
+<li>
+    <a href="../decisions/0046-shipped-pages-are-rendered-from-directives.html" class="dropdown-item">ADR-0046 Shipped pages are rendered from directives</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -777,6 +781,9 @@
             <li class="nav-item">
                 <a href="../decisions/0045-one-home-per-rationale.html" class="nav-link">ADR-0045 One home per rationale</a>
             </li>
+            <li class="nav-item">
+                <a href="../decisions/0046-shipped-pages-are-rendered-from-directives.html" class="nav-link">ADR-0046 Shipped pages are rendered from directives</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -830,6 +837,8 @@
 
 <h1 id="the-_ci-tasks-architecture">The _CI tasks architecture</h1>
 <p>The <code>_CI/</code> directory is the template's portable CI/CD framework — vendored <a href="https://www.pyinvoke.org/">Invoke</a> plus a set of opinionated task modules. This page covers the design.</p>
+<!-- shipped: The `_CI/` directory is this project's portable CI/CD framework — vendored [Invoke](https://www.pyinvoke.org/) plus a set of opinionated task modules. This page covers the design. -->
+
 <h2 id="why-invoke-not-make-just-nox">Why Invoke, not make / just / nox</h2>
 <table>
 <thead>
@@ -934,10 +943,16 @@ for module in (build, container, develop, ...):
 </ul>
 <p><code>container.py</code>, <code>release.py</code>, <code>document.py</code> and <code>sbom.py</code> import whichever module survived generation via a relative import that's rendered concrete at copy time: a GitHub project ends up with <code>from .github import …</code>, a GitLab project with <code>from .gitlab import …</code>. Because the unchosen module is omitted entirely at generation time via a copier conditional filename (its rendered name is empty when not selected), the generated project has exactly one code path and no runtime branching between hosts.</p>
 <h2 id="see-also">See also</h2>
+<!-- template-only -->
 <ul>
 <li><a href="../how-to/extend-the-template-tasks.html">Extend the template workflow tasks</a> — how a maintainer changes or adds tasks (the user-facing recipe, <em>Add a workflow task</em>, ships inside every generated project under its docs's Developer section).</li>
 <li><a href="../../using/reference/generated-project-tree.html">Generated project tree</a> — the full <code>_CI/tasks/</code> file listing.</li>
-</ul></div>
+</ul>
+<!-- /template-only -->
+<!-- shipped-only
+- [Add a workflow task](../how-to/add-a-workflow-task.md) — practical recipe for extending the framework.
+- [CI framework internals](../reference/ci-framework.md) — shared utilities, constants, and the directory layout.
+--></div>
             </div>
         </div>
 

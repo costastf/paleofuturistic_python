@@ -389,6 +389,10 @@
 <li>
     <a href="0045-one-home-per-rationale.html" class="dropdown-item active" aria-current="page">ADR-0045 One home per rationale</a>
 </li>
+            
+<li>
+    <a href="0046-shipped-pages-are-rendered-from-directives.html" class="dropdown-item">ADR-0046 Shipped pages are rendered from directives</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -407,7 +411,7 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a rel="next" class="nav-link disabled">
+                                <a rel="next" href="0046-shipped-pages-are-rendered-from-directives.html" class="nav-link">
                                     Next <i class="fa fa-arrow-right"></i>
                                 </a>
                             </li>
@@ -777,6 +781,9 @@
             <li class="nav-item">
                 <a href="0045-one-home-per-rationale.html" class="nav-link active fw-bold">ADR-0045 One home per rationale</a>
             </li>
+            <li class="nav-item">
+                <a href="0046-shipped-pages-are-rendered-from-directives.html" class="nav-link">ADR-0046 Shipped pages are rendered from directives</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -850,8 +857,8 @@ drive are left alone.</p>
 <li>A rule that changes is changed in one page. The pointers do not age, because they say only
   that the rule exists and where it is explained.</li>
 <li>The stale fork sentence in the shipped security page is fixed, and it was the kind of drift
-  the heading-subset invariant between the parent and shipped copies cannot see. A task that
-  syncs the shipped rationale pages from the parent is the next decision in this area.</li>
+  the heading-subset invariant between the parent and shipped copies could not see; ADR-0046
+  replaced that invariant with a render.</li>
 </ul>
 <h2 id="references">References</h2>
 <ul>

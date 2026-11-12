@@ -389,6 +389,10 @@
 <li>
     <a href="../../maintaining/decisions/0045-one-home-per-rationale.html" class="dropdown-item">ADR-0045 One home per rationale</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/decisions/0046-shipped-pages-are-rendered-from-directives.html" class="dropdown-item">ADR-0046 Shipped pages are rendered from directives</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -777,6 +781,9 @@
             <li class="nav-item">
                 <a href="../../maintaining/decisions/0045-one-home-per-rationale.html" class="nav-link">ADR-0045 One home per rationale</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0046-shipped-pages-are-rendered-from-directives.html" class="nav-link">ADR-0046 Shipped pages are rendered from directives</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -866,21 +873,32 @@ index and an installer read them moves all of it to the push that introduced it.
 </tbody>
 </table>
 <p>validate-pyproject is a per-file step because whether <code>pyproject.toml</code> conforms is a question
-about that file alone. The other two need a built wheel, and a wheel is built from the whole
-tree, so they run on push with the rest of <code>build</code>.</p>
+about that file alone, so a commit that does not touch it does not pay for it. The other two need
+a built wheel, and a wheel is built from the whole tree, so they run on push with the rest of
+<code>build</code>.</p>
+<!-- shipped-only
+To run them yourself:
+
+
+<pre><code class="language-bash">./workflow.cmd lint.pyproject
+./workflow.cmd build.package
+</code></pre>
+
+-->
+
 <h2 id="what-they-cannot-catch">What they cannot catch</h2>
 <ul>
 <li><strong>Whether the metadata is true.</strong> A wrong description, a stale classifier, a URL pointing at
   the wrong repository: all valid, all published.</li>
 <li><strong>A <code>License ::</code> classifier beside a <code>license</code> expression.</strong> The licence-expression spec says
   tools should refuse the combination, but <code>uv_build</code> builds it and none of the three flags it.
-  Generated projects ship without one; adding one is a mistake no gate catches.</li>
+  A generated project ships without one; adding one is a mistake no gate catches.</li>
 <li><strong>Whether PyPI already has this version.</strong> Only the upload finds out. <code>uv publish --check-url</code>
   can skip files that already exist when re-running a partial upload.</li>
 </ul>
 <h2 id="why-the-version-is-not-dynamic">Why the version is not <code>dynamic</code></h2>
 <p><code>[project] dynamic</code> lets the build backend compute a field, typically the version from a git tag.
-Generated projects do not use it: <code>./workflow.cmd release</code> has commitizen write the new version
+A generated project does not use it: <code>./workflow.cmd release</code> has commitizen write the new version
 into <code>pyproject.toml</code>, and CI tags that version once it lands on the default branch, so the version in the
 file is the released one and every field is static. Static metadata is what validate-pyproject, twine and anything else that
 reads <code>pyproject.toml</code> without running a build can see.</p>
@@ -892,7 +910,10 @@ That is the job of the PEP 740 attestations signed at publish time; see
 <ul>
 <li><a href="../reference/packaging-specifications.html">Packaging specifications</a> — every spec, and how a generated project meets it.</li>
 <li><a href="how-uv-is-used.html">How uv is used</a> — the build backend and the lockfile.</li>
-</ul></div>
+</ul>
+<!-- shipped-only
+- [Invoke task catalog](../reference/invoke-tasks.md) — `lint.pyproject` and `build.package`.
+--></div>
             </div>
         </div>
 
