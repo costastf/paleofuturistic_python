@@ -50,6 +50,10 @@ This change adds a question and three checks:
 - **New dependency group** `build`, and new pins in `lint` and `security`. Run `uv lock` after the update and commit `uv.lock` with it.
 - **Publishing.** The publish job now signs PEP 740 attestations. On GitLab it also requests `id_tokens:`, and PyPI needs a Trusted Publisher registered for the project (the new *Set up Trusted Publishing* how-to). If you publish with `UV_PUBLISH_*` credentials, nothing changes: that path uploads without attestations.
 
+## Upgrading past the fork pull-request coverage
+
+On GitHub, `continuous-integration.yaml` and `security-audit.yaml` now trigger on `pull_request` as well as `push`. A pull request from a fork runs the gate, and the audit when it touches the dependency surface, in a job that installs the dependencies with uv on the runner because a fork's token cannot push the deps image. Pull requests from your own branches run nothing on the new trigger, since the push already did. After updating, require the `Preflight` check in branch protection; the [hardening how-to](harden-github-repository.md) has the details. See [ADR-0041](../../maintaining/decisions/0041-fork-pull-requests-run-the-gate-on-the-runners-image.md).
+
 ## Upgrading past the default-branch question
 
 `copier update` asks `default_branch`, with `main` as the default. Accept it if your default branch is `main` and nothing changes. Answer with your branch's name otherwise: the publish and Pages workflows start triggering on it, `release` starts from it, release pull or merge requests target it, and the CI badge reads it. Before the question, all of those spelled `main`, so a project on another branch had to edit each by hand after every update. See [ADR-0040](../../maintaining/decisions/0040-the-default-branch-is-a-copier-answer.md).

@@ -6,7 +6,7 @@ After generating with `git_hosting_service=github`, you have five workflow files
 
 These are non-negotiable for any repository connected to CI/CD:
 
-- **Branch protection on the default branch** (`main`, or whatever `default_branch` was answered). Require pull requests, require status checks, require a linear history. Block force pushes and deletions. Require only checks that run on every pull request — and today that is none of the shipped ones. **Do not require `Preflight`**: the workflows trigger on `push`, so a pull request from a fork runs nothing in this repository and a required check would sit pending forever, leaving the repository unable to merge an external contribution. `security-audit` is filtered by `on.push.paths` on top of that. Require them once the workflows gain a `pull_request` trigger, which is a decision the template has not taken yet.
+- **Branch protection on the default branch** (`main`, or whatever `default_branch` was answered). Require pull requests, require status checks, require a linear history. Block force pushes and deletions. **Require `Preflight`**: it runs on every push to a branch of the repository and, through a second job of the same name, on every pull request from a fork, so no pull request is left without it. Whichever of the two jobs did not run is skipped, which a branch rule reads as passed. Do not require `Security audit`: it runs only when the dependency surface changes, so on most pull requests it would sit pending forever. See [ADR-0041](../../maintaining/decisions/0041-fork-pull-requests-run-the-gate-on-the-runners-image.md).
 - **Tag protection for `v*`.** A ruleset on `refs/tags/v*` with *Restrict updates* and *Restrict deletions* ticked, and *Restrict creations* left off. Creation must stay unrestricted: `release.tag` creates each release tag from the publish job through the Releases API with the workflow's `GITHUB_TOKEN`, an identity no ruleset bypass list is guaranteed to accept, and a creation restriction makes that call fail with `422` before anything is built. Updates and deletions are what rewrite release history, and those two rules stop them. Do not use the legacy *Tag protection rules*, which restrict creation to admins and maintainers with no way round.
 - **Required approvals.** At least one reviewer per PR.
 
@@ -24,7 +24,7 @@ The same OIDC identity signs two attestations over the wheel and sdist, one befo
 
 ## Hardening against external contributors
 
-- Set **Settings → Actions → Fork pull request workflows → Require approval for all external contributors**.
+- Set **Settings → Actions → Fork pull request workflows → Require approval for all external contributors**. The fork jobs run the project's own task code from the pull request, so a maintainer reads the diff before a workflow runs it.
 - Enable **Settings → Code review limits → Limit to users explicitly granted read or higher access**.
 - Consider **Temporary interaction limits** if the repo gets brigaded.
 

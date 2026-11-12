@@ -61,7 +61,7 @@ almost always what you wanted.
 
 ## What skipping does not do
 
-CI runs `./workflow.cmd preflight` on every push — the same command the pre-push hook runs — so
+CI runs `./workflow.cmd preflight` on every push, and on every pull request from a fork — the same command the pre-push hook runs — so
 a skipped check is deferred rather than avoided. You hear about it from the pipeline instead, a
 few minutes later and in front of everyone on the pull request.
 

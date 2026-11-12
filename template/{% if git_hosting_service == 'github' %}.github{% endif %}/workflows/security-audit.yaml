@@ -38,6 +38,17 @@ on:
       - '_CI/lib/vendor/**'
       - '_CI/lib/patches/**'
       - '.security-overrides'
+  # The same files, for a pull request from a fork, whose push to its own repository runs
+  # nothing here. Pull requests from branches of this repository are covered by the push.
+  # The list is repeated because a workflow file cannot share one between two triggers; an
+  # invariant in the template keeps the two equal.
+  pull_request:
+    paths:
+      - 'uv.lock'
+      - '_CI/lib/vendor.txt'
+      - '_CI/lib/vendor/**'
+      - '_CI/lib/patches/**'
+      - '.security-overrides'
   workflow_dispatch:
 
 permissions:
@@ -45,6 +56,9 @@ permissions:
 
 jobs:
   build-deps-image:
+    # A pull request's token cannot push to ghcr; see continuous-integration.yaml. The fork
+    # job below audits on the runner's own image instead.
+    if: ${{ github.event_name != 'pull_request' }}
     uses: ./.github/workflows/build-deps-image.yaml
     permissions:
       contents: read
@@ -71,3 +85,31 @@ jobs:
 
       - name: Audit dependencies
         run: ./workflow.cmd secure.audit
+
+  # The same audit for a pull request from a fork that touches the dependency surface, with
+  # the dependencies installed at job time rather than read from the deps image. Same name
+  # as the job above, for the same reason `Preflight` is spelled twice in
+  # continuous-integration.yaml.
+  secure-from-fork:
+    name: Security audit
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Audit dependencies
+        run: ./workflow.cmd secure.audit
+
+      - name: Minimize uv cache
+        run: uv cache prune --ci

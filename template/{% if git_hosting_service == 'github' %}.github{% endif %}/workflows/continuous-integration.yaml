@@ -1,7 +1,13 @@
 name: Continuous Integration
 
+# `push` covers every branch of this repository, pull requests from them included: the push
+# that updated the branch already ran the gate on the commit the pull request now shows.
+# `pull_request` is there for forks, whose pushes land somewhere else. Each event runs one of
+# the two Preflight jobs below, never both, and both run the same command, so a required check
+# named `Preflight` is satisfied either way (ADR-0041).
 on:
   push:
+  pull_request:
 
 # One job for the checks, running the same command the pre-push hook does, character for
 # character: `preflight`. Verifying is that command's default and writing is opt-in, so there is
@@ -28,6 +34,10 @@ permissions:
 
 jobs:
   build-deps-image:
+    # Pushing to ghcr needs `packages: write`, which the token of a pull request from a fork
+    # never has. Only pushes build the image; `preflight` below follows it, so a pull request
+    # event skips both and `preflight-from-fork` takes over when the head is a fork.
+    if: ${{ github.event_name == 'push' }}
     uses: ./.github/workflows/build-deps-image.yaml
     permissions:
       contents: read
@@ -65,3 +75,36 @@ jobs:
       # the command that fixes it.
       - name: Verify checks and derived files
         run: ./workflow.cmd preflight
+
+  # The same gate for a pull request from a fork, on the runner's own image: no registry
+  # push is possible with that token, so the dependencies are installed at job time instead
+  # of being read from the deps image. Slower, same command, same verdict. The job carries
+  # the same name as the one above so a branch rule can require `Preflight` once and be
+  # satisfied by whichever of the two ran; the other one is skipped, which the rule reads as
+  # passed. A pull request from a branch of this repository skips this job too, being
+  # covered by the push that updated it.
+  preflight-from-fork:
+    name: Preflight
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+
+      # Reads `[tool.uv] required-version` from pyproject.toml, so the uv it installs is the
+      # one the launcher insists on.
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Verify checks and derived files
+        run: ./workflow.cmd preflight
+
+      - name: Minimize uv cache
+        run: uv cache prune --ci

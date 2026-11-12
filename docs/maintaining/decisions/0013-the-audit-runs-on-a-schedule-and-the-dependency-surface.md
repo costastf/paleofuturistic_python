@@ -35,7 +35,8 @@ cell only, so a transient advisory-service error fails one job instead of five.
 
 ## Consequences
 
-- A pull request from a fork triggers no audit; the scheduled run after the merge covers it.
+- A pull request from a fork triggered no audit until ADR-0041; the scheduled run after the
+  merge covered it.
 - A hand-edited vendored file is watched, not audited: no scanner can read a patched source, so
   the push fires the job to put the diff in front of a human.
 - `secure` remains the human-facing aggregator; nothing automated calls it.

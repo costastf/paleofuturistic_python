@@ -77,3 +77,4 @@ anywhere in the repository resolves to a file.
 | [ADR-0038](0038-template-tests-snapshot-pin-and-mature.md) | Template tests generate from a snapshot, pin the uv version, and run one matured cell |
 | [ADR-0039](0039-repository-url-renders-well-known-project-urls-or-nothing.md) | `repository_url` renders well-known `[project.urls]`, or nothing |
 | [ADR-0040](0040-the-default-branch-is-a-copier-answer.md) | The default branch is a copier answer |
+| [ADR-0041](0041-fork-pull-requests-run-the-gate-on-the-runners-image.md) | Fork pull requests run the gate on the runner's image |

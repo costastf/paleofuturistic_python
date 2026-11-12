@@ -4,7 +4,7 @@ The template is opinionated. The choices below were made deliberately, not by ac
 
 ## Pipelines run template commands only
 
-Records: [ADR-0004](../decisions/0004-pipelines-run-template-commands-only.md), [ADR-0033](../decisions/0033-the-deps-image-is-content-addressed-and-handed-on-by-digest.md), [ADR-0034](../decisions/0034-the-deps-image-runs-as-uid-1001.md), [ADR-0035](../decisions/0035-github-reuses-a-deps-tag-gitlab-builds-with-kaniko.md), [ADR-0036](../decisions/0036-checkouts-persist-no-credentials.md).
+Records: [ADR-0004](../decisions/0004-pipelines-run-template-commands-only.md), [ADR-0033](../decisions/0033-the-deps-image-is-content-addressed-and-handed-on-by-digest.md), [ADR-0034](../decisions/0034-the-deps-image-runs-as-uid-1001.md), [ADR-0035](../decisions/0035-github-reuses-a-deps-tag-gitlab-builds-with-kaniko.md), [ADR-0036](../decisions/0036-checkouts-persist-no-credentials.md), [ADR-0041](../decisions/0041-fork-pull-requests-run-the-gate-on-the-runners-image.md).
 
 Every CI step is a `./workflow.cmd <task>` call — no inline `uv …`, `pip install …`, ad-hoc `properdocs …`, or other business logic in YAML. Behaviour changes happen in `_CI/tasks/`; workflow files are glue.
 

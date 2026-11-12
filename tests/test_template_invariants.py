@@ -703,6 +703,74 @@ def test_security_audit_is_automated_without_failing_unrelated_changes(generated
         assert 'pyproject.toml' not in changes, 'a version bump fires a full dependency audit'
 
 
+FORK_HEAD = 'github.event.pull_request.head.repo.full_name != github.repository'
+
+
+def fork_pair(workflow, container_job, fork_job):
+    """Return (container job, fork job) from a workflow, asserting the fork job's shape (ADR-0041).
+
+    The fork job has no container, since the token of a pull request from a fork cannot push
+    the deps image; it runs only for a head that is another repository; and it carries the
+    container job's name, so one required check is satisfied by whichever of the two ran.
+    """
+    jobs = workflow['jobs']
+    container, fork = jobs[container_job], jobs[fork_job]
+    assert 'container' not in fork, f'{fork_job} runs in the deps image, which a fork cannot build'
+    assert FORK_HEAD in fork['if'], f'{fork_job} does not key on the head being a fork: {fork["if"]!r}'
+    assert "github.event_name == 'pull_request'" in fork['if'], f'{fork_job} could run on a push'
+    assert fork['name'] == container['name'], f'{fork_job} is not the check {container_job} is'
+    assert fork['permissions'] == {'contents': 'read'}, f'{fork_job} asks for more than it can get'
+    assert any(str(step.get('uses', '')).startswith('astral-sh/setup-uv@') for step in fork['steps']), (
+        f'{fork_job} has no uv to run the launcher with'
+    )
+    return container, fork
+
+
+def run_commands(job):
+    """The `run:` lines of a job, in order."""
+    return [step['run'] for step in job['steps'] if 'run' in step]
+
+
+def test_fork_pull_requests_run_the_same_gate_on_the_runners_image(generated_project):
+    """A pull request from a fork runs `preflight` with the same command, on a plain runner.
+
+    `push` covers the repository's own branches; a fork's pushes land elsewhere. `pull_request`
+    covers those, but its read-only token cannot push the deps image, so the image build is
+    skipped on that event and a second job installs the dependencies with uv instead. Pull
+    requests from the repository's own branches run nothing on the new trigger.
+    """
+    project, cell = generated_project
+    if cell['git_hosting_service'] != 'github':
+        pytest.skip('GitHub-only workflows')
+    workflow = yaml.safe_load(
+        (project / '.github' / 'workflows' / 'continuous-integration.yaml').read_text(encoding='utf-8')
+    )
+    triggers = workflow.get('on') or workflow[True]
+    assert 'pull_request' in triggers, 'a pull request from a fork runs nothing'
+    assert 'push' in triggers, "the repository's own branches lost their run"
+    assert "github.event_name == 'push'" in workflow['jobs']['build-deps-image']['if'], (
+        'the image build runs on a pull request event, whose token cannot push it'
+    )
+    container, fork = fork_pair(workflow, 'preflight', 'preflight-from-fork')
+    gate = next(hook for hook in pre_commit_hooks(project) if hook['id'] == 'preflight')['entry']
+    assert gate in run_commands(container)
+    assert gate in run_commands(fork), f'the fork job runs {run_commands(fork)}, not the gate'
+
+
+def test_fork_pull_requests_touching_the_dependency_surface_are_audited(generated_project):
+    """The audit's `pull_request` trigger watches the same files as its `push` trigger."""
+    project, cell = generated_project
+    if cell['git_hosting_service'] != 'github':
+        pytest.skip('GitHub-only workflows')
+    workflow = yaml.safe_load((project / '.github' / 'workflows' / 'security-audit.yaml').read_text(encoding='utf-8'))
+    triggers = workflow.get('on') or workflow[True]
+    assert triggers['pull_request']['paths'] == triggers['push']['paths'], 'the two path filters drifted apart'
+    assert "github.event_name != 'pull_request'" in workflow['jobs']['build-deps-image']['if']
+    container, fork = fork_pair(workflow, 'secure', 'secure-from-fork')
+    assert run_commands(container) == ['./workflow.cmd secure.audit']
+    assert './workflow.cmd secure.audit' in run_commands(fork)
+
+
 def test_scheduled_security_audit_ships_for_github(generated_project):
     """GitHub projects get a scheduled audit, so expiries come due without a push."""
     project, cell = generated_project
@@ -2076,7 +2144,9 @@ def test_no_ci_job_reruns_what_the_gate_already_covers(generated_project):
     if cell['git_hosting_service'] == 'github':
         pipeline = (project / '.github' / 'workflows' / 'continuous-integration.yaml').read_text(encoding='utf-8')
         jobs = set(yaml.safe_load(pipeline)['jobs'])
-        assert jobs == {'build-deps-image', 'preflight'}, f'the pipeline runs {jobs}'
+        # Two gate jobs, one per event shape (ADR-0041); both run the same command, which
+        # `test_fork_pull_requests_run_the_same_gate_on_the_runners_image` asserts.
+        assert jobs == {'build-deps-image', 'preflight', 'preflight-from-fork'}, f'the pipeline runs {jobs}'
     else:
         pipeline = (project / '.gitlab-ci.yml').read_text(encoding='utf-8')
         jobs = {name for name in yaml.safe_load(pipeline) if not name.startswith(('stages', 'variables'))}

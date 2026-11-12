@@ -95,5 +95,6 @@ nav:
       - ADR-0038 Template tests snapshot, pin and mature: maintaining/decisions/0038-template-tests-snapshot-pin-and-mature.md
       - ADR-0039 repository_url renders well-known project URLs: maintaining/decisions/0039-repository-url-renders-well-known-project-urls-or-nothing.md
       - ADR-0040 The default branch is a copier answer: maintaining/decisions/0040-the-default-branch-is-a-copier-answer.md
+      - ADR-0041 Fork pull requests run the gate on the runner's image: maintaining/decisions/0041-fork-pull-requests-run-the-gate-on-the-runners-image.md
 
 copyright: Copyright &copy; 2024 <a href="https://schubergphilis.com/">Schuberg Philis</a>

@@ -43,9 +43,9 @@ ignore. It is triggered on the axes it varies along instead:
 - **On pushes that change the dependency surface** — `uv.lock`, `_CI/lib/vendor.txt`, the
   vendored tree and its patches, and `.security-overrides`. Change what you depend on and you
   own the result. A release lands here too: `version_provider = "uv"` re-locks, so the bump
-  commit carries `uv.lock`, and the commit that publishes is worth auditing anyway. Pushes
-  only: a pull request from a fork triggers nothing here, so the audit that covers a fork's
-  dependencies is the scheduled one, after the merge.
+  commit carries `uv.lock`, and the commit that publishes is worth auditing anyway. A pull
+  request from a fork that touches the same files runs it too, on the runner's own image since
+  its token cannot push a deps image.
 - **A hand-edited vendored file is watched, not audited.** A push touching `_CI/lib/vendor/`
   fires the job so the diff reaches a human. No scanner can say anything about a patched
   vendored source: `vendor.txt` is what pip-audit reads, and it describes the packages that
