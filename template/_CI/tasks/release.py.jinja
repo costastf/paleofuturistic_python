@@ -81,10 +81,9 @@ def bump(context: Context, increment: str = '') -> None:
 
     `cz bump --version-files-only` moves `pyproject.toml` and `uv.lock` through the uv version
     provider and stops there; this task commits the result with the message `cz bump` would
-    have used. The tag is deliberately not created here: it is created on the default branch by
-    CI once the release lands there (`release.tag`), so the way the pull request is merged —
-    merge commit, squash, rebase — cannot leave a tag pointing at a commit the default branch
-    never saw.
+    have used. The tag is deliberately not created here: CI creates it on the default branch
+    once the release lands there (`release.tag`), so the merge method cannot leave a tag
+    pointing at a commit the branch never saw (ADR-0014).
 
     The badge is refreshed *before* the bump, so it lands in the same commit as the version it
     announces: the commit stages every modified tracked file, which is also why `release`
@@ -391,8 +390,8 @@ def ship(context: Context, before: str = '', after: str = '', output: str = '') 
     """Publish from CI if the push ``before..after`` carried a release; otherwise do nothing.
 
     The one command the publish job runs on every push to the default branch. A release is a
-    version bump arriving on that branch, so merging the release request any way — merge
-    commit, squash, rebase — publishes it. With no bump it prints why and exits 0, so the
+    version bump arriving on that branch (ADR-0014), so merging the release request any way —
+    merge commit, squash, rebase — publishes it. With no bump it prints why and exits 0, so the
     pipeline stays green. With one it tags the new tip through the host's API, then runs
     ``release.dist``, ``release.attest`` and the upload over it. ``dist/`` is left in place for
     anything the pipeline attests afterwards.

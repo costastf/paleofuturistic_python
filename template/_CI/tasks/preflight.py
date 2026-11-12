@@ -1,9 +1,9 @@
 """Preflight task definitions.
 
-One registry, three consumers. Every check is declared once in ``STEPS``; the pre-commit hook,
-``preflight`` and the CI preflight job all read that declaration rather than keeping their own
-lists, so a check added here reaches its tier without editing three files. An invariant asserts
-the commit-stage hook holds exactly the per-file steps.
+One registry, three consumers (ADR-0009). Every check is declared once in ``STEPS``; the
+pre-commit hook, ``preflight`` and the CI preflight job all read that declaration rather than
+keeping their own lists, so a check added here reaches its tier without editing three files. An
+invariant asserts the commit-stage hook holds exactly the per-file steps.
 
 *Scope decides the tier.* ``PER_FILE`` steps answer correctly from the staged files alone, so
 they run on every commit and cost time proportional to the change. ``WHOLE_PROGRAM`` steps
@@ -13,23 +13,21 @@ tree or not at all. Those cost time proportional to the *project*, so they run o
 which keeps commit latency flat as the project grows. It is a rule about correctness rather than
 speed: a whole-program check narrowed to a diff does not run faster, it answers wrongly.
 
-*A name carries a scope.* ``reports/coverage.json`` means coverage across every interpreter in
-``env_list``; ``reports/coverage.py311.json`` means one of them, and ``coverage.local.json``
-means whichever one a bare ``pytest`` happened to use. Whatever writes one of those names has to
-be running at that scope, because the readers cannot tell — the badge and the ratchet read a
-filename, not a provenance. That rule took three passes to hold: the per-env paths in
-``[tool.tox]``, then ``test.tox --env=py311`` writing its env's name rather than the union's,
-then ``addopts`` and ``test.coverage`` — which had been overwriting the union's file with one
-interpreter's number every time anyone ran ``test.pytest`` outside tox. The CI badge is the same
-rule at the other end: its value is a fact about a clone rather than about this tree, so no run
-here is at the right scope to judge it, and it is written but never verified.
+*A name carries a scope* (ADR-0011). ``reports/coverage.json`` means coverage across every
+interpreter in ``env_list``; ``reports/coverage.py311.json`` means one of them, and
+``coverage.local.json`` means whichever one a bare ``pytest`` happened to use. Whatever writes
+one of those names has to be running at that scope, because the readers cannot tell — the badge
+and the ratchet read a filename, not a provenance. The record lists the writers that got this
+wrong before the rule held. The CI badge is the same rule at the other end: its value is a fact
+about a clone rather than about this tree, so no run here is at the right scope to judge it, and
+it is written but never verified.
 
-*Verifying is the default; writing is a flag.* ``preflight`` compares the derived files against
-what the tools measured; ``preflight --write`` updates them. So the bare command is what the
-hooks and the pipeline run, and reproducing a pipeline failure needs no flag. ``artifacts`` is
-the only step that behaves differently between the two, and it does so by swapping one callable —
-nothing here re-implements a check for the verifying side, which is how a gate drifts from its
-generator.
+*Verifying is the default; writing is a flag* (ADR-0010). ``preflight`` compares the derived
+files against what the tools measured; ``preflight --write`` updates them. So the bare command
+is what the hooks and the pipeline run, and reproducing a pipeline failure needs no flag.
+``artifacts`` is the only step that behaves differently between the two, and it does so by
+swapping one callable — nothing here re-implements a check for the verifying side, which is how
+a gate drifts from its generator.
 
 *Nothing here edits your code.* What ``--write`` writes is derived: the badges and the coverage
 ratchet. No step has a source-writing variant, so this file has no notion of fixing at all.
@@ -338,11 +336,8 @@ def staged_files(context: Context) -> str:
     absent one means there is no work, not an error to raise.
 
     Raises:
-        SystemExit: If a staged path contains a space or a shell metacharacter. `--paths` is
-            space-separated the whole way down, so a space cannot be forwarded at all; the rest
-            are refused because these paths are printed back as a command to paste, and
-            `src/a";id;".py` is a valid filename. Refusing loudly beats letting a path split
-            into fragments that match no filter and are quietly skipped.
+        SystemExit: If a staged path contains a space or a shell metacharacter, since `--paths`
+            is space-separated and the paths are printed back as a command to paste (ADR-0023).
 
     """
     result = context.run('git diff --cached --name-only --diff-filter=ACMR', hide=True, warn=True)
@@ -411,11 +406,10 @@ def preflight(context: Context, write: bool = False, audit_dependencies: bool = 
     Neither mode edits source. Unformatted code fails here and is fixed by
     `./workflow.cmd format`, which is named for the mutation it performs.
 
-    There is no flag for running a lighter version: the pipeline runs this exact command, so a
-    switch that trimmed it would be a documented way to make the two disagree, and the obvious
-    thing to reach for in a hurry. `env_list` in pyproject.toml is the knob that shortens the
-    matrix, and it shortens CI with it. For fast feedback while writing code the individual
-    tasks are there: `test.pytest`, `lint.pylint --paths=…`.
+    There is no flag for running a lighter version, because the pipeline runs this exact
+    command (ADR-0009). `env_list` in pyproject.toml shortens the matrix, and CI with it; for
+    fast feedback while writing code the individual tasks are there: `test.pytest`,
+    `lint.pylint --paths=…`.
 
     Args:
         context: Invoke context.

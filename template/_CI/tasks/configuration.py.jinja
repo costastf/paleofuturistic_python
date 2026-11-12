@@ -7,11 +7,9 @@ from pathlib import Path
 # before any environment exists, kept out of the gate on purpose.
 PATHS = 'src/ _CI/tasks/ tests/'
 # Which paths a per-file check accepts, and the same answer for anything else asking "is this
-# file ours?". These moved out of `.pre-commit-config.yaml`: with one hook for the whole bundle
-# there is only one `files:` filter left, so the per-tool distinction has to live somewhere it
-# can still be applied — and here it is one source of truth the invariant suite can read,
-# rather than six YAML patterns nobody diffs. The gate names it when it prints the command that
-# fixes a formatting failure, so that command covers the files the checks have an opinion on.
+# file ours?". One source of truth the invariant suite can read, rather than a `files:` pattern
+# per hook (ADR-0022). The gate names it when it prints the command that fixes a formatting
+# failure, so that command covers the files the checks have an opinion on.
 CODE_FILES = re.compile(r'^(_CI/tasks/|src/|tests/).*\.py$')
 SRC_FILES = re.compile(r'^src/.*\.py$')
 PYPROJECT_FILES = re.compile(r'^pyproject\.toml$')

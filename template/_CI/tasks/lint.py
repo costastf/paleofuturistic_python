@@ -114,11 +114,9 @@ def resolves(context: Context, revision: str) -> bool:
 def unpushed_range(context: Context) -> str | None:
     """Return a commit range to check, or None when the repository holds no commit at all.
 
-    Bounded on purpose. `--rev-range HEAD` reads every reachable commit, so one message that
-    predates the convention — a squashed import, history from before this template was applied,
-    a `--no-verify` from last year — fails every run from then on, with no way past it but
-    `SKIP=preflight`, which drops the whole gate. And it is unfixable by design: rewriting
-    published history is worse than the lint it satisfies.
+    Bounded on purpose: `--rev-range HEAD` reads every reachable commit, so one message from
+    before the convention fails every run from then on, and rewriting published history is
+    worse than the lint it satisfies (ADR-0024).
 
     Candidates in order of how much they know. pre-commit exports
     `PRE_COMMIT_FROM_REF`/`PRE_COMMIT_TO_REF` to pre-push hooks straight from what git handed

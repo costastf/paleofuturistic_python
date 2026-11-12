@@ -68,11 +68,10 @@ def pre_commit(context: Context) -> None:
     is it the full check: ty, commitizen, the docs build, pyscn, the matrix and the derived
     files are on pre-push, and `./workflow.cmd preflight` runs everything.
 
-    There is no whole-tree flag. The staged bundle passes no filenames — it reads the index,
-    so it is the same command whether pre-commit or you invoke it — and `pre-commit run
-    --all-files` therefore had nothing to widen. `./workflow.cmd preflight` checks every file
-    in the project, which is what the whole backlog after installing hooks or a `copier update`
-    calls for.
+    There is no whole-tree flag: the staged bundle reads the index rather than taking
+    filenames, so there is nothing for `--all-files` to widen (ADR-0022). `./workflow.cmd
+    preflight` checks every file in the project, which is what the whole backlog after
+    installing hooks or a `copier update` calls for.
 
     Args:
         context: Invoke context.
@@ -91,8 +90,8 @@ def bump_uv(context: Context, version: str = '') -> None:
     to the *digest*, so a bumped tag beside a stale digest silently keeps building the old
     image. This updates all of them together or none at all, then re-locks so `uv.lock` agrees.
 
-    The version was current when this project was generated; it does not advance on its own.
-    Running this is how it moves.
+    The version was current when this project was generated; it does not advance on its own
+    (ADR-0008). Running this is how it moves.
 
     Args:
         context: Invoke context.

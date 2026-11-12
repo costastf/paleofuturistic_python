@@ -98,5 +98,6 @@ nav:
       - ADR-0041 Fork pull requests run the gate on the runner's image: maintaining/decisions/0041-fork-pull-requests-run-the-gate-on-the-runners-image.md
       - ADR-0042 refresh-deps moves the boundary and the pins together: maintaining/decisions/0042-refresh-deps-moves-the-boundary-and-the-pins-together.md
       - ADR-0043 The GitLab deps tag is computed by the launcher: maintaining/decisions/0043-the-gitlab-deps-tag-is-computed-by-the-launcher.md
+      - ADR-0044 Docstrings state the rule and name the record: maintaining/decisions/0044-docstrings-state-the-rule-and-name-the-record.md
 
 copyright: Copyright &copy; 2024 <a href="https://schubergphilis.com/">Schuberg Philis</a>

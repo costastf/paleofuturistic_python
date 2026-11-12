@@ -1,7 +1,7 @@
 """Tasks owned by this project, not by the template.
 
-The template creates this file once and never touches it again — it is listed in the
-template's ``_skip_if_exists``, so ``copier update`` will neither overwrite it nor raise a
+The template creates this file once and never touches it again (ADR-0015) — it is listed in
+the template's ``_skip_if_exists``, so ``copier update`` will neither overwrite it nor raise a
 conflict on it. Every other module in ``_CI/tasks/`` belongs to the template and *will* be
 updated, so a task added there collides on every update. Add yours here instead.
 

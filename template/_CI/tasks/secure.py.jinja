@@ -44,10 +44,8 @@ def validate_override_entry(entry: str, source: str, *, require_expiry: bool = F
     suppressions arriving from outside the repository, where a permanent entry would
     leave no reviewable trace.
 
-    An expiry further out than ``MAX_SUPPRESSION_DAYS`` is said out loud but allowed. The date
-    exists to force a re-review, so ``CVE-2024-1234::2999-12-31`` is a permanent suppression in
-    the costume of a bounded one — but how long an acceptance is worth carrying is the project's
-    call, not this workflow's, and refusing a well-formed entry at audit time helps nobody.
+    An expiry further out than ``MAX_SUPPRESSION_DAYS`` is said out loud but allowed: how long
+    an acceptance is worth carrying is the project's call, not this workflow's (ADR-0029).
 
     Raises:
         SystemExit: with exit code 1 if the entry is malformed.
@@ -94,12 +92,10 @@ def audit_requirement_files() -> list[Path]:
     The lockfile is the whole resolution: every package for every interpreter and platform the
     project supports, with nothing to evaluate and no extras or groups to remember to ask for.
 
-    `uv export` cannot do this job. It produces a *universal* requirements file that keeps the
-    environment markers, and pip-audit evaluates them — so `waitress==2.1.0 ; sys_platform ==
-    "win32"` audits clean on Linux, and an export audited on one interpreter skips every pin whose
-    marker excludes it, though other matrix interpreters install it and the SBOM lists it.
-    Reading the lock directly is also why this needs no `--all-groups`/`--all-extras` pair to
-    keep in step with the project's own: a locked package is in the lock.
+    Not `uv export`: its universal requirements file keeps the environment markers, and
+    pip-audit evaluates them, so a pin another interpreter installs audits clean on this one
+    (ADR-0028). Reading the lock directly is also why this needs no `--all-groups`/`--all-extras`
+    pair to keep in step with the project's own: a locked package is in the lock.
 
     One file per version slot. pip-audit refuses a file that names a package twice — exit 1,
     "has duplicate requirements" — and a lockfile legitimately pins two versions of one package
@@ -204,19 +200,15 @@ def audit(context: Context, ignore: str | None = None) -> None:
 
     Every entry is validated whatever its source, and the two sources that leave no
     trace in the repository — ``--ignore`` and the environment variable — must carry an
-    expiry, so they cannot mute a finding indefinitely. Whatever ends up applied is
-    printed with its origin, so a suppression injected through CI configuration alone
+    expiry, so they cannot mute a finding indefinitely (ADR-0029). Whatever ends up applied
+    is printed with its origin, so a suppression injected through CI configuration alone
     still shows up in the build log.
 
     What is audited is every version in `uv.lock`, plus the vendored CI manifest — not the
     environment this happens to be running in, and not a rendering of the lock that depends on
-    it. Two forms were tried and both saw less than the lock: `pip-audit` with no `-r`
-    enumerates *installed* distributions, so a Linux runner omits whatever a platform marker,
-    an extra or an unsynced group kept out of the venv; `uv export` keeps the markers in the
-    file and pip-audit evaluates them, so the same pins are skipped a step later. See
-    `audit_requirement_files`. The vendored tree needs naming separately because it ships as
-    source with no `.dist-info` for any scan to find, and it is code `./workflow.cmd` runs in
-    every job.
+    it (ADR-0028 records the two narrower forms this replaced). See `audit_requirement_files`.
+    The vendored tree needs naming separately because it ships as source with no `.dist-info`
+    for any scan to find, and it is code `./workflow.cmd` runs in every job.
 
     What it still cannot see: a vendored file edited by hand, since `vendor.txt` describes the
     packages that should be there; and anything in `[build-system] requires`, which no part of

@@ -181,8 +181,7 @@ def qa_sequence(*, audit: bool) -> tuple[str, ...]:
     """Return the steps one matrix cell runs, in order: the writers, the audit, then the gate.
 
     A function rather than a tuple literal in `run_combo`, so what a cell runs is a thing this
-    suite can ask about. The guard it replaces asserted `secure.audit` was in `QA_STEPS`, which
-    stopped meaning anything when the audit moved out of that tuple.
+    suite can ask about.
     """
     return (*QA_STEPS, *((AUDIT_STEP,) if audit else ()), QA_SETTLE_STEP)
 

@@ -316,7 +316,7 @@ def apply_badge(  # noqa: PLR0913 — one general-purpose writer for every badge
     updates the file; ``write=False`` leaves it alone and reports what it would have changed.
     The two cannot disagree about what "up to date" means, being the same substitution against
     the same file; a second implementation for the verifying side is how a check drifts from the
-    generator it guards.
+    generator it guards (ADR-0010).
 
     ``announce=False`` suppresses the success line for callers that print their own, such as the
     coverage ratchet's single ``[ratchet]`` line.
@@ -375,10 +375,8 @@ def execute_with_retries(context: Context, cmd: str, *, attempts: int, verdicts:
 
     Both exit non-zero, so the exit code cannot separate them. What can is the tool's own
     report: ``verdicts`` holds the phrases it prints when it reached a conclusion, either way,
-    and anything else is treated as not having got that far. Keying on the reporting contract
-    rather than on a traceback matters — the first version of this looked for a Python stack,
-    which caught a reset connection only because that exception happens to go uncaught, and
-    would have gone quietly inert the day pip-audit caught it and printed a message instead.
+    and anything else is treated as not having got that far. The reporting contract, not a
+    traceback, is what is keyed on (ADR-0028 records why).
 
     The bias is deliberate: a run whose output contains a verdict is never retried, so the worst
     this can do to a genuine finding is nothing at all.
@@ -414,11 +412,10 @@ def signing_requested(context: Context) -> bool:
 def commit(context: Context, message: str) -> None:
     """Commit the staged changes, letting git decide whether to sign.
 
-    Signing is deliberately not forced in either direction. ``commit.gpgsign`` is what the
-    developer or the repository has asked for, and a branch protected by a required-signatures
-    rule rejects an unsigned commit at push time — so hardcoding ``--no-gpg-sign`` would break
-    exactly the repositories that care most about provenance. CI, on the other hand, usually
-    has no signing key at all, and a release must not stop on a documentation commit.
+    Signing is deliberately not forced in either direction (ADR-0030): ``commit.gpgsign`` is
+    what the developer or the repository has asked for, and a required-signatures rule rejects
+    an unsigned commit at push time, while CI usually has no signing key at all and a release
+    must not stop on a documentation commit.
 
     So a signed commit is attempted first, and retried unsigned only when both guards hold:
     signing is what git was asked to do, and signing is what failed. Without the second guard

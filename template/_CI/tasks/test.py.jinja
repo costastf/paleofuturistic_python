@@ -257,11 +257,9 @@ def combine_coverage(context: Context, *, scope: str = '') -> None:
     each reports a miss on code the matrix as a whole exercises fully — reading one env's report
     understates coverage on exactly the code a five-interpreter matrix exists to test.
 
-    Averaging the per-env percentages would be meaningless: coverage is not a noisy measurement
-    of one quantity, it is the set of lines that ran.
-
     The union does not tell you that a line reached only under py315 works under py311. Coverage
-    measures reach, not correctness; the tests check the latter on all five.
+    measures reach, not correctness; the tests check the latter on all five. ADR-0025 is the
+    record.
 
     ``[tool.coverage.paths]`` is what makes this possible: each env installs the package into
     its own site-packages, and that mapping folds those paths back onto ``src/``.
@@ -286,8 +284,7 @@ def combine_coverage(context: Context, *, scope: str = '') -> None:
         # One interpreter's data, so it is written under that interpreter's name and gates
         # nothing. `reports/coverage.json` means the union across `env_list` — every reader of
         # it, the badge and the ratchet included, is entitled to that — and `fail_under` is set
-        # from the union, so no single env can clear it. `test.tox --env=py311` used to write
-        # both the wrong file and a failure.
+        # from the union, so no single env can clear it (ADR-0011).
         execute(context, f'uv run coverage json -o reports/coverage.{scope}.json --fail-under=0')
         return
     # The one place `fail_under` is enforced: the only run whose data is the union it was
