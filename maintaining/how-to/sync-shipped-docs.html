@@ -866,7 +866,7 @@
 <li>Run <code>./workflow.cmd maintain.sync-docs --write</code>.</li>
 <li>Commit both files together.</li>
 </ol>
-<p><code>./workflow.cmd maintain.sync-docs</code> without <code>--write</code> names the shipped pages that differ from their render and exits 1. <code>tests/test_template_invariants.py::test_shipped_rationale_pages_are_rendered_from_canonical</code> asserts the same equality, so a canonical edit that was not rendered fails <code>test.invariants</code> until it is.</p>
+<p><code>./workflow.cmd maintain.sync-docs</code> without <code>--write</code> names the shipped pages that differ from their render and exits 1. <code>tests/invariants/test_docs.py::test_shipped_rationale_pages_are_rendered_from_canonical</code> asserts the same equality, so a canonical edit that was not rendered fails <code>test.invariants</code> until it is.</p>
 <h2 id="what-the-render-does">What the render does</h2>
 <p>The shipped copy is the canonical page with:</p>
 <ul>

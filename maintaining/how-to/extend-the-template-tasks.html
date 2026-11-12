@@ -844,7 +844,7 @@
 <p><strong>Update the shipped task catalog.</strong> <code>template/docs/developer/reference/invoke-tasks.md.jinja</code> lists every task a generated project exposes; add your task with the same knob-gating as the code.</p>
 </li>
 <li>
-<p><strong>Add an invariant.</strong> A conditional task should have a matching assertion in <code>tests/test_template_invariants.py</code> (see the existing <code>test_pages_task_definition_matches_choice</code> for the pattern: assert the <code>def</code> is present iff the knob is on).</p>
+<p><strong>Add an invariant.</strong> A conditional task should have a matching assertion under <code>tests/invariants/</code>, in the module for the subject it reads (see the existing <code>test_pages_task_definition_matches_choice</code> for the pattern: assert the <code>def</code> is present iff the knob is on).</p>
 </li>
 <li>
 <p><strong>Verify:</strong></p>

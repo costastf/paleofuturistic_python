@@ -884,7 +884,7 @@
 <pre><code class="language-bash">TEMPLATE_SECURITY_OVERRIDE=&quot;CVE-2025-71176&quot; ./workflow.cmd test.combo --mature
 </code></pre>
 <h2 id="adding-a-new-invariant">Adding a new invariant</h2>
-<p>Structural assertions live in <code>tests/test_template_invariants.py</code>; each test receives one generated project per matrix cell via the <code>generated_project</code> fixture. Adding an assertion is one new <code>test_*</code> function. Adding a new combo axis means editing <code>matrix_combos()</code> in <code>_CI/tasks/configuration.py</code> — both the pytest suite and the Invoke matrix runner pick it up automatically.</p>
+<p>Structural assertions live under <code>tests/invariants/</code>, one module per subject they read (<code>test_pipelines.py</code>, <code>test_gate.py</code>, <code>test_security.py</code>, <code>test_release.py</code>, <code>test_tasks.py</code>, <code>test_generation.py</code>, <code>test_docs.py</code>, <code>test_runner.py</code>) with shared helpers in <code>support.py</code>; each test receives one generated project per matrix cell via the <code>generated_project</code> fixture. Adding an assertion is one new <code>test_*</code> function. Adding a new combo axis means editing <code>matrix_combos()</code> in <code>_CI/tasks/configuration.py</code> — both the pytest suite and the Invoke matrix runner pick it up automatically.</p>
 <h2 id="see-also">See also</h2>
 <ul>
 <li><a href="../decisions/0038-template-tests-snapshot-pin-and-mature.html">ADR-0038</a> — why the snapshot, the pinned uv and the matured cell are shaped this way.</li>
