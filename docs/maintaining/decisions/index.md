@@ -78,3 +78,4 @@ anywhere in the repository resolves to a file.
 | [ADR-0039](0039-repository-url-renders-well-known-project-urls-or-nothing.md) | `repository_url` renders well-known `[project.urls]`, or nothing |
 | [ADR-0040](0040-the-default-branch-is-a-copier-answer.md) | The default branch is a copier answer |
 | [ADR-0041](0041-fork-pull-requests-run-the-gate-on-the-runners-image.md) | Fork pull requests run the gate on the runner's image |
+| [ADR-0042](0042-refresh-deps-moves-the-boundary-and-the-pins-together.md) | `develop.refresh-deps` moves the boundary and the pins together |

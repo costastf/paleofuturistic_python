@@ -1,5 +1,8 @@
 """Development setup task definitions."""
 
+import re
+import tomllib
+from datetime import date
 from pathlib import Path
 from typing import cast
 
@@ -19,10 +22,29 @@ from _CI.uv_release import (
     version_key,
 )
 
-from .configuration import PYLOCK_FILE
+from .configuration import PYLOCK_FILE, UV_LOCK
 from .shared import execute, logged, run
 
 PYPROJECT = Path('pyproject.toml')
+EXCLUDE_NEWER = re.compile(r'^exclude-newer = "(?P<boundary>[^"]*)"$', re.MULTILINE)
+# A dependency entry pinned exactly: `"name==1.2"` or `"name[extra]==1.2"`, alone on its line,
+# which is how every group in pyproject.toml spells its entries. Comments and the build
+# backend's range are not matched.
+PIN = re.compile(
+    r'^(?P<lead>\s*")(?P<name>[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)(?P<extras>\[[^\]]*\])?'
+    r'==(?P<version>[^"]+)"',
+    re.MULTILINE,
+)
+# One line of `uv tree --outdated`: `├── ty v0.0.100 (group: lint) (latest: v0.0.101)`. Lines
+# without a `latest` are current and do not match.
+OUTDATED = re.compile(
+    r'^[│├└─\s]*(?P<name>[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)(?:\[[^\]]*\])? v(?P<version>\S+)'
+    r'.*\(latest: v(?P<latest>[^)]+)\)',
+    re.MULTILINE,
+)
+# Pins `develop.refresh-deps` leaves alone. uv's version is tied to the base image's digest,
+# and `develop.bump-uv` is what moves the two together.
+HELD_BACK = frozenset({'uv'})
 
 
 @task
@@ -107,6 +129,111 @@ def bump_uv(context: Context, version: str = '') -> None:
     execute(context, 'uv lock')
 
 
+def canonical(name: str) -> str:
+    """Normalise ``name`` the way PyPI and uv compare it: lowercase, runs of `-`, `_` and `.` as one `-`."""
+    return re.sub(r'[-_.]+', '-', name).lower()
+
+
+def outdated_pins(tree: str) -> dict[str, str]:
+    """Return ``{canonical name: newest version under the boundary}`` from ``uv tree --outdated``."""
+    return {canonical(match['name']): match['latest'] for match in OUTDATED.finditer(tree)}
+
+
+def move_pins(content: str, latest: dict[str, str]) -> tuple[str, list[tuple[str, str, str]]]:
+    """Rewrite every exact pin in ``content`` that ``latest`` knows a newer version for.
+
+    Returns the new content and ``[(name, old, new), ...]`` for what moved. Names in
+    ``HELD_BACK`` stay where they are whatever ``latest`` says.
+    """
+    moved: list[tuple[str, str, str]] = []
+
+    def replace(match: re.Match[str]) -> str:
+        name = canonical(match['name'])
+        target = latest.get(name)
+        if target is None or name in HELD_BACK or target == match['version']:
+            return match.group(0)
+        moved.append((match['name'], match['version'], target))
+        return f'{match["lead"]}{match["name"]}{match["extras"] or ""}=={target}"'
+
+    return PIN.sub(replace, content), moved
+
+
+def locked_versions() -> dict[str, str]:
+    """``{name: version}`` for every package in ``uv.lock``."""
+    packages = tomllib.loads(UV_LOCK.read_text(encoding='utf-8')).get('package', [])
+    return {package['name']: package['version'] for package in packages}
+
+
+@task
+@logged('develop.refresh-deps')
+def refresh_deps(context: Context, boundary: str = '') -> None:
+    """Raise the resolution boundary to today and move every pin up to it.
+
+    `[tool.uv] exclude-newer` is a fixed date, so nothing changes until someone moves it
+    (ADR-0008). This is the move: the date goes to today, every exact pin in `pyproject.toml`
+    goes to the newest release under the new date, and `uv lock --upgrade` brings the
+    transitive closure with it. It prints what moved and stops short of committing, because
+    the full QA cycle has to pass on the result first; the date, the pins and `uv.lock` then
+    land in one commit, so the boundary and the pins never disagree (ADR-0042).
+
+    `uv` is the one pin left alone: its version is tied to the base image's digest, and
+    `develop.bump-uv` moves the two together. A newer uv is mentioned, not taken.
+
+    Args:
+        context: Invoke context.
+        boundary: Date to set instead of today, as YYYY-MM-DD, to take releases up to a day
+            that is not today, or to re-run a refresh at a boundary already chosen.
+
+    """
+    target = boundary or date.today().isoformat()  # noqa: DTZ011 - a calendar date, like the one it replaces
+    try:
+        date.fromisoformat(target)
+    except ValueError:
+        print(f'`{target}` is not a date of the form YYYY-MM-DD.')
+        raise SystemExit(1) from None
+    original = PYPROJECT.read_text(encoding='utf-8')
+    match = EXCLUDE_NEWER.search(original)
+    if not match:
+        print('No `exclude-newer = "…"` line in pyproject.toml; nothing to raise.')
+        raise SystemExit(1)
+    previous = match['boundary']
+    content = EXCLUDE_NEWER.sub(f'exclude-newer = "{target}"', original)
+    PYPROJECT.write_text(content, encoding='utf-8')
+    print(f'exclude-newer {previous} → {target}')
+
+    # Asked under the new boundary, so "latest" means the newest release the date admits.
+    tree = context.run('uv tree --depth 1 --all-groups --outdated', hide=True, warn=True)
+    if tree.failed:
+        PYPROJECT.write_text(original, encoding='utf-8')
+        print(tree.stderr.strip())
+        print('Could not read which pins are behind; pyproject.toml is as it was.')
+        raise SystemExit(1)
+    latest = outdated_pins(tree.stdout)
+    content, moved = move_pins(content, latest)
+    PYPROJECT.write_text(content, encoding='utf-8')
+    for name, old, new in moved:
+        print(f'  {name} {old} → {new}')
+    if not moved:
+        print('  every exact pin is already the newest release under the boundary')
+    for name in sorted(HELD_BACK & latest.keys()):
+        print(f'  {name} {latest[name]} is available; `./workflow.cmd develop.bump-uv` is what moves it')
+
+    before = locked_versions()
+    execute(context, 'uv lock --upgrade')
+    after = locked_versions()
+    direct = {canonical(name) for name, _, _ in moved}
+    transitive = sorted(
+        f'{name} {before[name]} → {after[name]}'
+        for name in before.keys() & after.keys()
+        if before[name] != after[name] and canonical(name) not in direct
+    )
+    if transitive:
+        print(f'  {len(transitive)} transitive dependencies moved in uv.lock:')
+        for line in transitive:
+            print(f'    {line}')
+    print('Run `./workflow.cmd preflight` and commit pyproject.toml and uv.lock together.')
+
+
 @task
 @logged('develop.pylock')
 def pylock(context: Context) -> None:
@@ -127,4 +254,5 @@ namespace = Collection('develop')
 namespace.add_task(cast(Task, pre_commit_install), name='pre-commit-install')
 namespace.add_task(cast(Task, pre_commit), name='pre-commit')
 namespace.add_task(cast(Task, bump_uv), name='bump-uv')
+namespace.add_task(cast(Task, refresh_deps), name='refresh-deps')
 namespace.add_task(cast(Task, pylock))

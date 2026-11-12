@@ -87,7 +87,7 @@ Together these are what make one command mean the same thing in three places.
 
 ## uv is the only tool you install
 
-Records: [ADR-0002](../decisions/0002-uv-is-the-only-tool-you-install.md), [ADR-0008](../decisions/0008-reproducibility-by-pin.md).
+Records: [ADR-0002](../decisions/0002-uv-is-the-only-tool-you-install.md), [ADR-0008](../decisions/0008-reproducibility-by-pin.md), [ADR-0042](../decisions/0042-refresh-deps-moves-the-boundary-and-the-pins-together.md).
 
 Earlier revisions asked users to install Python, then `pipx`, then `tox`, then `pre-commit`, then `commitizen`. Today, every one of those is a uv-managed dependency group inside the generated project. You install uv; uv installs the rest.
 

@@ -39,8 +39,8 @@ Three things could change what a project resolved to without a commit changing i
   from the committed literal.
 - The seven-day cool-down is also what keeps a stamped uv pin resolvable under a quarantine date
   stamped the same day.
-- Raising the quarantine date is still a three-step manual flow; a `develop.refresh-deps` task is
-  the open follow-up.
+- Raising the quarantine date was a three-step manual flow until ADR-0042 added
+  `develop.refresh-deps`.
 
 ## References
 

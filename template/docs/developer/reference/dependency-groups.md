@@ -54,10 +54,15 @@ packages. Stamping means the boundary was current on day one and is frozen from 
 
 The consequence is that **upgrades are deliberate**. To take newer versions:
 
-1. Raise `exclude-newer` to today's date.
-2. Re-resolve (`uv lock --upgrade`) and run the full QA cycle.
+1. `./workflow.cmd develop.refresh-deps` raises `exclude-newer` to today, moves every exact
+   pin to the newest release under the new date, and runs `uv lock --upgrade` for the rest.
+   It prints what moved. `--boundary=<YYYY-MM-DD>` picks another date.
+2. Run the full QA cycle (`./workflow.cmd preflight`) and fix what the new versions broke.
 3. Commit the date, the pin bumps and `uv.lock` **together** — a boundary that disagrees
    with the pins is the confusing state this setup exists to prevent.
+
+The task leaves the `uv` pin alone, because that one is tied to the base image's digest; it
+says when a newer uv is available, and `develop.bump-uv` below is what takes it.
 
 `[tool.docker-versions]` is pinned the same way, by tag *and* digest. A reference carrying
 both resolves to the digest, so a bumped tag with a stale digest silently keeps the old image;

@@ -1737,6 +1737,68 @@ def test_generated_quarantine_date_is_stamped_not_inherited(generated_project):
     assert abs((today - stamped).days) <= 1, f'quarantine date {stamped} was not stamped at generation'
 
 
+OUTDATED_TREE = """\
+paleofuturistic-python-project v0.0.0
+├── check-wheel-contents v0.6.3 (group: build)
+├── ty v0.0.100 (group: dev) (latest: v0.0.101)
+├── uv v0.13.7 (group: dev) (latest: v0.13.9)
+├── validate-pyproject[all] v0.27 (group: dev) (latest: v0.28)
+├── Pytest_Env v1.8.5 (group: test) (latest: v1.9.0)
+└── ruff v0.17.4 (group: lint)
+"""
+
+PINNED_PYPROJECT = """\
+[build-system]
+requires = ["uv_build>=0.8.15,<=0.13.7"]
+
+[dependency-groups]
+lint = [
+    # Newest version clearing the [tool.uv] exclude-newer boundary.
+    "ty==0.0.100",
+    "validate-pyproject[all]==0.27",
+    "ruff==0.17.4",
+]
+test = [
+    "pytest-env==1.8.5",
+    "uv==0.13.7",  # moves with develop.bump-uv
+]
+"""
+
+
+def test_refresh_deps_moves_every_exact_pin_except_uv(generated_project):
+    """`develop.refresh-deps` rewrites the pins `uv tree --outdated` names, and never uv's.
+
+    The newest version comes from uv under the boundary just set, so a pin cannot move past
+    it. uv's own pin is tied to the base image's digest and belongs to `develop.bump-uv`
+    (ADR-0042). Extras survive, names compare the way PyPI compares them, and the build
+    backend's range is not an exact pin, so it is not touched.
+    """
+    project, _ = generated_project
+    source = (project / '_CI' / 'tasks' / 'develop.py').read_text(encoding='utf-8')
+    helpers = exec_from(source, 'canonical', 'outdated_pins', 'move_pins', 'PIN', 'OUTDATED', 'HELD_BACK', re=re)
+    latest = helpers['outdated_pins'](OUTDATED_TREE)
+    assert latest == {'ty': '0.0.101', 'uv': '0.13.9', 'validate-pyproject': '0.28', 'pytest-env': '1.9.0'}
+    content, moved = helpers['move_pins'](PINNED_PYPROJECT, latest)
+    assert moved == [
+        ('ty', '0.0.100', '0.0.101'),
+        ('validate-pyproject', '0.27', '0.28'),
+        ('pytest-env', '1.8.5', '1.9.0'),
+    ]
+    assert '"ty==0.0.101",' in content
+    assert '"validate-pyproject[all]==0.28",' in content, 'the extras were lost'
+    assert '"pytest-env==1.9.0",' in content, 'the name was not compared the way PyPI compares it'
+    assert '"ruff==0.17.4",' in content, 'a current pin moved'
+    assert '"uv==0.13.7",  # moves with develop.bump-uv' in content, 'the uv pin moved, leaving the image digest behind'
+    assert 'requires = ["uv_build>=0.8.15,<=0.13.7"]' in content, 'the build backend range was rewritten'
+    assert '# Newest version clearing the [tool.uv] exclude-newer boundary.' in content
+    assert helpers['HELD_BACK'] == frozenset({'uv'})
+    # The task says a newer uv exists rather than taking it; the body spells the hand-off.
+    body = source.split('def refresh_deps', 1)[1].split('\n@task', 1)[0]
+    assert 'develop.bump-uv' in body, 'a held-back uv is not pointed at the task that moves it'
+    assert 'uv lock --upgrade' in body, 'the transitive closure is not re-resolved'
+    assert 'preflight' in body, 'the task does not say what has to pass before the commit'
+
+
 def test_base_image_is_pinned_by_digest(generated_project):
     """The base image carries a digest and its tag matches the project's minimum Python.
 

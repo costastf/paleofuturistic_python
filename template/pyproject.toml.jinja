@@ -415,9 +415,9 @@ required-version = "==0.13.7"
 # Every dependency above is pinned exactly, so this bounds the transitive closure.
 #
 # The value was stamped with the date this project was generated, and stays put until you
-# move it. Raising it is a deliberate act: change the date, re-resolve, and land the
-# resulting pin bumps and `uv.lock` in the same commit so the boundary and the pins never
-# disagree. See docs/developer/reference/dependency-groups.md for the flow.
+# move it. Raising it is a deliberate act: `./workflow.cmd develop.refresh-deps` moves the
+# date, the exact pins above and `uv.lock` together, and you land all three in one commit so
+# the boundary and the pins never disagree. See docs/developer/reference/dependency-groups.md.
 #
 # (The literal below is only a fallback; `tasks_render.py` overwrites it at generation.)
 exclude-newer = "2026-11-10"
