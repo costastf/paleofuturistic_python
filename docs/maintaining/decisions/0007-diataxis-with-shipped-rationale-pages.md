@@ -31,9 +31,8 @@ explanation pages link to them on the published site.
 
 - Each new page has a home decided by what the reader needs, and a reader can tell which site
   they are on by whether the subject is the template or their project.
-- The six pages are synced by hand. Heading drift is caught; prose drift is not, and the
-  2026-11-11 audit found some. A `maintain.sync-docs` task that renders the shipped copies from
-  the canonical ones is the open follow-up.
+- The six pages were synced by hand until ADR-0046: heading drift was caught, prose drift was
+  not, and the 2026-11-11 audit found some. `maintain.sync-docs` now renders them.
 - The generated task catalog is checked against the registered tasks, and every page in a
   generated nav must exist, so the shipped docs cannot name a task or page that is gone.
 

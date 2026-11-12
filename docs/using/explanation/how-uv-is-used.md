@@ -1,6 +1,7 @@
 # How uv is used
 
 This template uses [uv](https://docs.astral.sh/uv/) for every Python operation in a generated project: creating virtualenvs, installing dependencies, resolving the lockfile, publishing to PyPI, even fetching Python interpreters. This page explains why, and what the template gives up to get there.
+<!-- shipped: This project uses [uv](https://docs.astral.sh/uv/) for every Python operation: creating virtualenvs, installing dependencies, resolving the lockfile, publishing to PyPI, even fetching Python interpreters. This page explains why, and what the template gives up to get there. -->
 
 ## What uv replaces
 
@@ -34,7 +35,9 @@ uv replaces all of them with a single Rust binary that:
 **Older Python support.** uv itself supports far older interpreters than the template targets, so the project's chosen `min_python_version` (as low as 3.11) isn't a constraint uv adds — if a generated project wanted to support 3.8, uv wouldn't stop it; that configuration just isn't one the template tests.
 
 **Familiarity.** Some contributors will arrive expecting `pip install -r requirements.txt`. The generated README points them to `./workflow.cmd bootstrap` and the [tutorial that walks through generating a first project](../tutorials/generate-your-first-project.md).
+<!-- shipped: **Familiarity.** Some contributors will arrive expecting `pip install -r requirements.txt`. The README points them at `./workflow.cmd`, and [First-run setup](../tutorials/first-run-setup.md) walks the whole loop. -->
 
+<!-- template-only -->
 ## Which uv version a new project gets
 
 Because `[tool.uv] required-version` is an **exact** pin, a stale uv version does not merely
@@ -63,6 +66,7 @@ Two escape hatches:
 - **Generate offline.** If PyPI cannot be reached, generation keeps the version the template
   committed and says so. It never fails for want of a network, and never falls back silently.
 
+<!-- /template-only -->
 ## When this decision could be revisited
 
 If two of these became true together:
@@ -75,3 +79,6 @@ Then the cost of migration would be one template revision and a `copier update`.
 ## See also
 
 - [Design principles](../../maintaining/explanation/design-principles.md) — why dependency groups replaced extras.
+<!-- shipped-only
+- [Dependency groups](../reference/dependency-groups.md) — the groups this project ships with, and the uv pin.
+-->

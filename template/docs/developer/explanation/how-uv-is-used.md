@@ -1,11 +1,11 @@
-<!-- canonical: synced from docs/using/explanation/how-uv-is-used.md in the paleofuturistic_python template repo. Edit there first. -->
+<!-- canonical: rendered from docs/using/explanation/how-uv-is-used.md in the paleofuturistic_python template repo by `./workflow.cmd maintain.sync-docs`. Edit there, not here. -->
 # How uv is used
 
-This project uses [uv](https://docs.astral.sh/uv/) for every Python operation: creating virtualenvs, installing dependencies, resolving the lockfile, publishing to PyPI, even fetching Python interpreters. This page explains why, and what the scaffold gives up to get there.
+This project uses [uv](https://docs.astral.sh/uv/) for every Python operation: creating virtualenvs, installing dependencies, resolving the lockfile, publishing to PyPI, even fetching Python interpreters. This page explains why, and what the template gives up to get there.
 
 ## What uv replaces
 
-In an older lineage of the template, a fresh checkout required: a system Python, pipx, virtualenv, pipenv and pip-tools. Each had its own configuration surface, its own caching behaviour, and its own update cadence.
+In an older lineage of this template, a fresh checkout required: a system Python, pipx, virtualenv, pipenv and pip-tools. Each had its own configuration surface, its own caching behaviour, and its own update cadence.
 
 uv replaces all of them with a single Rust binary that:
 
@@ -27,12 +27,12 @@ uv replaces all of them with a single Rust binary that:
 
 ## What the template gives up
 
-**Tool risk.** uv is one company's project (Astral). If they pivot or the project stalls, a project built on it is more exposed than one that stuck with the pip/build/twine stack maintained by the PyPA. The scaffold mitigates by:
+**Tool risk.** uv is one company's project (Astral). If they pivot or the project stalls, a project built on it is more exposed than one that stuck with the pip/build/twine stack maintained by the PyPA. The template mitigates by:
 
-- Keeping `pyproject.toml` valid against PEP 517 / 518 / 621 — any PEP-compliant tool could build it.
+- Keeping the generated `pyproject.toml` valid against PEP 517 / 518 / 621 — any PEP-compliant tool could build it.
 - Not relying on uv-specific syntax beyond dependency groups (which are themselves standardised).
 
-**Older Python support.** uv itself supports far older interpreters than the template targets, so this project's chosen minimum Python version (as low as 3.11) isn't a constraint uv adds.
+**Older Python support.** uv itself supports far older interpreters than the template targets, so the project's chosen `min_python_version` (as low as 3.11) isn't a constraint uv adds — if this project wanted to support 3.8, uv wouldn't stop it; that configuration just isn't one the template tests.
 
 **Familiarity.** Some contributors will arrive expecting `pip install -r requirements.txt`. The README points them at `./workflow.cmd`, and [First-run setup](../tutorials/first-run-setup.md) walks the whole loop.
 
@@ -48,4 +48,4 @@ Then the cost of migration would be one template revision and a `copier update`.
 ## See also
 
 - [Design principles](design-principles.md) — why dependency groups replaced extras.
-- [Dependency groups](../reference/dependency-groups.md) — the groups this project ships with.
+- [Dependency groups](../reference/dependency-groups.md) — the groups this project ships with, and the uv pin.

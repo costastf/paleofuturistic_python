@@ -1,11 +1,11 @@
-<!-- canonical: synced from docs/maintaining/explanation/the-ci-tasks-architecture.md in the paleofuturistic_python template repo. Edit there first. -->
+<!-- canonical: rendered from docs/maintaining/explanation/the-ci-tasks-architecture.md in the paleofuturistic_python template repo by `./workflow.cmd maintain.sync-docs`. Edit there, not here. -->
 # The _CI tasks architecture
 
 The `_CI/` directory is this project's portable CI/CD framework — vendored [Invoke](https://www.pyinvoke.org/) plus a set of opinionated task modules. This page covers the design.
 
 ## Why Invoke, not make / just / nox
 
-| Tool | Pro | Con (for this scaffold) |
+| Tool | Pro | Con (for this template) |
 | --- | --- | --- |
 | `make` | Universal | Whitespace-sensitive, shell-quoted args, awkward Python integration |
 | `just` | Modern, fast | Extra binary to install; not Python-native |
@@ -46,7 +46,7 @@ _CI/tasks/
 ├── configuration.py     # Shared constants (paths, env vars, registry settings)
 ├── shared.py            # @logged, @run, execute, run_steps, apply_badge, IndentingStream
 ├── github.py / gitlab.py  # Host-specific helpers (only one is present)
-├── local.py             # Yours. Never overwritten by `copier update`
+├── local.py             # The project's own tasks. Never overwritten by `copier update`
 └── <feature>.py         # build, container, develop, document, format_, lint,
                          #   preflight, quality, release, sbom, secure, test
 ```
@@ -98,7 +98,7 @@ This makes CI runs informative — you see every issue per run instead of fixing
 
 ## Host-specific code isolation
 
-Whichever host was chosen at generation time — GitHub or GitLab — determines whether `_CI/tasks/github.py` or `_CI/tasks/gitlab.py` shipped in this project. Both expose the same contract:
+Whichever host was chosen at generation time — GitHub or GitLab — determines whether `_CI/tasks/github.py` or `_CI/tasks/gitlab.py` ships in this project. Both expose the same contract:
 
 - `registry_settings() -> RegistrySettings`
 - `publish_deps_image(context, tag) -> str`
@@ -109,7 +109,7 @@ Whichever host was chosen at generation time — GitHub or GitLab — determines
 - `pipeline_badge(context) -> str`
 - `iter_pipeline_components() -> Iterator[PipelineComponent]`
 
-`container.py`, `release.py`, `document.py` and `sbom.py` import whichever module survived generation via a relative import that was rendered concrete at copy time. Because the unchosen module is omitted entirely at generation time via a copier conditional filename, this project has exactly one code path and no runtime branching between hosts.
+`container.py`, `release.py`, `document.py` and `sbom.py` import whichever module survived generation via a relative import that's rendered concrete at copy time: a GitHub project ends up with `from .github import …`, a GitLab project with `from .gitlab import …`. Because the unchosen module is omitted entirely at generation time via a copier conditional filename (its rendered name is empty when not selected), this project has exactly one code path and no runtime branching between hosts.
 
 ## See also
 

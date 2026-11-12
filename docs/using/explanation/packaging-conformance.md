@@ -26,8 +26,18 @@ Each tool reads a different artifact, so none of them overlaps with another.
 | [check-wheel-contents](https://github.com/jwodder/check-wheel-contents) | The built wheel | Bytecode, duplicate files, modules outside the package, an empty package, and files at the top level of `site-packages`. | `build.package`. |
 
 validate-pyproject is a per-file step because whether `pyproject.toml` conforms is a question
-about that file alone. The other two need a built wheel, and a wheel is built from the whole
-tree, so they run on push with the rest of `build`.
+about that file alone, so a commit that does not touch it does not pay for it. The other two need
+a built wheel, and a wheel is built from the whole tree, so they run on push with the rest of
+`build`.
+
+<!-- shipped-only
+To run them yourself:
+
+```bash
+./workflow.cmd lint.pyproject
+./workflow.cmd build.package
+```
+-->
 
 ## What they cannot catch
 
@@ -35,14 +45,14 @@ tree, so they run on push with the rest of `build`.
   the wrong repository: all valid, all published.
 - **A `License ::` classifier beside a `license` expression.** The licence-expression spec says
   tools should refuse the combination, but `uv_build` builds it and none of the three flags it.
-  Generated projects ship without one; adding one is a mistake no gate catches.
+  A generated project ships without one; adding one is a mistake no gate catches.
 - **Whether PyPI already has this version.** Only the upload finds out. `uv publish --check-url`
   can skip files that already exist when re-running a partial upload.
 
 ## Why the version is not `dynamic`
 
 `[project] dynamic` lets the build backend compute a field, typically the version from a git tag.
-Generated projects do not use it: `./workflow.cmd release` has commitizen write the new version
+A generated project does not use it: `./workflow.cmd release` has commitizen write the new version
 into `pyproject.toml`, and CI tags that version once it lands on the default branch, so the version in the
 file is the released one and every field is static. Static metadata is what validate-pyproject, twine and anything else that
 reads `pyproject.toml` without running a build can see.
@@ -57,3 +67,6 @@ That is the job of the PEP 740 attestations signed at publish time; see
 
 - [Packaging specifications](../reference/packaging-specifications.md) — every spec, and how a generated project meets it.
 - [How uv is used](how-uv-is-used.md) — the build backend and the lockfile.
+<!-- shipped-only
+- [Invoke task catalog](../reference/invoke-tasks.md) — `lint.pyproject` and `build.package`.
+-->

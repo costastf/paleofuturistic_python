@@ -1,7 +1,7 @@
-<!-- canonical: synced from docs/using/explanation/packaging-conformance.md in the paleofuturistic_python template repo. Edit there first. -->
+<!-- canonical: rendered from docs/using/explanation/packaging-conformance.md in the paleofuturistic_python template repo by `./workflow.cmd maintain.sync-docs`. Edit there, not here. -->
 # Packaging conformance
 
-Your project's metadata and distributions are checked against the
+This project's metadata and distributions are checked against the
 [PyPA packaging specifications](https://packaging.python.org/en/latest/specifications/) on every
 push, not first discovered by PyPI during a release. This page explains which tools do the
 checking, why those three, where each one runs, and what none of them can catch. The
@@ -12,10 +12,9 @@ spec-by-spec list is [Packaging specifications](../reference/packaging-specifica
 `uv build` is permissive: it will build a wheel from a `pyproject.toml` that PyPI then refuses, or
 worse, accepts and renders wrong. A README with broken markup shows as raw text on the project
 page. A misspelt classifier is rejected at upload. A stray file at the wheel's top level installs
-into every user's `site-packages`. Without the checks, each of these turns up at release time,
-when the tag is already pushed and there is no cheap way back, or is reported by a user. Checking
-the files the way an index and an installer read them moves all of it to the push that introduced
-it.
+into every user's `site-packages`. Each of these is found today either at release time, when a
+tag is already pushed and there is no cheap way back, or by a user. Checking the files the way an
+index and an installer read them moves all of it to the push that introduced it.
 
 ## Three tools, three different files
 
@@ -45,17 +44,17 @@ To run them yourself:
   the wrong repository: all valid, all published.
 - **A `License ::` classifier beside a `license` expression.** The licence-expression spec says
   tools should refuse the combination, but `uv_build` builds it and none of the three flags it.
-  Your project ships without one; adding one is a mistake no gate catches.
+  This project ships without one; adding one is a mistake no gate catches.
 - **Whether PyPI already has this version.** Only the upload finds out. `uv publish --check-url`
   can skip files that already exist when re-running a partial upload.
 
 ## Why the version is not `dynamic`
 
 `[project] dynamic` lets the build backend compute a field, typically the version from a git tag.
-This project does not use it: `./workflow.cmd release` has commitizen write the new version into
-`pyproject.toml`, and CI tags that version once it lands on the default branch, so the version in the file is
-the released one and every field is static. Static metadata is what validate-pyproject, twine and anything else that reads
-`pyproject.toml` without running a build can see.
+This project does not use it: `./workflow.cmd release` has commitizen write the new version
+into `pyproject.toml`, and CI tags that version once it lands on the default branch, so the version in the
+file is the released one and every field is static. Static metadata is what validate-pyproject, twine and anything else that
+reads `pyproject.toml` without running a build can see.
 
 ## Where provenance fits
 
@@ -65,5 +64,6 @@ That is the job of the PEP 740 attestations signed at publish time; see
 
 ## See also
 
-- [Packaging specifications](../reference/packaging-specifications.md) — every spec, and what enforces it here.
+- [Packaging specifications](../reference/packaging-specifications.md) — every spec, and how this project meets it.
+- [How uv is used](how-uv-is-used.md) — the build backend and the lockfile.
 - [Invoke task catalog](../reference/invoke-tasks.md) — `lint.pyproject` and `build.package`.

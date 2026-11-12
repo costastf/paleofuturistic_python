@@ -1,19 +1,23 @@
-<!-- canonical: synced from docs/maintaining/explanation/design-principles.md in the paleofuturistic_python template repo. Edit there first. -->
+<!-- canonical: rendered from docs/maintaining/explanation/design-principles.md in the paleofuturistic_python template repo by `./workflow.cmd maintain.sync-docs`. Edit there, not here. -->
 # Design principles
 
-The scaffold this project inherited is opinionated. The choices below were made deliberately, not by accumulation — each replaces something an earlier revision of the template relied on. The dated decision records behind them, with the situation each was made in, are published with the template at [Decision records](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/index.html).
+The scaffold this project inherited is opinionated. The choices below were made deliberately, not by accumulation — each replaces something an earlier revision of the template relied on. This page is the overview; each principle has a dated [decision record](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/index.html), published with the template, with the situation it was made in and what it cost.
 
 ## Pipelines run template commands only
 
+Records: [ADR-0004](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0004-pipelines-run-template-commands-only.html), [ADR-0033](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0033-the-deps-image-is-content-addressed-and-handed-on-by-digest.html), [ADR-0034](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0034-the-deps-image-runs-as-uid-1001.html), [ADR-0035](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0035-github-reuses-a-deps-tag-gitlab-builds-with-kaniko.html), [ADR-0036](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0036-checkouts-persist-no-credentials.html), [ADR-0041](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0041-fork-pull-requests-run-the-gate-on-the-runners-image.html), [ADR-0043](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0043-the-gitlab-deps-tag-is-computed-by-the-launcher.html).
+
 Every CI step is a `./workflow.cmd <task>` call — no inline `uv …`, `pip install …`, ad-hoc `properdocs …`, or other business logic in YAML. Behaviour changes happen in `_CI/tasks/`; workflow files are glue.
 
-Two side-effects of this rule earn it its own section:
+Two side-effects of this rule earn the rule a section of its own:
 
 **Parity.** What CI runs is exactly what you can run locally. Debugging a failing CI step means running the same `./workflow.cmd` command on your laptop. No "but it worked on my machine" gap, no separate path to maintain.
 
-**And those commands lean on tracked dependencies.** When a `properdocs` / `uv` / `pytest` invocation can do a CI step, it's preferred over a GitHub Action, because every Python dependency is pinned in `uv.lock` and surfaces in the project SBOM. Action dependencies are hidden inside `uses:` references and never appear in the supply-chain picture. Concretely: `properdocs gh-deploy` over `actions/upload-pages-artifact` + `actions/deploy-pages`; `./workflow.cmd test` over inline `pytest` invocations; and so on. Three actions are unavoidable: `actions/checkout` to fetch the repo, `astral-sh/setup-uv` to bootstrap the toolchain itself when the deps image isn't used, and `actions/attest-build-provenance`, since GitHub's own provenance attestation can only be recorded by GitHub — beyond those, prefer commands.
+**And those commands lean on tracked dependencies.** When a `properdocs` / `uv` / `pytest` invocation can do a CI step, it is preferred over a GitHub Action, because every Python dependency is pinned in `uv.lock` and surfaces in the project SBOM. Action dependencies are hidden inside `uses:` references and never appear in the supply-chain picture. Concretely: `properdocs gh-deploy` over `actions/upload-pages-artifact` + `actions/deploy-pages`; `./workflow.cmd test` over inline `pytest` invocations; and so on. Three actions are unavoidable: `actions/checkout` to fetch the repo, `astral-sh/setup-uv` to bootstrap the toolchain itself when the deps image isn't used, and `actions/attest-build-provenance`, since GitHub's own provenance attestation can only be recorded by GitHub — beyond those, prefer commands.
 
 ## The QA gate
+
+Records: [ADR-0009](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0009-one-qa-gate.html), [ADR-0010](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0010-verifying-is-the-default-writing-is-a-flag.html), [ADR-0011](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0011-report-names-carry-a-scope.html), [ADR-0022](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0022-one-commit-stage-hook-and-no-filter-on-pre-push.html), [ADR-0023](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0023-staged-paths-with-shell-characters-are-refused.html), [ADR-0024](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0024-commit-messages-are-checked-over-the-unpushed-range.html), [ADR-0026](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0026-pyscn-json-in-the-gate-html-on-demand.html), [ADR-0027](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0027-heavy-imports-stay-out-of-launcher-startup.html).
 
 The **QA gate** is not a command; it is the role a command plays. `preflight` with no flags is the gate: it
 runs every check, compares every derived value against what the tools just measured, writes nothing,
@@ -32,7 +36,7 @@ exactly one thing ever writes that badge, and only from a run that measured it.
 
 ### How the checks run
 
-**One registry, three consumers.** `STEPS` in your `_CI/tasks/preflight.py` declares every check once,
+**One registry, three consumers.** `STEPS` in `_CI/tasks/preflight.py` declares every check once,
 with its scope, its path filter and whether it writes. The commit hook, the pre-push hook and the CI
 job read that declaration rather than keeping their own lists, so a check added there reaches all
 three without editing three files — and two lists of checks can never disagree about what "green"
@@ -87,11 +91,15 @@ hooks and your pipeline. What each task does with them is in the
 
 ## uv is the only tool you install
 
-Earlier template revisions asked users to install Python, then `pipx`, then `tox`, then `pre-commit`, then `commitizen`. Today, every one of those is a uv-managed dependency group inside this project. You install uv; uv installs the rest.
+Records: [ADR-0002](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0002-uv-is-the-only-tool-you-install.html), [ADR-0008](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0008-reproducibility-by-pin.html), [ADR-0042](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0042-refresh-deps-moves-the-boundary-and-the-pins-together.html).
 
-**Tradeoff:** the scaffold is bound to uv's lifecycle. If uv goes away or changes lock format incompatibly, the template needs work. That risk is accepted because uv has compressed the toolchain to a single binary that's fast enough to run on every commit.
+Earlier revisions asked users to install Python, then `pipx`, then `tox`, then `pre-commit`, then `commitizen`. Today, every one of those is a uv-managed dependency group inside this project. You install uv; uv installs the rest.
+
+**Tradeoff:** the template is now bound to uv's lifecycle. If uv goes away or changes lock format incompatibly, the template needs work. That risk is accepted because uv has compressed the toolchain to a single binary that's fast enough to run on every commit.
 
 ## Why groups, not extras
+
+Record: [ADR-0005](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0005-dependency-groups-not-extras.html).
 
 The template used to put dev tools under `[project.optional-dependencies]` (PEP 621 extras). Those work but they conflate two ideas:
 
@@ -102,43 +110,59 @@ The template used to put dev tools under `[project.optional-dependencies]` (PEP 
 
 ## Ruff replaces Black + isort + flake8 (and most of pylint)
 
+Record: [ADR-0016](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0016-ruff-replaces-black-isort-and-flake8.html).
+
 One tool, one config block, one cache. Ruff doesn't yet cover everything pylint does — so pylint stays, but only for the checks Ruff doesn't have. Expect pylint's role to shrink as Ruff grows.
 
 ## ty replaces mypy
+
+Record: [ADR-0017](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0017-ty-replaces-mypy.html).
 
 [ty](https://github.com/astral-sh/ty) is Astral's type checker, written in Rust. It's faster than mypy and shares the Ruff/uv codebase's quality bar. Mypy compatibility issues still surface occasionally; that trade is accepted for the speed and consistency.
 
 ## pytest, not unittest
 
-The template's original lineage used `python -m unittest`. It moved to pytest for fixtures, parametrization, coverage integration, and parallel execution via xdist. Unittest test classes still work — pytest discovers them.
+Records: [ADR-0018](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0018-pytest-replaces-unittest.html), [ADR-0025](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0025-coverage-is-a-union-and-the-ratchet-starts-dormant.html).
+
+The original lineage used `python -m unittest`. The template moved to pytest for fixtures, parametrization, coverage integration, and parallel execution via xdist. Unittest test classes still work — pytest discovers them.
 
 ## Conventional Commits drive the release notes
 
-Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) — the lint step rejects anything that doesn't parse. They're used for **automatic release notes**: [commitizen](https://commitizen-tools.github.io/commitizen/) reads the commits since the last tag and groups them by prefix (`feat:`, `fix:`, etc.) into a generated changelog.
+Records: [ADR-0019](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0019-conventional-commits-drive-the-changelog.html), [ADR-0014](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0014-a-release-is-the-version-bump-arriving-on-the-default-branch.html) for how a release reaches the default branch, and [ADR-0040](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0040-the-default-branch-is-a-copier-answer.html) for where that branch's name comes from.
+
+Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) — the lint step rejects anything that doesn't parse. They drive the **automatic release notes**: [commitizen](https://commitizen-tools.github.io/commitizen/) reads the commits since the last tag and groups them by prefix (`feat:`, `fix:`, etc.) into a generated changelog.
 
 Commitizen's autorelease mode is **not** used. The version bump is an explicit choice you make at release time: `./workflow.cmd release -i <major|minor|patch|…>`. Commit prefixes inform changelog structure, not the version number.
 
 ## properdocs (not vanilla mkdocs), with mkdocstrings for API docs
 
+Records: [ADR-0020](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0020-properdocs-with-mkdocstrings.html), [ADR-0037](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0037-docs-deploy-on-release-through-gh-deploy.html).
+
 properdocs is mkdocs with a curated plugin set. mkdocstrings reads the source directly — no `.rst` files in the middle. Sphinx is more capable; that capability isn't needed here.
 
 ## SBOMs ship inside the wheel
 
-Every release composes a CycloneDX 1.7 SBOM covering four sources — runtime dependencies (from `uv export --no-dev` against the lockfile), dev / lint / test / docs / quality / security groups (the lockfile minus the runtime set), vendored CI tooling (every package in `_CI/lib/vendor.txt`), and the chosen host's pipeline components (GitHub Actions `uses:` refs or GitLab CI `image:` refs). Each component carries an SPDX-identified licence, a SHA-256 hash where the lockfile provides one, and an external_reference pointing at its upstream page. CycloneDX `scope` (`required` / `optional` / `excluded`) distinguishes what ships in the wheel from what builds it. A two-level dependency graph (project → runtime + dev + a synthetic `build-environment` → vendored + pipeline) makes "what's in the wheel" vs "what built the wheel" walkable from the root bom-ref.
+Records: [ADR-0012](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0012-the-sbom-ships-inside-the-wheel.html), [ADR-0013](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0013-the-audit-runs-on-a-schedule-and-the-dependency-surface.html), [ADR-0021](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0021-trusted-publishing-with-attestations.html), [ADR-0028](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0028-the-audit-reads-the-lockfile-and-retries-without-a-verdict.html), [ADR-0029](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0029-suppressions-from-three-sources-two-of-them-must-expire.html), [ADR-0032](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0032-dependency-track-upload-removed.html).
 
-The SBOM is validated against the CycloneDX 1.7 JSON schema and written to `src/<project_slug>/sbom.cdx.json`, which `uv build` automatically ships **inside the wheel** rather than next to it. A downstream consumer extracts it with `unzip -p <wheel> <project_slug>/sbom.cdx.json` or `importlib.resources` — the SBOM travels with the artefact instead of needing to be re-correlated post-release.
+Every release composes a CycloneDX 1.7 SBOM covering four sources — runtime dependencies (from `uv export --no-dev` against the lockfile), dev / build / develop / lint / test / docs / quality / security groups (the lockfile minus the runtime set), vendored CI tooling (every package in `_CI/lib/vendor.txt`), and the chosen host's pipeline components (GitHub Actions `uses:` refs or GitLab CI `image:` refs). Each component carries an SPDX-identified licence, a SHA-256 hash where the lockfile provides one, and an external_reference pointing at its upstream page. CycloneDX `scope` (`required` / `optional` / `excluded`) distinguishes what ships in the wheel from what builds it. A two-level dependency graph (project → runtime + dev + a synthetic `build-environment` → vendored + pipeline) makes "what's in the wheel" vs "what built the wheel" walkable from the root bom-ref.
+
+The SBOM is validated against the CycloneDX 1.7 JSON schema and written to `src/{{ project_slug }}/sbom.cdx.json`, which `uv build` automatically ships **inside the wheel** rather than next to it. A downstream consumer extracts it with `unzip -p <wheel> {{ project_slug }}/sbom.cdx.json` or `importlib.resources` — the SBOM travels with the artefact instead of needing to be re-correlated post-release.
 
 The cost is one Python module (`_CI/tasks/sbom.py`) and one extra build step; the benefit is that supply-chain questions have an answer the day someone asks them, without depending on a separate registry or pinned cyclonedx-cli binary.
 
 ## Vendored CI tooling
 
+Records: [ADR-0003](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0003-vendored-invoke-behind-one-launcher.html), [ADR-0015](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0015-local-py-is-the-projects-module.html).
+
 `_CI/lib/vendor/` ships Invoke + its dependencies committed to the repo. `./workflow.cmd` works on a fresh clone with only uv installed — no `pip install invoke` step, no version drift between contributor machines. The vendoring cost is bytes in the repo; the benefit is that the dev cycle is the same on day one as on day one thousand.
 
 ## What we deliberately do not do
 
+Record: [ADR-0006](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0006-deliberate-non-goals.html).
+
 - **No framework choice.** This is a library scaffold. It does not know about FastAPI, Django, or Click. Add what you need.
-- **No monorepo support.** One package, one repo.
-- **No Python below the project's chosen minimum version (as low as 3.11).** `tomllib` is in the standard library from 3.11, the template's floor, so no fallback is needed.
+- **No monorepo support.** One package, one repo. If you want a monorepo, use a different template.
+- **No Python below the project's chosen `min_python_version` (as low as 3.11).** `tomllib` is in the standard library from 3.11, the template's floor, so no fallback is needed.
 - **No GitHub-only or GitLab-only assumptions in the dev cycle.** Host-specific code lives in `_CI/tasks/<host>.py`; the rest of the workflow runs identically.
 
 ## See also

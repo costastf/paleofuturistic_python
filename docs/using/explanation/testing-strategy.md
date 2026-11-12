@@ -69,6 +69,7 @@ The union does not tell you that a line reached only under py315 also works unde
 One consequence: because the ratchet bumps `fail_under` against the union, trimming `env_list` later can genuinely lower measured coverage and fail the next run. That is the ratchet working, and lowering the bar is a deliberate, reviewable change as it is everywhere else.
 
 `./workflow.cmd test` runs only one Python version (whichever the active uv venv resolved to). The full matrix runs in CI per shipped workflow, or locally via `./workflow.cmd test.tox` (add `--env=py311` to run a single version). See [Choose the Python version range](../how-to/choose-python-version-range.md) for how the matrix is derived.
+<!-- shipped: `./workflow.cmd test` runs only one Python version (whichever the active uv venv resolved to). The full matrix runs in CI per shipped workflow, or locally via `./workflow.cmd test.tox` — see [Run tests for one Python version](../how-to/run-tests-for-one-python-version.md) for slicing it. -->
 
 ## What we don't ship
 
@@ -94,4 +95,5 @@ The template treats `_CI/` as part of the codebase for linting purposes but **no
 ## See also
 
 - [Choose the Python version range](../how-to/choose-python-version-range.md) — the practical commands for the version matrix.
+<!-- shipped-line: - [Run tests for one Python version](../how-to/run-tests-for-one-python-version.md) — the practical commands for the version matrix. -->
 - [Design principles](../../maintaining/explanation/design-principles.md) — why the template uses dependency groups instead of extras.

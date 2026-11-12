@@ -1,6 +1,7 @@
 # Design principles
 
 The template is opinionated. The choices below were made deliberately, not by accumulation — each replaces something an earlier revision relied on. This page is the overview; each principle has a dated [decision record](../decisions/index.md) with the situation it was made in and what it cost.
+<!-- shipped: The scaffold this project inherited is opinionated. The choices below were made deliberately, not by accumulation — each replaces something an earlier revision of the template relied on. This page is the overview; each principle has a dated [decision record](../decisions/index.md), published with the template, with the situation it was made in and what it cost. -->
 
 ## Pipelines run template commands only
 
@@ -12,7 +13,7 @@ Two side-effects of this rule earn the rule a section of its own:
 
 **Parity.** What CI runs is exactly what you can run locally. Debugging a failing CI step means running the same `./workflow.cmd` command on your laptop. No "but it worked on my machine" gap, no separate path to maintain.
 
-**And those commands lean on tracked dependencies.** When a `properdocs` / `uv` / `pytest` invocation can do a CI step, we prefer it over a GitHub Action, because every Python dependency is pinned in `uv.lock` and surfaces in the project SBOM. Action dependencies are hidden inside `uses:` references and never appear in the supply-chain picture. Concretely: `properdocs gh-deploy` over `actions/upload-pages-artifact` + `actions/deploy-pages`; `./workflow.cmd test` over inline `pytest` invocations; and so on. Three actions are unavoidable: `actions/checkout` to fetch the repo, `astral-sh/setup-uv` to bootstrap the toolchain itself when the deps image isn't used, and `actions/attest-build-provenance`, since GitHub's own provenance attestation can only be recorded by GitHub — beyond those, prefer commands.
+**And those commands lean on tracked dependencies.** When a `properdocs` / `uv` / `pytest` invocation can do a CI step, it is preferred over a GitHub Action, because every Python dependency is pinned in `uv.lock` and surfaces in the project SBOM. Action dependencies are hidden inside `uses:` references and never appear in the supply-chain picture. Concretely: `properdocs gh-deploy` over `actions/upload-pages-artifact` + `actions/deploy-pages`; `./workflow.cmd test` over inline `pytest` invocations; and so on. Three actions are unavoidable: `actions/checkout` to fetch the repo, `astral-sh/setup-uv` to bootstrap the toolchain itself when the deps image isn't used, and `actions/attest-build-provenance`, since GitHub's own provenance attestation can only be recorded by GitHub — beyond those, prefer commands.
 
 ## The QA gate
 
@@ -84,6 +85,12 @@ failed, in either mode. A badge computed from a tree that just failed its checks
 untrue about it, so there is nothing for `--write` to write and nothing for the gate to compare.
 
 Together these are what make one command mean the same thing in three places.
+<!-- shipped:
+Together these are what make one command mean the same thing in three places: your terminal, your
+hooks and your pipeline. What each task does with them is in the
+[task catalog](../reference/invoke-tasks.md), and which knob is which in
+[Environment variables and flags](../reference/environment-and-flags.md).
+-->
 
 ## uv is the only tool you install
 
@@ -91,7 +98,7 @@ Records: [ADR-0002](../decisions/0002-uv-is-the-only-tool-you-install.md), [ADR-
 
 Earlier revisions asked users to install Python, then `pipx`, then `tox`, then `pre-commit`, then `commitizen`. Today, every one of those is a uv-managed dependency group inside the generated project. You install uv; uv installs the rest.
 
-**Tradeoff:** the template is now bound to uv's lifecycle. If uv goes away or changes lock format incompatibly, the template needs work. We accept that risk because uv has compressed the toolchain to a single binary that's fast enough to run on every commit.
+**Tradeoff:** the template is now bound to uv's lifecycle. If uv goes away or changes lock format incompatibly, the template needs work. That risk is accepted because uv has compressed the toolchain to a single binary that's fast enough to run on every commit.
 
 ## Why groups, not extras
 
@@ -108,33 +115,33 @@ The template used to put dev tools under `[project.optional-dependencies]` (PEP 
 
 Record: [ADR-0016](../decisions/0016-ruff-replaces-black-isort-and-flake8.md).
 
-One tool, one config block, one cache. Ruff doesn't yet cover everything pylint does — so pylint stays, but only for the checks Ruff doesn't have. We expect pylint's role to shrink as Ruff grows.
+One tool, one config block, one cache. Ruff doesn't yet cover everything pylint does — so pylint stays, but only for the checks Ruff doesn't have. Expect pylint's role to shrink as Ruff grows.
 
 ## ty replaces mypy
 
 Record: [ADR-0017](../decisions/0017-ty-replaces-mypy.md).
 
-[ty](https://github.com/astral-sh/ty) is Astral's type checker, written in Rust. It's faster than mypy and shares the Ruff/uv codebase's quality bar. Mypy compatibility issues still surface occasionally; we accept that trade for the speed and consistency.
+[ty](https://github.com/astral-sh/ty) is Astral's type checker, written in Rust. It's faster than mypy and shares the Ruff/uv codebase's quality bar. Mypy compatibility issues still surface occasionally; that trade is accepted for the speed and consistency.
 
 ## pytest, not unittest
 
 Records: [ADR-0018](../decisions/0018-pytest-replaces-unittest.md), [ADR-0025](../decisions/0025-coverage-is-a-union-and-the-ratchet-starts-dormant.md).
 
-The original lineage used `python -m unittest`. We moved to pytest for fixtures, parametrization, coverage integration, and parallel execution via xdist. Unittest test classes still work — pytest discovers them.
+The original lineage used `python -m unittest`. The template moved to pytest for fixtures, parametrization, coverage integration, and parallel execution via xdist. Unittest test classes still work — pytest discovers them.
 
 ## Conventional Commits drive the release notes
 
 Records: [ADR-0019](../decisions/0019-conventional-commits-drive-the-changelog.md), [ADR-0014](../decisions/0014-a-release-is-the-version-bump-arriving-on-the-default-branch.md) for how a release reaches the default branch, and [ADR-0040](../decisions/0040-the-default-branch-is-a-copier-answer.md) for where that branch's name comes from.
 
-Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) — the lint step rejects anything that doesn't parse. We use them for **automatic release notes**: [commitizen](https://commitizen-tools.github.io/commitizen/) reads the commits since the last tag and groups them by prefix (`feat:`, `fix:`, etc.) into a generated changelog.
+Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) — the lint step rejects anything that doesn't parse. They drive the **automatic release notes**: [commitizen](https://commitizen-tools.github.io/commitizen/) reads the commits since the last tag and groups them by prefix (`feat:`, `fix:`, etc.) into a generated changelog.
 
-We do **not** use commitizen's autorelease mode. The version bump is an explicit choice you make at release time: `./workflow.cmd release -i <major|minor|patch|…>`. Commit prefixes inform changelog structure, not the version number.
+Commitizen's autorelease mode is **not** used. The version bump is an explicit choice you make at release time: `./workflow.cmd release -i <major|minor|patch|…>`. Commit prefixes inform changelog structure, not the version number.
 
 ## properdocs (not vanilla mkdocs), with mkdocstrings for API docs
 
 Records: [ADR-0020](../decisions/0020-properdocs-with-mkdocstrings.md), [ADR-0037](../decisions/0037-docs-deploy-on-release-through-gh-deploy.md).
 
-properdocs is mkdocs with a curated plugin set. mkdocstrings reads the source directly — no `.rst` files in the middle. Sphinx is more capable; we don't need that capability here.
+properdocs is mkdocs with a curated plugin set. mkdocstrings reads the source directly — no `.rst` files in the middle. Sphinx is more capable; that capability isn't needed here.
 
 ## SBOMs ship inside the wheel
 
@@ -152,12 +159,14 @@ Records: [ADR-0003](../decisions/0003-vendored-invoke-behind-one-launcher.md), [
 
 `_CI/lib/vendor/` ships Invoke + its dependencies committed to the repo. `./workflow.cmd` works on a fresh clone with only uv installed — no `pip install invoke` step, no version drift between contributor machines. The vendoring cost is bytes in the repo; the benefit is that the dev cycle is the same on day one as on day one thousand.
 
+<!-- template-only -->
 ## Diátaxis for our own docs
 
-Record: [ADR-0007](../decisions/0007-diataxis-with-shipped-rationale-pages.md).
+Records: [ADR-0007](../decisions/0007-diataxis-with-shipped-rationale-pages.md), [ADR-0046](../decisions/0046-shipped-pages-are-rendered-from-directives.md).
 
 The four sections — Tutorials, How-to, Reference, Explanation — exist because the template's documentation has historically conflated "I want to start" with "I want to understand", and readers got annoyed at both. Diátaxis splits the audiences. This page is in *Explanation* because it tells you *why*; it won't show you *how* to change anything.
 
+<!-- /template-only -->
 ## What we deliberately do not do
 
 Record: [ADR-0006](../decisions/0006-deliberate-non-goals.md).
@@ -169,5 +178,11 @@ Record: [ADR-0006](../decisions/0006-deliberate-non-goals.md).
 
 ## See also
 
+<!-- template-only -->
 - [Why copier?](why-copier.md) — why we picked the template format we did.
 - [History and lineage](history-and-lineage.md) — what this template was forked from and why.
+<!-- /template-only -->
+<!-- shipped-only
+- [The scaffold](../index.md) — the tour of everything these principles produced.
+- [The _CI tasks architecture](the-ci-tasks-architecture.md) — the task-runner design in depth.
+-->

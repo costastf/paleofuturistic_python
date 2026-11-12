@@ -81,6 +81,7 @@ impossible to build a wheel from code that built yesterday. `./workflow.cmd pref
 | Dev / build / develop / lint / test / docs / quality / security groups | `optional` | full lockfile via `uv export --all-groups`, minus the runtime set |
 | Vendored CI tooling | `excluded` | every package in `_CI/lib/vendor.txt` |
 | Pipeline components | `excluded` | GitHub Actions (`uses:`) or GitLab CI images, sourced from `_CI/tasks/<host>.py`'s `iter_pipeline_components()` |
+<!-- shipped-line: | Pipeline components | `excluded` | {% if git_hosting_service == 'github' %}GitHub Actions (`uses:`){% else %}GitLab CI images{% endif %}, sourced from `_CI/tasks/{{ git_hosting_service }}.py`'s `iter_pipeline_components()` | -->
 
 Plus one **synthetic build-environment component** (type `platform`, scope `excluded`) that groups the vendored + pipeline material into a single sub-graph.
 
@@ -98,6 +99,7 @@ Each PyPI component (runtime, dev, vendored) carries:
 - **`licenses`** — declared SPDX expression. The lookup walks `PEP 639 License-Expression → legacy License header → LICENSE-File text → Trove classifier mapping`. Vendored entries first try text-detection over the `_CI/lib/vendor/<name>/LICENSE*` files (the vendored tree carries no dist-info but keeps the LICENSE), then defer to the venv-installed copy when the same package is also a transitive dev dep. A handful of packages with no licence-bearing file locally end up with `licenses: []` — graceful degradation rather than failure.
 - **`hashes`** — SHA-256 from `uv.lock`'s `wheels[*].hash` (or `sdist.hash` fallback). Pipeline and vendored components carry no hash here — the GitHub-Action PURL already encodes the commit SHA, and vendored entries aren't in the lockfile.
 - **`external_references`** — every PyPI component points at its PyPI project page (`type=website`); GitHub Actions point at their repo (`type=vcs`); GitLab images point at their registry (`type=distribution`).
+<!-- shipped-line: - **`external_references`** — every PyPI component points at its PyPI project page (`type=website`); {% if git_hosting_service == 'github' %}GitHub Actions point at their repo (`type=vcs`){% else %}GitLab images point at their registry (`type=distribution`){% endif %}. -->
 
 ### Validation
 
@@ -115,6 +117,7 @@ Watching a released version for advisories published after the release is outsid
 
 ## Layer 3 — build provenance
 
+<!-- template-only -->
 The SBOM says what is *inside* an artifact. Provenance says where the artifact *came from*, and unlike the SBOM it is not self-reported. On both hosts, `release.attest` signs a [PEP 740](https://packaging.python.org/en/latest/specifications/index-hosted-attestations/) attestation for every wheel and sdist: a statement binding the file's digest to the repository, workflow and commit that published it. The signing identity is the CI job's own OIDC token, the signature chains to Sigstore's public instance, and the signing event lands in Sigstore's transparency log, so nothing the project controls can mint one after the fact. A forged SBOM is a text edit; a forged attestation is not.
 
 `uv publish` uploads each `<file>.publish.attestation` with its file, and PyPI shows the publishing repository and workflow on the release page. A consumer verifies a release on PyPI with:
@@ -128,6 +131,30 @@ GitHub projects also get GitHub's own provenance attestation from `actions/attes
 Order matters in the publish job, and `release.ship` fixes it: `release.dist` builds into `dist/`, `release.attest` signs those files, and the upload sends them *without* rebuilding. Rebuilding in between would publish files that no attestation refers to, and verification would then fail — reading as tampering rather than as a fresh build. GitHub's provenance step runs after the upload over the same files, still in `dist/`; a statement about file contents proves the same thing whichever side of the upload it is taken on.
 
 PyPI accepts attestations only through [Trusted Publishing](https://docs.pypi.org/trusted-publishers/). A project that publishes with `UV_PUBLISH_*` credentials instead (a private index, say) uploads none: `release.publish` passes `--no-attestations` on that path, because indexes that do not support attestations may reject the upload.
+<!-- /template-only -->
+<!-- shipped-only
+The SBOM says what is *inside* your artifact. Provenance says where it *came from*, and unlike the SBOM it is not self-reported. `release.attest` signs a [PEP 740](https://packaging.python.org/en/latest/specifications/index-hosted-attestations/) attestation for every wheel and sdist: a statement binding the file's digest to this repository, the publish workflow and the commit. The signing identity is the CI job's own OIDC token{% if git_hosting_service == 'gitlab' %} (`SIGSTORE_ID_TOKEN`, from the publish job's `id_tokens:`){% endif %}, the signature chains to Sigstore's public instance, and the signing event lands in Sigstore's transparency log, so nothing this project controls can mint one after the fact. A forged SBOM is a text edit; a forged attestation is not.
+
+`uv publish` uploads each `<file>.publish.attestation` with its file, and PyPI shows the publishing repository and workflow on the release page. Anyone who downloads a release can verify it:
+
+```bash
+pypi-attestations verify pypi --repository <repository URL> pypi:{{ project_slug }}-<version>-py3-none-any.whl
+```
+{%- if git_hosting_service == 'github' %}
+
+The publish job also records GitHub's own provenance attestation (`actions/attest-build-provenance`), stored with the repository:
+
+```bash
+gh attestation verify {{ project_slug }}-<version>-py3-none-any.whl --repo <owner>/<repo>
+```
+
+The two answer the same question for different audiences: the PEP 740 one travels with the package to PyPI, the GitHub one stays where the source is.
+{%- endif %}
+
+Order matters in the publish job, and `release.ship` fixes it: `release.dist` builds into `dist/`, `release.attest` signs those files, and the upload sends them *without* rebuilding. Rebuilding in between would publish files that no attestation refers to, and verification would then fail — reading as tampering rather than as a fresh build.{% if git_hosting_service == 'github' %} GitHub's provenance step runs after the upload over the same files, still in `dist/`; a statement about file contents proves the same thing whichever side of the upload it is taken on.{% endif %}
+
+PyPI accepts attestations only through [Trusted Publishing](../how-to/set-up-trusted-publishing.md). Publishing with `UV_PUBLISH_*` credentials instead uploads none: `release.publish` passes `--no-attestations` on that path. [Verify a release attestation](../how-to/verify-a-release-attestation.md) walks through checking one.
+-->
 
 ## What about overrides?
 
@@ -143,5 +170,11 @@ The expiry date is what makes an acceptance temporary: on that date the audit re
 
 ## See also
 
+<!-- template-only -->
 - [Harden the GitHub repository](../how-to/harden-github-repository.md) — the repository settings the publish job, and so the provenance layer, depends on.
+<!-- /template-only -->
+<!-- shipped-only
+- [Triage a security finding](../how-to/triage-a-security-finding.md) — what to do when pip-audit flags something.
+- [Verify a release attestation](../how-to/verify-a-release-attestation.md) — checking layer 3 on a published release.
+-->
 - [Packaging specifications](../reference/packaging-specifications.md) — every PyPA spec, and how a generated project meets it.

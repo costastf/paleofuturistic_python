@@ -30,11 +30,13 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 # before this module, which is why no path setup is needed here.
 from _CI.tasks.configuration import (  # noqa: E402
     PROJECT_SLUG,
+    SHIPPED_RATIONALE_PAGES,
     UV_VERSION_ENV,
     combo_context,
     matrix_combos,
     template_uv_version,
 )
+from _CI.tasks.maintain import render_shipped  # noqa: E402
 
 
 def test_host_scaffolding_present(generated_project):
@@ -3843,43 +3845,65 @@ def test_no_hidden_dirs_in_docs(generated_project):
     assert not hidden, f'hidden paths shipped under docs/: {hidden}'
 
 
-SHIPPED_EXPLANATION_DIR = 'template/docs/developer/explanation'
-SHIPPED_RATIONALE_PAGES = {
-    'docs/maintaining/explanation/design-principles.md': f'{SHIPPED_EXPLANATION_DIR}/design-principles.md',
-    'docs/maintaining/explanation/the-ci-tasks-architecture.md': (
-        f'{SHIPPED_EXPLANATION_DIR}/the-ci-tasks-architecture.md'
-    ),
-    'docs/using/explanation/how-uv-is-used.md': f'{SHIPPED_EXPLANATION_DIR}/how-uv-is-used.md',
-    'docs/using/explanation/packaging-conformance.md': f'{SHIPPED_EXPLANATION_DIR}/packaging-conformance.md',
-    'docs/using/explanation/sbom-and-security-model.md': f'{SHIPPED_EXPLANATION_DIR}/sbom-and-security-model.md.jinja',
-    'docs/using/explanation/testing-strategy.md': f'{SHIPPED_EXPLANATION_DIR}/testing-strategy.md',
-}
-
-
-def extract_h2_headings(markdown_text):
-    """Return the set of `## ` headings, ignoring jinja-only lines."""
-    return {
-        line.strip()
-        for line in markdown_text.splitlines()
-        if line.startswith('## ') and '{%' not in line and '{{' not in line
-    }
-
-
 @pytest.mark.parametrize('canonical_path', sorted(SHIPPED_RATIONALE_PAGES), ids=lambda p: Path(p).stem)
-def test_shipped_rationale_pages_match_canonical(canonical_path):
-    """Shipped rationale copies carry the canonical marker and stay structurally aligned.
+def test_shipped_rationale_pages_are_rendered_from_canonical(canonical_path):
+    """Each shipped explanation page is byte-for-byte what `maintain.sync-docs` renders (ADR-0046).
 
-    The drift ratchet promised in docs/maintaining/how-to/sync-shipped-docs.md: each shipped
-    copy's ``##`` headings must be a subset of its canonical page's headings, so renaming or
-    removing a canonical section forces the shipped copy to follow.
+    The predecessor of this test compared headings, which let prose drift between the canonical
+    page and its shipped copy for three commits. Rendering the copy from the canonical page's
+    directives makes any difference a failure, and the fix is one command.
     """
     canonical = (REPO_ROOT / canonical_path).read_text(encoding='utf-8')
-    shipped = (REPO_ROOT / SHIPPED_RATIONALE_PAGES[canonical_path]).read_text(encoding='utf-8')
     shipped_path = SHIPPED_RATIONALE_PAGES[canonical_path]
+    shipped = (REPO_ROOT / shipped_path).read_text(encoding='utf-8')
+    rendered = render_shipped(canonical, canonical_path)
+    assert shipped == rendered, (
+        f'{shipped_path} differs from its render; run `./workflow.cmd maintain.sync-docs --write`'
+    )
     assert shipped.startswith('<!-- canonical:'), f'{shipped_path} lacks the canonical marker'
-    assert canonical_path in shipped.splitlines()[0], 'canonical marker does not name its source page'
-    extra = extract_h2_headings(shipped) - extract_h2_headings(canonical)
-    assert not extra, f'shipped copy has headings the canonical page lacks: {extra}'
+    for directive in ('<!-- template-only -->', '<!-- shipped-only', '<!-- shipped:', '<!-- shipped-line:'):
+        assert directive not in shipped, f'{shipped_path} still carries a {directive!r} directive'
+    assert '](../decisions/' not in shipped, 'a shipped page links to a decision record that does not ship'
+    assert '../../maintaining/' not in shipped, 'a shipped page links into the template repository'
+
+
+def test_render_shipped_applies_every_directive():
+    """The four directives do what the sync how-to says, on a page small enough to read."""
+    canonical = """# Title
+
+The template does X for a generated project.
+<!-- shipped: This project does X. -->
+
+<!-- template-only -->
+Only maintainers care.
+<!-- /template-only -->
+<!-- shipped-only
+Only developers care, `<your_package>` included.
+-->
+- keep
+- [Parent](../how-to/parent.md)
+<!-- shipped-line: - [Child](../how-to/child.md) -->
+
+Record: [ADR-0001](../decisions/0001-x.md#why),
+[Design](../../maintaining/explanation/design.md).
+"""
+    rendered = render_shipped(canonical, 'docs/using/explanation/page.md')
+    assert rendered.splitlines()[0].startswith('<!-- canonical: rendered from docs/using/explanation/page.md')
+    assert rendered.endswith(
+        """# Title
+
+This project does X.
+
+Only developers care, `{{ project_slug }}` included.
+- keep
+- [Child](../how-to/child.md)
+
+Record: [ADR-0001](https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/0001-x.html#why),
+[Design](design.md).
+"""
+    )
+    with pytest.raises(ValueError, match='unterminated'):
+        render_shipped('# T\n<!-- template-only -->\nx\n', 'p.md')
 
 
 def test_project_slug_sanitizes_punctuated_name(generate, tmp_path_factory):

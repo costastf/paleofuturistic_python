@@ -15,7 +15,7 @@ from invoke import Context, task
 
 from _CI import PROJECT_ROOT_DIRECTORY, emojize_message
 
-from .configuration import TEMPLATE_PYPROJECT
+from .configuration import PUBLISHED_DECISIONS_URL, SHIPPED_RATIONALE_PAGES, TEMPLATE_PYPROJECT
 
 REPO_PYPROJECT = PROJECT_ROOT_DIRECTORY / 'pyproject.toml'
 COPIER_YML = PROJECT_ROOT_DIRECTORY / 'copier.yml'
@@ -232,6 +232,142 @@ def retarget_manifest(destination: Path, upstream_name: str) -> None:
     text = manifest.read_text(encoding='utf-8')
     if upstream_name != local_name:
         manifest.write_text(text.replace(upstream_name, local_name), encoding='utf-8')
+
+
+# The directives a canonical explanation page may carry, all HTML comments so the parent site
+# renders none of them (ADR-0046):
+#   <!-- template-only --> … <!-- /template-only -->   lines dropped from the shipped copy
+#   <!-- shipped-only … -->                             a comment whose body the shipped copy gets
+#   <!-- shipped: … -->                                 replaces the block just above it
+#   <!-- shipped-line: … -->                            replaces the one line just above it
+TEMPLATE_ONLY_START = '<!-- template-only -->'
+TEMPLATE_ONLY_END = '<!-- /template-only -->'
+SHIPPED_ONLY_START = '<!-- shipped-only'
+SHIPPED_REPLACE_START = '<!-- shipped:'
+SHIPPED_LINE_START = '<!-- shipped-line:'
+COMMENT_END = '-->'
+DECISION_LINK = re.compile(r'\]\(\.\./decisions/([^)#]+)\.md(#[^)]*)?\)')
+# Phrases that address the template's audience, and what the project developer reads instead.
+SHIPPED_WORDING = (
+    ("A generated project's", "This project's"),
+    ("a generated project's", "this project's"),
+    ('A generated project', 'This project'),
+    ('a generated project', 'this project'),
+    ('a project built from this template', 'this project'),
+    ('the generated project', 'this project'),
+    ('generated projects', 'projects generated from it'),
+    ('<your_package>', '{{ project_slug }}'),
+    ('<project_slug>', '{{ project_slug }}'),
+    ('](../../maintaining/explanation/', ']('),
+)
+
+
+def shipped_marker(canonical_path: str) -> str:
+    """Return the first line of every shipped copy, naming the page it is rendered from."""
+    return (
+        f'<!-- canonical: rendered from {canonical_path} in the paleofuturistic_python template '
+        'repo by `./workflow.cmd maintain.sync-docs`. Edit there, not here. -->'
+    )
+
+
+def comment_body(lines: list[str], start: int, prefix: str) -> tuple[list[str], int]:
+    """Return the body of the comment opening at ``lines[start]`` and the index after it.
+
+    A one-line comment carries its body between ``prefix`` and ``-->``; a multi-line one opens
+    with ``prefix`` alone, holds the body on the following lines, and closes with ``-->`` on
+    its own line.
+    """
+    first = lines[start].strip()
+    if first.endswith(COMMENT_END):
+        return [first[len(prefix) : -len(COMMENT_END)].strip()], start + 1
+    body = []
+    index = start + 1
+    while index < len(lines) and lines[index].strip() != COMMENT_END:
+        body.append(lines[index])
+        index += 1
+    if index == len(lines):
+        message = f'unterminated {prefix} directive at line {start + 1}'
+        raise ValueError(message)
+    return body, index + 1
+
+
+def render_shipped(canonical: str, canonical_path: str) -> str:
+    """Render a shipped copy of ``canonical`` from its directives, with the audience rewording."""
+    lines = canonical.splitlines()
+    out: list[str] = [shipped_marker(canonical_path)]
+    index = 0
+    while index < len(lines):
+        stripped = lines[index].strip()
+        if stripped == TEMPLATE_ONLY_START:
+            try:
+                index = lines.index(TEMPLATE_ONLY_END, index) + 1
+            except ValueError:
+                message = f'unterminated {TEMPLATE_ONLY_START} at line {index + 1}'
+                raise ValueError(message) from None
+            continue
+        if stripped.startswith(SHIPPED_ONLY_START):
+            body, index = comment_body(lines, index, SHIPPED_ONLY_START)
+            out.extend(body)
+            continue
+        if stripped.startswith(SHIPPED_LINE_START):
+            body, index = comment_body(lines, index, SHIPPED_LINE_START)
+            out.pop()
+            out.extend(body)
+            continue
+        if stripped.startswith(SHIPPED_REPLACE_START):
+            body, index = comment_body(lines, index, SHIPPED_REPLACE_START)
+            while out and out[-1].strip():
+                out.pop()
+            out.extend(body)
+            continue
+        out.append(lines[index])
+        index += 1
+    text = '\n'.join(out) + '\n'
+    text = DECISION_LINK.sub(lambda m: f']({PUBLISHED_DECISIONS_URL}{m.group(1)}.html{m.group(2) or ""})', text)
+    for before, after in SHIPPED_WORDING:
+        text = text.replace(before, after)
+    return re.sub(r'\n{3,}', '\n\n', text)
+
+
+def stale_shipped_pages() -> dict[Path, str]:
+    """``{shipped path: rendered text}`` for every shipped page that differs from its render."""
+    stale = {}
+    for canonical_path, shipped_path in SHIPPED_RATIONALE_PAGES.items():
+        canonical = (PROJECT_ROOT_DIRECTORY / canonical_path).read_text(encoding='utf-8')
+        rendered = render_shipped(canonical, canonical_path)
+        shipped = PROJECT_ROOT_DIRECTORY / shipped_path
+        if not shipped.exists() or shipped.read_text(encoding='utf-8') != rendered:
+            stale[shipped] = rendered
+    return stale
+
+
+@task(name='sync-docs')
+def sync_docs(context: Context, write: bool = False) -> None:  # noqa: ARG001
+    """Render the shipped explanation pages from their canonical pages, or say which are stale.
+
+    The six pages in ``SHIPPED_RATIONALE_PAGES`` ship into every generated project. Each is
+    rendered from the canonical page's directives, so prose edited in the canonical page reaches
+    the shipped copy on the next ``--write``, and an invariant fails until it does (ADR-0046).
+
+    Args:
+        context: Invoke context.
+        write: Write the rendered copies. Without it, name the stale ones and exit 1.
+
+    """
+    stale = stale_shipped_pages()
+    if not stale:
+        print(emojize_message('Every shipped explanation page matches its canonical page.', success=True))
+        return
+    for shipped, rendered in stale.items():
+        if write:
+            shipped.write_text(rendered, encoding='utf-8')
+            print(f'  wrote {shipped.relative_to(PROJECT_ROOT_DIRECTORY)}')
+        else:
+            print(f'  stale: {shipped.relative_to(PROJECT_ROOT_DIRECTORY)}')
+    if not write:
+        print(emojize_message('Run `./workflow.cmd maintain.sync-docs --write` and commit the result.', success=False))
+        raise SystemExit(1)
+    print(emojize_message(f'Rendered {len(stale)} shipped page(s).', success=True))
 
 
 @task(name='sync-vendor')

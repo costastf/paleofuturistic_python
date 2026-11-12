@@ -1,6 +1,7 @@
 # The _CI tasks architecture
 
 The `_CI/` directory is the template's portable CI/CD framework — vendored [Invoke](https://www.pyinvoke.org/) plus a set of opinionated task modules. This page covers the design.
+<!-- shipped: The `_CI/` directory is this project's portable CI/CD framework — vendored [Invoke](https://www.pyinvoke.org/) plus a set of opinionated task modules. This page covers the design. -->
 
 ## Why Invoke, not make / just / nox
 
@@ -112,5 +113,11 @@ Whichever host was chosen at generation time — GitHub or GitLab — determines
 
 ## See also
 
+<!-- template-only -->
 - [Extend the template workflow tasks](../how-to/extend-the-template-tasks.md) — how a maintainer changes or adds tasks (the user-facing recipe, *Add a workflow task*, ships inside every generated project under its docs's Developer section).
 - [Generated project tree](../../using/reference/generated-project-tree.md) — the full `_CI/tasks/` file listing.
+<!-- /template-only -->
+<!-- shipped-only
+- [Add a workflow task](../how-to/add-a-workflow-task.md) — practical recipe for extending the framework.
+- [CI framework internals](../reference/ci-framework.md) — shared utilities, constants, and the directory layout.
+-->

@@ -100,6 +100,24 @@ def read_template_overrides() -> str:
     return ','.join(entries)
 
 
+# The six explanation pages that ship into generated projects, canonical path to shipped path.
+# `maintain.sync-docs` renders the shipped copy from the canonical page's directives (ADR-0046),
+# and an invariant asserts the committed copy is that render.
+SHIPPED_EXPLANATION_DIR = 'template/docs/developer/explanation'
+SHIPPED_RATIONALE_PAGES = {
+    'docs/maintaining/explanation/design-principles.md': f'{SHIPPED_EXPLANATION_DIR}/design-principles.md',
+    'docs/maintaining/explanation/the-ci-tasks-architecture.md': (
+        f'{SHIPPED_EXPLANATION_DIR}/the-ci-tasks-architecture.md'
+    ),
+    'docs/using/explanation/how-uv-is-used.md': f'{SHIPPED_EXPLANATION_DIR}/how-uv-is-used.md',
+    'docs/using/explanation/packaging-conformance.md': f'{SHIPPED_EXPLANATION_DIR}/packaging-conformance.md',
+    'docs/using/explanation/sbom-and-security-model.md': f'{SHIPPED_EXPLANATION_DIR}/sbom-and-security-model.md.jinja',
+    'docs/using/explanation/testing-strategy.md': f'{SHIPPED_EXPLANATION_DIR}/testing-strategy.md',
+}
+# Where the decision records are published; shipped pages link there, since the records do not ship.
+PUBLISHED_DECISIONS_URL = 'https://schubergphilis.github.io/paleofuturistic_python/maintaining/decisions/'
+
+
 def template_uv_version() -> str:
     """Return the uv version the template currently pins.
 

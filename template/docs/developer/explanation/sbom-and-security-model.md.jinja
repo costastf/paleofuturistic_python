@@ -1,11 +1,11 @@
-<!-- canonical: synced from docs/using/explanation/sbom-and-security-model.md in the paleofuturistic_python template repo. Edit there first. -->
+<!-- canonical: rendered from docs/using/explanation/sbom-and-security-model.md in the paleofuturistic_python template repo by `./workflow.cmd maintain.sync-docs`. Edit there, not here. -->
 # SBOM and security model
 
-The scaffold's security pipeline has three layers: known-vulnerability scanning, SBOM generation, and build provenance. This page explains what each layer does and what threat model it addresses.
+The template's security pipeline has three layers: known-vulnerability scanning, SBOM generation, and build provenance. This page explains what each layer does and what threat model it addresses.
 
 ## The threat model
 
-The scaffold assumes this project:
+The template assumes this project:
 
 - Publishes a Python package consumed by people its maintainers mostly don't know.
 - Has a dependency graph that's large and changes frequently.
@@ -16,7 +16,7 @@ The pipeline answers those questions before the questions are asked.
 
 ## Layer 1 — pip-audit
 
-`./workflow.cmd secure.audit` runs [pip-audit](https://github.com/pypa/pip-audit) over every package version in your `uv.lock`, plus `_CI/lib/vendor.txt`, comparing each against the [PyPI advisory database](https://github.com/pypa/advisory-database). `--strict`, so a package the service cannot resolve fails the audit rather than being listed in a skip table under exit 0.
+`./workflow.cmd secure.audit` runs [pip-audit](https://github.com/pypa/pip-audit) over every package version in this project's `uv.lock`, plus `_CI/lib/vendor.txt`, comparing each against the [PyPI advisory database](https://github.com/pypa/advisory-database). `--strict`, so a package the service cannot resolve fails the audit rather than being listed in a skip table under exit 0.
 
 Every version in the lockfile, not a rendering of it. Two narrower forms were tried and both saw less: `pip-audit` with no `-r` enumerates *installed* distributions, so a Linux runner omits whatever a platform marker, an extra or an unsynced group kept out of the venv; `uv export` keeps those markers in the file and pip-audit evaluates them, so the same pins are skipped one step later — an export audited on one interpreter skips every pin whose marker excludes it, though other matrix interpreters install it and the SBOM lists it. Reading `[[package]]` entries straight out of `uv.lock` has no markers to evaluate and no extras or groups to remember to ask for. One requirement file per version slot, because pip-audit refuses a file that names a package twice and a lockfile legitimately pins two versions behind different markers.
 
@@ -97,12 +97,12 @@ Reading top-down: "the project depends on these runtime + dev components for its
 Each PyPI component (runtime, dev, vendored) carries:
 
 - **`licenses`** — declared SPDX expression. The lookup walks `PEP 639 License-Expression → legacy License header → LICENSE-File text → Trove classifier mapping`. Vendored entries first try text-detection over the `_CI/lib/vendor/<name>/LICENSE*` files (the vendored tree carries no dist-info but keeps the LICENSE), then defer to the venv-installed copy when the same package is also a transitive dev dep. A handful of packages with no licence-bearing file locally end up with `licenses: []` — graceful degradation rather than failure.
-- **`hashes`** — SHA-256 from `uv.lock`'s `wheels[*].hash` (or `sdist.hash` fallback). Pipeline and vendored components carry no hash here.
+- **`hashes`** — SHA-256 from `uv.lock`'s `wheels[*].hash` (or `sdist.hash` fallback). Pipeline and vendored components carry no hash here — the GitHub-Action PURL already encodes the commit SHA, and vendored entries aren't in the lockfile.
 - **`external_references`** — every PyPI component points at its PyPI project page (`type=website`); {% if git_hosting_service == 'github' %}GitHub Actions point at their repo (`type=vcs`){% else %}GitLab images point at their registry (`type=distribution`){% endif %}.
 
 ### Validation
 
-`./workflow.cmd secure.sbom-validate` runs the CycloneDX 1.7 JSON-schema validator from the project venv. The aggregate `./workflow.cmd secure` runs all sub-steps; a clean run means: no known vulns, a fresh SBOM written, validated against the schema.
+`./workflow.cmd secure.sbom-validate` runs the CycloneDX 1.7 JSON-schema validator from the project venv. The aggregate `./workflow.cmd secure` runs all three sub-steps; a clean run means: no known vulns, a fresh SBOM written, validated against the schema.
 
 ### What this enables
 
@@ -112,7 +112,7 @@ Each PyPI component (runtime, dev, vendored) carries:
 
 The SBOM is part of every release.
 
-Watching a released version for advisories published after the release is outside the scaffold. The scheduled audit re-checks `uv.lock` on the default branch every day, but that is the code as it is now, not the versions already on PyPI. To track those, point your organisation's software composition analysis platform (OWASP Dependency-Track, the GitHub dependency graph, or similar) at the SBOM inside each wheel. Which platform, and the credentials to reach it, are your organisation's call, so the scaffold ships no upload step.
+Watching a released version for advisories published after the release is outside the template. The scheduled audit re-checks `uv.lock` on the default branch every day, but that is the code as it is now, not the versions already on PyPI. To track those, point your organisation's software composition analysis platform (OWASP Dependency-Track, the GitHub dependency graph, or similar) at the SBOM inside each wheel. Which platform, and the credentials to reach it, are your organisation's call, so the template ships no upload step.
 
 ## Layer 3 — build provenance
 
@@ -148,10 +148,10 @@ The expiry date is what makes an acceptance temporary: on that date the audit re
 
 - **SAST**: Bandit / Semgrep / pyright security rules are not shipped. Add them as a `secure.*` task if needed.
 - **Container scanning**: Trivy / Grype are not shipped. The deps image built by `container.publish` is a dev convenience, not a published artifact, so releases aren't gated on it.
-- **License compliance**: SBOM includes license metadata, but the scaffold doesn't enforce license policies. An SCA platform reading the SBOM can.
+- **License compliance**: SBOM includes license metadata, but the template doesn't enforce license policies. An SCA platform reading the SBOM can.
 
 ## See also
 
 - [Triage a security finding](../how-to/triage-a-security-finding.md) — what to do when pip-audit flags something.
 - [Verify a release attestation](../how-to/verify-a-release-attestation.md) — checking layer 3 on a published release.
-- [Packaging specifications](../reference/packaging-specifications.md) — every PyPA spec and what enforces it here.
+- [Packaging specifications](../reference/packaging-specifications.md) — every PyPA spec, and how this project meets it.

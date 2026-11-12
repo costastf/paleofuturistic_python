@@ -43,8 +43,8 @@ drive are left alone.
 - A rule that changes is changed in one page. The pointers do not age, because they say only
   that the rule exists and where it is explained.
 - The stale fork sentence in the shipped security page is fixed, and it was the kind of drift
-  the heading-subset invariant between the parent and shipped copies cannot see. A task that
-  syncs the shipped rationale pages from the parent is the next decision in this area.
+  the heading-subset invariant between the parent and shipped copies could not see; ADR-0046
+  replaced that invariant with a render.
 
 ## References
 
