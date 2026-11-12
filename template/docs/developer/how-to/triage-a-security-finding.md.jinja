@@ -79,13 +79,10 @@ setting has three doors — a file, an environment variable and a flag — when 
 - **Before publishing** — `release.dist` audits before it builds. This is the gate that matters: publishing is when the outside world is exposed to these dependencies.
 - **Pre-commit** — only `secure.validate-overrides`, and only when `.security-overrides` itself changes. That checks the file's syntax, not your dependencies.
 
-Deliberately *not* on every push, and not from `build`. An audit's answer depends on the
-advisory database on the day it runs rather than on your branch, so a pull request that touches
-a docstring would go red for a CVE published overnight that its author neither introduced nor
-can fix — and a pipeline that fails for reasons outside the author's control is one people
-learn to ignore. Bundling it into `build` had a sharper edge: a fresh advisory made it
-impossible to build a wheel from code that built yesterday, blocking a hotfix on an unrelated
-finding. Run it locally whenever you like with `./workflow.cmd secure.audit`, or alongside
+Deliberately *not* on every push, and not from `build`: an audit's answer depends on the
+advisory database on the day it runs rather than on your branch, and
+[SBOM and security model](../explanation/sbom-and-security-model.md#layer-1-pip-audit) has the
+reasoning. Run it locally whenever you like with `./workflow.cmd secure.audit`, or alongside
 everything else with `./workflow.cmd preflight --audit-dependencies`.
 
 ## Re-running after a triage

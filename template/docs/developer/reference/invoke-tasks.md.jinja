@@ -41,10 +41,9 @@ there once `origin` resolves, which means nobody has written it yet.
 itself once the URL is right, so run `preflight --write` after `git remote add origin …` and
 commit the README.
 
-Both read one registry — `STEPS` in `_CI/tasks/preflight.py` — which declares every check
-once with its scope, its path filter and whether it writes. The two hooks and the CI job consume
-that declaration rather than keeping their own lists, so a check added to the registry reaches
-its tier without editing three files.
+Both read one registry, `STEPS` in `_CI/tasks/preflight.py`, so a check added there reaches
+its tier without editing three files; [Design principles](../explanation/design-principles.md#the-qa-gate)
+explains the split.
 
 Both modes run the *same* steps; only the derived-files step differs, by swapping one
 callable. Every derived value is written through a single function taking `write`,

@@ -410,16 +410,11 @@ mode = "auto-detect"
 # every other place it appears, together. Editing it here alone leaves the base image below
 # pinned to the old version's digest.
 required-version = "==0.13.7"
-# Fixed date, not a relative window. A rolling `"1 week"` moved forward every day, so a
-# resolution — and therefore a green pipeline — could change with no commit behind it.
-# Every dependency above is pinned exactly, so this bounds the transitive closure.
-#
-# The value was stamped with the date this project was generated, and stays put until you
-# move it. Raising it is a deliberate act: `./workflow.cmd develop.refresh-deps` moves the
-# date, the exact pins above and `uv.lock` together, and you land all three in one commit so
-# the boundary and the pins never disagree. See docs/developer/reference/dependency-groups.md.
-#
-# (The literal below is only a fallback; `tasks_render.py` overwrites it at generation.)
+# Fixed date, not a relative window, so a resolution changes only when a commit changes it.
+# Stamped with the date this project was generated; `./workflow.cmd develop.refresh-deps`
+# moves it together with the exact pins above and `uv.lock`. The reasoning is in
+# docs/developer/reference/dependency-groups.md. (The literal below is only a fallback;
+# `tasks_render.py` overwrites it at generation.)
 exclude-newer = "2026-11-10"
 
 [tool.tox]

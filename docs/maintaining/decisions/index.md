@@ -81,3 +81,4 @@ anywhere in the repository resolves to a file.
 | [ADR-0042](0042-refresh-deps-moves-the-boundary-and-the-pins-together.md) | `develop.refresh-deps` moves the boundary and the pins together |
 | [ADR-0043](0043-the-gitlab-deps-tag-is-computed-by-the-launcher.md) | The GitLab deps tag is computed by the launcher |
 | [ADR-0044](0044-docstrings-state-the-rule-and-name-the-record.md) | Docstrings state the rule and name the record |
+| [ADR-0045](0045-one-home-per-rationale.md) | One home per rationale |

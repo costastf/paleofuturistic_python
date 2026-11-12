@@ -81,17 +81,10 @@ build-deps-image:
       dotenv: .deps-image.env
 
 # One job for the checks, running the same command the pre-push hook does, character for
-# character. Verifying is that command's default and writing is opt-in, so there is no flag here
-# to keep in step with the hook. Splitting the work across lint, test and build jobs would mean
-# two lists of checks that can disagree; the cost of one job is the wall-clock their parallelism
-# bought, and `run_scope` still reports every failure in one pass.
-#
-# Anything failing here would have failed the push: format, lint, ty, the commit messages this
-# push adds, the docs build, pyscn, the tox matrix, the wheel, and the badges and coverage
-# ratchet matching what the tools measure.
-#
-# No `--write`: the job has no write access to the repository, so its only useful move is to
-# fail and name the command that fixes it.
+# character. Separate lint, test and build jobs would be a second list of checks that can
+# disagree with the hook's; docs/developer/explanation/design-principles.md, under "The QA
+# gate", has the reasoning. No `--write`: the job has no write access to the repository, so its
+# only useful move is to fail and name the command that fixes it.
 preflight:
   stage: ci
   image: $DEPS_IMAGE
@@ -103,16 +96,11 @@ preflight:
   script:
     - ./workflow.cmd preflight
 
-# Not on every pipeline. An audit's answer depends on the advisory database on the day it runs
-# rather than on the branch, so running it everywhere fails merge requests for something the
-# author did not introduce and cannot fix — and a pipeline that goes red for reasons outside the
-# author's control is one people learn to ignore. The `changes:` rule narrows it to the files
-# that can introduce a vulnerable dependency.
-#
-# A dependency that turns vulnerable while nobody touches it, and `.security-overrides` entries
-# coming due, belong to a scheduled pipeline instead: add one under CI/CD → Schedules, which
-# `$CI_PIPELINE_SOURCE == "schedule"` below runs the audit for regardless of what changed.
-# Publishing is gated separately, `release.dist` auditing before it builds.
+# Not on every pipeline: the audit's answer depends on the advisory database on the day it
+# runs, not on the branch, so the `changes:` rule narrows it to the dependency surface and a
+# scheduled pipeline (add one under CI/CD → Schedules) runs it regardless of what changed.
+# docs/developer/explanation/sbom-and-security-model.md, under "When it runs", has the
+# reasoning; `release.dist` audits before publishing.
 secure:
   stage: ci
   image: $DEPS_IMAGE

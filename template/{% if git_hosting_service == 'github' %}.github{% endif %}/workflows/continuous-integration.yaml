@@ -10,15 +10,10 @@ on:
   pull_request:
 
 # One job for the checks, running the same command the pre-push hook does, character for
-# character: `preflight`. Verifying is that command's default and writing is opt-in, so there is
-# no flag here to keep in step with the hook, and reproducing a failure from this log means
-# typing what you see. Splitting the work across lint, test and build jobs would mean two lists
-# of checks that can disagree; the cost of one job is the wall-clock their parallelism bought,
-# and `run_scope` still reports every failure in one pass, so it costs time, not diagnosis.
-#
-# What is deliberately *not* here: the dependency audit, which runs on a schedule and on
-# pushes that touch the dependency surface (see security-audit.yaml), because an advisory
-# published overnight is not something this branch's author introduced or can fix.
+# character: `preflight`. Separate lint, test and build jobs would be a second list of checks
+# that can disagree with the hook's; docs/developer/explanation/design-principles.md, under
+# "The QA gate", has the reasoning. The dependency audit is not here either: it has its own
+# triggers in security-audit.yaml.
 #
 # Workflow-level permissions floor. Without it every job would inherit the repository
 # default, which for many repositories is the full read/write token — far more than a check

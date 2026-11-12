@@ -1,20 +1,9 @@
 name: Security audit
 
-# Every trigger the audit has, and none of them is "every push".
-#
-# A dependency can turn out to be vulnerable, and a `.security-overrides` entry can expire,
-# without anyone pushing a commit. The schedule is what makes those expiry dates load-bearing:
-# tied to `push` alone, a quiet repository quietly stops being checked.
-#
-# The reverse matters as much. An audit on *every* push fails pull requests for something the
-# author did not do and cannot fix in their branch, and a docstring change going red because a
-# CVE was published overnight is the kind of noise that teaches people to ignore a red pipeline.
-# So the push trigger is narrowed to the files that can introduce a vulnerable dependency:
-# change the dependency surface and you own the result, touch anything else and the schedule
-# handles it.
-#
-# Publishing is gated separately by `release.dist`, which audits before it builds — the moment
-# the outside world is exposed, and the one place refusing to proceed protects somebody.
+# Every trigger the audit has, and none of them is "every push": the audit's answer depends on
+# the advisory database on the day it runs, not on the branch, so it runs on a schedule, on
+# changes to the dependency surface, and before publishing (`release.dist`). The reasoning is in
+# docs/developer/explanation/sbom-and-security-model.md, under "When it runs".
 on:
   schedule:
     # Daily. The minute is deliberately not :00 — GitHub sheds on-the-hour scheduled
