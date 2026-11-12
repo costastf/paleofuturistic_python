@@ -19,7 +19,7 @@ The mapping is `SHIPPED_RATIONALE_PAGES` in `_CI/tasks/configuration.py`.
 2. Run `./workflow.cmd maintain.sync-docs --write`.
 3. Commit both files together.
 
-`./workflow.cmd maintain.sync-docs` without `--write` names the shipped pages that differ from their render and exits 1. `tests/test_template_invariants.py::test_shipped_rationale_pages_are_rendered_from_canonical` asserts the same equality, so a canonical edit that was not rendered fails `test.invariants` until it is.
+`./workflow.cmd maintain.sync-docs` without `--write` names the shipped pages that differ from their render and exits 1. `tests/invariants/test_docs.py::test_shipped_rationale_pages_are_rendered_from_canonical` asserts the same equality, so a canonical edit that was not rendered fails `test.invariants` until it is.
 
 ## What the render does
 

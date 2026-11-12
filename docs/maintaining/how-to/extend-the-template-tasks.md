@@ -25,7 +25,7 @@ Change or add a `./workflow.cmd` task that generated projects ship with. This is
 
 4. **Update the shipped task catalog.** `template/docs/developer/reference/invoke-tasks.md.jinja` lists every task a generated project exposes; add your task with the same knob-gating as the code.
 
-5. **Add an invariant.** A conditional task should have a matching assertion in `tests/test_template_invariants.py` (see the existing `test_pages_task_definition_matches_choice` for the pattern: assert the `def` is present iff the knob is on).
+5. **Add an invariant.** A conditional task should have a matching assertion under `tests/invariants/`, in the module for the subject it reads (see the existing `test_pages_task_definition_matches_choice` for the pattern: assert the `def` is present iff the knob is on).
 
 6. **Verify:**
 

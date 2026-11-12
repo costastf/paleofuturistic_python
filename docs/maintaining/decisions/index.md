@@ -19,7 +19,7 @@ Each record is `NNNN-slug.md`, numbered in the order the decisions were made, wi
 - `## Context`, `## Decision`, `## Consequences`, and optionally `## References` to the commits
   and pages involved.
 
-`tests/test_template_invariants.py` checks the numbering has no gaps, every record has that
+`tests/invariants/test_docs.py` checks the numbering has no gaps, every record has that
 shape, every record is in the nav and in the table below, and every `ADR-NNNN` mentioned
 anywhere in the repository resolves to a file.
 

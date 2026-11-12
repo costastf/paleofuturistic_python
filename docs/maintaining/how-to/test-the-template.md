@@ -44,7 +44,7 @@ TEMPLATE_SECURITY_OVERRIDE="CVE-2025-71176" ./workflow.cmd test.combo --mature
 
 ## Adding a new invariant
 
-Structural assertions live in `tests/test_template_invariants.py`; each test receives one generated project per matrix cell via the `generated_project` fixture. Adding an assertion is one new `test_*` function. Adding a new combo axis means editing `matrix_combos()` in `_CI/tasks/configuration.py` — both the pytest suite and the Invoke matrix runner pick it up automatically.
+Structural assertions live under `tests/invariants/`, one module per subject they read (`test_pipelines.py`, `test_gate.py`, `test_security.py`, `test_release.py`, `test_tasks.py`, `test_generation.py`, `test_docs.py`, `test_runner.py`) with shared helpers in `support.py`; each test receives one generated project per matrix cell via the `generated_project` fixture. Adding an assertion is one new `test_*` function. Adding a new combo axis means editing `matrix_combos()` in `_CI/tasks/configuration.py` — both the pytest suite and the Invoke matrix runner pick it up automatically.
 
 ## See also
 
