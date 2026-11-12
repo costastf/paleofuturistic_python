@@ -21,8 +21,8 @@ since only GitHub can record GitHub's provenance attestation. Concretely, docs d
 rather than an inline `pytest`.
 
 One pipeline job cannot follow the rule: GitLab's deps-image job runs in the kaniko image, which
-has no Python, so it repeats in shell what `container.publish` does, and an invariant keeps the
-two tag computations identical.
+has no Python. Until ADR-0043 it repeated in shell what `container.publish` does; now it runs
+only the push, with the address computed by `container.tag` in a job before it.
 
 ## Consequences
 
@@ -32,8 +32,7 @@ two tag computations identical.
 - The Pages deploy goes through the legacy branch flow, which GitHub's own internal pipeline
   then builds; its Node deprecation warning is accepted as the price of keeping deploy logic in
   `document.py`.
-- The GitLab shell duplicate is a standing exception, and a candidate for computing the tag in a
-  Python job and handing it to kaniko.
+- The GitLab kaniko job is the standing exception, reduced by ADR-0043 to the push alone.
 
 ## References
 

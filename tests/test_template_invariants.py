@@ -628,24 +628,62 @@ def test_deps_image_tag_covers_every_content_input(generated_project):
     assert 'hexdigest()' in tag_source, 'deps_image_tag() does not fold per-input digests'
 
 
-def test_gitlab_deps_job_matches_the_python_tag_algorithm(generated_project):
-    """GitLab's inlined deps job hashes the same three inputs and pins by digest.
+def test_gitlab_deps_tag_reaches_kaniko_from_the_launcher(generated_project):
+    """GitLab's kaniko job pushes to an address `container.tag` computed, and computes nothing.
 
-    Its deps job runs in kaniko with no Python, so it cannot call ``deps_image_tag()``
-    and reimplements it in shell. That duplicate is easy to leave behind — this pins it.
+    kaniko has no Python, so the job used to repeat `deps_image_tag()` in shell, pinned to
+    the Python one by this test's predecessor. Now a job before it runs the launcher and hands
+    the tag and the base image on as a dotenv artifact (ADR-0043); the only shell left in the
+    kaniko job is the push.
     """
     project, cell = generated_project
     if cell['git_hosting_service'] != 'gitlab':
         pytest.skip('GitLab-only pipeline')
     pipeline = (project / '.gitlab-ci.yml').read_text(encoding='utf-8')
+    config = yaml.safe_load(pipeline)
+    plan = config['plan-deps-image']
+    assert any('./workflow.cmd container.tag --output .deps-tag.env' in line for line in plan['script']), (
+        f'the plan job does not run the launcher: {plan["script"]}'
+    )
+    assert plan['artifacts']['reports']['dotenv'] == '.deps-tag.env', 'the tag is not handed on as a dotenv artifact'
+    assert plan['variables'].get('UV_NO_SYNC') == '1', 'the plan job installs every group to hash a file'
+    deps = config['build-deps-image']
+    assert {'job': 'plan-deps-image', 'artifacts': True} in deps['needs'], 'kaniko does not wait for the tag'
     deps_job = pipeline.split('build-deps-image:', 1)[1].split('\npreflight:', 1)[0]
-    for required in ('uv.lock', 'Dockerfile.deps', 'BASE_IMAGE'):
-        assert required in deps_job, f'GitLab deps job does not hash {required}'
-    assert 'sha256sum uv.lock' in deps_job, 'the deps tag does not hash the lockfile'
-    assert 'sha256sum Dockerfile.deps' in deps_job, 'the deps tag does not hash the Dockerfile'
-    assert 'cut -c1-16' not in deps_job, 'GitLab deps job still uses the old 64-bit lockfile-only tag'
+    for forbidden in ('sha256sum', 'sed ', 'cut -c'):
+        assert forbidden not in deps_job, f'the kaniko job still computes something with {forbidden!r}'
+    assert '${CI_REGISTRY_IMAGE}:deps-${DEPS_TAG}' in deps_job, 'the kaniko job does not push to the computed tag'
+    assert '--build-arg=BASE_IMAGE="$BASE_IMAGE"' in deps_job, (
+        'the kaniko job does not build on the handed-on base image'
+    )
     assert '--digest-file' in deps_job, 'GitLab deps job does not capture the pushed digest'
     assert 'DEPS_IMAGE=${CI_REGISTRY_IMAGE}@${DIGEST}' in deps_job, 'DEPS_IMAGE is not digest-pinned'
+
+
+def test_container_tag_writes_the_dotenv_the_kaniko_job_reads(generated_project):
+    """`container.tag --output` writes exactly the two keys the kaniko job substitutes."""
+    project, _ = generated_project
+    source = (project / '_CI' / 'tasks' / 'container.py').read_text(encoding='utf-8')
+    printed = []
+    helpers = exec_from(
+        source,
+        'tag',
+        Path=Path,
+        Context=object,
+        task=lambda fn: fn,
+        logged=lambda _name: lambda fn: fn,
+        deps_image_tag=lambda: 'cafe' * 8,
+        read_info=lambda _key: 'ghcr.io/astral-sh/uv:0.13.7-python3.11-trixie-slim@sha256:abc',
+        print=printed.append,
+    )
+    helpers['tag'](None)
+    assert printed == ['cafe' * 8], 'without --output the task prints something other than the bare tag'
+    output = project / 'reports' / 'deps-tag.env'
+    output.parent.mkdir(exist_ok=True)
+    helpers['tag'](None, output=str(output))
+    assert output.read_text(encoding='utf-8') == (
+        f'DEPS_TAG={"cafe" * 8}\nBASE_IMAGE=ghcr.io/astral-sh/uv:0.13.7-python3.11-trixie-slim@sha256:abc\n'
+    )
 
 
 def test_deps_image_reference_is_digest_pinned(generated_project):
@@ -2212,7 +2250,9 @@ def test_no_ci_job_reruns_what_the_gate_already_covers(generated_project):
     else:
         pipeline = (project / '.gitlab-ci.yml').read_text(encoding='utf-8')
         jobs = {name for name in yaml.safe_load(pipeline) if not name.startswith(('stages', 'variables'))}
-        assert jobs == {'build-deps-image', 'preflight', 'secure', 'publish'}, f'the pipeline runs {jobs}'
+        assert jobs == {'plan-deps-image', 'build-deps-image', 'preflight', 'secure', 'publish'}, (
+            f'the pipeline runs {jobs}'
+        )
     # The task name, not the whole line: `startswith` also forbade a future
     # `test.list-combos`, exact-match let `./workflow.cmd test --args=…` through, and
     # `lstrip('- ')` strips any run of those two characters rather than one list marker.

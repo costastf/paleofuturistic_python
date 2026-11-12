@@ -8,37 +8,51 @@ variables:
   # boundaries, so downstream jobs that run `uv run` need copy mode.
   UV_LINK_MODE: copy
 
+# The deps image is content-addressed on the lockfile, the Dockerfile and the base image
+# (ADR-0033), and `container.tag` is the one implementation of that address. The job that
+# builds the image runs in the kaniko image, which has no Python, so this job computes the
+# tag and reads the base image first and hands both on as a dotenv artifact (ADR-0043).
+#
+# It runs on a plain Python image and installs the uv the project pins, read out of
+# pyproject.toml the way copier does at generation. That one line is the only shell the
+# launcher cannot replace: the launcher is `uv run`, so uv has to exist before it starts.
+plan-deps-image:
+  stage: deps
+  image: python:3-slim
+  variables:
+    # The tag needs nothing the project depends on, only the lockfile's bytes, so the
+    # launcher runs on an empty environment instead of installing every group first.
+    UV_NO_SYNC: "1"
+  script:
+    - pip install --quiet "uv==$(sed -n 's/^required-version = "==\(.*\)"$/\1/p' pyproject.toml)"
+    - ./workflow.cmd container.tag --output .deps-tag.env
+  artifacts:
+    reports:
+      dotenv: .deps-tag.env
+
 build-deps-image:
   stage: deps
+  needs:
+    - job: plan-deps-image
+      artifacts: true
   # Declared so the registry credentials below can be scoped to this environment
   # instead of being readable by every job in the project.
   environment: deps
   # kaniko builds without a daemon, which is what a shared runner allows; docker and
   # podman are not available there. kaniko:debug has no python/uv and its busybox
   # binaries are static, which uv's libc probe refuses, so this is the one pipeline job
-  # that can't go through ./workflow.cmd: it repeats what `container.publish` does with
-  # docker or podman by hand, in shell. Every other job runs inside $DEPS_IMAGE (built
-  # here) where ./workflow.cmd works normally.
+  # that can't go through ./workflow.cmd. What it runs by hand is the push itself; the
+  # address it pushes to, $DEPS_TAG and $BASE_IMAGE, comes from `container.tag` in the
+  # job above. Every other job runs inside $DEPS_IMAGE (built here) where ./workflow.cmd
+  # works normally.
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [""]
   script:
-    - BASE_IMAGE=$(sed -n 's/^base-image = "\(.*\)"$/\1/p' pyproject.toml)
-    # Mirrors deps_image_tag() in _CI/tasks/container.py: fold each input's own
-    # hex digest into an outer hash. Fixed-width digests make the concatenation
-    # unambiguous, and hashing the Dockerfile and base image — not just the
-    # lockfile — means a change to either produces a new tag instead of silently
-    # reusing a stale image. Keep both implementations in step.
-    - |
-      TAG=$(printf '%s%s%s' \
-        "$(sha256sum uv.lock | cut -d' ' -f1)" \
-        "$(sha256sum Dockerfile.deps | cut -d' ' -f1)" \
-        "$(printf '%s' "$BASE_IMAGE" | sha256sum | cut -d' ' -f1)" \
-        | sha256sum | cut -c1-32)
     # Push to $CI_REGISTRY_IMAGE (the project's registry root) with a
     # deps-prefixed tag. Some registries restrict deploy tokens to the
     # root path only — /deps and -deps subpaths both return DENIED.
-    - IMAGE="${CI_REGISTRY_IMAGE}:deps-${TAG}"
+    - IMAGE="${CI_REGISTRY_IMAGE}:deps-${DEPS_TAG}"
     - mkdir -p /kaniko/.docker
     # Some registries reject the default CI_JOB_TOKEN for pushes, so this job
     # authenticates with a project Deploy Token (scopes: read_registry +

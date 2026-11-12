@@ -79,3 +79,4 @@ anywhere in the repository resolves to a file.
 | [ADR-0040](0040-the-default-branch-is-a-copier-answer.md) | The default branch is a copier answer |
 | [ADR-0041](0041-fork-pull-requests-run-the-gate-on-the-runners-image.md) | Fork pull requests run the gate on the runner's image |
 | [ADR-0042](0042-refresh-deps-moves-the-boundary-and-the-pins-together.md) | `develop.refresh-deps` moves the boundary and the pins together |
+| [ADR-0043](0043-the-gitlab-deps-tag-is-computed-by-the-launcher.md) | The GitLab deps tag is computed by the launcher |

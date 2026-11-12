@@ -151,6 +151,7 @@ Calling one directly is how to run a single tool over a single file:
 | --- | --- |
 | `container.build` | Build `{{ project_slug }}-deps:latest` locally. |
 | `container.publish` | In CI: push to the chosen host's registry. Locally: build only. |
+| `container.tag` | Print the deps image's content-addressed tag; `--output <file>` writes `DEPS_TAG` and `BASE_IMAGE` as a dotenv file instead{% if git_hosting_service == 'gitlab' %}, which is how the pipeline hands the address to its kaniko job{% endif %}. |
 
 ## Shared helpers (not tasks)
 

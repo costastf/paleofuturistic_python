@@ -27,9 +27,8 @@ docker, buildah and podman; kaniko builds in userspace, but its image has no Pyt
 
 ## Consequences
 
-- An invariant pins the shell duplicate to the Python tag algorithm.
-- The GitLab duplicate is a standing exception to ADR-0004, and the candidate fix is computing
-  the tag in a Python job and passing it to kaniko as a dotenv artifact.
+- The shell duplicate of the tag algorithm was pinned to the Python one by an invariant until
+  ADR-0043 removed it: the tag now reaches kaniko as a dotenv artifact from `container.tag`.
 - The Deploy Token variables must be Protected, Masked and scoped to the `deps` environment, or
   a fork's merge request could read a registry write token.
 

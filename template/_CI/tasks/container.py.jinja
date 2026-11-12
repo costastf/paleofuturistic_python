@@ -1,6 +1,7 @@
 """Container task definitions for building and running the deps image."""
 
 import hashlib
+from pathlib import Path
 from typing import cast
 
 from invoke import Collection, Context, Task, task
@@ -20,10 +21,10 @@ def deps_image_tag() -> str:
     running a stale image.
 
     Each input is reduced to its own hex digest before being folded into the outer
-    hash. Those digests are fixed-width, so the concatenation is unambiguous — no
-    combination of inputs can collide with a different combination — and the whole
-    thing is reproducible in shell with `sha256sum`, which the GitLab pipeline needs
-    because its deps job runs in kaniko without Python. Keep the two in step.
+    hash. Those digests are fixed-width, so the concatenation is unambiguous: no
+    combination of inputs can collide with a different combination. This is the one
+    implementation; a pipeline job that cannot run Python gets the value from
+    `container.tag` as an artifact rather than recomputing it (ADR-0043).
     """
     digest = hashlib.sha256()
     parts = (
@@ -49,6 +50,30 @@ def build(context: Context) -> None:
 
 
 @task
+@logged('container.tag')
+def tag(context: Context, output: str = '') -> None:  # noqa: ARG001
+    """Print the deps-image tag, or write it and the base image to a dotenv file.
+
+    The tag is the content address `container.publish` builds under. A pipeline job that
+    builds the image without Python, such as GitLab's kaniko job, needs the address computed
+    for it; with ``--output`` this writes ``DEPS_TAG`` and ``BASE_IMAGE`` as a dotenv artifact
+    that job reads, so the algorithm above stays the only one (ADR-0043).
+
+    Args:
+        context: Invoke context.
+        output: File to write the two ``KEY=value`` lines to, instead of printing the tag.
+
+    """
+    value = deps_image_tag()
+    base_image = read_info('info.base-image')
+    if not output:
+        print(value)
+        return
+    Path(output).write_text(f'DEPS_TAG={value}\nBASE_IMAGE={base_image}\n', encoding='utf-8')
+    print(f'Wrote {output}: deps-{value} on {base_image}')
+
+
+@task
 @logged('container.publish')
 def publish(context: Context) -> None:
     """Build the deps image and publish to a container registry (CI) or keep it local.
@@ -62,11 +87,11 @@ def publish(context: Context) -> None:
     that reference is digest-pinned, so a tag repointed mid-run cannot change the
     container a later job runs in.
     """
-    tag = deps_image_tag()
+    address = deps_image_tag()
     if is_ci():
-        image = publish_deps_image(context, tag)
+        image = publish_deps_image(context, address)
     else:
-        image = f'{IMAGE_NAME}:{tag}'
+        image = f'{IMAGE_NAME}:{address}'
         engine = container_engine()
         result = context.run(f'{engine} image inspect {image}', hide=True, warn=True)
         if not result.failed:
@@ -80,3 +105,4 @@ def publish(context: Context) -> None:
 namespace = Collection('container')
 namespace.add_task(cast(Task, publish), default=True)
 namespace.add_task(cast(Task, build))
+namespace.add_task(cast(Task, tag))
