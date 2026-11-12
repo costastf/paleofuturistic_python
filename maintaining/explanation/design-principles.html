@@ -365,6 +365,10 @@
 <li>
     <a href="../decisions/0039-repository-url-renders-well-known-project-urls-or-nothing.html" class="dropdown-item">ADR-0039 repository_url renders well-known project URLs</a>
 </li>
+            
+<li>
+    <a href="../decisions/0040-the-default-branch-is-a-copier-answer.html" class="dropdown-item">ADR-0040 The default branch is a copier answer</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -735,6 +739,9 @@
             <li class="nav-item">
                 <a href="../decisions/0039-repository-url-renders-well-known-project-urls-or-nothing.html" class="nav-link">ADR-0039 repository_url renders well-known project URLs</a>
             </li>
+            <li class="nav-item">
+                <a href="../decisions/0040-the-default-branch-is-a-copier-answer.html" class="nav-link">ADR-0040 The default branch is a copier answer</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -894,7 +901,7 @@ untrue about it, so there is nothing for <code>--write</code> to write and nothi
 <p>Records: <a href="../decisions/0018-pytest-replaces-unittest.html">ADR-0018</a>, <a href="../decisions/0025-coverage-is-a-union-and-the-ratchet-starts-dormant.html">ADR-0025</a>.</p>
 <p>The original lineage used <code>python -m unittest</code>. We moved to pytest for fixtures, parametrization, coverage integration, and parallel execution via xdist. Unittest test classes still work — pytest discovers them.</p>
 <h2 id="conventional-commits-drive-the-release-notes">Conventional Commits drive the release notes</h2>
-<p>Records: <a href="../decisions/0019-conventional-commits-drive-the-changelog.html">ADR-0019</a>, and <a href="../decisions/0014-a-release-is-the-version-bump-arriving-on-the-default-branch.html">ADR-0014</a> for how a release reaches the default branch.</p>
+<p>Records: <a href="../decisions/0019-conventional-commits-drive-the-changelog.html">ADR-0019</a>, <a href="../decisions/0014-a-release-is-the-version-bump-arriving-on-the-default-branch.html">ADR-0014</a> for how a release reaches the default branch, and <a href="../decisions/0040-the-default-branch-is-a-copier-answer.html">ADR-0040</a> for where that branch's name comes from.</p>
 <p>Commit messages must follow <a href="https://www.conventionalcommits.org/">Conventional Commits</a> — the lint step rejects anything that doesn't parse. We use them for <strong>automatic release notes</strong>: <a href="https://commitizen-tools.github.io/commitizen/">commitizen</a> reads the commits since the last tag and groups them by prefix (<code>feat:</code>, <code>fix:</code>, etc.) into a generated changelog.</p>
 <p>We do <strong>not</strong> use commitizen's autorelease mode. The version bump is an explicit choice you make at release time: <code>./workflow.cmd release -i &lt;major|minor|patch|…&gt;</code>. Commit prefixes inform changelog structure, not the version number.</p>
 <h2 id="properdocs-not-vanilla-mkdocs-with-mkdocstrings-for-api-docs">properdocs (not vanilla mkdocs), with mkdocstrings for API docs</h2>

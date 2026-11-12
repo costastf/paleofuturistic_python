@@ -365,6 +365,10 @@
 <li>
     <a href="../../maintaining/decisions/0039-repository-url-renders-well-known-project-urls-or-nothing.html" class="dropdown-item">ADR-0039 repository_url renders well-known project URLs</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/decisions/0040-the-default-branch-is-a-copier-answer.html" class="dropdown-item">ADR-0040 The default branch is a copier answer</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -735,6 +739,9 @@
             <li class="nav-item">
                 <a href="../../maintaining/decisions/0039-repository-url-renders-well-known-project-urls-or-nothing.html" class="nav-link">ADR-0039 repository_url renders well-known project URLs</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0040-the-default-branch-is-a-copier-answer.html" class="nav-link">ADR-0040 The default branch is a copier answer</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -839,7 +846,7 @@ tree, so they run on push with the rest of <code>build</code>.</p>
 <h2 id="why-the-version-is-not-dynamic">Why the version is not <code>dynamic</code></h2>
 <p><code>[project] dynamic</code> lets the build backend compute a field, typically the version from a git tag.
 Generated projects do not use it: <code>./workflow.cmd release</code> has commitizen write the new version
-into <code>pyproject.toml</code>, and CI tags that version once it lands on <code>main</code>, so the version in the
+into <code>pyproject.toml</code>, and CI tags that version once it lands on the default branch, so the version in the
 file is the released one and every field is static. Static metadata is what validate-pyproject, twine and anything else that
 reads <code>pyproject.toml</code> without running a build can see.</p>
 <h2 id="where-provenance-fits">Where provenance fits</h2>

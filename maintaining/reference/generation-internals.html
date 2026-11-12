@@ -365,6 +365,10 @@
 <li>
     <a href="../decisions/0039-repository-url-renders-well-known-project-urls-or-nothing.html" class="dropdown-item">ADR-0039 repository_url renders well-known project URLs</a>
 </li>
+            
+<li>
+    <a href="../decisions/0040-the-default-branch-is-a-copier-answer.html" class="dropdown-item">ADR-0040 The default branch is a copier answer</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -735,6 +739,9 @@
             <li class="nav-item">
                 <a href="../decisions/0039-repository-url-renders-well-known-project-urls-or-nothing.html" class="nav-link">ADR-0039 repository_url renders well-known project URLs</a>
             </li>
+            <li class="nav-item">
+                <a href="../decisions/0040-the-default-branch-is-a-copier-answer.html" class="nav-link">ADR-0040 The default branch is a copier answer</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -817,7 +824,7 @@
 <td><code>_CI/tasks/gitlab.py</code> absent for GitHub projects</td>
 </tr>
 <tr>
-<td><code>template/{% if git_hosting_service == 'github' %}.github{% endif %}/workflows/{% if integrate_pages %}pages.yaml{% endif %}</code></td>
+<td><code>template/{% if git_hosting_service == 'github' %}.github{% endif %}/workflows/{% if integrate_pages %}pages.yaml{% endif %}.jinja</code></td>
 <td>either condition false → name is <code>''</code></td>
 <td>Pages workflow absent when not GitHub or pages disabled</td>
 </tr>

@@ -365,6 +365,10 @@
 <li>
     <a href="../../maintaining/decisions/0039-repository-url-renders-well-known-project-urls-or-nothing.html" class="dropdown-item">ADR-0039 repository_url renders well-known project URLs</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/decisions/0040-the-default-branch-is-a-copier-answer.html" class="dropdown-item">ADR-0040 The default branch is a copier answer</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -735,6 +739,9 @@
             <li class="nav-item">
                 <a href="../../maintaining/decisions/0039-repository-url-renders-well-known-project-urls-or-nothing.html" class="nav-link">ADR-0039 repository_url renders well-known project URLs</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0040-the-default-branch-is-a-copier-answer.html" class="nav-link">ADR-0040 The default branch is a copier answer</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -760,6 +767,10 @@
               </ul>
             </li>
             <li class="nav-item" data-bs-level="2"><a href="#upgrading-past-the-packaging-conformance-change" class="nav-link">Upgrading past the packaging-conformance change</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#upgrading-past-the-default-branch-question" class="nav-link">Upgrading past the default-branch question</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -832,6 +843,8 @@
 <li><strong>New dependency group</strong> <code>build</code>, and new pins in <code>lint</code> and <code>security</code>. Run <code>uv lock</code> after the update and commit <code>uv.lock</code> with it.</li>
 <li><strong>Publishing.</strong> The publish job now signs PEP 740 attestations. On GitLab it also requests <code>id_tokens:</code>, and PyPI needs a Trusted Publisher registered for the project (the new <em>Set up Trusted Publishing</em> how-to). If you publish with <code>UV_PUBLISH_*</code> credentials, nothing changes: that path uploads without attestations.</li>
 </ul>
+<h2 id="upgrading-past-the-default-branch-question">Upgrading past the default-branch question</h2>
+<p><code>copier update</code> asks <code>default_branch</code>, with <code>main</code> as the default. Accept it if your default branch is <code>main</code> and nothing changes. Answer with your branch's name otherwise: the publish and Pages workflows start triggering on it, <code>release</code> starts from it, release pull or merge requests target it, and the CI badge reads it. Before the question, all of those spelled <code>main</code>, so a project on another branch had to edit each by hand after every update. See <a href="../../maintaining/decisions/0040-the-default-branch-is-a-copier-answer.html">ADR-0040</a>.</p>
 <h2 id="upgrading-past-the-tag-on-main-release-flow">Upgrading past the tag-on-main release flow</h2>
 <p><code>release</code> used to create the tag on the release branch and push it with the branch. On GitLab that published the version before the MR was reviewed; on both hosts a squash merge left the tag pointing at a commit <code>main</code> never saw, and nothing published. Now <code>release</code> creates no tag. The publish job runs on every push to the default branch and hands it to <code>release.ship</code>, which publishes when <code>[project].version</code> changed between the previous tip and the new one: it creates the tag on the new tip through the host's Release API (a Release entry appears on the releases page), then builds, signs and uploads. Merge release PRs/MRs any way you like.</p>
 <p>Updating changes:</p>
@@ -843,7 +856,7 @@
 <ol>
 <li>If the <code>pypi</code> environment has required reviewers or approvers, remove them and restrict the environment to the default branch instead; the job now runs on every push to it. The PyPI Trusted Publisher registration itself is unchanged.</li>
 <li>On GitHub, if a ruleset restricts who may create <code>v*</code> tags, add a bypass for GitHub Actions, or <code>release.tag</code> fails.</li>
-<li>A release branch opened before the update carries a tag on its bump commit. Delete that tag everywhere (<code>git tag -d vX.Y.Z &amp;&amp; git push origin :refs/tags/vX.Y.Z</code>) before merging, or <code>release.tag</code> refuses to create it on <code>main</code> because it exists on another commit.</li>
+<li>A release branch opened before the update carries a tag on its bump commit. Delete that tag everywhere (<code>git tag -d vX.Y.Z &amp;&amp; git push origin :refs/tags/vX.Y.Z</code>) before merging, or <code>release.tag</code> refuses to create it on the default branch because it exists on another commit.</li>
 </ol>
 <h2 id="upgrading-past-the-changelog-move">Upgrading past the changelog move</h2>
 <p>Releases used to write the changelog to <code>docs/changelog.md</code>, a page missing from the docs nav, while <em>Reference → Changelog</em> showed a placeholder that never changed. They now write <code>docs/reference/changelog.md</code>, the page the nav shows.</p>

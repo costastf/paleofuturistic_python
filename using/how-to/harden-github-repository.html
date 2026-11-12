@@ -365,6 +365,10 @@
 <li>
     <a href="../../maintaining/decisions/0039-repository-url-renders-well-known-project-urls-or-nothing.html" class="dropdown-item">ADR-0039 repository_url renders well-known project URLs</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/decisions/0040-the-default-branch-is-a-copier-answer.html" class="dropdown-item">ADR-0040 The default branch is a copier answer</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -735,6 +739,9 @@
             <li class="nav-item">
                 <a href="../../maintaining/decisions/0039-repository-url-renders-well-known-project-urls-or-nothing.html" class="nav-link">ADR-0039 repository_url renders well-known project URLs</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0040-the-default-branch-is-a-copier-answer.html" class="nav-link">ADR-0040 The default branch is a copier answer</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -783,7 +790,7 @@
 <h2 id="prerequisite-security">Prerequisite security</h2>
 <p>These are non-negotiable for any repository connected to CI/CD:</p>
 <ul>
-<li><strong>Branch protection on <code>main</code>.</strong> Require pull requests, require status checks, require a linear history. Block force pushes and deletions. Require only checks that run on every pull request — and today that is none of the shipped ones. <strong>Do not require <code>Preflight</code></strong>: the workflows trigger on <code>push</code>, so a pull request from a fork runs nothing in this repository and a required check would sit pending forever, leaving the repository unable to merge an external contribution. <code>security-audit</code> is filtered by <code>on.push.paths</code> on top of that. Require them once the workflows gain a <code>pull_request</code> trigger, which is a decision the template has not taken yet.</li>
+<li><strong>Branch protection on the default branch</strong> (<code>main</code>, or whatever <code>default_branch</code> was answered). Require pull requests, require status checks, require a linear history. Block force pushes and deletions. Require only checks that run on every pull request — and today that is none of the shipped ones. <strong>Do not require <code>Preflight</code></strong>: the workflows trigger on <code>push</code>, so a pull request from a fork runs nothing in this repository and a required check would sit pending forever, leaving the repository unable to merge an external contribution. <code>security-audit</code> is filtered by <code>on.push.paths</code> on top of that. Require them once the workflows gain a <code>pull_request</code> trigger, which is a decision the template has not taken yet.</li>
 <li><strong>Tag protection for <code>v*</code>.</strong> A ruleset on <code>refs/tags/v*</code> with <em>Restrict updates</em> and <em>Restrict deletions</em> ticked, and <em>Restrict creations</em> left off. Creation must stay unrestricted: <code>release.tag</code> creates each release tag from the publish job through the Releases API with the workflow's <code>GITHUB_TOKEN</code>, an identity no ruleset bypass list is guaranteed to accept, and a creation restriction makes that call fail with <code>422</code> before anything is built. Updates and deletions are what rewrite release history, and those two rules stop them. Do not use the legacy <em>Tag protection rules</em>, which restrict creation to admins and maintainers with no way round.</li>
 <li><strong>Required approvals.</strong> At least one reviewer per PR.</li>
 </ul>
@@ -791,7 +798,7 @@
 <p>The shipped <code>.github/workflows/publish.yaml</code> is configured for <a href="https://docs.pypi.org/trusted-publishers/">PyPI trusted publishing</a> — short-lived OIDC tokens, no long-lived secrets.</p>
 <ol>
 <li>Create a <code>pypi</code> environment on the repo: <strong>Settings → Environments → New environment</strong>.</li>
-<li>Restrict deployment branches: only <code>main</code> may deploy to <code>pypi</code>.</li>
+<li>Restrict deployment branches: only the default branch may deploy to <code>pypi</code>.</li>
 <li>On <a href="https://pypi.org/">pypi.org</a>, add a <a href="https://docs.pypi.org/trusted-publishers/adding-a-publisher/">trusted publisher</a> pointing at your repo + workflow + environment name (<code>pypi</code>).</li>
 </ol>
 <p>The workflow grants <code>id-token: write</code> on the publish job — that's what makes the OIDC handshake possible. Don't set <code>UV_PUBLISH_*</code> secrets alongside: when all three are present <code>release.publish</code> uploads with them instead, and without attestations.</p>

@@ -365,6 +365,10 @@
 <li>
     <a href="0039-repository-url-renders-well-known-project-urls-or-nothing.html" class="dropdown-item">ADR-0039 repository_url renders well-known project URLs</a>
 </li>
+            
+<li>
+    <a href="0040-the-default-branch-is-a-copier-answer.html" class="dropdown-item">ADR-0040 The default branch is a copier answer</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -735,6 +739,9 @@
             <li class="nav-item">
                 <a href="0039-repository-url-renders-well-known-project-urls-or-nothing.html" class="nav-link">ADR-0039 repository_url renders well-known project URLs</a>
             </li>
+            <li class="nav-item">
+                <a href="0040-the-default-branch-is-a-copier-answer.html" class="nav-link">ADR-0040 The default branch is a copier answer</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -804,8 +811,8 @@ API, with the token the job already holds (<code>GITHUB_TOKEN</code> with <code>
   bypass list is guaranteed to accept it.</li>
 <li><code>release.push</code> lost its purpose and was removed. A release branch opened before the change
   carries a tag that has to be deleted before merging.</li>
-<li>The default branch is still spelled <code>main</code> in the tasks, the workflows and the badge URL.
-  Making it a copier answer read from one place is the next decision in this area.</li>
+<li>The default branch was spelled <code>main</code> in the tasks, the workflows and the badge URL until
+  ADR-0040 made it a copier answer.</li>
 </ul>
 <h2 id="references">References</h2>
 <ul>

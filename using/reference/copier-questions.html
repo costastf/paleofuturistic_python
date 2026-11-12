@@ -365,6 +365,10 @@
 <li>
     <a href="../../maintaining/decisions/0039-repository-url-renders-well-known-project-urls-or-nothing.html" class="dropdown-item">ADR-0039 repository_url renders well-known project URLs</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/decisions/0040-the-default-branch-is-a-copier-answer.html" class="dropdown-item">ADR-0040 The default branch is a copier answer</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -735,6 +739,9 @@
             <li class="nav-item">
                 <a href="../../maintaining/decisions/0039-repository-url-renders-well-known-project-urls-or-nothing.html" class="nav-link">ADR-0039 repository_url renders well-known project URLs</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0040-the-default-branch-is-a-copier-answer.html" class="nav-link">ADR-0040 The default branch is a copier answer</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -828,6 +835,13 @@
 <li><strong>Allowed</strong>: <code>github</code>, <code>gitlab</code></li>
 </ul>
 <p>Determines which CI scaffolding ships and which host-specific submodule lives at <code>_CI/tasks/&lt;host&gt;.py</code>. The unchosen host's files are omitted at generation time via copier conditional filenames — a file or directory whose rendered name is an empty string is simply not created. See <a href="../how-to/choose-a-git-host.html">Choose a git host</a>.</p>
+<h3 id="default_branch"><code>default_branch</code></h3>
+<ul>
+<li><strong>Type</strong>: string</li>
+<li><strong>Default</strong>: <code>main</code></li>
+<li><strong>Allowed</strong>: a branch name git accepts, without characters that would need quoting in YAML or a URL: letters, digits, <code>.</code>, <code>_</code>, <code>/</code> and <code>-</code>, starting with a letter or digit, no <code>..</code>, not ending in <code>/</code> or <code>.lock</code></li>
+</ul>
+<p>The branch releases land on. The publish workflow or pipeline triggers on it by name, the Pages workflow does too, <code>release</code> refuses to start from any other branch, the release pull or merge request targets it, and the CI badge reads its status. The tasks read it from <code>DEFAULT_BRANCH</code> in <code>_CI/tasks/configuration.py</code>; the workflow files have it written in at generation time, since a trigger cannot be computed at run time. Renaming the branch later is a <code>copier update</code> with a new answer. On GitLab the answer has to match the project's default branch setting, which <code>.gitlab-ci.yml</code> reads as <code>$CI_DEFAULT_BRANCH</code>. See <a href="../../maintaining/decisions/0040-the-default-branch-is-a-copier-answer.html">ADR-0040</a>.</p>
 <h3 id="repository_url"><code>repository_url</code></h3>
 <ul>
 <li><strong>Type</strong>: string</li>
@@ -879,6 +893,7 @@
 <li><strong>Python version range</strong> — a <code>validator</code> on the <code>max_python_version</code> question in <code>copier.yml</code> checks that <code>max &gt;= min</code>, that both values share the same major version, and that both appear in the choices list. Any failure aborts generation immediately before any files are written.</li>
 <li><strong>Project slug</strong> — a <code>validator</code> on the <code>project_slug</code> question checks the value is a valid Python identifier and PyPI project name (<code>^[a-z]([a-z0-9_]*[a-z0-9])?$</code>), rejecting empty values, leading digits, and punctuation such as apostrophes. Generation aborts before any files are written on failure.</li>
 <li><strong>Repository URL</strong> — a <code>validator</code> on <code>repository_url</code> accepts an empty value or <code>^https://[^/\s]+/[^\s]+$</code>, so <code>http://</code>, SSH remotes and a bare host are refused before any files are written.</li>
+<li><strong>Default branch</strong> — a <code>validator</code> on <code>default_branch</code> refuses an empty value and the names <code>git check-ref-format --branch</code> would refuse that the pattern can express: a leading <code>-</code> or <code>.</code>, <code>..</code>, a trailing <code>/</code> or <code>.lock</code>, and any character outside letters, digits, <code>.</code>, <code>_</code>, <code>/</code> and <code>-</code>.</li>
 <li><strong>License installation</strong> — <code>tasks_render.py</code> installs the chosen <code>LICENSE</code> file (substituting author/year tokens) and removes the <code>licenses/</code> staging directory. It runs only on <code>copier copy</code>, not on <code>copier update</code>.</li>
 </ol>
 <h2 id="see-also">See also</h2>
