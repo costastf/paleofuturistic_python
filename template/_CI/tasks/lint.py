@@ -128,8 +128,8 @@ def unpushed_range(context: Context) -> str | None:
 
     An empty candidate falls through to the next rather than ending the search, and the last
     resort is the tip commit. That matters because of where the empty case comes from:
-    `actions/checkout` fetches one commit and runs `checkout -B main refs/remotes/origin/main`,
-    so in CI the branch *does* track `origin/main` and `origin/main` *is* `HEAD` — the range is
+    `actions/checkout` fetches one commit and runs `checkout -B <branch> refs/remotes/origin/<branch>`,
+    so in CI the branch *does* track its remote counterpart and that *is* `HEAD` — the range is
     empty on every push. Returning None there would have the pipeline validate nothing at all,
     on the one run that can catch what the hook cannot: a `--no-verify` commit, or a clone with
     no hooks installed.

@@ -1,19 +1,20 @@
 name: Pages
 
-# Published on release, not on every push to main. Docs built from main describe code that is
-# on main but in no release yet, so a reader following them can reach for something they cannot
-# install — the published site and the published package should describe the same thing.
+# Published on release, not on every push to the default branch. Docs built from that branch
+# describe code that is on it but in no release yet, so a reader following them can reach for
+# something they cannot install — the published site and the published package should describe
+# the same thing.
 #
-# The trigger is a push to main, with `release.detect` deciding whether it carried a release:
-# the same question `publish.yaml` asks through `release.ship`, answered by the same code, so
-# the two cannot drift. Not `push: tags:`: `release` creates no tag, the publish job does, once
-# the release has landed on main.
+# The trigger is a push to the default branch, with `release.detect` deciding whether it carried
+# a release: the same question `publish.yaml` asks through `release.ship`, answered by the same
+# code, so the two cannot drift. Not `push: tags:`: `release` creates no tag, the publish job
+# does, once the release has landed. The branch is the `default_branch` copier answer.
 #
 # `workflow_dispatch` is the escape hatch and earns its place: a project that has not released
 # yet would otherwise never publish its docs at all.
 on:
   push:
-    branches: [main]
+    branches: [{{ default_branch }}]
   workflow_dispatch:
 
 # Floor for the workflow; the deploy job widens it to what `gh-deploy` needs. Without this
@@ -37,16 +38,22 @@ jobs:
     needs: build-deps-image
     runs-on: ubuntu-latest
     container:
+      {%- raw %}
       image: ${{ needs.build-deps-image.outputs.image }}
+      {%- endraw %}
       credentials:
+        {%- raw %}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
+        {%- endraw %}
     permissions:
       contents: read
       packages: read
     outputs:
+      {%- raw %}
       tag: ${{ steps.find.outputs.tag }}
       sha: ${{ steps.find.outputs.sha }}
+      {%- endraw %}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
@@ -56,17 +63,25 @@ jobs:
       # On a manual run `github.event.before` is empty and the task compares the tip with its
       # parent, so a dispatch republishes the current docs rather than finding an old release.
       - id: find
+        {%- raw %}
         run: ./workflow.cmd release.detect --before "${{ github.event.before }}" --after "${{ github.sha }}" --output "$GITHUB_OUTPUT"
+        {%- endraw %}
 
   deploy:
     needs: [detect, build-deps-image]
+    {%- raw %}
     if: ${{ needs.detect.outputs.tag != '' || github.event_name == 'workflow_dispatch' }}
+    {%- endraw %}
     runs-on: ubuntu-latest
     container:
+      {%- raw %}
       image: ${{ needs.build-deps-image.outputs.image }}
+      {%- endraw %}
       credentials:
+        {%- raw %}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
+        {%- endraw %}
     permissions:
       # `contents: write` is required, not an oversight: `properdocs gh-deploy` commits the
       # built site to the `gh-pages` branch. That flow is deliberate — see "Why gh-pages
@@ -81,9 +96,11 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           # The commit the release is, so the site describes the version that was just
-          # released rather than whatever else has landed on main since. Empty when a manual
+          # released rather than whatever else has landed on the branch since. Empty when a manual
           # run found no release, which actions/checkout reads as the triggering ref.
+          {%- raw %}
           ref: ${{ needs.detect.outputs.sha }}
+          {%- endraw %}
           fetch-depth: 0
           # Deliberately left persisted, unlike every other checkout here: gh-deploy
           # pushes with these credentials. This job builds no SBOM, so nothing reads the
@@ -92,4 +109,6 @@ jobs:
       - name: Build and deploy docs
         run: ./workflow.cmd document.deploy-github
         env:
+          {%- raw %}
           GITHUB_TOKEN: ${{ github.token }}
+          {%- endraw %}

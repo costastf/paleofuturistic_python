@@ -45,9 +45,9 @@ minted for any other environment is refused.
 
 In the repository, *Settings → Environments → New environment*, name it `pypi`, and restrict
 deployment to the default branch. Do not add required reviewers: the publish job runs on every
-push to `main` and exits early when the push carried no release, so a reviewer gate would hold
+push to `{{ default_branch }}` and exits early when the push carried no release, so a reviewer gate would hold
 every push. The review that guards a release is the pull request's, and only what is merged
-into `main` can reach this environment. GitHub's [environments guide](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments)
+into `{{ default_branch }}` can reach this environment. GitHub's [environments guide](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments)
 has the details.
 
 ## 3. Nothing to configure in the workflow

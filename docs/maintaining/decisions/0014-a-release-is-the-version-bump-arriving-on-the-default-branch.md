@@ -37,8 +37,8 @@ API, with the token the job already holds (`GITHUB_TOKEN` with `contents: write`
   bypass list is guaranteed to accept it.
 - `release.push` lost its purpose and was removed. A release branch opened before the change
   carries a tag that has to be deleted before merging.
-- The default branch is still spelled `main` in the tasks, the workflows and the badge URL.
-  Making it a copier answer read from one place is the next decision in this area.
+- The default branch was spelled `main` in the tasks, the workflows and the badge URL until
+  ADR-0040 made it a copier answer.
 
 ## References
 

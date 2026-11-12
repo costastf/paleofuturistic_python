@@ -10,7 +10,7 @@ from typing import cast
 from invoke import Collection, Context, Task, task
 
 from .build import build
-from .configuration import CHANGELOG_FILE, DIST_DIR, OIDC_ENV_VARS, SBOM_FILE, UV_PUBLISH_SETTINGS
+from .configuration import CHANGELOG_FILE, DEFAULT_BRANCH, DIST_DIR, OIDC_ENV_VARS, SBOM_FILE, UV_PUBLISH_SETTINGS
 from .document import update_package_version_badge
 from .{{ git_hosting_service }} import create_release, create_release_pr, pr_create_url, release_tag_commit
 from .secure import audit
@@ -83,13 +83,14 @@ def bump(context: Context, increment: str = '') -> None:
     provider and stops there; this task commits the result with the message `cz bump` would
     have used. The tag is deliberately not created here: it is created on the default branch by
     CI once the release lands there (`release.tag`), so the way the pull request is merged —
-    merge commit, squash, rebase — cannot leave a tag pointing at a commit `main` never saw.
+    merge commit, squash, rebase — cannot leave a tag pointing at a commit the default branch
+    never saw.
 
     The badge is refreshed *before* the bump, so it lands in the same commit as the version it
     announces: the commit stages every modified tracked file, which is also why `release`
     runs `validate` first to insist on a clean tree. Otherwise the release would land a README
-    contradicting the version it released, and the next `preflight` on main would fail on the
-    stale badge.
+    contradicting the version it released, and the next `preflight` on the default branch would
+    fail on the stale badge.
 
     Writing before the step that can fail means putting the badge back when it does. `cz bump`
     refuses on an unparseable history or an invalid increment, and a badge announcing a version
@@ -515,10 +516,11 @@ def ensure_refs_are_free(context: Context, new_version: str, release_branch: str
 def release(context: Context, increment: str = '', no_push: bool = False) -> None:
     """Prepare a release on a new ``release/<version>`` branch.
 
-    Validates a clean tree on ``main``, branches off, bumps the version, commits the
+    Validates a clean tree on the default branch, branches off, bumps the version, commits the
     changelog, and pushes the branch so the resulting pull request carries the full release
     snapshot for review. No tag is created here: once the request is merged, CI sees the
-    version bump arrive on ``main``, creates the tag there, and publishes (``release.ship``).
+    version bump arrive on the default branch, creates the tag there, and publishes
+    (``release.ship``). Which branch that is comes from ``DEFAULT_BRANCH``, a copier answer.
 
     Args:
         context: Invoke context.
@@ -533,8 +535,8 @@ def release(context: Context, increment: str = '', no_push: bool = False) -> Non
         print('Could not determine the current branch.')
         raise SystemExit(1)
     current_branch = current.stdout.strip()
-    if current_branch != 'main':
-        print(f'Releases must start from `main` (currently on `{current_branch}`).')
+    if current_branch != DEFAULT_BRANCH:
+        print(f'Releases must start from `{DEFAULT_BRANCH}` (currently on `{current_branch}`).')
         raise SystemExit(1)
 
     new_version = resolve_next_version(context, increment)

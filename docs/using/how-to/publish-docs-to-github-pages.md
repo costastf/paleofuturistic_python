@@ -1,6 +1,6 @@
 # Publish docs to GitHub Pages
 
-For GitHub-hosted projects, the template ships `.github/workflows/pages.yaml` by default. It runs `./workflow.cmd document.deploy-github` when a release lands on `main`, which delegates to `properdocs gh-deploy` (no GitHub Pages deploy actions involved — see [Design principles](../../maintaining/explanation/design-principles.md#pipelines-run-template-commands-only) for the reasoning). The only manual step is enabling Pages on the GitHub side.
+For GitHub-hosted projects, the template ships `.github/workflows/pages.yaml` by default. It runs `./workflow.cmd document.deploy-github` when a release lands on the default branch, which delegates to `properdocs gh-deploy` (no GitHub Pages deploy actions involved — see [Design principles](../../maintaining/explanation/design-principles.md#pipelines-run-template-commands-only) for the reasoning). The only manual step is enabling Pages on the GitHub side.
 
 The Pages scaffolding is **opt-in/opt-out at generation time** via the `integrate_pages` question (default `true`). Answering `false` omits both the workflow file and the matching `document.deploy-github` task from the generated project — see [Copier questions](../reference/copier-questions.md#integrate_pages).
 
@@ -45,16 +45,16 @@ The workflow uses `concurrency: { group: pages, cancel-in-progress: false }`. If
 
 ## Why on release rather than on every push
 
-Docs built from `main` describe code that is in no release yet, so a reader following them can
-reach for a function they cannot install. The workflow triggers on a push to `main` and asks
+Docs built from the default branch describe code that is in no release yet, so a reader following
+them can reach for a function they cannot install. The workflow triggers on a push to that branch and asks
 `./workflow.cmd release.detect` whether it carried a release — a change of `[project].version`
 — the same question `publish.yaml` asks through `release.ship`, so the site and the package
 cannot disagree about what counts as released.
 
 Not a `push: tags: ['v*']` trigger: `./workflow.cmd release` creates no tag. The publish job
-creates it on `main` once the release has merged, which is after the docs should go out.
+creates it on the default branch once the release has merged, which is after the docs should go out.
 
-A site tracking `main` as well means versioned docs — a `stable` build plus a `dev` one — rather
+A site tracking the default branch as well means versioned docs — a `stable` build plus a `dev` one — rather
 than a trigger change, which is more machinery than the template ships today.
 
 ## Custom domain

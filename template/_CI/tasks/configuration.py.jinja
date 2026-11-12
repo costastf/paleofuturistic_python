@@ -29,6 +29,12 @@ IMAGE_NAME = '{{ project_slug }}-deps'
 
 PROJECT_NAME = '{{ project_slug }}'
 
+# The branch a release lands on: `release` refuses to start anywhere else, the release pull
+# request targets it, and the CI badge reads its status. The pipelines trigger on the same
+# copier answer, written into them at generation time, so renaming the branch is a
+# `copier update` with a new answer rather than a hunt through the tree (ADR-0040).
+DEFAULT_BRANCH = '{{ default_branch }}'
+
 # SBOM ships inside the wheel via the package data tree, so consumers of the
 # released artefact can extract it via importlib.resources or by unzipping.
 SBOM_FILE = Path('src') / PROJECT_NAME / 'sbom.cdx.json'

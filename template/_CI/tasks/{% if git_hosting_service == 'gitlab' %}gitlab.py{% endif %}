@@ -15,6 +15,7 @@ from invoke import Context
 
 from _CI.info import read as read_info
 
+from .configuration import DEFAULT_BRANCH
 from .shared import (
     PipelineComponent,
     RemoteRef,
@@ -115,7 +116,7 @@ def pipeline_badge(context: Context) -> str:
     if not origin.host or not origin.path:
         return ''
     return (
-        f'[![Pipeline](https://{origin.host}/{origin.path}/badges/main/pipeline.svg)]'
+        f'[![Pipeline](https://{origin.host}/{origin.path}/badges/{DEFAULT_BRANCH}/pipeline.svg)]'
         f'(https://{origin.host}/{origin.path}/-/pipelines)'
     )
 
@@ -152,11 +153,11 @@ def create_release_pr(context: Context, release_branch: str, new_version: str) -
     payload = json.dumps(
         {
             'source_branch': release_branch,
-            'target_branch': 'main',
+            'target_branch': DEFAULT_BRANCH,
             'title': f'chore(release): v{new_version}',
             'description': (
                 f'Release v{new_version} prepared by `./workflow.cmd release`. '
-                'Merge it any way; the version bump arriving on main is what makes '
+                f'Merge it any way; the version bump arriving on {DEFAULT_BRANCH} is what makes '
                 'CI create the tag and publish.'
             ),
         }

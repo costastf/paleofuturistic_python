@@ -66,4 +66,4 @@ a skipped check is deferred rather than avoided. You hear about it from the pipe
 few minutes later and in front of everyone on the pull request.
 
 That is the design: the hooks tell you sooner, and they are not the only thing between a mistake
-and the main branch, which is what makes it safe to skip one when you need to.
+and the default branch, which is what makes it safe to skip one when you need to.

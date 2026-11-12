@@ -6,7 +6,7 @@ After generating with `git_hosting_service=github`, you have five workflow files
 
 These are non-negotiable for any repository connected to CI/CD:
 
-- **Branch protection on `main`.** Require pull requests, require status checks, require a linear history. Block force pushes and deletions. Require only checks that run on every pull request — and today that is none of the shipped ones. **Do not require `Preflight`**: the workflows trigger on `push`, so a pull request from a fork runs nothing in this repository and a required check would sit pending forever, leaving the repository unable to merge an external contribution. `security-audit` is filtered by `on.push.paths` on top of that. Require them once the workflows gain a `pull_request` trigger, which is a decision the template has not taken yet.
+- **Branch protection on the default branch** (`main`, or whatever `default_branch` was answered). Require pull requests, require status checks, require a linear history. Block force pushes and deletions. Require only checks that run on every pull request — and today that is none of the shipped ones. **Do not require `Preflight`**: the workflows trigger on `push`, so a pull request from a fork runs nothing in this repository and a required check would sit pending forever, leaving the repository unable to merge an external contribution. `security-audit` is filtered by `on.push.paths` on top of that. Require them once the workflows gain a `pull_request` trigger, which is a decision the template has not taken yet.
 - **Tag protection for `v*`.** A ruleset on `refs/tags/v*` with *Restrict updates* and *Restrict deletions* ticked, and *Restrict creations* left off. Creation must stay unrestricted: `release.tag` creates each release tag from the publish job through the Releases API with the workflow's `GITHUB_TOKEN`, an identity no ruleset bypass list is guaranteed to accept, and a creation restriction makes that call fail with `422` before anything is built. Updates and deletions are what rewrite release history, and those two rules stop them. Do not use the legacy *Tag protection rules*, which restrict creation to admins and maintainers with no way round.
 - **Required approvals.** At least one reviewer per PR.
 
@@ -15,7 +15,7 @@ These are non-negotiable for any repository connected to CI/CD:
 The shipped `.github/workflows/publish.yaml` is configured for [PyPI trusted publishing](https://docs.pypi.org/trusted-publishers/) — short-lived OIDC tokens, no long-lived secrets.
 
 1. Create a `pypi` environment on the repo: **Settings → Environments → New environment**.
-2. Restrict deployment branches: only `main` may deploy to `pypi`.
+2. Restrict deployment branches: only the default branch may deploy to `pypi`.
 3. On [pypi.org](https://pypi.org/), add a [trusted publisher](https://docs.pypi.org/trusted-publishers/adding-a-publisher/) pointing at your repo + workflow + environment name (`pypi`).
 
 The workflow grants `id-token: write` on the publish job — that's what makes the OIDC handshake possible. Don't set `UV_PUBLISH_*` secrets alongside: when all three are present `release.publish` uploads with them instead, and without attestations.

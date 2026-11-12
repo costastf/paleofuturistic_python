@@ -1,14 +1,14 @@
 name: Publish
 
-# Runs on every push to main and publishes only when the push carried a release — a change of
-# `[project].version` — which `release.ship` decides. Not `push: tags:`: `release` creates no
-# tag; this job creates it, on main, once the release has been reviewed and merged, so the
-# merge method (merge commit, squash, rebase) cannot leave a tag pointing at a commit main
-# never saw. The pipeline the GitLab template ships runs the same command the same way.
+# Runs on every push to the default branch and publishes only when the push carried a release —
+# a change of `[project].version` — which `release.ship` decides. Not `push: tags:`: `release`
+# creates no tag; this job creates it, on the default branch, once the release has been reviewed
+# and merged, so the merge method (merge commit, squash, rebase) cannot leave a tag pointing at a
+# commit the branch never saw. The branch is the `default_branch` copier answer. The pipeline the GitLab template ships runs the same command the same way.
 on:
   push:
     branches:
-      - main
+      - {{ default_branch }}
 
 # Floor for the workflow; the publish job widens it to what Trusted Publishing needs.
 permissions:
@@ -54,8 +54,8 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
       {%- endraw %}
-    # Protect this environment by restricting it to the `main` branch, not by required
-    # reviewers: the job runs on every push to main and exits early without a release, so a
+    # Protect this environment by restricting it to the `{{ default_branch }}` branch, not by
+    # required reviewers: the job runs on every push to it and exits early without a release, so a
     # reviewer gate would hold every push. The review that guards a release is the pull
     # request's.
     environment: pypi

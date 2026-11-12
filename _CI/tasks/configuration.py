@@ -137,6 +137,10 @@ def base_context() -> dict:
 # One repository URL per host, so every matrix cell renders `[project.urls]` and the
 # host-specific link shapes (`/issues` vs `/-/issues`, GitHub Pages) are exercised. The
 # empty-URL case is a single extra generation in the invariants suite, not an axis.
+# What copier.yml answers for `default_branch` when nobody says otherwise. The cells all generate
+# with it; one invariant generates with another name to prove nothing is still spelled `main`.
+DEFAULT_BRANCH = 'main'
+
 REPOSITORY_URLS = {
     'github': f'https://github.com/example-org/{PROJECT_SLUG}',
     'gitlab': f'https://gitlab.com/example-org/{PROJECT_SLUG}',

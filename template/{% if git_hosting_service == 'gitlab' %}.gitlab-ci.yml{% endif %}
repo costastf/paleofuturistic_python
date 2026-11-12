@@ -126,9 +126,10 @@ secure:
 
 # Runs on every push to the default branch and publishes only when the push carried a release —
 # a change of `[project].version` — which `release.ship` decides. Not a tag rule: `release`
-# creates no tag; this job creates it, on main, once the release has been reviewed and merged,
-# so the merge method (merge commit, squash, rebase) cannot leave a tag pointing at a commit
-# main never saw. The workflow the GitHub template ships runs the same command the same way.
+# creates no tag; this job creates it, on the default branch, once the release has been reviewed
+# and merged, so the merge method (merge commit, squash, rebase) cannot leave a tag pointing at a
+# commit the branch never saw. `$CI_DEFAULT_BRANCH` is GitLab's own name for it, which the
+# `default_branch` copier answer has to match. The workflow the GitHub template ships runs the same command the same way.
 publish:
   stage: publish
   image: $DEPS_IMAGE

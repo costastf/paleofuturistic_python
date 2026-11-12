@@ -76,3 +76,4 @@ anywhere in the repository resolves to a file.
 | [ADR-0037](0037-docs-deploy-on-release-through-gh-deploy.md) | Docs deploy on release through `gh-deploy` |
 | [ADR-0038](0038-template-tests-snapshot-pin-and-mature.md) | Template tests generate from a snapshot, pin the uv version, and run one matured cell |
 | [ADR-0039](0039-repository-url-renders-well-known-project-urls-or-nothing.md) | `repository_url` renders well-known `[project.urls]`, or nothing |
+| [ADR-0040](0040-the-default-branch-is-a-copier-answer.md) | The default branch is a copier answer |

@@ -50,6 +50,10 @@ This change adds a question and three checks:
 - **New dependency group** `build`, and new pins in `lint` and `security`. Run `uv lock` after the update and commit `uv.lock` with it.
 - **Publishing.** The publish job now signs PEP 740 attestations. On GitLab it also requests `id_tokens:`, and PyPI needs a Trusted Publisher registered for the project (the new *Set up Trusted Publishing* how-to). If you publish with `UV_PUBLISH_*` credentials, nothing changes: that path uploads without attestations.
 
+## Upgrading past the default-branch question
+
+`copier update` asks `default_branch`, with `main` as the default. Accept it if your default branch is `main` and nothing changes. Answer with your branch's name otherwise: the publish and Pages workflows start triggering on it, `release` starts from it, release pull or merge requests target it, and the CI badge reads it. Before the question, all of those spelled `main`, so a project on another branch had to edit each by hand after every update. See [ADR-0040](../../maintaining/decisions/0040-the-default-branch-is-a-copier-answer.md).
+
 ## Upgrading past the tag-on-main release flow
 
 `release` used to create the tag on the release branch and push it with the branch. On GitLab that published the version before the MR was reviewed; on both hosts a squash merge left the tag pointing at a commit `main` never saw, and nothing published. Now `release` creates no tag. The publish job runs on every push to the default branch and hands it to `release.ship`, which publishes when `[project].version` changed between the previous tip and the new one: it creates the tag on the new tip through the host's Release API (a Release entry appears on the releases page), then builds, signs and uploads. Merge release PRs/MRs any way you like.
@@ -63,7 +67,7 @@ After the update:
 
 1. If the `pypi` environment has required reviewers or approvers, remove them and restrict the environment to the default branch instead; the job now runs on every push to it. The PyPI Trusted Publisher registration itself is unchanged.
 2. On GitHub, if a ruleset restricts who may create `v*` tags, add a bypass for GitHub Actions, or `release.tag` fails.
-3. A release branch opened before the update carries a tag on its bump commit. Delete that tag everywhere (`git tag -d vX.Y.Z && git push origin :refs/tags/vX.Y.Z`) before merging, or `release.tag` refuses to create it on `main` because it exists on another commit.
+3. A release branch opened before the update carries a tag on its bump commit. Delete that tag everywhere (`git tag -d vX.Y.Z && git push origin :refs/tags/vX.Y.Z`) before merging, or `release.tag` refuses to create it on the default branch because it exists on another commit.
 
 ## Upgrading past the changelog move
 

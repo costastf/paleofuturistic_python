@@ -104,9 +104,9 @@ the image can only ever be what that run produced.
 
 ## The publish pipeline
 
-Every push to `main` runs one job, and the job publishes when the push carried a release: a
+Every push to `{{ default_branch }}` runs one job, and the job publishes when the push carried a release: a
 change of `[project].version` between the previous tip and the new one. `release` creates no
-tag; `release.ship` creates it on the new tip of `main` through the host's Release API, once
+tag; `release.ship` creates it on the new tip of `{{ default_branch }}` through the host's Release API, once
 the release has been reviewed and merged, so the merge method (merge commit, squash, rebase)
 does not matter. The job then builds once and uploads exactly what it built. With no version
 bump it prints so and exits 0.{% if git_hosting_service == 'github' %} `pages.yaml` asks the same

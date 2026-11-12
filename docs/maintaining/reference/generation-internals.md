@@ -24,7 +24,7 @@ Examples currently used:
 | `template/{% if git_hosting_service == 'gitlab' %}.gitlab-ci.yml{% endif %}` | `git_hosting_service != 'gitlab'` → name is `''` | `.gitlab-ci.yml` absent for GitHub projects |
 | `template/_CI/tasks/{% if git_hosting_service == 'github' %}github.py{% endif %}.jinja` | `git_hosting_service != 'github'` → name is `''` | `_CI/tasks/github.py` absent for GitLab projects |
 | `template/_CI/tasks/{% if git_hosting_service == 'gitlab' %}gitlab.py{% endif %}` | `git_hosting_service != 'gitlab'` → name is `''` | `_CI/tasks/gitlab.py` absent for GitHub projects |
-| `template/{% if git_hosting_service == 'github' %}.github{% endif %}/workflows/{% if integrate_pages %}pages.yaml{% endif %}` | either condition false → name is `''` | Pages workflow absent when not GitHub or pages disabled |
+| `template/{% if git_hosting_service == 'github' %}.github{% endif %}/workflows/{% if integrate_pages %}pages.yaml{% endif %}.jinja` | either condition false → name is `''` | Pages workflow absent when not GitHub or pages disabled |
 
 The `from .{{ git_hosting_service }} import …` line in `_CI/tasks/container.py`, `release.py`, `document.py` and `sbom.py` is Jinja-substituted at copy time to name the surviving module — exactly one code path remains, no runtime branching.
 

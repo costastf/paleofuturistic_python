@@ -73,6 +73,14 @@ Selects which license file is installed to `LICENSE` by `tasks_render.py`. See [
 
 Determines which CI scaffolding ships and which host-specific submodule lives at `_CI/tasks/<host>.py`. The unchosen host's files are omitted at generation time via copier conditional filenames — a file or directory whose rendered name is an empty string is simply not created. See [Choose a git host](../how-to/choose-a-git-host.md).
 
+### `default_branch`
+
+- **Type**: string
+- **Default**: `main`
+- **Allowed**: a branch name git accepts, without characters that would need quoting in YAML or a URL: letters, digits, `.`, `_`, `/` and `-`, starting with a letter or digit, no `..`, not ending in `/` or `.lock`
+
+The branch releases land on. The publish workflow or pipeline triggers on it by name, the Pages workflow does too, `release` refuses to start from any other branch, the release pull or merge request targets it, and the CI badge reads its status. The tasks read it from `DEFAULT_BRANCH` in `_CI/tasks/configuration.py`; the workflow files have it written in at generation time, since a trigger cannot be computed at run time. Renaming the branch later is a `copier update` with a new answer. On GitLab the answer has to match the project's default branch setting, which `.gitlab-ci.yml` reads as `$CI_DEFAULT_BRANCH`. See [ADR-0040](../../maintaining/decisions/0040-the-default-branch-is-a-copier-answer.md).
+
 ### `repository_url`
 
 - **Type**: string
@@ -106,7 +114,8 @@ Validation is split between copier's built-in mechanisms and the `tasks_render.p
 1. **Python version range** — a `validator` on the `max_python_version` question in `copier.yml` checks that `max >= min`, that both values share the same major version, and that both appear in the choices list. Any failure aborts generation immediately before any files are written.
 2. **Project slug** — a `validator` on the `project_slug` question checks the value is a valid Python identifier and PyPI project name (`^[a-z]([a-z0-9_]*[a-z0-9])?$`), rejecting empty values, leading digits, and punctuation such as apostrophes. Generation aborts before any files are written on failure.
 3. **Repository URL** — a `validator` on `repository_url` accepts an empty value or `^https://[^/\s]+/[^\s]+$`, so `http://`, SSH remotes and a bare host are refused before any files are written.
-4. **License installation** — `tasks_render.py` installs the chosen `LICENSE` file (substituting author/year tokens) and removes the `licenses/` staging directory. It runs only on `copier copy`, not on `copier update`.
+4. **Default branch** — a `validator` on `default_branch` refuses an empty value and the names `git check-ref-format --branch` would refuse that the pattern can express: a leading `-` or `.`, `..`, a trailing `/` or `.lock`, and any character outside letters, digits, `.`, `_`, `/` and `-`.
+5. **License installation** — `tasks_render.py` installs the chosen `LICENSE` file (substituting author/year tokens) and removes the `licenses/` staging directory. It runs only on `copier copy`, not on `copier update`.
 
 ## See also
 

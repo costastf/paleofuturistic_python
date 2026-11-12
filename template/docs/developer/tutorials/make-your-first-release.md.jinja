@@ -45,7 +45,7 @@ The prefix does **not** drive the version bump — you'll pass that explicitly i
 
 The `release` task is the orchestrator. In order, it:
 
-1. **Validates** — working tree is clean and synced with origin, you're on `main`.
+1. **Validates** — working tree is clean and synced with origin, you're on `{{ default_branch }}`.
 2. **Resolves the next version** — runs `cz bump --dry-run` to project the new version.
 3. **Checks for collisions** — fails if the target tag or `release/<version>` branch already exists locally or on origin. The tag must not exist yet because CI is about to create it.
 4. **Branches** — `git checkout -b release/<version>`.
@@ -58,9 +58,9 @@ Pass `--no-push` to keep the branch local for inspection.
 
 ## Step 4 — Approve and merge
 
-On your git host, approve the release PR/MR and merge it the way your project merges: merge commit, squash or rebase all work, because what marks the release is the version bump arriving on `main`, not a tag. The publish {% if git_hosting_service == 'github' %}workflow{% else %}pipeline{% endif %} runs `release.ship` on that push. It:
+On your git host, approve the release PR/MR and merge it the way your project merges: merge commit, squash or rebase all work, because what marks the release is the version bump arriving on `{{ default_branch }}`, not a tag. The publish {% if git_hosting_service == 'github' %}workflow{% else %}pipeline{% endif %} runs `release.ship` on that push. It:
 
-1. sees that `[project].version` changed between the previous tip of `main` and the new one;
+1. sees that `[project].version` changed between the previous tip of `{{ default_branch }}` and the new one;
 2. creates the tag `v<version>` on the new tip through the host's Release API, with a Release entry on the releases page (`release.tag`);
 3. builds the wheel and sdist (`release.dist`), checking both with `twine check --strict` and `check-wheel-contents`;
 4. signs a PEP 740 attestation per file (`release.attest`);
@@ -69,7 +69,7 @@ On your git host, approve the release PR/MR and merge it the way your project me
 6. records GitHub's build-provenance attestation over the uploaded wheel and sdist.
 {%- endif %}
 
-A push to `main` that carries no version bump runs the same job, which prints that there is nothing to publish and exits 0.
+A push to `{{ default_branch }}` that carries no version bump runs the same job, which prints that there is nothing to publish and exits 0.
 
 ## Verify
 

@@ -94,5 +94,6 @@ nav:
       - ADR-0037 Docs deploy on release through gh-deploy: maintaining/decisions/0037-docs-deploy-on-release-through-gh-deploy.md
       - ADR-0038 Template tests snapshot, pin and mature: maintaining/decisions/0038-template-tests-snapshot-pin-and-mature.md
       - ADR-0039 repository_url renders well-known project URLs: maintaining/decisions/0039-repository-url-renders-well-known-project-urls-or-nothing.md
+      - ADR-0040 The default branch is a copier answer: maintaining/decisions/0040-the-default-branch-is-a-copier-answer.md
 
 copyright: Copyright &copy; 2024 <a href="https://schubergphilis.com/">Schuberg Philis</a>

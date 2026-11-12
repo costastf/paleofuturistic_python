@@ -31,6 +31,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 from _CI.tasks.configuration import (  # noqa: E402
     PROJECT_SLUG,
     UV_VERSION_ENV,
+    combo_context,
     matrix_combos,
     template_uv_version,
 )
@@ -1351,6 +1352,96 @@ def test_repository_url_validator_rejects_invalid(generate, tmp_path_factory, ba
     result = generate(workdir / PROJECT_SLUG, {'repository_url': bad_url}, check=False)
     assert result.returncode != 0, f'copier accepted repository_url={bad_url!r}'
     assert not (workdir / PROJECT_SLUG / 'pyproject.toml').exists()
+
+
+@pytest.mark.parametrize(
+    'bad_branch',
+    [
+        pytest.param('', id='empty'),
+        pytest.param('-trunk', id='leading-dash'),
+        pytest.param('.trunk', id='leading-dot'),
+        pytest.param('release..next', id='double-dot'),
+        pytest.param('trunk/', id='trailing-slash'),
+        pytest.param('trunk.lock', id='lock-suffix'),
+        pytest.param('my branch', id='space'),
+        pytest.param('trunk~1', id='revision-syntax'),
+    ],
+)
+def test_default_branch_validator_rejects_invalid(generate, tmp_path_factory, bad_branch):
+    """A branch name git would refuse, or one that needs quoting in YAML or a URL, never renders."""
+    workdir = tmp_path_factory.mktemp('bad-default-branch')
+    result = generate(workdir / PROJECT_SLUG, {'default_branch': bad_branch}, check=False)
+    assert result.returncode != 0, f'copier accepted default_branch={bad_branch!r}'
+    assert not (workdir / PROJECT_SLUG / 'pyproject.toml').exists()
+
+
+# Where a generated project may still say `main` and mean something other than the branch.
+MAIN_NOT_THE_BRANCH = (
+    '__main__',
+    'cli:main',
+    'invoke.main',
+    'main()',
+    'test for `main`',
+    'the main pieces',
+    'the main ',
+)
+MAIN_WORD = re.compile(r'\bmain\b')
+
+
+def lines_naming_main(project):
+    """Every `path:line` in a generated project that says `main` as a branch would be said."""
+    found = []
+    for path in sorted(project.rglob('*')):
+        if not path.is_file() or '.git' in path.parts or '_CI/lib' in path.as_posix() or path.name == '.gitignore':
+            continue
+        try:
+            text = path.read_text(encoding='utf-8')
+        except UnicodeDecodeError:
+            continue
+        found.extend(
+            f'{path.relative_to(project)}:{number}'
+            for number, line in enumerate(text.splitlines(), start=1)
+            if MAIN_WORD.search(line) and not any(allowed in line for allowed in MAIN_NOT_THE_BRANCH)
+        )
+    return found
+
+
+@pytest.mark.parametrize(
+    ('host', 'pages'),
+    [pytest.param('github', True, id='github-pages'), pytest.param('gitlab', False, id='gitlab')],
+)
+def test_default_branch_is_spelled_from_one_answer(generate, tmp_path_factory, host, pages):
+    """Generated for `trunk`, nothing in the project says `main` as a branch (ADR-0040).
+
+    The trigger in a workflow file cannot be computed when the workflow runs, so the answer is
+    written into the YAML at generation; the tasks read the same answer from `DEFAULT_BRANCH`
+    in `configuration.py`. The four matrix cells all answer `main`, which is what `release` and
+    the badge spelled before the question existed, so only a generation with another name can
+    tell a rendered answer from a leftover literal.
+    """
+    workdir = tmp_path_factory.mktemp('default-branch')
+    project = workdir / PROJECT_SLUG
+    generate(project, {**combo_context(git_hosting_service=host, integrate_pages=pages), 'default_branch': 'trunk'})
+
+    assert load_generated_configuration(project).DEFAULT_BRANCH == 'trunk'
+    if host == 'github':
+        workflows = project / '.github' / 'workflows'
+        publish = yaml.safe_load((workflows / 'publish.yaml').read_text(encoding='utf-8'))
+        assert publish[True]['push']['branches'] == ['trunk']
+        pages_workflow = yaml.safe_load((workflows / 'pages.yaml').read_text(encoding='utf-8'))
+        assert pages_workflow[True]['push']['branches'] == ['trunk']
+        # The `${{ }}` expressions survive the file becoming a Jinja template.
+        assert '${{ needs.build-deps-image.outputs.image }}' in (workflows / 'pages.yaml').read_text(encoding='utf-8')
+    else:
+        pipeline = (project / '.gitlab-ci.yml').read_text(encoding='utf-8')
+        assert '$CI_DEFAULT_BRANCH' in pipeline, 'the GitLab pipeline no longer keys on the default branch'
+
+    host_module = (project / '_CI' / 'tasks' / f'{host}.py').read_text(encoding='utf-8')
+    assert 'DEFAULT_BRANCH' in host_module, 'the badge and the release request do not read the answer'
+    release_py = (project / '_CI' / 'tasks' / 'release.py').read_text(encoding='utf-8')
+    assert 'current_branch != DEFAULT_BRANCH' in release_py, '`release` does not check against the answer'
+
+    assert lines_naming_main(project) == []
 
 
 TEMPLATE_WORKFLOWS = REPO_ROOT / 'template' / "{% if git_hosting_service == 'github' %}.github{% endif %}" / 'workflows'
@@ -2870,6 +2961,7 @@ def test_exactly_one_matrix_cell_audits_its_dependencies(tmp_path):
         'qa_sequence': qa_sequence,
         'PROJECT_SLUG': PROJECT_SLUG,
         'TEMPLATE_SECURITY_OVERRIDE_ENV': 'TEMPLATE_SECURITY_OVERRIDE',
+        'DEFAULT_BRANCH': 'main',
         'MATURE_ORIGIN': 'git@example.invalid:acme/widget.git',
         'MATURE_TEST_MODULE': '"""{slug}."""\n',
         'MATURE_GATED_MODULE': '"""{slug} {boundary}."""\n',
@@ -3325,7 +3417,9 @@ def test_the_ci_badge_is_the_hosts_own(generated_project):
 
     host_module = (tasks / f'{cell["git_hosting_service"]}.py').read_text(encoding='utf-8')
     assert 'def pipeline_badge' in host_module, 'the host module builds no CI badge'
-    expected = 'actions/workflows' if cell['git_hosting_service'] == 'github' else 'badges/main/pipeline.svg'
+    expected = (
+        'actions/workflows' if cell['git_hosting_service'] == 'github' else 'badges/{DEFAULT_BRANCH}/pipeline.svg'
+    )
     assert expected in host_module, f'the CI badge does not point at the host: {expected!r} missing'
 
     document = (tasks / 'document.py').read_text(encoding='utf-8')

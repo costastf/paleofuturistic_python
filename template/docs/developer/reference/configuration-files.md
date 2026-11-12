@@ -95,7 +95,7 @@ tool: `./workflow.cmd lint.pylint --paths="src/thing.py"`. Need to push past the
 hooks in place, unlike `--no-verify`. Every variable this workflow reads is listed in
 [Environment variables and flags](environment-and-flags.md).
 
-Edit to add hooks; don't remove the existing ones without thinking — they keep the main
+Edit to add hooks; don't remove the existing ones without thinking — they keep the default
 branch clean.
 
 ## `.security-overrides`

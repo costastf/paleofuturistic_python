@@ -124,7 +124,7 @@ The original lineage used `python -m unittest`. We moved to pytest for fixtures,
 
 ## Conventional Commits drive the release notes
 
-Records: [ADR-0019](../decisions/0019-conventional-commits-drive-the-changelog.md), and [ADR-0014](../decisions/0014-a-release-is-the-version-bump-arriving-on-the-default-branch.md) for how a release reaches the default branch.
+Records: [ADR-0019](../decisions/0019-conventional-commits-drive-the-changelog.md), [ADR-0014](../decisions/0014-a-release-is-the-version-bump-arriving-on-the-default-branch.md) for how a release reaches the default branch, and [ADR-0040](../decisions/0040-the-default-branch-is-a-copier-answer.md) for where that branch's name comes from.
 
 Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) — the lint step rejects anything that doesn't parse. We use them for **automatic release notes**: [commitizen](https://commitizen-tools.github.io/commitizen/) reads the commits since the last tag and groups them by prefix (`feat:`, `fix:`, etc.) into a generated changelog.
 

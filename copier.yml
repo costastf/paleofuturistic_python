@@ -113,6 +113,18 @@ git_hosting_service:
   default: "github"
   help: Which git hosting service the project targets
 
+# The branch a release lands on. The pipelines trigger on it by name, which has to be written at
+# generation time, and the tasks read the same answer from `_CI/tasks/configuration.py`, so it
+# is spelled in one place (ADR-0040). The validator accepts what `git check-ref-format` would
+# for a branch, narrowed to what fits in a YAML list and a badge URL without quoting.
+default_branch:
+  type: str
+  default: "main"
+  help: The default branch, where releases land and the publish pipeline runs
+  validator: >-
+    {% if not default_branch %}default_branch cannot be empty
+    {% elif not (default_branch | regex_search('^[A-Za-z0-9][A-Za-z0-9._/-]*$')) or '..' in default_branch or default_branch.endswith('/') or default_branch.endswith('.lock') %}'{{ default_branch }}' is not a branch name git accepts: letters, digits, `.`, `_`, `/` and `-`, starting with a letter or digit, no `..`, not ending in `/` or `.lock`{% endif %}
+
 # Feeds `[project.urls]`, the links PyPI shows in the sidebar of the project page. Optional
 # because a project may not have a public home yet; empty ships no `[project.urls]` at all
 # rather than placeholder links that would 404 on PyPI forever. Normalised in

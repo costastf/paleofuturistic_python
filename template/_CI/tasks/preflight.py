@@ -165,7 +165,7 @@ def artifacts(context: Context, *, write: bool) -> None:
         print(reason)
     # A reason survives `--write` only when a value could not be computed at all — a report
     # missing, or unreadable. Both modes fail on it: "wrote nothing, exited 0" is the shape
-    # that lets a stale badge reach main through the command meant to refresh it.
+    # that lets a stale badge reach the default branch through the command meant to refresh it.
     if not write:
         print(f'Run `{FIX_COMMAND}` and commit the result.')
     raise SystemExit(1)

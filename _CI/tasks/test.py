@@ -14,6 +14,7 @@ from invoke import Context, task
 
 from _CI import PROJECT_ROOT_DIRECTORY, emojize_message
 from _CI.tasks.configuration import (
+    DEFAULT_BRANCH,
     PROJECT_SLUG,
     TEMPLATE_SECURITY_OVERRIDE_ENV,
     base_context,
@@ -217,8 +218,11 @@ def run_combo(
     if mature:
         write_mature_project(project_dir, extra_context)
 
+    # The project's first branch has to be the one it was generated for: `release` refuses to
+    # start anywhere else, and the matured cell's badge names it.
+    branch = (extra_context or {}).get('default_branch', DEFAULT_BRANCH)
     init_steps = (
-        'git init -b main',
+        f'git init -b {branch}',
         *((f'git remote add origin {MATURE_ORIGIN}',) if mature else ()),
         'git add -A',
         (
