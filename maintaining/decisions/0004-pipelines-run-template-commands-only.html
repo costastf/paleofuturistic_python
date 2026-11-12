@@ -377,6 +377,10 @@
 <li>
     <a href="0042-refresh-deps-moves-the-boundary-and-the-pins-together.html" class="dropdown-item">ADR-0042 refresh-deps moves the boundary and the pins together</a>
 </li>
+            
+<li>
+    <a href="0043-the-gitlab-deps-tag-is-computed-by-the-launcher.html" class="dropdown-item">ADR-0043 The GitLab deps tag is computed by the launcher</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -756,6 +760,9 @@
             <li class="nav-item">
                 <a href="0042-refresh-deps-moves-the-boundary-and-the-pins-together.html" class="nav-link">ADR-0042 refresh-deps moves the boundary and the pins together</a>
             </li>
+            <li class="nav-item">
+                <a href="0043-the-gitlab-deps-tag-is-computed-by-the-launcher.html" class="nav-link">ADR-0043 The GitLab deps tag is computed by the launcher</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -810,8 +817,8 @@ since only GitHub can record GitHub's provenance attestation. Concretely, docs d
 <code>properdocs gh-deploy</code> rather than the Pages actions, and tests run through <code>./workflow.cmd test</code>
 rather than an inline <code>pytest</code>.</p>
 <p>One pipeline job cannot follow the rule: GitLab's deps-image job runs in the kaniko image, which
-has no Python, so it repeats in shell what <code>container.publish</code> does, and an invariant keeps the
-two tag computations identical.</p>
+has no Python. Until ADR-0043 it repeated in shell what <code>container.publish</code> does; now it runs
+only the push, with the address computed by <code>container.tag</code> in a job before it.</p>
 <h2 id="consequences">Consequences</h2>
 <ul>
 <li>Parity. The pre-push hook and the CI job run the same <code>./workflow.cmd preflight</code>, character
@@ -820,8 +827,7 @@ two tag computations identical.</p>
 <li>The Pages deploy goes through the legacy branch flow, which GitHub's own internal pipeline
   then builds; its Node deprecation warning is accepted as the price of keeping deploy logic in
   <code>document.py</code>.</li>
-<li>The GitLab shell duplicate is a standing exception, and a candidate for computing the tag in a
-  Python job and handing it to kaniko.</li>
+<li>The GitLab kaniko job is the standing exception, reduced by ADR-0043 to the push alone.</li>
 </ul>
 <h2 id="references">References</h2>
 <ul>

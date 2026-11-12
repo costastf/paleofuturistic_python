@@ -377,6 +377,10 @@
 <li>
     <a href="../decisions/0042-refresh-deps-moves-the-boundary-and-the-pins-together.html" class="dropdown-item">ADR-0042 refresh-deps moves the boundary and the pins together</a>
 </li>
+            
+<li>
+    <a href="../decisions/0043-the-gitlab-deps-tag-is-computed-by-the-launcher.html" class="dropdown-item">ADR-0043 The GitLab deps tag is computed by the launcher</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -756,6 +760,9 @@
             <li class="nav-item">
                 <a href="../decisions/0042-refresh-deps-moves-the-boundary-and-the-pins-together.html" class="nav-link">ADR-0042 refresh-deps moves the boundary and the pins together</a>
             </li>
+            <li class="nav-item">
+                <a href="../decisions/0043-the-gitlab-deps-tag-is-computed-by-the-launcher.html" class="nav-link">ADR-0043 The GitLab deps tag is computed by the launcher</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -834,7 +841,7 @@
 <h1 id="design-principles">Design principles</h1>
 <p>The template is opinionated. The choices below were made deliberately, not by accumulation — each replaces something an earlier revision relied on. This page is the overview; each principle has a dated <a href="../decisions/index.html">decision record</a> with the situation it was made in and what it cost.</p>
 <h2 id="pipelines-run-template-commands-only">Pipelines run template commands only</h2>
-<p>Records: <a href="../decisions/0004-pipelines-run-template-commands-only.html">ADR-0004</a>, <a href="../decisions/0033-the-deps-image-is-content-addressed-and-handed-on-by-digest.html">ADR-0033</a>, <a href="../decisions/0034-the-deps-image-runs-as-uid-1001.html">ADR-0034</a>, <a href="../decisions/0035-github-reuses-a-deps-tag-gitlab-builds-with-kaniko.html">ADR-0035</a>, <a href="../decisions/0036-checkouts-persist-no-credentials.html">ADR-0036</a>, <a href="../decisions/0041-fork-pull-requests-run-the-gate-on-the-runners-image.html">ADR-0041</a>.</p>
+<p>Records: <a href="../decisions/0004-pipelines-run-template-commands-only.html">ADR-0004</a>, <a href="../decisions/0033-the-deps-image-is-content-addressed-and-handed-on-by-digest.html">ADR-0033</a>, <a href="../decisions/0034-the-deps-image-runs-as-uid-1001.html">ADR-0034</a>, <a href="../decisions/0035-github-reuses-a-deps-tag-gitlab-builds-with-kaniko.html">ADR-0035</a>, <a href="../decisions/0036-checkouts-persist-no-credentials.html">ADR-0036</a>, <a href="../decisions/0041-fork-pull-requests-run-the-gate-on-the-runners-image.html">ADR-0041</a>, <a href="../decisions/0043-the-gitlab-deps-tag-is-computed-by-the-launcher.html">ADR-0043</a>.</p>
 <p>Every CI step is a <code>./workflow.cmd &lt;task&gt;</code> call — no inline <code>uv …</code>, <code>pip install …</code>, ad-hoc <code>properdocs …</code>, or other business logic in YAML. Behaviour changes happen in <code>_CI/tasks/</code>; workflow files are glue.</p>
 <p>Two side-effects of this rule earn the rule a section of its own:</p>
 <p><strong>Parity.</strong> What CI runs is exactly what you can run locally. Debugging a failing CI step means running the same <code>./workflow.cmd</code> command on your laptop. No "but it worked on my machine" gap, no separate path to maintain.</p>

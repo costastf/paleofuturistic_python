@@ -377,6 +377,10 @@
 <li>
     <a href="0042-refresh-deps-moves-the-boundary-and-the-pins-together.html" class="dropdown-item">ADR-0042 refresh-deps moves the boundary and the pins together</a>
 </li>
+            
+<li>
+    <a href="0043-the-gitlab-deps-tag-is-computed-by-the-launcher.html" class="dropdown-item">ADR-0043 The GitLab deps tag is computed by the launcher</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -756,6 +760,9 @@
             <li class="nav-item">
                 <a href="0042-refresh-deps-moves-the-boundary-and-the-pins-together.html" class="nav-link">ADR-0042 refresh-deps moves the boundary and the pins together</a>
             </li>
+            <li class="nav-item">
+                <a href="0043-the-gitlab-deps-tag-is-computed-by-the-launcher.html" class="nav-link">ADR-0043 The GitLab deps tag is computed by the launcher</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -818,9 +825,8 @@ docker, buildah and podman; kaniko builds in userspace, but its image has no Pyt
 </ul>
 <h2 id="consequences">Consequences</h2>
 <ul>
-<li>An invariant pins the shell duplicate to the Python tag algorithm.</li>
-<li>The GitLab duplicate is a standing exception to ADR-0004, and the candidate fix is computing
-  the tag in a Python job and passing it to kaniko as a dotenv artifact.</li>
+<li>The shell duplicate of the tag algorithm was pinned to the Python one by an invariant until
+  ADR-0043 removed it: the tag now reaches kaniko as a dotenv artifact from <code>container.tag</code>.</li>
 <li>The Deploy Token variables must be Protected, Masked and scoped to the <code>deps</code> environment, or
   a fork's merge request could read a registry write token.</li>
 </ul>
