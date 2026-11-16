@@ -75,11 +75,12 @@ def tag(context: Context, output: str = '') -> None:  # noqa: ARG001
 
 @task
 @logged('container.publish')
-def publish(context: Context) -> None:
+def publish(context: Context, reuse: bool = False) -> None:
     """Build the deps image and publish to a container registry (CI) or keep it local.
 
     In CI: delegates to the host-specific submodule (``{{ git_hosting_service }}``)
-    to log in and push.
+    to log in, build and push. Every run builds; ``--reuse`` lets a tag already in the
+    registry stand in for the build, which trusts whoever pushed it (ADR-0050).
 
     Locally: builds and tags the image without pushing anywhere.
 
@@ -89,7 +90,7 @@ def publish(context: Context) -> None:
     """
     address = deps_image_tag()
     if is_ci():
-        image = publish_deps_image(context, address)
+        image = publish_deps_image(context, address, reuse=reuse)
     else:
         image = f'{IMAGE_NAME}:{address}'
         engine = container_engine()

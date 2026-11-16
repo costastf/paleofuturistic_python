@@ -81,25 +81,25 @@ downstream jobs a mutable tag. A tag repointed between the build job and a consu
 therefore cannot change the container that consumer runs in.
 {%- if git_hosting_service == 'github' %}
 
-**Residual risk — reuse of an existing tag.** When the tag already exists in the registry,
-the build is skipped and that image is reused. This keeps CI fast, but it trusts whoever
-pushed the tag first: an actor able to pre-seed `<repo>-deps:<tag>` would have later jobs
-run inside their image, including the publish job that holds PyPI OIDC. Digest pinning does not remove this — you would pin their digest.
+**Reuse is opt-in.** Every run builds the image from the repository. `container.publish
+--reuse` skips the build when the tag already exists in the registry and pulls that image
+instead, which saves a build per gated push but trusts whoever pushed the tag first: an
+actor able to pre-seed `<repo>-deps:<tag>` would have later jobs run inside their image,
+including the publish job that holds PyPI OIDC. Digest pinning does not remove this — you
+would pin their digest. The shipped `build-deps-image` job therefore passes no flag.
 
-Because the mitigation is an access-control one, keep it that way:
+If you add the flag there, the mitigation is an access-control one, so keep it that way:
 
 - Restrict write access to the `<repo>-deps` package to this pipeline. Only
   `build-deps-image` needs `packages: write`; every other job runs at `packages: read`.
 - Audit who else can publish packages in the org, and treat that set as trusted to the
   same degree as the release credentials.
-- To remove the trade-off entirely, drop the `manifest inspect` skip in
-  `publish_deps_image()` so every run rebuilds from the repository. The cost is a full
-  image build per gated run.
 {%- else %}
 
-**No reuse path.** Every run builds from the repository — kaniko in the pipeline job, docker
-or podman from `container.publish` by hand — and there is no skip-if-the-tag-exists branch, so
-the image can only ever be what that run produced.
+**No reuse in the pipeline.** Every pipeline run builds from the repository with kaniko,
+which cannot ask the registry, so the image can only ever be what that run produced. By
+hand, `container.publish --reuse` pulls a tag already in the registry instead of building,
+which trusts whoever pushed it.
 {%- endif %}
 
 ## The publish pipeline

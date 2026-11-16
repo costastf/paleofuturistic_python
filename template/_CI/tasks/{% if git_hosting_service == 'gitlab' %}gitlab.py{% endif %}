@@ -58,7 +58,7 @@ def registry_settings() -> RegistrySettings:
     )
 
 
-def publish_deps_image(context: Context, tag: str) -> str:
+def publish_deps_image(context: Context, tag: str, *, reuse: bool = False) -> str:
     """Build and push the deps image with docker or podman. Return a digest-pinned reference.
 
     The by-hand path. The shipped ``build-deps-image`` job cannot run this: it builds with
@@ -67,8 +67,8 @@ def publish_deps_image(context: Context, tag: str) -> str:
     registries that restrict deploy tokens to the project root — and both hand on a digest
     rather than the tag, so the image a consumer runs in cannot be repointed afterwards.
 
-    Every run builds from the repository, as the pipeline job does: there is no
-    reuse-an-existing-tag path, so the image can only ever be what this run produced.
+    Every run builds from the repository, as the pipeline job does. With ``reuse``, a tag
+    already in the registry is pulled instead, which trusts whoever pushed it (ADR-0050).
     """
     settings = registry_settings()
     image = f'{settings.image_prefix}:deps-{tag}'
@@ -77,9 +77,13 @@ def publish_deps_image(context: Context, tag: str) -> str:
         f'echo "${settings.password_env}" | {engine} login {settings.url} -u "{settings.user}" --password-stdin',
         hide=True,
     )
-    base_image = info.base_image()
-    execute(context, f'{engine} build --build-arg BASE_IMAGE={base_image} -f Dockerfile.deps -t {image} .')
-    execute(context, f'{engine} push {image}')
+    if reuse and not context.run(f'{engine} manifest inspect {image}', hide=True, warn=True).failed:
+        print(f'Reusing {image}')
+        execute(context, f'{engine} pull {image}')
+    else:
+        base_image = info.base_image()
+        execute(context, f'{engine} build --build-arg BASE_IMAGE={base_image} -f Dockerfile.deps -t {image} .')
+        execute(context, f'{engine} push {image}')
     return image_digest_reference(context, engine, image)
 
 

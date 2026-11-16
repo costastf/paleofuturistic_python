@@ -18,9 +18,11 @@ from .support import (
     action_pins,
     exec_from,
     fork_pair,
+    function_named,
     function_source,
     github_workflows,
     load_generated_shared,
+    parameter_defaults,
     pre_commit_hooks,
     run_commands,
     workflow_run_scripts,
@@ -200,6 +202,24 @@ def test_deps_image_reference_is_digest_pinned(generated_project):
     # Parsed as JSON rather than via a Go --format template, which docker and
     # podman expose differently and which needs brace quoting in a shell command.
     assert 'json.loads' in resolver
+
+
+def test_deps_image_is_built_unless_reuse_is_asked_for(generated_project):
+    """`container.publish` builds and pushes every run; reusing an existing tag is the opt-in (ADR-0050).
+
+    A reused tag runs whatever whoever pushed it first put there, so the manifest check that
+    makes reuse possible sits behind the flag, on both hosts, and the shipped job passes none.
+    """
+    project, cell = generated_project
+    host_py = (project / '_CI' / 'tasks' / f'{cell["git_hosting_service"]}.py').read_text(encoding='utf-8')
+    assert parameter_defaults(function_named(host_py, 'publish_deps_image')).get('reuse') == 'False'
+    source = function_source(host_py, 'publish_deps_image')
+    assert re.search(r'if reuse and .*manifest inspect', source), 'the registry is consulted without --reuse'
+    container_py = (project / '_CI' / 'tasks' / 'container.py').read_text(encoding='utf-8')
+    assert 'publish_deps_image(context, address, reuse=reuse)' in container_py, 'the flag does not reach the host'
+    for path in (*(project / '.github' / 'workflows').glob('*.yaml'), project / '.gitlab-ci.yml'):
+        if path.is_file():
+            assert '--reuse' not in path.read_text(encoding='utf-8'), f'{path.name} opts into reuse'
 
 
 def test_security_audit_is_automated_without_failing_unrelated_changes(generated_project):

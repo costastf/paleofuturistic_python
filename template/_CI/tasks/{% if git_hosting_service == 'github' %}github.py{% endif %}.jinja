@@ -42,18 +42,16 @@ def registry_settings() -> RegistrySettings:
     )
 
 
-def publish_deps_image(context: Context, tag: str) -> str:
+def publish_deps_image(context: Context, tag: str, *, reuse: bool = False) -> str:
     """Build and push the deps image to ghcr.io. Return a digest-pinned reference.
 
-    Logs into the registry with the detected engine and builds+pushes only when the
-    image is not already present. The tag is content-addressed on the lockfile, the
-    Dockerfile and the base image, so a hit means those inputs match.
-
-    Reusing a pre-existing tag is a deliberate trade-off: it keeps CI fast, but it
-    trusts whoever pushed that tag first. Restrict registry write access to this
-    pipeline accordingly — see the deps-image section of the CI framework reference.
-    The returned reference is digest-pinned either way, so the tag cannot be
-    repointed between this job and the jobs that run inside the image.
+    Logs into the registry with the detected engine, then builds and pushes. With
+    ``reuse``, a tag already in the registry is pulled instead of built: the tag is
+    content-addressed on the lockfile, the Dockerfile and the base image, so a hit means
+    those inputs match. That trusts whoever pushed the tag first, which is why it is the
+    opt-in and not the default (ADR-0050); the CI framework reference has the trade-off.
+    The returned reference is digest-pinned either way, so the tag cannot be repointed
+    between this job and the jobs that run inside the image.
     """
     settings = registry_settings()
     image = f'{settings.image_prefix}-deps:{tag}'
@@ -62,9 +60,8 @@ def publish_deps_image(context: Context, tag: str) -> str:
         f'echo "${settings.password_env}" | {engine} login {settings.url} -u "{settings.user}" --password-stdin',
         hide=True,
     )
-    result = context.run(f'{engine} manifest inspect {image}', hide=True, warn=True)
-    if not result.failed:
-        print(f'Image already exists: {image}')
+    if reuse and not context.run(f'{engine} manifest inspect {image}', hide=True, warn=True).failed:
+        print(f'Reusing {image}')
         # Pull so a repo digest exists locally to pin against, and so a corrupt or
         # unpullable image fails here rather than in every consumer job.
         execute(context, f'{engine} pull {image}')
