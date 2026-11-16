@@ -89,6 +89,15 @@ def test_repository_url_is_normalised(generate, tmp_path_factory):
     assert urls['Documentation'] == 'https://acme.github.io/widget/'
 
 
+def test_repository_url_is_suggested_from_the_host_the_email_and_the_slug(generate, tmp_path_factory):
+    """The default is the host's public instance, the email's local part and the slug, so most projects accept it."""
+    workdir = tmp_path_factory.mktemp('suggested-url')
+    generate(workdir / PROJECT_SLUG, {'email': 'jane.doe@example.org', 'git_hosting_service': 'gitlab'})
+    urls = tomllib.loads((workdir / PROJECT_SLUG / 'pyproject.toml').read_text(encoding='utf-8'))['project']['urls']
+    assert urls['Source'] == f'https://gitlab.com/jane.doe/{PROJECT_SLUG}'
+    assert urls['Issues'] == f'https://gitlab.com/jane.doe/{PROJECT_SLUG}/-/issues'
+
+
 @pytest.mark.parametrize(
     'bad_url',
     [

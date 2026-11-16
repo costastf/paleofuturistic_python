@@ -131,10 +131,12 @@ default_branch:
 # pyproject.toml.jinja (trailing `/` and `.git` dropped), so a pasted clone URL works too.
 repository_url:
   type: str
-  default: ""
+  # The host's public instance, the owner spelled as the local part of the email, and the slug:
+  # right for most projects and one edit away for the rest. Clearing it ships no [project.urls].
+  default: "https://{{ git_hosting_service }}.com/{{ email.split('@') | first }}/{{ project_slug }}"
   help: >-
     Public https URL of the repository, e.g. https://github.com/acme/widget
-    (leave empty to ship no [project.urls] for now)
+    (clear it to ship no [project.urls] for now)
   validator: >-
     {% if repository_url and not (repository_url | trim | regex_search('^https://[^/\\s]+/[^\\s]+$')) %}
     repository_url must be empty or an https URL like https://github.com/acme/widget
