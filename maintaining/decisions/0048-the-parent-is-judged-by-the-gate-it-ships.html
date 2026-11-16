@@ -875,7 +875,8 @@ is two named steps rather than three.</p>
 <li>A change to the parent is held to the standard it ships. The findings above are fixed in
   the same commit, and the next one of their kind fails locally and in CI's <code>lint</code> job.</li>
 <li><code>lint</code> is slower by a pylint and a ty run over some twenty modules, locally and in CI's
-  <code>lint</code> job.</li>
+  <code>lint</code> job. That job's environment now includes the test group: both tools follow imports,
+  and a <code>tests/</code> module that imports pytest is an error where pytest is not installed.</li>
 <li>The parent's task registry casts each function to <code>Task</code> when registering it, as the
   template's modules do, because invoke's <code>@task</code> is untyped and ty reads the decorated name
   as a function.</li>
