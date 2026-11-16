@@ -927,7 +927,7 @@ launcher to keep in step.</p>
 ├── github.py / gitlab.py  # Host-specific helpers (only one is present)
 ├── local.py             # The project's own tasks. Never overwritten by `copier update`
 └── &lt;feature&gt;.py         # build, container, develop, document, format_, lint,
-                         #   preflight, quality, release, sbom, secure, test
+                         #   grade, preflight, release, sbom, secure, test
 </code></pre>
 <p>Everything there except <code>local.py</code> is template-owned and replaced on update, which is why
 project-specific tasks belong in <code>local.py</code> — <code>__init__.py</code> picks it up automatically.</p>
