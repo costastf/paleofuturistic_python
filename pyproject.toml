@@ -51,7 +51,7 @@ lint = [
 [tool.ruff]
 line-length = 120
 target-version = "py312"
-exclude = ["_CI/lib"]
+extend-exclude = ["_CI/lib"]
 
 [tool.ruff.lint]
 select = ["ALL"]
