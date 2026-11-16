@@ -8,6 +8,7 @@ from typing import cast
 from invoke import Collection, Context, Task, task
 
 from .configuration import SENTINEL
+from .develop import pre_commit_install
 from .shared import execute, is_ci, logged
 
 
@@ -29,36 +30,27 @@ class BootstrapStep:
     ci_behavior: str = 'skip'
 
 
-@task
-def ensure_git_repo(context: Context) -> None:
-    """Initialise a git repository in the current directory if one does not exist."""
-    result = context.run('git rev-parse --git-dir', hide=True, warn=True)
-    if result.failed:
-        execute(context, 'git init')
-
-
-@task(pre=[ensure_git_repo])
 def install_pre_commit(context: Context) -> None:
-    """Install and activate pre-commit hooks."""
-    execute(context, 'uv run pre-commit install')
+    """Install the hooks through `develop.pre-commit-install`, initialising git first if needed.
+
+    The same task a developer runs by hand, so there is one place that knows how hooks are
+    installed. A tree that is not a repository yet gets `git init` first, since pre-commit
+    needs `.git/hooks` to write into.
+    """
+    if context.run('git rev-parse --git-dir', hide=True, warn=True).failed:
+        execute(context, 'git init')
+    pre_commit_install(context)
 
 
 # Register steps here — add new ones as needed
 STEPS: list[BootstrapStep] = [
     BootstrapStep(
         name='pre-commit hooks',
-        action=cast('Callable[[Context], None]', install_pre_commit),
+        action=install_pre_commit,
         prompt='Install pre-commit hooks? [y/N] ',
         ci_behavior='skip',
     ),
 ]
-
-
-def run_action(action: Callable[[Context], None], context: Context) -> None:
-    """Execute an action, walking invoke pre-task chains if present."""
-    for pre in getattr(action, 'pre', []):
-        run_action(pre, context)
-    action(context)
 
 
 def run_steps(context: Context) -> None:
@@ -68,14 +60,14 @@ def run_steps(context: Context) -> None:
         if non_interactive:
             if step.ci_behavior == 'run':
                 print(f'  Running {step.name}...')
-                run_action(step.action, context)
+                step.action(context)
             else:
                 print(f'  Skipping {step.name} (non-interactive mode)')
         elif step.prompt:
             if input(step.prompt).strip().lower() in ('y', 'yes'):
-                run_action(step.action, context)
+                step.action(context)
         else:
-            run_action(step.action, context)
+            step.action(context)
 
 
 @task
