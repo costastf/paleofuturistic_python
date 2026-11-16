@@ -23,13 +23,18 @@ from .support import (
     commits_in,
     exec_from,
     function_named,
+    function_source,
     git,
     hook_stages,
+    imported_names,
     invoked_task,
+    parameter_defaults,
     per_file_step_filters,
     pre_commit_hooks,
     range_resolver,
     registry_steps,
+    strip_prose,
+    task_source,
 )
 
 
@@ -188,7 +193,7 @@ def test_the_coverage_floor_is_enforced_where_it_was_measured(generated_project)
     assert 'fail_under' in data['tool']['coverage']['report']
 
     test_py = (project / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
-    combine = test_py.split('def combine_coverage', 1)[1].split('\n@', 1)[0]
+    combine = function_source(test_py, 'combine_coverage')
     # Command lines, not any line mentioning the command: the comments here discuss
     # `coverage json` too, and an earlier version of this test inspected one of those and
     # passed for that reason.
@@ -207,12 +212,12 @@ def test_the_coverage_floor_is_enforced_where_it_was_measured(generated_project)
 
     # And the floor cannot drift by the gate and the task measuring different things: both run
     # the same tox task, and the `test` aggregator the same pytest task.
-    aggregator = test_py.split("@logged('test')", 1)[1]
+    aggregator = task_source(test_py, 'test')
     assert 'run_steps(pytest)' in aggregator, 'the aggregator no longer delegates to the same pytest task'
     assert 'tox' in registry_steps(project), 'the registry no longer runs the matrix'
     preflight_py = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
-    imported_from_test = preflight_py.split('from .test import', 1)[1].split('\n', 1)[0]
-    assert 'tox' in imported_from_test, (
+    imported_from_test = imported_names(preflight_py, '.test')
+    assert 'tox_matrix' in imported_from_test, (
         'the registry no longer runs the shared tox task, so the floor it enforces can drift'
     )
 
@@ -228,8 +233,7 @@ def test_the_gate_offers_no_way_to_run_less_than_ci(generated_project):
     """
     project, _ = generated_project
     preflight_py = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
-    signature = preflight_py.split('def preflight(', 1)[1].split(')', 1)[0]
-    parameters = {part.split(':')[0].strip() for part in signature.split(',')}
+    parameters = set(parameter_defaults(function_named(preflight_py, 'preflight')))
     assert parameters == {'context', 'write', 'audit_dependencies'}, (
         f'preflight grew a parameter that can change what it runs: {parameters}'
     )
@@ -250,7 +254,7 @@ def test_a_failing_run_writes_no_derived_values(generated_project):
     """
     project, _ = generated_project
     source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
-    body = source.split('def run_scope', 1)[1]
+    body = function_source(source, 'run_scope')
     assert 'if failed and derived' in body, 'a failing run can still write derived values'
     # The writers have to be last for the skip to cover them; `artifacts` is the final
     # non-network step, and `build`'s badge precedes it.
@@ -297,10 +301,10 @@ def test_running_the_hooks_by_hand_matches_what_git_will_do(generated_project):
     """
     project, _ = generated_project
     develop = (project / '_CI' / 'tasks' / 'develop.py').read_text(encoding='utf-8')
-    body = develop.split("@logged('develop.pre-commit')", 1)[1].split('@task', 1)[0]
+    body = task_source(develop, 'develop.pre-commit')
     assert "'uv run pre-commit run'" in body, 'the default no longer runs the hooks on staged files'
     # Past the docstring, which explains the flag's absence.
-    code = body.split('"""', 2)[2]
+    code = strip_prose(body)
     assert '--all-files' not in code, 'a widening flag is back, and it still cannot widen'
 
 
@@ -314,14 +318,14 @@ def test_the_staged_bundle_defaults_to_what_is_staged(generated_project):
     """
     project, _ = generated_project
     source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
-    body = source.split("@logged('preflight.staged')", 1)[1].split('@task', 1)[0]
+    body = task_source(source, 'preflight.staged')
     assert re.search(r'paths\s+or\s+staged_files\(', body), 'an explicit --paths no longer wins'
     assert 'Nothing staged' in body, 'an empty index is not reported'
 
     # A space in a staged path has to fail loudly: `--paths` is space-separated the whole way
     # down, so such a path would otherwise split into fragments that match no step's filter and
     # be dropped, leaving the hook to pass because it checked nothing at all.
-    reader = source.split('def staged_files', 1)[1].split('\ndef ', 1)[0]
+    reader = function_source(source, 'staged_files')
     assert 'git diff --cached --name-only' in reader, 'the staged bundle no longer reads the index'
     assert 'splitlines()' in reader, 'the index is split on whitespace, so a path with a space breaks up'
     assert 'unsupported' in reader, 'a staged path containing a space is not refused'
@@ -344,17 +348,16 @@ def test_the_gate_renders_no_report_it_does_not_read(generated_project):
     """
     project, _ = generated_project
     tasks = project / '_CI' / 'tasks'
-    gate_pyscn = (tasks / 'quality.py').read_text(encoding='utf-8').split('def pyscn_json_report', 1)[1]
-    gate_pyscn = gate_pyscn.split('\n@', 1)[0]
+    gate_pyscn = function_source((tasks / 'quality.py').read_text(encoding='utf-8'), 'pyscn_json_report')
     assert 'ANALYZE_JSON' in gate_pyscn, 'the gate no longer produces the JSON the badge reads'
     assert 'ANALYZE_HTML' not in gate_pyscn, 'the gate produces a pyscn HTML report nothing reads'
 
     test_py = (tasks / 'test.py').read_text(encoding='utf-8')
-    gate_coverage = test_py.split('def combine_coverage', 1)[1].split('\n@', 1)[0]
+    gate_coverage = function_source(test_py, 'combine_coverage')
     assert 'coverage json' in gate_coverage, 'the gate no longer produces the JSON the badge reads'
     assert 'coverage html' not in gate_coverage, 'the gate renders a coverage HTML report nothing reads'
 
-    on_demand = test_py.split("@logged('test.coverage')", 1)[1].split('\n@task', 1)[0]
+    on_demand = task_source(test_py, 'test.coverage')
     assert 'coverage html' in on_demand, 'nothing renders the combined coverage report any more'
 
 
@@ -417,14 +420,14 @@ def test_a_report_a_reader_would_misread_is_cleared_first(generated_project):
     project, _ = generated_project
     quality = (project / '_CI' / 'tasks' / 'quality.py').read_text(encoding='utf-8')
     for name in ('analyze', 'pyscn_json_report'):
-        body = quality.split(f'\ndef {name}(', 1)[1].split('\ndef ', 1)[0]
+        body = function_source(quality, name)
         assert 'clear_pyscn_reports()' in body, f'{name} can read a report from a previous run'
     # The two analysis tasks share `analyze`, so the clearing above covers both.
     for name in ('pyscn_analyze', 'pyscn_analyze_only'):
-        body = quality.split(f'\ndef {name}(', 1)[1].split('\ndef ', 1)[0]
+        body = function_source(quality, name)
         assert 'analyze(context, write=write)' in body, f'{name} no longer runs the shared analysis'
     test_py = (project / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
-    erase = test_py.split('def erase_coverage_data', 1)[1].split('\ndef ', 1)[0]
+    erase = function_source(test_py, 'erase_coverage_data')
     assert "Path('reports').glob('coverage.*.json')" in erase, 'a retired env keeps its report'
 
 
@@ -438,7 +441,7 @@ def test_a_derived_value_that_cannot_be_written_fails_the_write(generated_projec
     """
     project, _ = generated_project
     source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
-    body = source.split('def artifacts', 1)[1].split('\nSTEPS', 1)[0]
+    body = function_source(source, 'artifacts')
     tail = body.split('for reason in reasons:', 1)[1]
     assert 'if not write:' in tail, 'both modes print the same hint'
     fix_hint, exit_call = tail.index('FIX_COMMAND'), tail.index('raise SystemExit(1)')
@@ -456,7 +459,7 @@ def test_a_badge_the_reader_removed_is_reported_not_assumed(generated_project):
     """
     project, _ = generated_project
     shared = (project / '_CI' / 'tasks' / 'shared.py').read_text(encoding='utf-8')
-    body = shared.split('def apply_badge', 1)[1].split('\ndef ', 1)[0]
+    body = function_source(shared, 'apply_badge')
     assert 're.search(pattern' in body, 'a missing badge is indistinguishable from a current one'
     assert body.index('re.search(pattern') < body.index('re.sub('), 'the check comes after the substitution'
 
@@ -532,7 +535,7 @@ def test_the_formatting_failure_names_a_command_you_can_paste(generated_project)
     """
     project, _ = generated_project
     source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
-    body = source.split('def formatting', 1)[1].split('\ndef ', 1)[0]
+    body = function_source(source, 'formatting')
     assert '--paths=' in body, 'the fix hint is not scoped to what was checked'
     assert re.search(r'if\s+paths\b', body), 'a whole-project run is told to fix a path list it never had'
 
@@ -654,7 +657,6 @@ def test_the_commit_message_task_uses_the_bounded_range(generated_project):
     project, _ = generated_project
     lint = (project / '_CI' / 'tasks' / 'lint.py').read_text(encoding='utf-8')
     task = function_named(lint, 'commitizen')
-    assert task, 'lint.py declares no commitizen task'
     assert 'unpushed_range' in calls_in(task), 'the task does not ask for a bounded range'
     commands = [text for text in command_strings(task) if 'cz check' in text]
     assert commands, 'the task no longer runs cz check'
@@ -672,7 +674,6 @@ def test_formatting_takes_paths_and_nothing_else(generated_project):
     project, _ = generated_project
     formatter = (project / '_CI' / 'tasks' / 'format_.py').read_text(encoding='utf-8')
     task = function_named(formatter, 'format_')
-    assert task, 'format_.py declares no format task'
     parameters = [argument.arg for argument in task.args.args]
     assert parameters == ['context', 'paths'], f'the formatter takes more than paths: {parameters}'
 
@@ -697,10 +698,10 @@ def test_only_the_matrix_writes_the_unions_filename(generated_project):
     writers = [line.strip() for line in test_py.splitlines() if 'coverage json -o' in line]
     union = [line for line in writers if 'coverage json -o {COVERAGE_REPORT}' in line]
     assert len(union) == 1, f'{len(union)} commands write the union report, not one: {union}'
-    combine = test_py.split('def combine_coverage', 1)[1].split('\n@', 1)[0]
+    combine = function_source(test_py, 'combine_coverage')
     assert union[0] in combine, 'the union report is written outside the combine'
 
-    erase = test_py.split('def erase_coverage_data', 1)[1].split('\ndef ', 1)[0]
+    erase = function_source(test_py, 'erase_coverage_data')
     assert 'COVERAGE_REPORT' in erase, 'a stale union report survives the next matrix run'
 
 
@@ -894,16 +895,16 @@ def test_matrix_coverage_is_combined_before_anything_reads_it(generated_project)
     test_py = (project / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
     # Past the closing `"""`, so the docstring's own mention of combine_coverage — which
     # precedes every command — cannot satisfy the ordering assertions below.
-    body = test_py.split('def tox_matrix', 1)[1].split('\n@', 1)[0].split('"""')[-1]
+    body = strip_prose(function_source(test_py, 'tox_matrix'))
     for step in ('erase_coverage_data', 'tox run', 'combine_coverage'):
         assert step in body, f'the matrix no longer runs {step!r}'
     assert body.index('erase_coverage_data') < body.index('tox run'), 'stale coverage data is not cleared first'
     # Not `coverage erase`: it leaves `.coverage.<envname>` in place, so a retired env's data
     # would still be combined into the union that feeds the badge and the ratchet.
-    erase = test_py.split('def erase_coverage_data', 1)[1].split('\ndef ', 1)[0]
+    erase = function_source(test_py, 'erase_coverage_data')
     assert "Path().glob('.coverage.*')" in erase, 'the per-env data files are no longer cleared'
     assert body.index('tox run') < body.index('combine_coverage'), 'coverage is combined before the matrix runs'
-    combine = test_py.split('def combine_coverage', 1)[1].split('\n@task', 1)[0]
+    combine = function_source(test_py, 'combine_coverage')
     assert 'coverage combine' in combine, 'the per-env data is never merged'
     assert 'coverage json -o {COVERAGE_REPORT}' in combine, 'the union never reaches the report the badge reads'
     # And it gates only when the data under it is the union the floor was measured from.
@@ -943,13 +944,13 @@ def test_only_what_measures_a_derived_value_may_write_it(generated_project):
     test_py = (tasks / 'test.py').read_text(encoding='utf-8')
 
     # One interpreter: no write, and no comment either.
-    for task_name in ("@logged('test')", "@logged('test.coverage')"):
-        body = test_py.split(task_name, 1)[1].split('\n@', 1)[0]
+    for task_name in ('test', 'test.coverage'):
+        body = task_source(test_py, task_name)
         assert 'update_coverage_badge' not in body, f'{task_name} writes the coverage badge again'
         assert 'ratchet_fail_under' not in body, f'{task_name} moves the ratchet again'
 
     # The matrix: writes under --write, reports otherwise, refuses a narrowed run.
-    tox_task = test_py.split("@logged('test.tox')", 1)[1].split('\n@', 1)[0]
+    tox_task = task_source(test_py, 'test.tox')
     assert 'note(update_coverage_badge(write=write))' in tox_task, 'the matrix no longer owns the badge'
     assert 'note(ratchet_fail_under(write=write))' in tox_task, 'the matrix no longer owns the ratchet'
     assert 'if env and write:' in tox_task, 'a narrowed matrix can still write the badge'
@@ -960,20 +961,20 @@ def test_only_what_measures_a_derived_value_may_write_it(generated_project):
 
     # pyscn measured the grade, so it may write the badge — but only when asked.
     quality = (tasks / 'quality.py').read_text(encoding='utf-8')
-    for task_name in ('def pyscn_analyze(', 'def pyscn_analyze_only(', 'def pyscn('):
-        signature = quality.split(task_name, 1)[1].split(')', 1)[0]
-        assert 'write: bool = False' in signature, f'{task_name} writes the pyscn badge unasked'
+    for task_name in ('pyscn_analyze', 'pyscn_analyze_only', 'pyscn'):
+        defaults = parameter_defaults(function_named(quality, task_name))
+        assert defaults.get('write') == 'False', f'{task_name} writes the pyscn badge unasked'
 
     # And `document` writes no badge at all: building docs is not changing the README.
     document = (tasks / 'document.py').read_text(encoding='utf-8')
-    aggregator = document.split("@logged('document')", 1)[1]
+    aggregator = task_source(document, 'document')
     for absent in ('update_coverage_badge', 'update_pyscn_badge', 'update_package_version_badge'):
         assert absent not in aggregator, f'document writes {absent} unasked'
 
     # Which leaves no task writing a tracked file unasked: every write is behind `--write` or
     # inside a command named for the mutation it performs.
     release = (tasks / 'release.py').read_text(encoding='utf-8')
-    bump = release.split("@logged('release.bump')", 1)[1].split('\n@', 1)[0]
+    bump = task_source(release, 'release.bump')
     assert 'update_package_version_badge(version=' in bump, (
         'release.bump lands a README that contradicts the version it released'
     )
@@ -1008,7 +1009,7 @@ def test_the_ci_badge_is_the_hosts_own(generated_project):
 
     document = (tasks / 'document.py').read_text(encoding='utf-8')
     assert 'def update_pipeline_badge' in document, 'nothing points the CI badge anywhere'
-    updater = document.split('def update_pipeline_badge', 1)[1].split('\ndef ', 1)[0]
+    updater = function_source(document, 'update_pipeline_badge')
     unknown_remote = updater.split('pipeline_badge(context)', 1)[1].split('return apply_badge', 1)[0]
     assert 'return None' in unknown_remote, 'a project without a remote is reported stale, not left alone'
 

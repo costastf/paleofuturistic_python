@@ -46,6 +46,8 @@ TEMPLATE_SECURITY_OVERRIDE="CVE-2025-71176" ./workflow.cmd test.combo --mature
 
 Structural assertions live under `tests/invariants/`, one module per subject they read (`test_pipelines.py`, `test_gate.py`, `test_security.py`, `test_release.py`, `test_tasks.py`, `test_generation.py`, `test_docs.py`, `test_runner.py`) with shared helpers in `support.py`; each test receives one generated project per matrix cell via the `generated_project` fixture. Adding an assertion is one new `test_*` function. Adding a new combo axis means editing `matrix_combos()` in `_CI/tasks/configuration.py` — both the pytest suite and the Invoke matrix runner pick it up automatically.
 
+An assertion about one function reads that function through the helpers in `support.py`, never through a string slice of the file ([ADR-0047](../decisions/0047-tests-locate-generated-code-by-syntax.md)). `function_source(text, 'name')` returns a definition with its decorators, `task_source(text, 'ns.task')` finds a task by its `@logged` name, `parameter_defaults(function_named(text, 'name'))` reads a signature, and `module_imports(text)` lists what a module imports at startup. Each fails by name when the function is gone, so a rename shows up as a lookup error rather than as an assertion over whatever followed. `tests/invariants/test_support.py` checks the helpers themselves over a hand-written module.
+
 ## See also
 
 - [ADR-0038](../decisions/0038-template-tests-snapshot-pin-and-mature.md) — why the snapshot, the pinned uv and the matured cell are shaped this way.

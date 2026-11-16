@@ -1,6 +1,7 @@
 """Helpers and constants shared by the invariant modules; the fixtures are in ``tests/conftest.py``."""
 
 import ast
+import functools
 import importlib.util
 import os
 import re
@@ -118,6 +119,97 @@ def strip_prose(source):
         if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant) and isinstance(first.value.value, str):
             node.body.pop(0)
     return ast.unparse(tree)
+
+
+# A test locates generated code by its syntax tree, never by string position (ADR-0047): a
+# slice bounded by "the next `def`" or "the next decorator" is right only while the file keeps
+# its layout, and one bounded by nothing is the rest of the file.
+DEFINITIONS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+
+
+@functools.cache
+def parsed(source):
+    """Return `source` parsed once; the suite reads the same generated module many times."""
+    return ast.parse(source)
+
+
+def node_source(source, node):
+    """Return the text of a definition, decorators included."""
+    lines = source.splitlines(keepends=True)
+    first = min([node.lineno, *(decorator.lineno for decorator in node.decorator_list)])
+    return ''.join(lines[first - 1 : node.end_lineno])
+
+
+def function_named(source, name):
+    """Return the top-level `def name` in `source`, or fail naming it."""
+    for node in parsed(source).body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
+            return node
+    missing = f'no top-level function {name!r}'
+    raise LookupError(missing)
+
+
+def function_source(source, name):
+    """Return the text of the top-level `def name`, decorators included."""
+    return node_source(source, function_named(source, name))
+
+
+def logged_as(node):
+    """Return the name a `@logged(...)` decorator gives `node`, or None."""
+    for decorator in node.decorator_list:
+        if not isinstance(decorator, ast.Call) or ast.unparse(decorator.func) != 'logged':
+            continue
+        if decorator.args and isinstance(decorator.args[0], ast.Constant):
+            return decorator.args[0].value
+    return None
+
+
+def task_source(source, name):
+    """Return the text of the function decorated `@logged(name)`, decorators included."""
+    for node in parsed(source).body:
+        if isinstance(node, ast.FunctionDef) and logged_as(node) == name:
+            return node_source(source, node)
+    missing = f'no task logged as {name!r}'
+    raise LookupError(missing)
+
+
+def parameter_defaults(node):
+    """Return the parameters of a function definition, each with its default's source or None."""
+    arguments = node.args
+    positional = arguments.posonlyargs + arguments.args
+    defaults = [None] * (len(positional) - len(arguments.defaults)) + list(arguments.defaults)
+    parameters = {parameter.arg: default for parameter, default in zip(positional, defaults, strict=True)}
+    parameters.update(zip((a.arg for a in arguments.kwonlyargs), arguments.kw_defaults, strict=True))
+    if arguments.vararg:
+        parameters[arguments.vararg.arg] = None
+    if arguments.kwarg:
+        parameters[arguments.kwarg.arg] = None
+    return {name: None if default is None else ast.unparse(default) for name, default in parameters.items()}
+
+
+def module_scope(node):
+    """Yield the statements that run on import: everything outside a function or class body."""
+    for child in ast.iter_child_nodes(node):
+        if isinstance(child, DEFINITIONS):
+            continue
+        if isinstance(child, ast.stmt):
+            yield child
+        yield from module_scope(child)
+
+
+def module_imports(source):
+    """Return the import statements `source` runs on import, one per line."""
+    imports = (node for node in module_scope(parsed(source)) if isinstance(node, (ast.Import, ast.ImportFrom)))
+    return '\n'.join(ast.unparse(node) for node in imports)
+
+
+def imported_names(source, module):
+    """Return every name `source` imports from `module` at module scope."""
+    names = set()
+    for node in module_scope(parsed(source)):
+        if isinstance(node, ast.ImportFrom) and f'{"." * node.level}{node.module or ""}' == module:
+            names.update(alias.name for alias in node.names)
+    return names
 
 
 REMOTE_URLS = [
@@ -531,14 +623,6 @@ def commits_in(repository, revision_range):
         return []
     listed = git(repository, 'log', '--format=%s', revision_range)
     return [line for line in listed.stdout.splitlines() if line]
-
-
-def function_named(source, name):
-    """Return the top-level `ast.FunctionDef` called `name`, or None."""
-    return next(
-        (node for node in ast.parse(source).body if isinstance(node, ast.FunctionDef) and node.name == name),
-        None,
-    )
 
 
 def command_strings(node):

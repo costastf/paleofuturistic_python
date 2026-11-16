@@ -19,6 +19,7 @@ from .support import (
     StubContext,
     collect_nav_pages,
     exec_from,
+    function_source,
     load_generated_configuration,
     load_generated_shared,
     step_index,
@@ -347,7 +348,7 @@ def test_a_failed_bump_leaves_no_badge_for_it(generated_project):
     """
     project, _ = generated_project
     release = (project / '_CI' / 'tasks' / 'release.py').read_text(encoding='utf-8')
-    body = release.split('def bump', 1)[1].split('\n@task', 1)[0]
+    body = function_source(release, 'bump')
     assert 'except SystemExit:' in body, 'a failed bump keeps the badge it wrote'
     restore = body.split('except SystemExit:', 1)[1]
     assert 'update_package_version_badge()' in restore, 'the restore does not go through the one writer'

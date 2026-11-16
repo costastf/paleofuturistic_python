@@ -18,8 +18,10 @@ from .support import (
     command_strings,
     exec_from,
     function_named,
+    function_source,
     load_generated_configuration,
     suppression_calls,
+    task_source,
 )
 
 
@@ -88,7 +90,7 @@ def test_publishing_audits_before_it_builds(generated_project):
     """
     project, _ = generated_project
     release_py = (project / '_CI' / 'tasks' / 'release.py').read_text(encoding='utf-8')
-    dist = release_py.split("@logged('release.dist')", 1)[1].split('@task', 1)[0]
+    dist = task_source(release_py, 'release.dist')
     assert 'audit(context)' in dist, 'release.dist publishes without auditing'
     assert dist.index('audit(context)') < dist.index('build(context)'), 'the audit runs after the build'
 
@@ -135,7 +137,7 @@ def test_suppressions_are_validated_whole_not_scanned(generated_project):
     """
     project, _ = generated_project
     secure_py = (project / '_CI' / 'tasks' / 'secure.py').read_text(encoding='utf-8')
-    audit_source = secure_py.split("@logged('secure.audit')", 1)[1].split('\n@task', 1)[0]
+    audit_source = task_source(secure_py, 'secure.audit')
     assert 'IGNORE_PATTERN.finditer' not in audit_source, 'audit still scans for id-shaped substrings'
     assert 'parse_suppressions' in audit_source
     assert 'IGNORE_PATTERN.fullmatch' in secure_py
@@ -155,7 +157,7 @@ def test_untracked_suppression_sources_require_an_expiry(generated_project):
     assert cli.get('require_expiry') == 'True', '--ignore does not require an expiry'
     assert env.get('require_expiry') == 'True', 'the env var does not require an expiry'
     # The file keeps permanent entries: load_overrides_file must not opt in.
-    file_loader = secure_py.split('def load_overrides_file', 1)[1].split('\n@task', 1)[0]
+    file_loader = function_source(secure_py, 'load_overrides_file')
     assert 'require_expiry=True' not in file_loader, '.security-overrides should still allow permanent entries'
 
 
@@ -163,7 +165,7 @@ def test_applied_suppressions_are_logged_with_their_source(generated_project):
     """Whatever is applied is printed with its origin, so an env-only mute leaves a footprint."""
     project, _ = generated_project
     secure_py = (project / '_CI' / 'tasks' / 'secure.py').read_text(encoding='utf-8')
-    audit_source = secure_py.split("@logged('secure.audit')", 1)[1].split('\n@task', 1)[0]
+    audit_source = task_source(secure_py, 'secure.audit')
     assert 'Applying' in audit_source, 'applied suppressions are not announced'
     assert 'suppression.source' in audit_source, 'the origin of each suppression is not printed'
     assert 'expired on' in audit_source, 'expired suppressions are not reported'
@@ -194,7 +196,6 @@ def test_the_audit_routes_every_query_through_the_retry(generated_project):
     project, _ = generated_project
     secure = (project / '_CI' / 'tasks' / 'secure.py').read_text(encoding='utf-8')
     task = function_named(secure, 'audit')
-    assert task, 'secure.py declares no audit task'
     called = calls_in(task)
     assert 'execute_with_retries' in called, 'the audit does not retry a run that reported nothing'
     assert 'execute' not in called, 'a pip-audit invocation bypasses the retries'
@@ -212,7 +213,6 @@ def test_the_audit_routes_every_query_through_the_retry(generated_project):
         'the audit reads a marker-carrying export again'
     )
     reader = function_named(secure, 'audit_requirement_files')
-    assert reader, 'secure.py declares no requirement-file writer'
     assert 'UV_LOCK' in ast.dump(reader), 'the writer does not read uv.lock'
 
 

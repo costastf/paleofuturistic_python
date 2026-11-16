@@ -18,7 +18,9 @@ from .support import (
     UNION_WORKAROUND_RULES,
     exec_from,
     failing,
+    function_source,
     load_generated_shared,
+    module_imports,
     opener,
     strip_prose,
 )
@@ -211,7 +213,7 @@ def test_refresh_deps_moves_every_exact_pin_except_uv(generated_project):
     assert '# Newest version clearing the [tool.uv] exclude-newer boundary.' in content
     assert helpers['HELD_BACK'] == frozenset({'uv'})
     # The task says a newer uv exists rather than taking it; the body spells the hand-off.
-    body = source.split('def refresh_deps', 1)[1].split('\n@task', 1)[0]
+    body = function_source(source, 'refresh_deps')
     assert 'develop.bump-uv' in body, 'a held-back uv is not pointed at the task that moves it'
     assert 'uv lock --upgrade' in body, 'the transitive closure is not re-resolved'
     assert 'preflight' in body, 'the task does not say what has to pass before the commit'
@@ -244,18 +246,17 @@ def test_importing_a_task_module_does_not_cost_a_second(generated_project):
     project, _ = generated_project
     tasks = project / '_CI' / 'tasks'
     secure = (tasks / 'secure.py').read_text(encoding='utf-8')
-    module_scope = secure.split('\n@task', 1)[0]
-    assert 'from .sbom import' not in module_scope, 'importing secure.py pays for cyclonedx again'
+    assert 'from .sbom import' not in module_imports(secure), 'importing secure.py pays for cyclonedx again'
     # Every module, not just `secure.py`: any of them importing `.sbom` at module scope brings
     # the cost back, since `preflight` imports most of them.
     for module in sorted(tasks.glob('*.py')):
         if module.name == 'sbom.py':
             continue
-        head = module.read_text(encoding='utf-8').split('\ndef ', 1)[0].split('\n@', 1)[0]
+        head = module_imports(module.read_text(encoding='utf-8'))
         assert 'from .sbom import' not in head, f'{module.name} imports the SBOM composer at module scope'
         assert 'import cyclonedx' not in head, f'{module.name} imports cyclonedx at module scope'
     sbom = (tasks / 'sbom.py').read_text(encoding='utf-8')
-    assert 'from cyclonedx.validation' not in sbom.split('\ndef ', 1)[0], (
+    assert 'from cyclonedx.validation' not in module_imports(sbom), (
         'the JSON validator is imported before anything validates'
     )
 

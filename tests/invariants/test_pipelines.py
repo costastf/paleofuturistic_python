@@ -17,6 +17,7 @@ from .support import (
     action_pins,
     exec_from,
     fork_pair,
+    function_source,
     github_workflows,
     load_generated_shared,
     pre_commit_hooks,
@@ -118,8 +119,7 @@ def test_deps_image_tag_covers_every_content_input(generated_project):
     """
     project, _ = generated_project
     container_py = (project / '_CI' / 'tasks' / 'container.py').read_text(encoding='utf-8')
-    assert 'def deps_image_tag' in container_py
-    tag_source = container_py.split('def deps_image_tag', 1)[1].split('\n@task', 1)[0]
+    tag_source = function_source(container_py, 'deps_image_tag')
     for required in ('UV_LOCK', 'DOCKERFILE_DEPS', 'info.base-image'):
         assert required in tag_source, f'deps_image_tag() does not hash {required}'
     # Per-input digests are fixed-width, which is what stops ("AB","C") colliding

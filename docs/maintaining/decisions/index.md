@@ -83,3 +83,4 @@ anywhere in the repository resolves to a file.
 | [ADR-0044](0044-docstrings-state-the-rule-and-name-the-record.md) | Docstrings state the rule and name the record |
 | [ADR-0045](0045-one-home-per-rationale.md) | One home per rationale |
 | [ADR-0046](0046-shipped-pages-are-rendered-from-directives.md) | Shipped pages are rendered from directives |
+| [ADR-0047](0047-tests-locate-generated-code-by-syntax.md) | Tests locate generated code by syntax |
