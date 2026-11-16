@@ -19,9 +19,11 @@ from .support import (
     StubContext,
     collect_nav_pages,
     exec_from,
+    function_named,
     function_source,
     load_generated_configuration,
     load_generated_shared,
+    statement_calls,
     step_index,
     stub_result,
 )
@@ -158,7 +160,7 @@ def test_ship_publishes_a_version_bump_however_it_was_merged(generated_project, 
 
     Exercised against a real git history: a release branch squash-merged into main — the case
     a tag-on-branch design lost — is detected, tagged on the squash commit through the host
-    API, built, signed and uploaded, with `dist/` left for provenance. A push with no bump
+    API, then published: built, signed and uploaded, with `dist/` left for provenance. A push with no bump
     publishes nothing and exits 0. The tag is created once: a re-run that finds the tag on the
     same commit carries on without creating it again.
     """
@@ -214,6 +216,7 @@ def test_ship_publishes_a_version_bump_however_it_was_merged(generated_project, 
         'released_version',
         'record_outputs',
         'tag_release',
+        'publish',
         'ship',
         tomllib=tomllib,
         Path=Path,
@@ -322,19 +325,19 @@ def test_changelog_is_one_file_everywhere(generated_project):
         assert url.endswith(f'/HEAD/{written}'), f'the Changelog URL {url} is not {written}'
 
 
-def test_prebuilt_publish_never_rebuilds(generated_project):
-    """`publish --prebuilt` must not call `dist()`, or CI would publish unattested files."""
+def test_publish_is_one_sequence_and_ship_runs_it(generated_project):
+    """`release.publish` is dist, attest, upload in that order, and `release.ship` runs it after the tag.
+
+    The files uploaded have to be the files signed, so nothing may rebuild between the two
+    steps, and the sequence lives in one task so the by-hand and pipeline paths cannot drift
+    (ADR-0049).
+    """
     project, _ = generated_project
     release_py = (project / '_CI' / 'tasks' / 'release.py').read_text(encoding='utf-8')
-    tree = ast.parse(release_py)
-    func = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == 'publish')
-    guarded = [
-        node
-        for node in ast.walk(func)
-        if isinstance(node, ast.If) and any('dist(context)' in ast.unparse(child) for child in node.body)
-    ]
-    assert guarded, 'publish() calls dist() unconditionally; --prebuilt would still rebuild'
-    assert 'prebuilt' in ast.unparse(guarded[0].test), 'the rebuild is not guarded by the prebuilt flag'
+    assert statement_calls(function_named(release_py, 'publish')) == ['dist', 'attest', 'upload']
+    ship = statement_calls(function_named(release_py, 'ship'))
+    assert ship[-2:] == ['tag_release', 'publish'], f'ship ends with {ship[-2:]}, not the tag and the publish'
+    assert 'dist' not in ship, 'ship builds on its own instead of through publish'
 
 
 def test_a_failed_bump_leaves_no_badge_for_it(generated_project):

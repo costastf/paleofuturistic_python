@@ -663,6 +663,15 @@ def calls_in(node):
     return called
 
 
+def statement_calls(node):
+    """Return the names of the functions a body calls as whole statements, in order."""
+    return [
+        getattr(statement.value.func, 'id', None) or getattr(statement.value.func, 'attr', None)
+        for statement in node.body
+        if isinstance(statement, ast.Expr) and isinstance(statement.value, ast.Call)
+    ]
+
+
 def exec_from(source, *names: str, **namespace: object):
     """Exec the named top-level functions and assignments from `source`, and return the namespace.
 

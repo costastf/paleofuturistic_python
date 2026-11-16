@@ -165,10 +165,8 @@ def changelog(context: Context, write: bool = False, version: str = '') -> None:
 def dist(context: Context) -> None:
     """Clean and build the distribution artifacts, leaving them in ``dist/``.
 
-    Split out of ``publish`` so a caller can do something with the artifacts *between*
-    building and uploading them — CI attests their provenance there. Anything that inspects
-    ``dist/`` must run against the exact files that get published, which is why ``publish
-    --prebuilt`` exists rather than simply building a second time.
+    The first step of ``release.publish``, which attests and uploads these exact files; it is
+    its own task so the artifacts can be inspected before anything is signed or sent.
 
     The dependency audit runs here rather than inside ``build``. Publishing is the moment the
     outside world is exposed to what these dependencies contain, so it is the moment worth
@@ -233,28 +231,22 @@ def attest(context: Context) -> None:
 
 @task
 @logged('release.publish')
-def publish(context: Context, prebuilt: bool = False) -> None:
-    """Build and publish — the full post-release publishing pipeline.
+def publish(context: Context) -> None:
+    """Build, attest and upload: ``release.dist``, ``release.attest``, then the upload (ADR-0049).
+
+    One sequence, run here by hand and by ``release.ship`` in the pipeline once it has detected
+    and tagged a release. The files uploaded are the files signed, because nothing rebuilds in
+    between. ``dist/`` is left in place afterwards for anything that inspects or attests the
+    uploaded files; ``release.clean`` removes it.
 
     Credentials decide how it uploads. With ``UV_PUBLISH_*`` set it uses them, and skips any
     attestations in ``dist/``: PyPI accepts attestations only through Trusted Publishing, and
     other indexes may reject the upload outright. Without them it requires an OIDC token and
     publishes through Trusted Publishing, uploading the attestations ``release.attest`` signed.
-
-    Args:
-        context: Invoke context.
-        prebuilt: Publish what is already in ``dist/`` instead of rebuilding. Set this when an
-            earlier step ran ``release.dist`` and acted on those artifacts — rebuilding would
-            upload files that no attestation, checksum or signature refers to.
-
     """
-    if not prebuilt:
-        dist(context)
-    elif not distribution_files():
-        print('--prebuilt was given but dist/ is empty; run `./workflow.cmd release.dist` first.')
-        raise SystemExit(1)
+    dist(context)
+    attest(context)
     upload(context)
-    clean(context)
 
 
 def upload(context: Context) -> None:
@@ -393,8 +385,8 @@ def ship(context: Context, before: str = '', after: str = '', output: str = '') 
     version bump arriving on that branch (ADR-0014), so merging the release request any way —
     merge commit, squash, rebase — publishes it. With no bump it prints why and exits 0, so the
     pipeline stays green. With one it tags the new tip through the host's API, then runs
-    ``release.dist``, ``release.attest`` and the upload over it. ``dist/`` is left in place for
-    anything the pipeline attests afterwards.
+    ``release.publish`` over it. ``dist/`` is left in place for anything the pipeline attests
+    afterwards.
 
     Args:
         context: Invoke context.
@@ -413,9 +405,7 @@ def ship(context: Context, before: str = '', after: str = '', output: str = '') 
     if commit_sha(context) != sha:
         execute(context, f'git checkout --quiet {sha}')
     tag_release(context, revision=sha)
-    dist(context)
-    attest(context)
-    upload(context)
+    publish(context)
 
 
 def resolve_next_version(context: Context, increment: str) -> str:
