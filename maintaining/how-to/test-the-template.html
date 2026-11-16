@@ -393,6 +393,10 @@
 <li>
     <a href="../decisions/0046-shipped-pages-are-rendered-from-directives.html" class="dropdown-item">ADR-0046 Shipped pages are rendered from directives</a>
 </li>
+            
+<li>
+    <a href="../decisions/0047-tests-locate-generated-code-by-syntax.html" class="dropdown-item">ADR-0047 Tests locate generated code by syntax</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -784,6 +788,9 @@
             <li class="nav-item">
                 <a href="../decisions/0046-shipped-pages-are-rendered-from-directives.html" class="nav-link">ADR-0046 Shipped pages are rendered from directives</a>
             </li>
+            <li class="nav-item">
+                <a href="../decisions/0047-tests-locate-generated-code-by-syntax.html" class="nav-link">ADR-0047 Tests locate generated code by syntax</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -885,6 +892,7 @@
 </code></pre>
 <h2 id="adding-a-new-invariant">Adding a new invariant</h2>
 <p>Structural assertions live under <code>tests/invariants/</code>, one module per subject they read (<code>test_pipelines.py</code>, <code>test_gate.py</code>, <code>test_security.py</code>, <code>test_release.py</code>, <code>test_tasks.py</code>, <code>test_generation.py</code>, <code>test_docs.py</code>, <code>test_runner.py</code>) with shared helpers in <code>support.py</code>; each test receives one generated project per matrix cell via the <code>generated_project</code> fixture. Adding an assertion is one new <code>test_*</code> function. Adding a new combo axis means editing <code>matrix_combos()</code> in <code>_CI/tasks/configuration.py</code> — both the pytest suite and the Invoke matrix runner pick it up automatically.</p>
+<p>An assertion about one function reads that function through the helpers in <code>support.py</code>, never through a string slice of the file (<a href="../decisions/0047-tests-locate-generated-code-by-syntax.html">ADR-0047</a>). <code>function_source(text, 'name')</code> returns a definition with its decorators, <code>task_source(text, 'ns.task')</code> finds a task by its <code>@logged</code> name, <code>parameter_defaults(function_named(text, 'name'))</code> reads a signature, and <code>module_imports(text)</code> lists what a module imports at startup. Each fails by name when the function is gone, so a rename shows up as a lookup error rather than as an assertion over whatever followed. <code>tests/invariants/test_support.py</code> checks the helpers themselves over a hand-written module.</p>
 <h2 id="see-also">See also</h2>
 <ul>
 <li><a href="../decisions/0038-template-tests-snapshot-pin-and-mature.html">ADR-0038</a> — why the snapshot, the pinned uv and the matured cell are shaped this way.</li>
