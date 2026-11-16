@@ -36,10 +36,12 @@ test = [
     "pytest",
     "validate-pyproject[all]",
 ]
-# Pinned to the same ruff the template pins, so this repository and the projects it
-# generates are judged by one version. Bump both together.
+# Pinned to the same versions the template pins, so this repository and the projects it
+# generates are judged by one ruff, one pylint and one ty. Bump each pair together.
 lint = [
+    "pylint==4.1.3",
     "ruff==0.17.4",
+    "ty==0.0.100",
 ]
 
 # Mirrors the rule set generated projects get, so the repository that defines the standard is
@@ -89,6 +91,36 @@ convention = "google"
 
 [tool.ruff.format]
 quote-style = "single"
+
+# pylint and ty read the generated project's blocks, minus what has no counterpart here: there
+# is no `src/`, and no module touches the cyclonedx classes the template's ty overrides are
+# for. The disable list is the template's, so a finding is judged the same way on both sides
+# (ADR-0048).
+[tool.ty.environment]
+extra-paths = ["_CI/lib/vendor"]
+
+[tool.pylint.MASTER]
+init-hook = "import sys; sys.path.append('_CI/lib/vendor/')"
+
+[tool.pylint."MESSAGES CONTROL"]
+max-line-length = 120
+disable = [
+    "too-few-public-methods",
+    "duplicate-code",
+    "logging-fstring-interpolation",
+    "too-many-ancestors",
+    "import-outside-toplevel",
+    # Complexity thresholds — already enforced by ruff (PLR0912/PLR0913/PLR0915)
+    "too-many-arguments",
+    "too-many-positional-arguments",
+    "too-many-branches",
+    "too-many-statements",
+    "too-many-locals",
+    "too-many-instance-attributes",
+    # Design choices
+    "unused-argument",           # handled by ruff ARG rules
+    "wrong-import-position",     # handled by ruff isort
+]
 
 # The vendored invoke under `_CI/lib/vendor/` and `template/_CI/lib/vendor/` is not maintained
 # here — it is built by schubergphilis/vendored_invoke and copied in verbatim. Move it with

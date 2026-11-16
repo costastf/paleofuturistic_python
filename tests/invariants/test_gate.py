@@ -1,5 +1,8 @@
 """Invariants over the QA gate: the preflight registry, the hooks, the badges and the coverage scope."""
 
+# The gate is the largest subject the suite reads, and one module per subject is the rule.
+# pylint: disable=too-many-lines
+
 import ast
 import os
 import re
@@ -764,7 +767,10 @@ def test_a_staged_path_that_cannot_be_forwarded_is_refused(generated_project, tm
 
     def index(*paths: str):
         class Context:
+            """A context whose index lists `paths`."""
+
             def run(self, _command, **_kwargs: object):
+                """Answer every command with the staged paths."""
                 return SimpleNamespace(failed=False, stdout=''.join(f'{path}\n' for path in paths))
 
         return Context()
@@ -782,7 +788,10 @@ def test_a_staged_path_that_cannot_be_forwarded_is_refused(generated_project, tm
             staged_files(index('src/kept.py', unforwardable))
 
     class Broken:
+        """A context whose every command fails."""
+
         def run(self, _command, **_kwargs: object):
+            """Fail, with no output."""
             return SimpleNamespace(failed=True, stdout='')
 
     assert staged_files(Broken()) == '', 'no index reads as an error rather than as no work'

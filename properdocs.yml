@@ -102,5 +102,6 @@ nav:
       - ADR-0045 One home per rationale: maintaining/decisions/0045-one-home-per-rationale.md
       - ADR-0046 Shipped pages are rendered from directives: maintaining/decisions/0046-shipped-pages-are-rendered-from-directives.md
       - ADR-0047 Tests locate generated code by syntax: maintaining/decisions/0047-tests-locate-generated-code-by-syntax.md
+      - ADR-0048 The parent is judged by the gate it ships: maintaining/decisions/0048-the-parent-is-judged-by-the-gate-it-ships.md
 
 copyright: Copyright &copy; 2024 <a href="https://schubergphilis.com/">Schuberg Philis</a>

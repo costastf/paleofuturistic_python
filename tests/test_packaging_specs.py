@@ -11,6 +11,10 @@ differs between cells in pyproject.toml (`[project.urls]`) is covered per cell b
 `test_project_urls_use_well_known_labels` in the invariants suite.
 """
 
+# A pytest fixture is consumed by naming it as a parameter, which is the redefinition
+# pylint warns about.
+# pylint: disable=redefined-outer-name
+
 import base64
 import csv
 import hashlib
@@ -174,7 +178,7 @@ def test_wheel_is_pure_python(built_project):
     """Platform compatibility tags + binary distribution format: one `py3-none-any` wheel, purelib."""
     _, wheel, _ = built_project
     _, _, build, tags = parse_wheel_filename(wheel.name)
-    assert build == ()
+    assert not build
     assert tags == frozenset({Tag('py3', 'none', 'any')})
     headers = HeaderParser().parsestr(read_wheel_file(wheel, f'{dist_info(wheel)}/WHEEL'))
     assert headers['Wheel-Version'] == '1.0'
@@ -219,7 +223,9 @@ def test_sdist_layout(built_project, pyproject):
         members = archive.getnames()
         assert {member.split('/', 1)[0] for member in members} == {root}
         assert f'{root}/pyproject.toml' in members
-        pkg_info = archive.extractfile(f'{root}/PKG-INFO').read().decode('utf-8')
+        member = archive.extractfile(f'{root}/PKG-INFO')
+        assert member is not None, 'PKG-INFO is listed but not extractable'
+        pkg_info = member.read().decode('utf-8')
     metadata = Metadata.from_email(pkg_info, validate=True)
     assert Version(metadata.metadata_version) >= Version('2.2'), 'sdists need Metadata-Version 2.2 or later'
     assert metadata.version == Version(pyproject['project']['version'])

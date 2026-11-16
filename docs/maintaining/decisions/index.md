@@ -84,3 +84,4 @@ anywhere in the repository resolves to a file.
 | [ADR-0045](0045-one-home-per-rationale.md) | One home per rationale |
 | [ADR-0046](0046-shipped-pages-are-rendered-from-directives.md) | Shipped pages are rendered from directives |
 | [ADR-0047](0047-tests-locate-generated-code-by-syntax.md) | Tests locate generated code by syntax |
+| [ADR-0048](0048-the-parent-is-judged-by-the-gate-it-ships.md) | The parent is judged by the gate it ships |

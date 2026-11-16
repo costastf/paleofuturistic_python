@@ -78,16 +78,23 @@ CREDENTIALED_URLS = [
 ]
 
 
+def load_module(name, path):
+    """Import one file by path as a standalone module called `name`."""
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        missing = f'no loadable module at {path}'
+        raise ImportError(missing)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def load_generated_configuration(project):
     """Import the generated project's `_CI/tasks/configuration.py` as a standalone module.
 
     Pure stdlib (`re`, `pathlib`), so it loads without the rest of the `_CI.tasks` package.
     """
-    path = project / '_CI' / 'tasks' / 'configuration.py'
-    spec = importlib.util.spec_from_file_location('generated_configuration', path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return load_module('generated_configuration', project / '_CI' / 'tasks' / 'configuration.py')
 
 
 def load_generated_shared(project):
@@ -96,11 +103,7 @@ def load_generated_shared(project):
     It imports only `invoke`, which ``conftest.py`` already puts on ``sys.path`` via the
     vendored tree, so the module loads without the rest of the `_CI.tasks` package.
     """
-    path = project / '_CI' / 'tasks' / 'shared.py'
-    spec = importlib.util.spec_from_file_location('generated_shared', path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return load_module('generated_shared', project / '_CI' / 'tasks' / 'shared.py')
 
 
 def strip_prose(source):
@@ -515,30 +518,37 @@ def invoked_task(hook):
     return match.group(1) if match else ''
 
 
-def registry_steps(project):
-    """Return ``{step name: scope}`` parsed out of the generated `_CI/tasks/preflight.py`.
+def step_declarations(source):
+    """Yield each `Step(...)` call in the STEPS registry as ``{argument: value node}``.
 
-    Read as source rather than imported: importing it would pull in invoke and every task
-    module behind it, which this suite has no reason to install just to read a declaration.
+    Read as source rather than imported: importing `preflight.py` would pull in invoke and every
+    task module behind it, which this suite has no reason to install just to read a declaration.
+    Keywords as well as positions: `Step('ty', scope=WHOLE_PROGRAM)` is the same declaration.
     """
-    source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
-    for node in ast.walk(ast.parse(source)):
-        if not isinstance(node, ast.Assign):
+    for node in ast.walk(parsed(source)):
+        if not isinstance(node, ast.Assign) or not isinstance(node.value, (ast.Tuple, ast.List)):
             continue
-        if not any(getattr(target, 'id', None) == 'STEPS' for target in node.targets):
+        if not any(isinstance(target, ast.Name) and target.id == 'STEPS' for target in node.targets):
             continue
-        # Keywords as well as positions, and a failed read fails the assertion rather than
-        # raising out of the helper: `Step('ty', scope=WHOLE_PROGRAM)` is the same declaration.
-        steps = {}
         for call in node.value.elts:
+            assert isinstance(call, ast.Call), f'STEPS holds something other than a Step call: {ast.dump(call)}'
             supplied = dict(zip(('name', 'scope'), call.args, strict=False))
-            supplied.update({word.arg: word.value for word in call.keywords})
-            name, scope = supplied.get('name'), supplied.get('scope')
-            assert isinstance(name, ast.Constant), f'a step in STEPS declares no literal name: {ast.dump(call)}'
-            assert isinstance(scope, ast.Name), f'step {name.value!r} declares no plain scope name'
-            steps[name.value] = scope.id
-        return steps
+            supplied.update({word.arg: word.value for word in call.keywords if word.arg})
+            yield supplied
+        return
     pytest.fail('preflight.py declares no STEPS registry')
+
+
+def registry_steps(project):
+    """Return ``{step name: scope}`` parsed out of the generated `_CI/tasks/preflight.py`."""
+    source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
+    steps = {}
+    for supplied in step_declarations(source):
+        name, scope = supplied.get('name'), supplied.get('scope')
+        assert isinstance(name, ast.Constant), f'a step in STEPS declares no literal name: {supplied}'
+        assert isinstance(scope, ast.Name), f'step {name.value!r} declares no plain scope name'
+        steps[name.value] = scope.id
+    return steps
 
 
 def per_file_step_filters(project):
@@ -550,17 +560,13 @@ def per_file_step_filters(project):
     source = (project / '_CI' / 'tasks' / 'preflight.py').read_text(encoding='utf-8')
     constants = load_generated_configuration(project)
     filters = {}
-    for node in ast.walk(ast.parse(source)):
-        if not (isinstance(node, ast.Assign) and any(getattr(t, 'id', None) == 'STEPS' for t in node.targets)):
+    for supplied in step_declarations(source):
+        name, scope, files = supplied.get('name'), supplied.get('scope'), supplied.get('files')
+        if not (isinstance(scope, ast.Name) and scope.id == 'PER_FILE'):
             continue
-        for call in node.value.elts:
-            supplied = dict(zip(('name', 'scope'), call.args, strict=False))
-            supplied.update({word.arg: word.value for word in call.keywords})
-            if getattr(supplied.get('scope'), 'id', None) != 'PER_FILE':
-                continue
-            files = supplied.get('files')
-            assert isinstance(files, ast.Name), f'per-file step {supplied["name"].value!r} has no files= constant'
-            filters[supplied['name'].value] = getattr(constants, files.id)
+        assert isinstance(name, ast.Constant), f'a per-file step declares no literal name: {supplied}'
+        assert isinstance(files, ast.Name), f'per-file step {name.value!r} has no files= constant'
+        filters[name.value] = getattr(constants, files.id)
     return filters
 
 
@@ -609,6 +615,7 @@ def range_resolver(project):
             self.repository = repository
 
         def run(self, command, *, hide=False, warn=False):  # noqa: ARG002
+            """Run `command` in the repository and report it the way invoke does."""
             done = subprocess.run(  # noqa: S602 — the commands are this test's own git literals
                 command, shell=True, cwd=str(self.repository), capture_output=True, text=True, check=False
             )
@@ -637,9 +644,9 @@ def command_strings(node):
     joined = []
     for inner in ast.walk(node):
         if isinstance(inner, ast.JoinedStr):
-            parts = [part for part in inner.values if isinstance(part, ast.Constant)]
+            parts = [part for part in inner.values if isinstance(part, ast.Constant) and isinstance(part.value, str)]
             pieces.update(id(part) for part in parts)
-            joined.append(''.join(part.value for part in parts))
+            joined.append(''.join(part.value for part in parts if isinstance(part.value, str)))
     yield from joined
     for inner in ast.walk(node):
         if isinstance(inner, ast.Constant) and isinstance(inner.value, str) and id(inner) not in pieces:
@@ -664,15 +671,17 @@ def exec_from(source, *names: str, **namespace: object):
     importing `_CI.tasks.*`, which pulls invoke and every sibling module behind it.
     """
     wanted = set(names)
-    body = [
+    body: list[ast.stmt] = [
         node
         for node in ast.parse(source).body
         if (isinstance(node, ast.FunctionDef) and node.name in wanted)
         or (isinstance(node, ast.Assign) and any(getattr(t, 'id', None) in wanted for t in node.targets))
     ]
-    found = {node.name if isinstance(node, ast.FunctionDef) else node.targets[0].id for node in body}
+    found = {node.name for node in body if isinstance(node, ast.FunctionDef)}
+    found |= {t.id for node in body if isinstance(node, ast.Assign) for t in node.targets if isinstance(t, ast.Name)}
     assert wanted <= found, f'missing from the source: {sorted(wanted - found)}'
-    exec(compile(ast.Module(body=body, type_ignores=[]), '<generated>', 'exec'), namespace)  # noqa: S102
+    module = ast.Module(body=body, type_ignores=[])
+    exec(compile(module, '<generated>', 'exec'), namespace)  # noqa: S102  # pylint: disable=exec-used
     return namespace
 
 
@@ -680,10 +689,13 @@ def failing(*, failed: bool = True):
     """A context whose `run` reports `failed`, recording the keyword arguments it was given."""
 
     class Context:
+        """The slice of invoke's Context a task touches: `run` and its result."""
+
         def __init__(self) -> None:
             self.calls = []
 
         def run(self, command, **kwargs: object):
+            """Record the call and answer with the configured failure."""
             self.calls.append((command, kwargs))
             return SimpleNamespace(failed=failed, stdout='', stderr='')
 

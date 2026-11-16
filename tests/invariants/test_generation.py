@@ -162,7 +162,7 @@ def test_default_branch_is_spelled_from_one_answer(generate, tmp_path_factory, h
     release_py = (project / '_CI' / 'tasks' / 'release.py').read_text(encoding='utf-8')
     assert 'current_branch != DEFAULT_BRANCH' in release_py, '`release` does not check against the answer'
 
-    assert lines_naming_main(project) == []
+    assert not lines_naming_main(project)
 
 
 def test_exclude_newer_is_a_fixed_date(generated_project):
@@ -344,9 +344,11 @@ def test_vendor_comments_agree_with_the_package_name(generated_project):
     """
     project, _ = generated_project
     for root in (project, REPO_ROOT):
-        name = re.search(
+        declared = re.search(
             r"^name = ['\"]([^'\"]+)['\"]", (root / '_CI' / 'pyproject.toml').read_text(encoding='utf-8'), re.MULTILINE
-        ).group(1)
+        )
+        assert declared, f'{root} declares no project name in _CI/pyproject.toml'
+        name = declared.group(1)
         vendor = (root / '_CI' / 'lib' / 'vendor.txt').read_text(encoding='utf-8')
         # `uv pip compile` indents the `# via …` comment under the requirement it belongs to.
         cited = set(re.findall(r'^\s*#\s+via ([a-z0-9-]+) \(pyproject\.toml\)\s*$', vendor, re.MULTILINE))

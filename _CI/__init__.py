@@ -1,5 +1,9 @@
 """Root CI package — shared constants and utilities for the template test harness."""
 
+# The package is `_CI` on purpose: the launcher, the pipelines and every generated project
+# spell the directory that way, and the name sorts it to the top of a listing.
+# pylint: disable=invalid-name
+
 import platform
 import shutil
 import subprocess
@@ -64,5 +68,6 @@ def open_in_default_application(target: Path) -> None:
         print(f'Could not translate {target} to a Windows path. Open it manually.')
         return
     # The empty '' is `start`'s window-title argument. Without it cmd.exe reads the
-    # quoted path as the title and opens nothing.
-    subprocess.run(['cmd.exe', '/c', 'start', '', windows_path], check=False)  # noqa: S603, S607 — argv is a fixed literal, resolved via PATH deliberately
+    # quoted path as the title and opens nothing. argv is a fixed literal, resolved via
+    # PATH deliberately.
+    subprocess.run(['cmd.exe', '/c', 'start', '', windows_path], check=False)  # noqa: S603, S607

@@ -1,5 +1,9 @@
 """Shared fixtures for the template invariants suite."""
 
+# A pytest fixture is consumed by naming it as a parameter, which is the redefinition
+# pylint warns about.
+# pylint: disable=redefined-outer-name
+
 import importlib.util
 import json
 import os
@@ -101,6 +105,9 @@ def uv_release():
     """
     path = REPO_ROOT / 'template' / '_CI' / 'uv_release.py'
     spec = importlib.util.spec_from_file_location('uv_release_under_test', path)
+    if spec is None or spec.loader is None:
+        missing = f'no loadable module at {path}'
+        raise ImportError(missing)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

@@ -244,6 +244,7 @@ def test_the_retry_reports_a_verdict_and_retries_anything_else(generated_project
             self.commands = []
 
         def run(self, command, **_: object):
+            """Record the command and answer with the next scripted result."""
             self.commands.append(command)
             return self.results.pop(0) if self.results else self.results[-1]
 

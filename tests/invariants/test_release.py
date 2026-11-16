@@ -192,6 +192,7 @@ def test_ship_publishes_a_version_bump_however_it_was_merged(generated_project, 
         """`context.run` against the scratch repository, with invoke's `Result` shape."""
 
         def run(self, command: str, **_kwargs: object) -> SimpleNamespace:
+            """Run `command` in the scratch repository."""
             done = subprocess.run(command, shell=True, cwd=repo, capture_output=True, text=True, check=False)  # noqa: S602
             return SimpleNamespace(failed=done.returncode != 0, stdout=done.stdout, stderr=done.stderr)
 
@@ -236,7 +237,7 @@ def test_ship_publishes_a_version_bump_however_it_was_merged(generated_project, 
 
     outputs = tmp_path / 'outputs'
     ship(context, before=before, after=before, output=str(outputs))
-    assert ran == [], 'a push with no bump published'
+    assert not ran, 'a push with no bump published'
     assert outputs.read_text(encoding='utf-8') == 'tag=\nsha=\n', 'outputs are not written when there is no release'
 
     ship(context, before=before, after=after)

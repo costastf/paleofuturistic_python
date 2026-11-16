@@ -2,6 +2,8 @@
 
 import json
 import os
+import re
+import tomllib
 from pathlib import Path
 from typing import NamedTuple
 
@@ -69,7 +71,7 @@ def test_the_matrix_verifies_what_it_wrote():
     from _CI.tasks.test import MATURE_ORIGIN, MATURE_TEST_MODULE  # noqa: PLC0415
 
     assert 'test_sanity' not in MATURE_TEST_MODULE, 'the ratchet stays dormant while test_sanity exists'
-    assert MATURE_ORIGIN, 'without an origin the CI badge has no slug to write'
+    assert MATURE_ORIGIN.endswith('.git'), 'without a repository origin the CI badge has no slug to write'
 
 
 def test_exactly_one_matrix_cell_audits_its_dependencies(tmp_path):
@@ -151,3 +153,17 @@ def test_exactly_one_matrix_cell_audits_its_dependencies(tmp_path):
     for cell in qa_cells():
         ran = [command for label, command in workflow_commands if label == cell['label']]
         assert ran == list(qa_sequence(audit=cell['mature'])), f'{cell["label"]} ran {ran}'
+
+
+def test_the_parent_lints_with_the_pins_it_ships():
+    """The parent's ruff, pylint and ty are the template's, so both sides are judged by one version.
+
+    The root `pyproject.toml` says "bump each pair together"; this is what makes that a rule
+    rather than a request (ADR-0048).
+    """
+    parent = tomllib.loads((REPO_ROOT / 'pyproject.toml').read_text(encoding='utf-8'))
+    parent_pins = dict(pin.split('==', 1) for pin in parent['dependency-groups']['lint'])
+    template = (REPO_ROOT / 'template' / 'pyproject.toml.jinja').read_text(encoding='utf-8')
+    template_pins = dict(re.findall(r'^\s*"(pylint|ruff|ty)==([^"]+)",', template, re.MULTILINE))
+    assert set(parent_pins) == {'pylint', 'ruff', 'ty'}, f'the parent lint group grew or shrank: {parent_pins}'
+    assert parent_pins == template_pins, 'the parent and the template are linted by different versions'

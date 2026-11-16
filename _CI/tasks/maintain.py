@@ -31,6 +31,9 @@ def load_uv_release() -> types.ModuleType:
     It is stdlib-only by design, so importing it outside a generated project is safe.
     """
     spec = importlib.util.spec_from_file_location('uv_release', UV_RELEASE_MODULE)
+    if spec is None or spec.loader is None:
+        missing = f'no loadable module at {UV_RELEASE_MODULE}'
+        raise ImportError(missing)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

@@ -82,11 +82,14 @@ def load_uv_release() -> ModuleType | None:
     safe. Returning None rather than raising keeps a missing or unreadable resolver from
     breaking generation outright; the caller falls back to the committed pin.
     """
+    spec = importlib.util.spec_from_file_location('uv_release', UV_RELEASE_MODULE)
+    if spec is None or spec.loader is None:
+        print(f'note: no loadable uv resolver at {UV_RELEASE_MODULE}; keeping the template default.')
+        return None
+    module = importlib.util.module_from_spec(spec)
     try:
-        spec = importlib.util.spec_from_file_location('uv_release', UV_RELEASE_MODULE)
-        module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-    except (OSError, ImportError, AttributeError) as exc:
+    except (OSError, ImportError) as exc:
         print(f'note: could not load the uv resolver ({exc}); keeping the template default.')
         return None
     return module

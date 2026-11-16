@@ -143,7 +143,7 @@ def test_open_target_keeps_strict_failure_off_wsl(generated_project, system, exp
     project, _ = generated_project
     ran, executed = opener(project, system)
     assert executed == [expected], f'{system} should go through execute() so a failure fails the task'
-    assert ran == []
+    assert not ran
 
 
 def test_open_target_uses_wslview_when_still_installed(generated_project):
@@ -151,7 +151,7 @@ def test_open_target_uses_wslview_when_still_installed(generated_project):
     project, _ = generated_project
     ran, executed = opener(project, 'wsl', has_wslview=True, interop=True)
     assert ran == ['wslview "site/index.html"']
-    assert executed == [], 'WSL must not use execute(): the Windows helpers exit non-zero on success'
+    assert not executed, 'WSL must not use execute(): the Windows helpers exit non-zero on success'
 
 
 def test_open_target_hands_a_translated_path_to_windows(generated_project):
@@ -165,15 +165,15 @@ def test_open_target_hands_a_translated_path_to_windows(generated_project):
     ran, executed = opener(project, 'wsl', interop=True)
     assert ran[0] == 'wslpath -w "site/index.html"'
     assert ran[1] == "cmd.exe /c start '' '\\\\wsl.localhost\\Ubuntu\\home\\me\\site\\index.html'"
-    assert executed == []
+    assert not executed
 
 
 def test_open_target_degrades_when_wsl_interop_is_disabled(generated_project):
     """A distro with interop off gets a message, not a traceback or a failed task."""
     project, _ = generated_project
     ran, executed = opener(project, 'wsl', interop=False)
-    assert ran == [], f'unexpected run() calls: {ran}'
-    assert executed == [], f'unexpected execute() calls: {executed}'
+    assert not ran, f'unexpected run() calls: {ran}'
+    assert not executed, f'unexpected execute() calls: {executed}'
 
 
 def test_no_task_still_depends_on_wslu(generated_project):

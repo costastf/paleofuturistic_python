@@ -132,8 +132,9 @@ def untracked_after_qa(project_dir: Path) -> list[str]:
     runner has. In a real project a developer's work-in-progress is indistinguishable from
     workflow output, so a shipped check would fail half the time and police the owner besides.
     """
+    # argv is a fixed literal, resolved via PATH deliberately.
     result = subprocess.run(
-        ['git', 'status', '--porcelain', '--untracked-files=all'],  # noqa: S607 — argv is a fixed literal, resolved via PATH deliberately
+        ['git', 'status', '--porcelain', '--untracked-files=all'],  # noqa: S607
         cwd=str(project_dir),
         capture_output=True,
         text=True,
@@ -366,7 +367,8 @@ def matrix(context: Context, workers: int = 1) -> None:  # noqa: ARG001 — invo
                     log_file=log_path,
                     mature=cell['mature'],
                 )
-            except Exception as exc:  # noqa: BLE001 — worker must not crash the pool
+            # A worker must not crash the pool, whatever the cell raised.
+            except Exception as exc:  # noqa: BLE001  # pylint: disable=broad-exception-caught
                 with log_path.open('a', encoding='utf-8') as handle:
                     handle.write(f'\nEXCEPTION: {exc}\n')
                 ok = False
