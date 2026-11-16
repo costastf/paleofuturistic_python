@@ -75,7 +75,7 @@ One consequence: because the ratchet bumps `fail_under` against the union, trimm
 
 - **A testing pyramid.** The template doesn't pre-create unit/integration/e2e folders. The example smoke test lives directly in `tests/`. Structure tests as the project warrants.
 - **Hypothesis or other property-based tooling.** Add it as a `test` group dep if wanted.
-- **Mutation testing.** Mutmut or cosmic-ray. Add them as a `quality` group concern if a project reaches for them.
+- **Mutation testing.** Mutmut or cosmic-ray. Add them as a `grade` group concern if a project reaches for them.
 - **A "tests" service in `docker-compose`.** The deps cache image (`Dockerfile.deps`) is for CI deps, not for app testing.
 
 ## Smoke tests vs. real tests

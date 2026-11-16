@@ -60,7 +60,7 @@ On GitHub, `continuous-integration.yaml` and `security-audit.yaml` now trigger o
 
 ## Upgrading past the `grade` rename
 
-The pyscn tasks answer to `grade` instead of `quality`: `./workflow.cmd grade`, `grade.pyscn`, `grade.pyscn-analyze` and `grade.pyscn-check`. The module is still `_CI/tasks/quality.py` and the dependency group is still `quality`, so `copier update` changes nothing else. Only your own scripts or notes that spelled the old command need the new name; the hooks and the pipelines run `preflight`, which never named it.
+The pyscn tasks answer to `grade` instead of `quality`: `./workflow.cmd grade`, `grade.pyscn`, `grade.pyscn-analyze` and `grade.pyscn-check`. The module moved with them, `_CI/tasks/quality.py` to `_CI/tasks/grade.py`, and so did the dependency group, `quality` to `grade`. After the update, `uv lock` records the new group name, and a `quality.py` left behind under `_CI/tasks/` is yours to delete: nothing imports it. Only your own scripts or notes that spelled the old command or group need the new name; the hooks and the pipelines run `preflight`, which never named either.
 
 ## Upgrading past the tag-on-main release flow
 

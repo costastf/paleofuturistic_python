@@ -39,7 +39,7 @@ example_project/
 │       ├── lint.py              ruff/validate-pyproject/pylint/ty/complexipy/commitizen
 │       ├── local.py             Your own tasks; never overwritten by copier update
 │       ├── preflight.py         Step registry; preflight + preflight.staged
-│       ├── quality.py           pyscn
+│       ├── grade.py             pyscn
 │       ├── release.py           Validate, bump, changelog, dist, attest, publish, detect, tag, ship
 │       ├── sbom.py              CycloneDX SBOM composition
 │       ├── secure.py            pip-audit, SBOM extract and validate

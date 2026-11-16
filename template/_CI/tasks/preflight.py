@@ -50,8 +50,8 @@ from .build import build
 from .configuration import CODE_FILES, PYPROJECT_FILES, SRC_FILES
 from .document import build as document_build
 from .document import update_package_version_badge, update_pipeline_badge, update_python_badge
+from .grade import pyscn_check, pyscn_json_report, update_pyscn_badge
 from .lint import commitizen, complexipy, format_check, pylint, pyproject, ruff_lint, ty
-from .quality import pyscn_check, pyscn_json_report, update_pyscn_badge
 from .secure import audit
 from .shared import logged, run_steps
 from .test import ratchet_fail_under, tox_matrix, update_coverage_badge

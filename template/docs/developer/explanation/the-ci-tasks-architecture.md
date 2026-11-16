@@ -48,7 +48,7 @@ _CI/tasks/
 ├── github.py / gitlab.py  # Host-specific helpers (only one is present)
 ├── local.py             # The project's own tasks. Never overwritten by `copier update`
 └── <feature>.py         # build, container, develop, document, format_, lint,
-                         #   preflight, quality, release, sbom, secure, test
+                         #   grade, preflight, release, sbom, secure, test
 ```
 
 Everything there except `local.py` is template-owned and replaced on update, which is why

@@ -351,7 +351,7 @@ def test_the_gate_renders_no_report_it_does_not_read(generated_project):
     """
     project, _ = generated_project
     tasks = project / '_CI' / 'tasks'
-    gate_pyscn = function_source((tasks / 'quality.py').read_text(encoding='utf-8'), 'pyscn_json_report')
+    gate_pyscn = function_source((tasks / 'grade.py').read_text(encoding='utf-8'), 'pyscn_json_report')
     assert 'ANALYZE_JSON' in gate_pyscn, 'the gate no longer produces the JSON the badge reads'
     assert 'ANALYZE_HTML' not in gate_pyscn, 'the gate produces a pyscn HTML report nothing reads'
 
@@ -377,9 +377,9 @@ def test_pyscn_never_opens_a_browser_by_itself(generated_project):
     Whether a report is worth opening is the task's call, not the tool's.
     """
     project, _ = generated_project
-    quality_py = (project / '_CI' / 'tasks' / 'quality.py').read_text(encoding='utf-8')
+    grade_py = (project / '_CI' / 'tasks' / 'grade.py').read_text(encoding='utf-8')
     # Command strings only — prose about `pyscn analyze` is not an invocation of it.
-    html_runs = [line for line in quality_py.splitlines() if 'uv run pyscn analyze' in line and '--json' not in line]
+    html_runs = [line for line in grade_py.splitlines() if 'uv run pyscn analyze' in line and '--json' not in line]
     assert html_runs, 'no pyscn invocation produces an HTML report any more'
     for line in html_runs:
         assert '--no-open' in line, f'{line.strip()!r} lets pyscn open a browser on its own'
@@ -421,13 +421,13 @@ def test_a_report_a_reader_would_misread_is_cleared_first(generated_project):
     entry would sit in `reports/` looking like a result from this run.
     """
     project, _ = generated_project
-    quality = (project / '_CI' / 'tasks' / 'quality.py').read_text(encoding='utf-8')
+    grade = (project / '_CI' / 'tasks' / 'grade.py').read_text(encoding='utf-8')
     for name in ('analyze', 'pyscn_json_report'):
-        body = function_source(quality, name)
+        body = function_source(grade, name)
         assert 'clear_pyscn_reports()' in body, f'{name} can read a report from a previous run'
     # The two analysis tasks share `analyze`, so the clearing above covers both.
     for name in ('pyscn_analyze', 'pyscn_analyze_only'):
-        body = function_source(quality, name)
+        body = function_source(grade, name)
         assert 'analyze(context, write=write)' in body, f'{name} no longer runs the shared analysis'
     test_py = (project / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
     erase = function_source(test_py, 'erase_coverage_data')
@@ -969,9 +969,9 @@ def test_only_what_measures_a_derived_value_may_write_it(generated_project):
     assert 'check=tox_matrix' in preflight, 'the gate runs the writing task instead of the matrix'
 
     # pyscn measured the grade, so it may write the badge — but only when asked.
-    quality = (tasks / 'quality.py').read_text(encoding='utf-8')
+    grade = (tasks / 'grade.py').read_text(encoding='utf-8')
     for task_name in ('pyscn_analyze', 'pyscn_analyze_only', 'pyscn'):
-        defaults = parameter_defaults(function_named(quality, task_name))
+        defaults = parameter_defaults(function_named(grade, task_name))
         assert defaults.get('write') == 'False', f'{task_name} writes the pyscn badge unasked'
 
     # And `document` writes no badge at all: building docs is not changing the README.
@@ -1050,7 +1050,7 @@ def test_derived_values_are_computed_in_both_modes_by_one_function(generated_pro
     project, _ = generated_project
     tasks = project / '_CI' / 'tasks'
     updaters = {
-        'quality.py': ['update_pyscn_badge'],
+        'grade.py': ['update_pyscn_badge'],
         'test.py': ['update_coverage_badge', 'ratchet_fail_under'],
         'document.py': ['update_package_version_badge', 'update_python_badge', 'update_pipeline_badge'],
     }

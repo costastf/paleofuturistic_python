@@ -79,7 +79,7 @@ impossible to build a wheel from code that built yesterday. `./workflow.cmd pref
 | --- | --- | --- |
 | Project itself (root) | `required` | `[project]` block in pyproject.toml; root carries the project's licence and a `vcs` external_reference pointing at the git remote when present |
 | Runtime dependencies | `required` | `uv export --no-dev` against `uv.lock` — exactly what ships in the wheel |
-| Dev / build / develop / lint / test / docs / quality / security groups | `optional` | full lockfile via `uv export --all-groups`, minus the runtime set |
+| Dev / build / develop / lint / test / docs / grade / security groups | `optional` | full lockfile via `uv export --all-groups`, minus the runtime set |
 | Vendored CI tooling | `excluded` | every package in `_CI/lib/vendor.txt` |
 | Pipeline components | `excluded` | {% if git_hosting_service == 'github' %}GitHub Actions (`uses:`){% else %}GitLab CI images{% endif %}, sourced from `_CI/tasks/{{ git_hosting_service }}.py`'s `iter_pipeline_components()` |
 

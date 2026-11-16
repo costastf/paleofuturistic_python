@@ -23,7 +23,7 @@ uv replaces all of them with a single Rust binary that:
 
 **Reproducibility by default.** uv's lockfile is platform-portable and hash-locked. CI and a contributor's laptop get bit-identical environments without opt-in flags.
 
-**Dependency groups, not extras-abuse.** uv first-classed PEP 735 dependency groups, which are exactly what's needed for the build/develop/lint/test/document/quality/security split. The template previously used `[project.optional-dependencies]` and had to explain that those aren't really "optional," they're internal grouping. See [Design principles](design-principles.md#why-groups-not-extras) for the full rationale.
+**Dependency groups, not extras-abuse.** uv first-classed PEP 735 dependency groups, which are exactly what's needed for the build/develop/lint/test/document/grade/security split. The template previously used `[project.optional-dependencies]` and had to explain that those aren't really "optional," they're internal grouping. See [Design principles](design-principles.md#why-groups-not-extras) for the full rationale.
 
 ## What the template gives up
 

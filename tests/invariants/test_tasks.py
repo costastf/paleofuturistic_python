@@ -179,7 +179,7 @@ def test_open_target_degrades_when_wsl_interop_is_disabled(generated_project):
 def test_no_task_still_depends_on_wslu(generated_project):
     """Nothing tells the user to install the deprecated `wslu` package, or shells out to it blindly."""
     project, _ = generated_project
-    for name in ('shared.py', 'document.py', 'test.py', 'quality.py'):
+    for name in ('shared.py', 'document.py', 'test.py', 'grade.py'):
         source = (project / '_CI' / 'tasks' / name).read_text(encoding='utf-8')
         assert 'install the wslu' not in source, f'{name} still recommends the deprecated wslu package'
         assert 'open_command' not in source, f'{name} still uses the removed open_command()'

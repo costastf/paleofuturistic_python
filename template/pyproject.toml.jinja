@@ -61,7 +61,7 @@ dev = [
     {include-group = "develop"},
     {include-group = "document"},
     {include-group = "lint"},
-    {include-group = "quality"},
+    {include-group = "grade"},
     {include-group = "security"},
     {include-group = "test"},
 ]
@@ -91,7 +91,7 @@ lint = [
     # Schema-checks pyproject.toml against the PyPA specs (`lint.pyproject`).
     "validate-pyproject[all]==0.27",
 ]
-quality = [
+grade = [
     "pyscn==1.33.2",
 ]
 security = [
@@ -123,7 +123,7 @@ test = [
 requires = ["uv_build>=0.8.15,<=0.13.7"]
 build-backend = "uv_build"
 
-# What to analyse is the `src/` argument the quality tasks pass; pyscn has no `paths` key.
+# What to analyse is the `src/` argument the grade tasks pass; pyscn has no `paths` key.
 [tool.pyscn.complexity]
 low_threshold = 5
 medium_threshold = 10
