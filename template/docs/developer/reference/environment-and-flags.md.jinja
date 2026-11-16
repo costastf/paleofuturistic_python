@@ -23,7 +23,7 @@ Two conventions hold on top of that:
   `--write` and `--audit-dependencies` each add something, and no flag makes a gate check
   less. [Design principles](../explanation/design-principles.md#the-qa-gate) says why.
 - **`--write` always means "update the derived files".** `preflight --write`, `test.tox --write`,
-  `quality.pyscn-analyze --write`, `secure.sbom-extract --write`, `release.changelog --write`.
+  `grade.pyscn-analyze --write`, `secure.sbom-extract --write`, `release.changelog --write`.
   Without it they report what they would change, so no automated run modifies anything you did
   not ask for. The [task catalog](invoke-tasks.md) says which commands write what.
 

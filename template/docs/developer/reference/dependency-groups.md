@@ -21,7 +21,7 @@ Listed under `[dependency-groups]` in `pyproject.toml`. `uv run` syncs them into
 | `develop` | `pre-commit` | `./workflow.cmd develop.*`. |
 | `document` | `properdocs`, `properdocs-theme-mkdocs`, `mkdocs-include-markdown-plugin`, `mkdocstrings[python]` | `./workflow.cmd document`. |
 | `lint` | `commitizen`, `complexipy`, `pylint`, `ruff`, `ty`, `validate-pyproject[all]` | `./workflow.cmd lint`, `format`, `release.*` (commitizen). |
-| `quality` | `pyscn` | `./workflow.cmd quality`. |
+| `quality` | `pyscn` | `./workflow.cmd grade`. |
 | `security` | `cyclonedx-python-lib[json-validation]`, `pip-audit`, `pypi-attestations` | `./workflow.cmd secure`, `release.attest`. |
 | `test` | `pytest`, `pytest-cov`, `pytest-env`, `pytest-html`, `pytest-xdist`, `uv`, `tox`, `tox-uv` | `./workflow.cmd test`. |
 

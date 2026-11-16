@@ -123,7 +123,7 @@ def pyscn(context: Context) -> None:
 
     JSON only. pyscn allows one output format per run, so an HTML report costs a second full
     analysis and a second identical summary table, and nothing in this path opens one.
-    `quality.pyscn-analyze` does, which is where that is worth paying for.
+    `grade.pyscn-analyze` does, which is where that is worth paying for.
     """
     run_steps(pyscn_json_report, pyscn_check)(context)
 

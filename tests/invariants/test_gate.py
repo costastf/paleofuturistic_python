@@ -346,7 +346,7 @@ def test_the_gate_renders_no_report_it_does_not_read(generated_project):
     pipeline is worth more than the fraction of a second.
 
     The reports are not lost, they are moved to where someone is actually looking:
-    `quality.pyscn-analyze` produces the pyscn HTML and opens it, and `test.coverage` renders
+    `grade.pyscn-analyze` produces the pyscn HTML and opens it, and `test.coverage` renders
     the coverage HTML from whatever the last run measured.
     """
     project, _ = generated_project
@@ -369,7 +369,7 @@ def test_pyscn_never_opens_a_browser_by_itself(generated_project):
 
     pyscn launches a browser as soon as it writes an HTML report — verified with a stub
     `xdg-open`, which fires once for a bare `analyze` and not at all with `--no-open`. That
-    made `quality.pyscn-analyze` open the report twice, once by itself and once from its own
+    made `grade.pyscn-analyze` open the report twice, once by itself and once from its own
     deliberate `open_target`, and made `pyscn_analyze_only` — "without opening the report" —
     open one anyway. It also had a tool reaching for a browser on a CI runner, where
     `is_ci()` exists precisely to prevent that.

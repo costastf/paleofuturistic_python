@@ -58,6 +58,10 @@ On GitHub, `continuous-integration.yaml` and `security-audit.yaml` now trigger o
 
 `copier update` asks `default_branch`, with `main` as the default. Accept it if your default branch is `main` and nothing changes. Answer with your branch's name otherwise: the publish and Pages workflows start triggering on it, `release` starts from it, release pull or merge requests target it, and the CI badge reads it. Before the question, all of those spelled `main`, so a project on another branch had to edit each by hand after every update. See [ADR-0040](../../maintaining/decisions/0040-the-default-branch-is-a-copier-answer.md).
 
+## Upgrading past the `grade` rename
+
+The pyscn tasks answer to `grade` instead of `quality`: `./workflow.cmd grade`, `grade.pyscn`, `grade.pyscn-analyze` and `grade.pyscn-check`. The module is still `_CI/tasks/quality.py` and the dependency group is still `quality`, so `copier update` changes nothing else. Only your own scripts or notes that spelled the old command need the new name; the hooks and the pipelines run `preflight`, which never named it.
+
 ## Upgrading past the tag-on-main release flow
 
 `release` used to create the tag on the release branch and push it with the branch. On GitLab that published the version before the MR was reviewed; on both hosts a squash merge left the tag pointing at a commit `main` never saw, and nothing published. Now `release` creates no tag. The publish job runs on every push to the default branch and hands it to `release.ship`, which publishes when `[project].version` changed between the previous tip and the new one: it creates the tag on the new tip through the host's Release API (a Release entry appears on the releases page), then builds, signs and uploads. Merge release PRs/MRs any way you like.

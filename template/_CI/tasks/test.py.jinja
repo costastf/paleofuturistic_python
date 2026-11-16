@@ -299,7 +299,7 @@ def tox_matrix(context: Context, env: str = '') -> None:
 
     The gate's path, and why there are two: `preflight` runs this, and `preflight` without
     `--write` must write nothing tracked, while the `test.tox` task reports on the coverage
-    badge and can write it. `quality.pyscn-analyze` and `pyscn_json_report` split likewise.
+    badge and can write it. `grade.pyscn-analyze` and `pyscn_json_report` split likewise.
 
     Args:
         context: Invoke context.

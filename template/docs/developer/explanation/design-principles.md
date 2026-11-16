@@ -22,7 +22,7 @@ Records: [ADR-0009](https://schubergphilis.github.io/paleofuturistic_python/main
 The **QA gate** is not a command; it is the role a command plays. `preflight` with no flags is the gate: it
 runs every check, compares every derived value against what the tools just measured, writes nothing,
 and exits non-zero if anything is wrong or out of date. "The gate" is the short form used from here
-on; the individual tools it runs — `format`, `lint`, `test`, `quality`, `build` — are the QA checks. That is what the pre-push hook runs and what
+on; the individual tools it runs — `format`, `lint`, `test`, `grade`, `build` — are the QA checks. That is what the pre-push hook runs and what
 the CI pipeline runs, character for character. The commit hook runs the part of the same declaration
 that can be judged from the files you staged.
 
@@ -54,7 +54,7 @@ and the steps are ordered cheapest-first so the verdict itself is early even whe
 
 **The gate produces what the gate consumes.** Every report a gate run writes has a reader inside that
 run — the coverage JSON the badge reads, the pyscn JSON the grade comes from. Nothing renders a
-browsable HTML report that no hook and no pipeline opens; `test.coverage` and `quality.pyscn-analyze`
+browsable HTML report that no hook and no pipeline opens; `test.coverage` and `grade.pyscn-analyze`
 produce those on demand, for a human who asked.
 
 ### Who may write what the checks measure

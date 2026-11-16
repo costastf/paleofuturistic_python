@@ -64,16 +64,16 @@ def update_pyscn_badge(*, write: bool = True) -> str | None:
     """
     try:
         report = json.loads(latest_pyscn_json().read_text(encoding='utf-8'))
-        grade = report['summary']['grade']
+        letter = report['summary']['grade']
     except (ValueError, KeyError, FileNotFoundError):
-        return f'no pyscn report in {PYSCN_REPORTS_DIR}/ — run ./workflow.cmd quality.pyscn-analyze'
-    color = GRADE_COLORS.get(grade, 'lightgrey')
+        return f'no pyscn report in {PYSCN_REPORTS_DIR}/ — run ./workflow.cmd grade.pyscn-analyze'
+    color = GRADE_COLORS.get(letter, 'lightgrey')
     return apply_badge(
         Path('README.md'),
         BADGE_PATTERN,
-        rf'\g<1>{grade}-{color}\2',
+        rf'\g<1>{letter}-{color}\2',
         label='pyscn badge',
-        detail=f'grade {grade}',
+        detail=f'grade {letter}',
         write=write,
     )
 
@@ -92,7 +92,7 @@ def analyze(context: Context, *, write: bool) -> None:
 
 
 @task
-@logged('quality.pyscn-analyze')
+@logged('grade.pyscn-analyze')
 def pyscn_analyze(context: Context, write: bool = False) -> None:
     """Run pyscn comprehensive analysis with HTML report, and open it.
 
@@ -111,7 +111,7 @@ def pyscn_analyze(context: Context, write: bool = False) -> None:
 
 
 @task
-@logged('quality.pyscn-check')
+@logged('grade.pyscn-check')
 @run(CHECK)
 def pyscn_check(context: Context) -> None:
     """Run pyscn's CI-friendly quality gate.
@@ -124,19 +124,19 @@ def pyscn_check(context: Context) -> None:
     """
 
 
-@logged('quality.pyscn-analyze')
+@logged('grade.pyscn-analyze')
 def pyscn_analyze_only(context: Context, *, write: bool = False) -> None:
-    """Run pyscn analyze without opening the report: what `quality.pyscn` runs."""
+    """Run pyscn analyze without opening the report: what `grade.pyscn` runs."""
     analyze(context, write=write)
 
 
-@logged('quality.pyscn-analyze')
+@logged('grade.pyscn-analyze')
 def pyscn_json_report(context: Context) -> None:
     """Produce just the JSON report, which is all the badge is derived from.
 
     The gate's path. An HTML report exists to be looked at, and nothing in `preflight` or a hook
     looks at one, so a second full analysis and a second summary table would buy nothing.
-    `quality.pyscn-analyze` opens what it produces, which is where that is worth paying for.
+    `grade.pyscn-analyze` opens what it produces, which is where that is worth paying for.
 
     The badge is not written here: `preflight` owns every write to a tracked file, so verifying
     can compare all of them together.
@@ -146,7 +146,7 @@ def pyscn_json_report(context: Context) -> None:
 
 
 @task
-@logged('quality.pyscn')
+@logged('grade.pyscn')
 def pyscn(context: Context, write: bool = False) -> None:
     """Run all pyscn steps; reports all failures before exiting.
 
@@ -159,9 +159,9 @@ def pyscn(context: Context, write: bool = False) -> None:
 
 
 @task
-@logged('quality')
-def quality(context: Context, write: bool = False) -> None:
-    """Run all quality steps; reports all failures before exiting.
+@logged('grade')
+def grade(context: Context, write: bool = False) -> None:
+    """Run every grading step; reports all failures before exiting.
 
     Args:
         context: Invoke context.
@@ -171,8 +171,8 @@ def quality(context: Context, write: bool = False) -> None:
     run_steps(partial(pyscn, write=write))(context)
 
 
-namespace = Collection('quality')
-namespace.add_task(cast(Task, quality), default=True, name='all')
+namespace = Collection('grade')
+namespace.add_task(cast(Task, grade), default=True, name='all')
 namespace.add_task(cast(Task, pyscn))
 namespace.add_task(cast(Task, pyscn_analyze), name='pyscn-analyze')
 namespace.add_task(cast(Task, pyscn_check), name='pyscn-check')
