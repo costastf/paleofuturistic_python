@@ -48,7 +48,8 @@ is two named steps rather than three.
 - A change to the parent is held to the standard it ships. The findings above are fixed in
   the same commit, and the next one of their kind fails locally and in CI's `lint` job.
 - `lint` is slower by a pylint and a ty run over some twenty modules, locally and in CI's
-  `lint` job.
+  `lint` job. That job's environment now includes the test group: both tools follow imports,
+  and a `tests/` module that imports pytest is an error where pytest is not installed.
 - The parent's task registry casts each function to `Task` when registering it, as the
   template's modules do, because invoke's `@task` is untyped and ty reads the decorated name
   as a function.

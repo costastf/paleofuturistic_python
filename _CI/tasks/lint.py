@@ -16,7 +16,9 @@ from _CI import emojize_message
 # tooling — and the rest by the root config. Listing `_CI/` costs no parity; leaving it out
 # meant nothing linted it at all.
 PATHS = '_CI/__init__.py _CI/tasks/ tasks_render.py tests/'
-LINT = 'uv run --group lint'
+# With the test group: pylint and ty follow imports, so the modules `tests/` imports have to be
+# installed where they run, or every `import pytest` is an error. CI syncs nothing else.
+LINT = 'uv run --group lint --group test'
 
 
 def run_check(context: Context, command: str, label: str) -> bool:
