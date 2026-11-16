@@ -3,6 +3,7 @@
 import inspect
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -120,7 +121,7 @@ def test_deps_image_tag_covers_every_content_input(generated_project):
     project, _ = generated_project
     container_py = (project / '_CI' / 'tasks' / 'container.py').read_text(encoding='utf-8')
     tag_source = function_source(container_py, 'deps_image_tag')
-    for required in ('UV_LOCK', 'DOCKERFILE_DEPS', 'info.base-image'):
+    for required in ('UV_LOCK', 'DOCKERFILE_DEPS', 'info.base_image()'):
         assert required in tag_source, f'deps_image_tag() does not hash {required}'
     # Per-input digests are fixed-width, which is what stops ("AB","C") colliding
     # with ("A","BC") and what makes the algorithm reproducible in shell.
@@ -172,7 +173,7 @@ def test_container_tag_writes_the_dotenv_the_kaniko_job_reads(generated_project)
         task=lambda fn: fn,
         logged=lambda _name: lambda fn: fn,
         deps_image_tag=lambda: 'cafe' * 8,
-        read_info=lambda _key: 'ghcr.io/astral-sh/uv:0.13.7-python3.11-trixie-slim@sha256:abc',
+        info=SimpleNamespace(base_image=lambda: 'ghcr.io/astral-sh/uv:0.13.7-python3.11-trixie-slim@sha256:abc'),
         print=printed.append,
     )
     helpers['tag'](None)

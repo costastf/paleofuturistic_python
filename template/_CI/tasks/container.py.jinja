@@ -6,7 +6,7 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from _CI.info import read as read_info
+from _CI import info
 
 from .configuration import DEPS_IMAGE_FILE, DOCKERFILE_DEPS, IMAGE_NAME, UV_LOCK
 from .{{ git_hosting_service }} import publish_deps_image
@@ -30,7 +30,7 @@ def deps_image_tag() -> str:
     parts = (
         UV_LOCK.read_bytes(),
         DOCKERFILE_DEPS.read_bytes(),
-        read_info('info.base-image').encode('utf-8'),
+        info.base_image().encode('utf-8'),
     )
     for part in parts:
         digest.update(hashlib.sha256(part).hexdigest().encode('ascii'))
@@ -42,7 +42,7 @@ def deps_image_tag() -> str:
 def build(context: Context) -> None:
     """Build the dependency cache container image locally."""
     engine = container_engine()
-    base_image = read_info('info.base-image')
+    base_image = info.base_image()
     execute(
         context,
         f'{engine} build --build-arg BASE_IMAGE={base_image} -f {DOCKERFILE_DEPS} -t {IMAGE_NAME}:latest .',
@@ -65,7 +65,7 @@ def tag(context: Context, output: str = '') -> None:  # noqa: ARG001
 
     """
     value = deps_image_tag()
-    base_image = read_info('info.base-image')
+    base_image = info.base_image()
     if not output:
         print(value)
         return
@@ -97,7 +97,7 @@ def publish(context: Context) -> None:
         if not result.failed:
             print(f'Image already exists: {image}')
         else:
-            base_image = read_info('info.base-image')
+            base_image = info.base_image()
             execute(context, f'{engine} build --build-arg BASE_IMAGE={base_image} -f {DOCKERFILE_DEPS} -t {image} .')
     DEPS_IMAGE_FILE.write_text(image, encoding='utf-8')
 

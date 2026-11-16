@@ -13,7 +13,7 @@ from urllib.parse import quote
 
 from invoke import Context
 
-from _CI.info import read as read_info
+from _CI import info
 
 from .configuration import DEFAULT_BRANCH
 from .shared import (
@@ -77,7 +77,7 @@ def publish_deps_image(context: Context, tag: str) -> str:
         f'echo "${settings.password_env}" | {engine} login {settings.url} -u "{settings.user}" --password-stdin',
         hide=True,
     )
-    base_image = read_info('info.base-image')
+    base_image = info.base_image()
     execute(context, f'{engine} build --build-arg BASE_IMAGE={base_image} -f Dockerfile.deps -t {image} .')
     execute(context, f'{engine} push {image}')
     return image_digest_reference(context, engine, image)

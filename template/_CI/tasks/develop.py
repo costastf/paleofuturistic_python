@@ -8,7 +8,7 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from _CI.info import read as read_info
+from _CI import info
 from _CI.uv_release import (
     COOLDOWN_DAYS,
     UvReleaseError,
@@ -112,7 +112,7 @@ def bump_uv(context: Context, version: str = '') -> None:
         if not has_uv_build(target):
             print(f'uv {target} exists but uv-build {target} does not; refusing a version that cannot build.')
             raise SystemExit(1)
-        digest = image_digest(target, read_info('info.python-version'))
+        digest = image_digest(target, info.python_version())
         apply_to_pyproject(PYPROJECT, target, digest)
     except UvReleaseError as exc:
         print(f'Could not bump uv: {exc}')

@@ -12,7 +12,7 @@ from typing import NamedTuple
 
 from invoke import Context
 
-from _CI.info import read as read_info
+from _CI import info
 
 from .configuration import DEFAULT_BRANCH
 from .shared import PipelineComponent, container_engine, execute, image_digest_reference, strip_credentials
@@ -69,7 +69,7 @@ def publish_deps_image(context: Context, tag: str) -> str:
         # unpullable image fails here rather than in every consumer job.
         execute(context, f'{engine} pull {image}')
     else:
-        base_image = read_info('info.base-image')
+        base_image = info.base_image()
         execute(context, f'{engine} build --build-arg BASE_IMAGE={base_image} -f Dockerfile.deps -t {image} .')
         execute(context, f'{engine} push {image}')
     return image_digest_reference(context, engine, image)
