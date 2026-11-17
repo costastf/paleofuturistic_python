@@ -105,26 +105,39 @@ def test_documented_override_format_is_actually_accepted(generated_project):
     pattern = load_generated_configuration(project).IGNORE_PATTERN
     # Every doc, not just the how-to: the same wrong format was also sitting in the
     # configuration-files reference, where a check scoped to one page could not see it.
-    examples = []
-    for doc_path in sorted((project / 'docs').rglob('*.md')):
-        doc = doc_path.read_text(encoding='utf-8')
-        # ```text fences hold override-file content; sample command output lives in
-        # ```console fences and is deliberately not a valid entry.
-        for block in re.findall(r'^```text\n(.*?)^```', doc, re.MULTILINE | re.DOTALL):
-            for line in block.splitlines():
-                entry = line.strip()
-                # Skip comments and `<PLACEHOLDER>` format specs; the rest must be real.
-                if not entry or entry.startswith('#') or '<' in entry:
-                    continue
-                examples.append((doc_path.relative_to(project), entry))
+    examples = list(override_examples(project))
     # Prose can also spell the format out inline; catch the space-separated shape directly.
-    for doc_path in sorted((project / 'docs').rglob('*.md')):
-        doc = doc_path.read_text(encoding='utf-8')
+    for source, doc in shipped_docs(project):
         bad = re.search(r'`<[A-Za-z_-]*(VULN|vuln)[A-Za-z_-]*>\s+<YYYY-MM-DD>', doc)
-        assert not bad, f'{doc_path.relative_to(project)} documents a space-separated override format'
+        assert not bad, f'{source} documents a space-separated override format'
     assert examples, 'no override examples found anywhere in the docs'
     for source, example in examples:
         assert pattern.fullmatch(example), f'{source}: documented example {example!r} would be rejected'
+
+
+def shipped_docs(project):
+    """``(path relative to the project, text)`` for every Markdown page under the generated docs."""
+    for doc_path in sorted((project / 'docs').rglob('*.md')):
+        yield doc_path.relative_to(project), doc_path.read_text(encoding='utf-8')
+
+
+def override_examples(project):
+    """``(page, entry)`` for every override-file line the docs show in a ```text fence.
+
+    Those fences hold override-file content; sample command output lives in ```console fences
+    and is deliberately not a valid entry. Comments and `<PLACEHOLDER>` format specs are
+    skipped; the rest must be real.
+    """
+    for source, doc in shipped_docs(project):
+        for block in re.findall(r'^```text\n(.*?)^```', doc, re.MULTILINE | re.DOTALL):
+            for entry in override_entries(block):
+                yield source, entry
+
+
+def override_entries(block):
+    """The lines of a fenced block that are override entries rather than comments or placeholders."""
+    entries = (line.strip() for line in block.splitlines())
+    return [entry for entry in entries if entry and not entry.startswith('#') and '<' not in entry]
 
 
 def test_suppressions_are_validated_whole_not_scanned(generated_project):
