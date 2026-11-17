@@ -8,7 +8,7 @@ are untouched.
 The format is the [inline script metadata](https://packaging.python.org/en/latest/specifications/inline-script-metadata/)
 specification (PEP 723), so any tool that implements it can run the script, not just uv.
 
-## 1. Create it
+## Step 1 — Create it
 
 ```bash
 mkdir -p scripts
@@ -24,7 +24,7 @@ The file starts with the metadata block:
 # ///
 ```
 
-## 2. Add what it needs
+## Step 2 — Add what it needs
 
 ```bash
 uv add --script scripts/report.py httpx
@@ -32,7 +32,7 @@ uv add --script scripts/report.py httpx
 
 uv writes the requirement into the block (`"httpx>=…"`), not into `pyproject.toml`.
 
-## 3. Run it
+## Step 3 — Run it
 
 ```bash
 uv run scripts/report.py
@@ -46,7 +46,7 @@ there, outside `.venv`. To make the file executable on its own, give it this fir
 #!/usr/bin/env -S uv run --script
 ```
 
-## 4. Lock it, if it has to be reproducible
+## Step 4 — Lock it, if it has to be reproducible
 
 ```bash
 uv lock --script scripts/report.py

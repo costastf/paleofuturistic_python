@@ -311,6 +311,42 @@ def test_every_decision_reference_resolves():
     assert not dangling, f'references to records that do not exist: {dangling}'
 
 
+def test_no_heading_starts_with_a_digit():
+    """Every heading on both sites starts with a word, so its id is a selector the theme can use.
+
+    `## 1. Clone` slugs to the id `1-clone`, and the sidebar's ScrollSpy hands `#1-clone` to
+    `querySelector` unescaped. A CSS identifier may not start with a digit, so that throws on
+    page load, and the theme's `base.js` reads `keyCodes` after that call and never binds the
+    header navigation: second-level dropdowns stop opening. Both defects are upstream in
+    properdocs-theme-mkdocs 1.6.7, the unescaped selector and the nav bound after the access
+    that throws. Numbered steps are written `## Step 1 — …` until they are fixed; this was
+    done once by hand and regressed within a month.
+    """
+    offenders = [
+        f'{path.relative_to(REPO_ROOT)}:{number}'
+        for path in site_pages()
+        for number, line in heading_lines(path.read_text(encoding='utf-8'))
+        if re.match(r'#+\s+\d', line)
+    ]
+    assert not offenders, f'headings whose id would start with a digit: {offenders}'
+
+
+def site_pages():
+    """Every Markdown page of the parent site and of the shipped docs, decision records included."""
+    for root in ('docs', 'template/docs'):
+        yield from sorted(path for path in (REPO_ROOT / root).rglob('*.md*') if path.is_file())
+
+
+def heading_lines(text):
+    """Yield ``(line number, line)`` for every heading line, fenced code blocks skipped."""
+    fenced = False
+    for number, line in enumerate(text.splitlines(), start=1):
+        if line.startswith('```'):
+            fenced = not fenced
+        elif not fenced and line.startswith('#'):
+            yield number, line
+
+
 def referencing_files():
     """Every file under the reference roots that may name a record, the vendored trees left out."""
     for root in DECISION_REFERENCE_ROOTS:

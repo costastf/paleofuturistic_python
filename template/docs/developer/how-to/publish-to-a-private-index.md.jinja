@@ -5,7 +5,7 @@ registry, GitLab's package registry) instead of, or before, PyPI. Any index that
 [simple repository API](https://packaging.python.org/en/latest/specifications/simple-repository-api/)
 for downloads and the legacy upload API for uploads works.
 
-## 1. Point the release pipeline at the index
+## Step 1 — Point the release pipeline at the index
 
 Set three variables as masked {% if git_hosting_service == 'github' %}secrets on the `pypi` environment (*Settings → Environments → pypi*){% else %}CI/CD variables scoped to the `pypi` environment (*Settings → CI/CD → Variables*){% endif %}:
 
@@ -25,7 +25,7 @@ reaches uv.{% endif %}
 The environment name stays `pypi` even when the index is not PyPI: it is the name the publish
 job declares, and renaming it means renaming it there too.
 
-## 2. Release as usual
+## Step 2 — Release as usual
 
 The upload — `release.ship` in the pipeline, `release.publish` by hand — sees all three
 `UV_PUBLISH_*` variables set and runs:
@@ -38,7 +38,7 @@ uv publish --trusted-publishing never --no-attestations
 Publishing, and an index that does not support them may reject the whole upload. For the same
 reason `release.attest` signs nothing on this path.
 
-## 3. Install from it
+## Step 3 — Install from it
 
 To depend on packages from the private index in this project, declare it in `pyproject.toml`:
 

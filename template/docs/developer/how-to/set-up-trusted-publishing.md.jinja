@@ -10,7 +10,7 @@ PyPI supports Trusted Publishing from **gitlab.com only**. On a self-managed Git
 to [Publishing with credentials instead](#publishing-with-credentials-instead).
 {%- endif %}
 
-## 1. Register the publisher on PyPI
+## Step 1 — Register the publisher on PyPI
 
 Sign in to PyPI and open the publishing settings:
 
@@ -39,7 +39,7 @@ Fill in the form for {% if git_hosting_service == 'github' %}GitHub Actions{% el
 The environment must match exactly. The publish job declares `environment: pypi`, and a token
 minted for any other environment is refused.
 
-## 2. Protect the environment
+## Step 2 — Protect the environment
 
 {%- if git_hosting_service == 'github' %}
 
@@ -50,7 +50,7 @@ every push. The review that guards a release is the pull request's, and only wha
 into `{{ default_branch }}` can reach this environment. GitHub's [environments guide](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments)
 has the details.
 
-## 3. Nothing to configure in the workflow
+## Step 3 — Nothing to configure in the workflow
 
 `.github/workflows/publish.yaml` already has what Trusted Publishing needs: `id-token: write` on
 the publish job, and `environment: pypi`. GitHub injects `ACTIONS_ID_TOKEN_REQUEST_URL` and
@@ -64,7 +64,7 @@ to it. Do not add approvers: the publish job runs on every push to the default b
 early when the push carried no release, so an approval gate would hold every push. The review
 that guards a release is the merge request's.
 
-## 3. Nothing to configure in the pipeline
+## Step 3 — Nothing to configure in the pipeline
 
 The `publish` job in `.gitlab-ci.yml` already requests the two tokens:
 
@@ -82,7 +82,7 @@ do not rename them. The upload step of `release.ship` sees `PYPI_ID_TOKEN` and r
 `uv publish --trusted-publishing always`.
 {%- endif %}
 
-## 4. Check it worked
+## Step 4 — Check it worked
 
 Make a release ([Make your first release](../tutorials/make-your-first-release.md)). In the
 publish job's log, `release.ship` prints:

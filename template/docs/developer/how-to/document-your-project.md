@@ -64,6 +64,14 @@ scaffolding to edit, duplicate, or delete, not content to keep:
 Make each one yours, then delete the coaching comments. Everything under **Developer** (this section)
 documents the inherited scaffold instead — leave it be; it's kept up to date via `copier update`.
 
+## Start headings with a word
+
+Write numbered steps as `## Step 1 — Clone it`, not `## 1. Clone it`. A heading's id is its
+slug, and the theme's sidebar script selects ids without escaping them; an id that starts
+with a digit is not a valid selector, so the page loads with its header navigation unbound
+and second-level menus stop opening. The template's own test suite refuses such headings in
+the pages it ships, so a `copier update` never brings one back.
+
 ## See also
 
 - [Preview docs locally](preview-docs-locally.md) — build and live-reload the site while you write.
