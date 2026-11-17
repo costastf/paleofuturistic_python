@@ -5,7 +5,7 @@ repos:
   - repo: local
     hooks:
       - id: lint-commit
-        name: Lint commit message
+        name: Lint commit message (commitizen)
         description: "Example: feat: added new feature"
         entry: sh -c './workflow.cmd lint.commitizen --commit-msg-file="$1"' --
         language: system
@@ -64,7 +64,7 @@ repos:
       # meant to prove it green, while CI still ran it in full. An invariant asserts the
       # absence.
       - id: preflight
-        name: Preflight checks (ty (types), commit messages, docs build, pyscn, test matrix, wheel, derived files)
+        name: Preflight checks (ty (types), commit messages (commitizen), docs build, pyscn, test matrix, wheel, derived files)
         entry: ./workflow.cmd preflight
         language: system
         pass_filenames: false
