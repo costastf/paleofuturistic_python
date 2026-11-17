@@ -109,8 +109,17 @@ def bump(context: Context, increment: str = '') -> None:
         increment: Version increment type — major, minor, patch, alpha, beta, or rc.
 
     """
+    bump_to(context, increment, resolve_next_version(context, increment))
+
+
+def bump_to(context: Context, increment: str, new_version: str) -> None:
+    """Bump by ``increment`` to ``new_version``, badge first, and commit the two together.
+
+    ``new_version`` is what `resolve_next_version` projected for the increment. `release.bump`
+    resolves and calls this; `release` has already resolved it to name the branch and calls
+    this with that answer, so one release projects its version once.
+    """
     current = project_version()
-    new_version = resolve_next_version(context, increment)
     note(update_package_version_badge(version=new_version))
     try:
         if increment in PRERELEASE_TYPES:
@@ -541,7 +550,7 @@ def release(context: Context, increment: str = '', no_push: bool = False) -> Non
     ensure_refs_are_free(context, new_version, release_branch)
 
     execute(context, f'git checkout -b {release_branch}')
-    bump(context, increment=increment)
+    bump_to(context, increment, new_version)
     changelog(context, write=True, version=new_version)
 
     if no_push:

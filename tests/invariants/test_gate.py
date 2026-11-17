@@ -1072,7 +1072,7 @@ def test_only_what_measures_a_derived_value_may_write_it(generated_project):
     # Which leaves no task writing a tracked file unasked: every write is behind `--write` or
     # inside a command named for the mutation it performs.
     release = (tasks / 'release.py').read_text(encoding='utf-8')
-    bump = task_source(release, 'release.bump')
+    bump = function_source(release, 'bump_to')
     assert 'update_package_version_badge(version=' in bump, (
         'release.bump lands a README that contradicts the version it released'
     )

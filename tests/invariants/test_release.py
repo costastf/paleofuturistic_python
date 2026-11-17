@@ -352,7 +352,11 @@ def test_a_failed_bump_leaves_no_badge_for_it(generated_project):
     """
     project, _ = generated_project
     release = (project / '_CI' / 'tasks' / 'release.py').read_text(encoding='utf-8')
-    body = function_source(release, 'bump')
+    # One projection per release: `bump` resolves and hands over, `release` hands over what it
+    # resolved to name the branch, and the bump itself lives in `bump_to`.
+    assert 'bump_to' in statement_calls(function_named(release, 'bump')), 'release.bump no longer bumps through bump_to'
+    assert 'bump_to' in statement_calls(function_named(release, 'release')), 'release resolves the version twice again'
+    body = function_source(release, 'bump_to')
     assert 'except SystemExit:' in body, 'a failed bump keeps the badge it wrote'
     restore = body.split('except SystemExit:', 1)[1]
     assert 'update_package_version_badge()' in restore, 'the restore does not go through the one writer'
