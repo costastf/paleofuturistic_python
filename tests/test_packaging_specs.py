@@ -153,10 +153,15 @@ def test_dependency_specifiers_parse(built_project, pyproject):
         assert isinstance(requirement, Requirement)
     for group, entries in pyproject['dependency-groups'].items():
         for entry in entries:
-            if isinstance(entry, str):
-                Requirement(entry)
-            else:
-                assert set(entry) == {'include-group'}, f'{group}: unknown table entry {entry}'
+            check_group_entry(group, entry)
+
+
+def check_group_entry(group, entry):
+    """A dependency-group entry is a PEP 508 requirement or an `include-group` table, nothing else."""
+    if isinstance(entry, str):
+        Requirement(entry)
+    else:
+        assert set(entry) == {'include-group'}, f'{group}: unknown table entry {entry}'
 
 
 def test_dependency_group_includes_resolve(pyproject):
