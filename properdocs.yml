@@ -116,5 +116,7 @@ nav:
       - ADR-0054 The quarantine boundary is an instant in UTC: maintaining/decisions/0054-the-quarantine-boundary-is-an-instant-in-utc.md
       - ADR-0055 Generation runs no shell: maintaining/decisions/0055-generation-runs-no-shell.md
       - ADR-0056 Fenced code nests in lists: maintaining/decisions/0056-fenced-code-nests-in-lists.md
+      - ADR-0057 Every push runs the whole matrix: maintaining/decisions/0057-every-push-runs-the-whole-matrix.md
+      - ADR-0058 Shipped pipelines are checked by reading them: maintaining/decisions/0058-shipped-pipelines-are-checked-by-reading-them.md
 
 copyright: Copyright &copy; 2024 <a href="https://schubergphilis.com/">Schuberg Philis</a>

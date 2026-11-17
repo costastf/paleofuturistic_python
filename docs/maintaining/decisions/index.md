@@ -93,3 +93,5 @@ anywhere in the repository resolves to a file.
 | [ADR-0054](0054-the-quarantine-boundary-is-an-instant-in-utc.md) | The quarantine boundary is an instant in UTC |
 | [ADR-0055](0055-generation-runs-no-shell.md) | Generation runs no shell |
 | [ADR-0056](0056-fenced-code-nests-in-lists.md) | Fenced code nests in lists |
+| [ADR-0057](0057-every-push-runs-the-whole-matrix.md) | Every push runs the whole matrix |
+| [ADR-0058](0058-shipped-pipelines-are-checked-by-reading-them.md) | Shipped pipelines are checked by reading them |
