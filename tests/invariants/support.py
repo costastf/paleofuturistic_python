@@ -711,31 +711,52 @@ def failing(*, failed: bool = True):
     return Context()
 
 
+def collection_name(tree):
+    """Return the name a module gives its ``Collection(...)``, or None when it builds none."""
+    for node in tree.body:
+        value = node.value if isinstance(node, ast.Assign) else None
+        if isinstance(value, ast.Call) and getattr(value.func, 'id', None) == 'Collection' and value.args:
+            return value.args[0].value
+    return None
+
+
+def add_task_calls(tree):
+    """Yield every ``namespace.add_task(...)`` call a module makes at module scope."""
+    for node in tree.body:
+        call = node.value if isinstance(node, ast.Expr) else None
+        if isinstance(call, ast.Call) and getattr(call.func, 'attr', None) == 'add_task':
+            yield call
+
+
+def registered_name(call):
+    """Return ``(task name, is default)`` for one ``add_task(cast(Task, fn), name=..., default=...)``.
+
+    Invoke names a task after its function with underscores turned into dashes unless ``name=``
+    says otherwise.
+    """
+    target = call.args[0]
+    if isinstance(target, ast.Call):  # cast(Task, fn)
+        target = target.args[1]
+    words = {word.arg: word.value for word in call.keywords}
+    name = words['name'].value if 'name' in words else target.id.replace('_', '-')
+    return name, 'default' in words and words['default'].value is True
+
+
 def registered_tasks(project):
     """Return ``{namespace: (task names, default task name)}`` from the generated `_CI/tasks/`.
 
     Read from source, like `registry_steps`: every module builds `namespace = Collection(name)`
-    and registers with `namespace.add_task(cast(Task, fn), name=..., default=...)`. Invoke names
-    a task after its function with underscores turned into dashes unless `name=` says otherwise.
+    and registers with `namespace.add_task(cast(Task, fn), name=..., default=...)`.
     """
     registered = {}
     for module in sorted((project / '_CI' / 'tasks').glob('*.py')):
         tree = ast.parse(module.read_text(encoding='utf-8'))
-        collection, names, default = None, set(), None
-        for node in tree.body:
-            value = node.value if isinstance(node, ast.Assign) else None
-            if isinstance(value, ast.Call) and getattr(value.func, 'id', None) == 'Collection' and value.args:
-                collection = value.args[0].value
-            call = node.value if isinstance(node, ast.Expr) else None
-            if not (isinstance(call, ast.Call) and getattr(call.func, 'attr', None) == 'add_task'):
-                continue
-            target = call.args[0]
-            if isinstance(target, ast.Call):  # cast(Task, fn)
-                target = target.args[1]
-            words = {word.arg: word.value for word in call.keywords}
-            name = words['name'].value if 'name' in words else target.id.replace('_', '-')
+        collection = collection_name(tree)
+        names, default = set(), None
+        for call in add_task_calls(tree):
+            name, is_default = registered_name(call)
             names.add(name)
-            if 'default' in words and words['default'].value is True:
+            if is_default:
                 default = name
         if collection and names:
             registered[collection] = (names, default)
