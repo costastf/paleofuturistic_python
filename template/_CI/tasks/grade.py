@@ -124,13 +124,13 @@ def pyscn_check(context: Context) -> None:
     """
 
 
-@logged('grade.pyscn-analyze')
+@logged('grade.pyscn-analyze-only')
 def pyscn_analyze_only(context: Context, *, write: bool = False) -> None:
     """Run pyscn analyze without opening the report: what `grade.pyscn` runs."""
     analyze(context, write=write)
 
 
-@logged('grade.pyscn-analyze')
+@logged('grade.pyscn-json-report')
 def pyscn_json_report(context: Context) -> None:
     """Produce just the JSON report, which is all the badge is derived from.
 
