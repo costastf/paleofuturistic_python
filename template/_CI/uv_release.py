@@ -83,16 +83,21 @@ def released_versions(package: str = 'uv') -> dict[str, datetime]:
     releases = data.get('releases') or {}
     dated: dict[str, datetime] = {}
     for version, files in releases.items():
-        if not files or not is_release(version):
-            continue
-        stamps = [file['upload_time_iso_8601'] for file in files if file.get('upload_time_iso_8601')]
-        if not stamps:
-            continue
-        dated[version] = datetime.fromisoformat(min(stamps).replace('Z', '+00:00'))
+        released = first_upload(files) if is_release(version) else None
+        if released is not None:
+            dated[version] = released
     if not dated:
         msg = f'no dated releases found for {package}'
         raise UvReleaseError(msg)
     return dated
+
+
+def first_upload(files: list[dict]) -> datetime | None:
+    """Return when the earliest of a release's ``files`` was uploaded, or None when none carries a time."""
+    stamps = [file['upload_time_iso_8601'] for file in files if file.get('upload_time_iso_8601')]
+    if not stamps:
+        return None
+    return datetime.fromisoformat(min(stamps).replace('Z', '+00:00'))
 
 
 def latest_eligible(cooldown_days: int = COOLDOWN_DAYS, *, now: datetime | None = None) -> tuple[str, datetime]:
