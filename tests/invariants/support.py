@@ -632,6 +632,18 @@ def commits_in(repository, revision_range):
     return [line for line in listed.stdout.splitlines() if line]
 
 
+def literal_pieces(fstring):
+    """Return the literal pieces of an f-string, its substitutions left out."""
+    return [part for part in fstring.values if isinstance(part, ast.Constant) and isinstance(part.value, str)]
+
+
+def string_constants(node):
+    """Yield every string `ast.Constant` anywhere inside `node`."""
+    for inner in ast.walk(node):
+        if isinstance(inner, ast.Constant) and isinstance(inner.value, str):
+            yield inner
+
+
 def command_strings(node):
     """Yield every string literal in `node`, with f-string pieces stitched back together.
 
@@ -640,17 +652,13 @@ def command_strings(node):
     """
     # `ast.walk` also descends *into* an f-string, so its pieces are collected and skipped
     # rather than yielded next to the whole they belong to.
-    pieces = set()
-    joined = []
-    for inner in ast.walk(node):
-        if isinstance(inner, ast.JoinedStr):
-            parts = [part for part in inner.values if isinstance(part, ast.Constant) and isinstance(part.value, str)]
-            pieces.update(id(part) for part in parts)
-            joined.append(''.join(part.value for part in parts if isinstance(part.value, str)))
-    yield from joined
-    for inner in ast.walk(node):
-        if isinstance(inner, ast.Constant) and isinstance(inner.value, str) and id(inner) not in pieces:
-            yield inner.value
+    fstrings = [inner for inner in ast.walk(node) if isinstance(inner, ast.JoinedStr)]
+    pieces = {id(part) for fstring in fstrings for part in literal_pieces(fstring)}
+    for fstring in fstrings:
+        yield ''.join(part.value for part in literal_pieces(fstring))
+    for constant in string_constants(node):
+        if id(constant) not in pieces:
+            yield constant.value
 
 
 def calls_in(node):
