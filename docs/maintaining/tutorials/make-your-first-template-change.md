@@ -43,7 +43,7 @@ If your change touches the coverage ratchet, the CI badge, or the dependency aud
 
 ## Step 5. Commit and open a pull request
 
-Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) — `feat(template): …`, `fix(ci): …` — by review convention; this repository ships no commit-message hook.
+Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) — `feat(template): …`, `fix(ci): …`. This repository installs no hook, but `./workflow.cmd lint` checks the messages a push would add with commitizen, and CI's `lint` job checks the pushed range or the pull request's commits (ADR-0052, ADR-0053), so a message that breaks the convention fails before review.
 
 ```bash
 git checkout -b feat/my-first-change

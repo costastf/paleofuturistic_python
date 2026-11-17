@@ -31,6 +31,8 @@ docker, buildah and podman; kaniko builds in userspace, but its image has no Pyt
   ADR-0043 removed it: the tag now reaches kaniko as a dotenv artifact from `container.tag`.
 - The Deploy Token variables must be Protected, Masked and scoped to the `deps` environment, or
   a fork's merge request could read a registry write token.
+- The GitHub reuse became an opt-in with ADR-0050: every run builds, and `--reuse` is for a
+  project that has restricted who can write the package.
 
 ## References
 

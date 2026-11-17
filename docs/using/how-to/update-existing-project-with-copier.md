@@ -62,6 +62,30 @@ On GitHub, `continuous-integration.yaml` and `security-audit.yaml` now trigger o
 
 The pyscn tasks answer to `grade` instead of `quality`: `./workflow.cmd grade`, `grade.pyscn`, `grade.pyscn-analyze` and `grade.pyscn-check`. The module moved with them, `_CI/tasks/quality.py` to `_CI/tasks/grade.py`, and so did the dependency group, `quality` to `grade`. After the update, `uv lock` records the new group name, and a `quality.py` left behind under `_CI/tasks/` is yours to delete: nothing imports it. Only your own scripts or notes that spelled the old command or group need the new name; the hooks and the pipelines run `preflight`, which never named either.
 
+## Upgrading past the one-sequence publish
+
+`release.publish` is `release.dist`, `release.attest` and the upload, in that order, and `release.ship` runs it; the `--prebuilt` flag is gone. A pipeline or script of your own that ran `release.dist`, `release.attest` and `release.publish --prebuilt` as three commands runs `release.publish` alone now, or `release.ship` where it detects the release itself. See [ADR-0049](../../maintaining/decisions/0049-publish-is-one-sequence.md).
+
+## Upgrading past building the deps image every run
+
+On GitHub, `build-deps-image` no longer reuses a tag that already exists in the registry: every run builds and pushes, and reuse is the opt-in `container.publish --reuse`. The shipped workflow passes no flag. If you want the old behaviour in a job of your own, restrict who can write to the `<repo>-deps` package first, then add the flag; the generated CI framework reference explains what a reused tag trusts. See [ADR-0050](../../maintaining/decisions/0050-the-deps-image-is-built-every-run-unless-asked-to-reuse.md).
+
+## Upgrading past the exported commit range
+
+The shipped `Preflight` jobs fetch full history and export `PRE_COMMIT_FROM_REF` and `PRE_COMMIT_TO_REF`, so `lint.commitizen` checks a pull request's commits, or what a push added, instead of the one commit a shallow checkout holds. A CI job of your own that runs the gate needs the same two things, `fetch-depth: 0` on the checkout and the two variables from the event, or it checks only the tip and, on a pull request, only the merge commit, which commitizen accepts. See [ADR-0053](../../maintaining/decisions/0053-ci-hands-the-commit-check-the-range-it-cannot-infer.md).
+
+## Upgrading past the UTC quarantine boundary
+
+`[tool.uv] exclude-newer` is spelled as an instant, `YYYY-MM-DDT00:00:00Z`, where it was a bare date. Your `pyproject.toml` holds the date stamped at generation, so the update may show a conflict on that line: keep your own date and give it the suffix, then `uv lock`. The lock records the boundary as an instant already; the spelling fixes it to midnight UTC instead of midnight in the zone the lock was last written in, so `uv lock` may move the recorded instant by your zone's offset and nothing else. See [ADR-0054](../../maintaining/decisions/0054-the-quarantine-boundary-is-an-instant-in-utc.md).
+
+## Upgrading past nested code blocks in the docs
+
+The `document` group pins `pymdown-extensions`, and `properdocs.yml` enables `pymdownx.superfences`, so a fenced block indented under a list item renders as code. Run `uv lock` after the update and commit `uv.lock` with it. Pages already written need no change. See [ADR-0056](../../maintaining/decisions/0056-fenced-code-nests-in-lists.md).
+
+## Upgrading past the formatting conventions
+
+Ruff formats with a line length of 120 and single quotes, and checks docstrings against the Google convention. None of the three is a copier question, and the template does not carry the numpy convention it used before 2026-04-13. A project generated before then meets the Google rules on its first `lint` after the update: ruff reports each docstring section it cannot read, and the fixes are by hand, since the docstring rules have no autofix. Keeping `convention = "numpy"` in your `pyproject.toml` works, at the cost of resolving that line at every update. See [ADR-0059](../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.md).
+
 ## Upgrading past the tag-on-main release flow
 
 `release` used to create the tag on the release branch and push it with the branch. On GitLab that published the version before the MR was reviewed; on both hosts a squash merge left the tag pointing at a commit `main` never saw, and nothing published. Now `release` creates no tag. The publish job runs on every push to the default branch and hands it to `release.ship`, which publishes when `[project].version` changed between the previous tip and the new one: it creates the tag on the new tip through the host's Release API (a Release entry appears on the releases page), then builds, signs and uploads. Merge release PRs/MRs any way you like.
