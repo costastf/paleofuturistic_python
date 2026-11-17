@@ -8,6 +8,7 @@ import tempfile
 import tomllib
 import types
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
 
 import yaml
@@ -294,42 +295,72 @@ def comment_body(lines: list[str], start: int, prefix: str) -> tuple[list[str], 
     return body, index + 1
 
 
-def render_shipped(canonical: str, canonical_path: str) -> str:
-    """Render a shipped copy of ``canonical`` from its directives, with the audience rewording."""
-    lines = canonical.splitlines()
-    out: list[str] = [shipped_marker(canonical_path)]
+def after_template_only(lines: list[str], start: int) -> int:
+    """Return the index after the ``template-only`` block opening at ``lines[start]``."""
+    try:
+        return lines.index(TEMPLATE_ONLY_END, start) + 1
+    except ValueError:
+        message = f'unterminated {TEMPLATE_ONLY_START} at line {start + 1}'
+        raise ValueError(message) from None
+
+
+def add_body(out: list[str], body: list[str]) -> None:
+    """``shipped-only``: the body goes in where the comment stood."""
+    out.extend(body)
+
+
+def replace_line(out: list[str], body: list[str]) -> None:
+    """``shipped-line``: the body replaces the one line just above the comment."""
+    out.pop()
+    out.extend(body)
+
+
+def replace_block(out: list[str], body: list[str]) -> None:
+    """``shipped``: the body replaces the block just above the comment, back to a blank line."""
+    while out and out[-1].strip():
+        out.pop()
+    out.extend(body)
+
+
+# Each shipped directive's opening and what its body does to the lines rendered so far.
+SHIPPED_DIRECTIVES: tuple[tuple[str, Callable[[list[str], list[str]], None]], ...] = (
+    (SHIPPED_ONLY_START, add_body),
+    (SHIPPED_LINE_START, replace_line),
+    (SHIPPED_REPLACE_START, replace_block),
+)
+
+
+def apply_directives(lines: list[str], out: list[str]) -> None:
+    """Append ``lines`` to ``out`` with every directive applied and the template-only blocks dropped."""
     index = 0
     while index < len(lines):
         stripped = lines[index].strip()
         if stripped == TEMPLATE_ONLY_START:
-            try:
-                index = lines.index(TEMPLATE_ONLY_END, index) + 1
-            except ValueError:
-                message = f'unterminated {TEMPLATE_ONLY_START} at line {index + 1}'
-                raise ValueError(message) from None
+            index = after_template_only(lines, index)
             continue
-        if stripped.startswith(SHIPPED_ONLY_START):
-            body, index = comment_body(lines, index, SHIPPED_ONLY_START)
-            out.extend(body)
+        directive = next(((prefix, apply) for prefix, apply in SHIPPED_DIRECTIVES if stripped.startswith(prefix)), None)
+        if directive is None:
+            out.append(lines[index])
+            index += 1
             continue
-        if stripped.startswith(SHIPPED_LINE_START):
-            body, index = comment_body(lines, index, SHIPPED_LINE_START)
-            out.pop()
-            out.extend(body)
-            continue
-        if stripped.startswith(SHIPPED_REPLACE_START):
-            body, index = comment_body(lines, index, SHIPPED_REPLACE_START)
-            while out and out[-1].strip():
-                out.pop()
-            out.extend(body)
-            continue
-        out.append(lines[index])
-        index += 1
-    text = '\n'.join(out) + '\n'
+        prefix, apply = directive
+        body, index = comment_body(lines, index, prefix)
+        apply(out, body)
+
+
+def reword_for_shipping(text: str) -> str:
+    """Point decision links at the published site and address the project developer."""
     text = DECISION_LINK.sub(lambda m: f']({PUBLISHED_DECISIONS_URL}{m.group(1)}.html{m.group(2) or ""})', text)
     for before, after in SHIPPED_WORDING:
         text = text.replace(before, after)
     return re.sub(r'\n{3,}', '\n\n', text)
+
+
+def render_shipped(canonical: str, canonical_path: str) -> str:
+    """Render a shipped copy of ``canonical`` from its directives, with the audience rewording."""
+    out: list[str] = [shipped_marker(canonical_path)]
+    apply_directives(canonical.splitlines(), out)
+    return reword_for_shipping('\n'.join(out) + '\n')
 
 
 def stale_shipped_pages() -> dict[Path, str]:
