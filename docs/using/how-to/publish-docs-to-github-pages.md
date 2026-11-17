@@ -16,7 +16,7 @@ On GitHub:
 2. **Source**: **Deploy from a branch**.
 3. **Branch**: `gh-pages` / `/ (root)`.
 
-The branch only appears after the first workflow run completes — wait for the Actions tab to show a green Pages run, then configure.
+The branch only appears once the Pages workflow has run. It runs on a release, or by hand: **Actions → Pages → Run workflow**. That first run pushes `gh-pages`, finds no Pages site to build and ends green with a message saying so; enabling Pages on the branch then builds the site without another run. Creating the site cannot be done from the workflow, because it needs repository admin rights the Actions token does not carry.
 
 That's it. Each subsequent release redeploys automatically. The site lives at `https://<owner>.github.io/<repo>/`.
 

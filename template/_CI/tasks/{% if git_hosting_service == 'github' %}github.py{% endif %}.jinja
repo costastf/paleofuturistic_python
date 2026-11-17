@@ -259,6 +259,10 @@ def create_release(context: Context, tag: str, sha: str) -> str:
 {%- if integrate_pages %}
 
 
+# What the Pages API answers while the repository has no Pages site to build.
+PAGES_NOT_ENABLED = 404
+
+
 def request_pages_build(context: Context) -> None:
     """Ask GitHub to build Pages from the freshly pushed gh-pages branch.
 
@@ -266,6 +270,11 @@ def request_pages_build(context: Context) -> None:
     (deploy-from-branch) Pages build, so CI must request one explicitly after
     ``properdocs gh-deploy``. Locally the push itself triggers the build and
     ``GITHUB_TOKEN`` is normally absent, making this a no-op.
+
+    Before Pages is enabled on the repository the request answers 404. That is the first
+    deploy of every new project, since the branch the setting needs is the one this run just
+    pushed; the run says what to enable and ends green, because enabling Pages on the branch
+    builds it without a request.
     """
     token = os.environ.get('GITHUB_TOKEN', '').strip()
     if not token:
@@ -288,6 +297,16 @@ def request_pages_build(context: Context) -> None:
         with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
             print(f'Requested GitHub Pages build (HTTP {response.status}).')
     except urllib.error.HTTPError as exc:
+        if exc.code == PAGES_NOT_ENABLED:
+            # The branch is pushed; enabling Pages on it builds it, so nothing is lost and
+            # nothing can be done from here: creating the site needs repository admin rights
+            # the Actions token does not carry.
+            print(
+                f'GitHub Pages is not enabled for {slug}, so no build was requested. The gh-pages '
+                'branch is pushed: enable Pages under Settings → Pages with source "Deploy from a '
+                'branch", branch gh-pages, folder /(root). Enabling it builds the site from the branch.'
+            )
+            return
         detail = exc.read().decode('utf-8', errors='replace')[:500]
         print(f'GitHub Pages build request returned {exc.code}: {detail}')
         raise SystemExit(1) from exc
