@@ -417,6 +417,10 @@
 <li>
     <a href="0052-the-parent-checks-its-commit-messages-over-the-unpushed-range.html" class="dropdown-item active" aria-current="page">ADR-0052 The parent checks its commit messages over the unpushed range</a>
 </li>
+            
+<li>
+    <a href="0053-ci-hands-the-commit-check-the-range-it-cannot-infer.html" class="dropdown-item">ADR-0053 CI hands the commit-message check the range it cannot infer</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -435,7 +439,7 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a rel="next" class="nav-link disabled">
+                                <a rel="next" href="0053-ci-hands-the-commit-check-the-range-it-cannot-infer.html" class="nav-link">
                                     Next <i class="fa fa-arrow-right"></i>
                                 </a>
                             </li>
@@ -826,6 +830,9 @@
             <li class="nav-item">
                 <a href="0052-the-parent-checks-its-commit-messages-over-the-unpushed-range.html" class="nav-link active fw-bold">ADR-0052 The parent checks its commit messages over the unpushed range</a>
             </li>
+            <li class="nav-item">
+                <a href="0053-ci-hands-the-commit-check-the-range-it-cannot-infer.html" class="nav-link">ADR-0053 CI hands the commit-message check the range it cannot infer</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -890,8 +897,9 @@ rather than listed in the static <code>CHECKS</code> table the other commands si
 <ul>
 <li>A commit whose message breaks the convention fails <code>lint</code> locally before it is pushed, and
   CI's <code>lint</code> job on the commit that arrived. The early history stays as it is.</li>
-<li>The <code>lint</code> job's checkout is shallow, so in CI the check reads the tip commit alone, as a
-  generated project's does; a bad message already pushed fails until a good one lands on it.</li>
+<li>The <code>lint</code> job's checkout was shallow, so in CI the check read the tip commit alone, and on
+  a pull request that tip was the merge commit, which commitizen accepts. ADR-0053 has the job
+  export the range instead.</li>
 <li>The pyproject validator is now the only step of a generated project's <code>lint</code> the parent does
   not run.</li>
 </ul>

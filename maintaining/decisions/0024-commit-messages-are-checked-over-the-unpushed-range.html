@@ -417,6 +417,10 @@
 <li>
     <a href="0052-the-parent-checks-its-commit-messages-over-the-unpushed-range.html" class="dropdown-item">ADR-0052 The parent checks its commit messages over the unpushed range</a>
 </li>
+            
+<li>
+    <a href="0053-ci-hands-the-commit-check-the-range-it-cannot-infer.html" class="dropdown-item">ADR-0053 CI hands the commit-message check the range it cannot infer</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -826,6 +830,9 @@
             <li class="nav-item">
                 <a href="0052-the-parent-checks-its-commit-messages-over-the-unpushed-range.html" class="nav-link">ADR-0052 The parent checks its commit messages over the unpushed range</a>
             </li>
+            <li class="nav-item">
+                <a href="0053-ci-hands-the-commit-check-the-range-it-cannot-infer.html" class="nav-link">ADR-0053 CI hands the commit-message check the range it cannot infer</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -889,6 +896,8 @@ made, in CI the commit that arrived.</p>
   any other way.</li>
 <li>This repository ran no commit-message check of its own at the time; ADR-0052 gave it one over
   the same range.</li>
+<li>"In CI the commit that arrived" was the merge commit on a pull request, which commitizen
+  accepts; ADR-0053 has the jobs export the range instead.</li>
 </ul>
 <h2 id="references">References</h2>
 <ul>

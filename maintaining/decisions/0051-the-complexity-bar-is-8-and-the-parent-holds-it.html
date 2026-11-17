@@ -417,6 +417,10 @@
 <li>
     <a href="0052-the-parent-checks-its-commit-messages-over-the-unpushed-range.html" class="dropdown-item">ADR-0052 The parent checks its commit messages over the unpushed range</a>
 </li>
+            
+<li>
+    <a href="0053-ci-hands-the-commit-check-the-range-it-cannot-infer.html" class="dropdown-item">ADR-0053 CI hands the commit-message check the range it cannot infer</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -826,6 +830,9 @@
             <li class="nav-item">
                 <a href="0052-the-parent-checks-its-commit-messages-over-the-unpushed-range.html" class="nav-link">ADR-0052 The parent checks its commit messages over the unpushed range</a>
             </li>
+            <li class="nav-item">
+                <a href="0053-ci-hands-the-commit-check-the-range-it-cannot-infer.html" class="nav-link">ADR-0053 CI hands the commit-message check the range it cannot infer</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -874,24 +881,32 @@ yet".</p>
 <p>A scan of everything this repository owns, the vendored trees excluded, found 33 functions
 above 8 and three above 15. The three above 15 were all readers in the invariant suite's
 support module and the docs renderer; the parent's own tooling was over the bar it shipped.
-Taking the 33 down, one module per commit, left 477 functions with a maximum of 8 and gave
-the template its opinion: a function in tooling or in tests splits at the same point one in
-<code>src/</code> does.</p>
+Taking the 33 down, one module per commit, left every plain <code>.py</code> function at 8 or under and
+gave the template its opinion: a function in tooling or in tests splits at the same point one
+in <code>src/</code> does.</p>
+<p>The scan had read only <code>.py</code> files. The template's eight <code>.jinja</code> task modules, which
+complexipy skips, held seven more functions above 8, the audit's lockfile reader at 19 among
+them. A review found them the same day; they were decomposed, and the parent's check now
+reads those modules with their tags stripped.</p>
 <h2 id="decision">Decision</h2>
 <p>The bar is 8. A generated project's <code>lint.complexipy</code> passes <code>--max-complexity-allowed 8</code>,
 over <code>src/</code> as before. The parent's <code>./workflow.cmd lint</code> runs complexipy under the same pin
 and the same bar over the paths its other checks read, <code>_CI/</code>, <code>tasks_render.py</code> and
 <code>tests/</code>, and over the template's own <code>_CI</code> modules as well: <code>_CI/tasks/</code>, <code>info.py</code> and
 <code>uv_release.py</code>, named one by one so the vendored tree under <code>template/_CI/lib</code> stays out.</p>
+<p>The <code>.jinja</code> task modules are read too. Before the check runs, each is copied under
+<code>reports/stripped-tasks/</code> with every block tag removed and every expression replaced by a
+name, so both arms of a template <code>if</code> are counted and what an expression renders to, a string
+the complexity does not depend on, is not. The copies are rebuilt on every run.</p>
 <p>The pin joins the <code>lint</code> group and the invariant that holds the parent's lint pins equal to
 the template's covers it.</p>
 <h2 id="consequences">Consequences</h2>
 <ul>
-<li>The next function over 8 fails locally and in CI's <code>lint</code> job, on either side.</li>
-<li>The template's <code>.jinja</code> task modules are not read by complexipy, which sees only <code>.py</code>
-  files, and the generated gate reads <code>src/</code> alone, so those five modules are held by review
-  rather than by a check. Widening the generated gate to <code>_CI/tasks/</code> would close that; it
-  would also widen the commit-stage filter and is not decided here.</li>
+<li>The next function over 8 fails locally and in CI's <code>lint</code> job, on either side, the <code>.jinja</code>
+  task modules included.</li>
+<li>The generated gate still reads <code>src/</code> alone, so a project that edits its own <code>_CI/tasks/</code>
+  past the bar is not told by its gate. Widening it to <code>_CI/tasks/</code> would also widen the
+  commit-stage filter and is not decided here.</li>
 <li>The pyproject validator is now the only step of a generated project's <code>lint</code> the parent
   does not run.</li>
 </ul>
