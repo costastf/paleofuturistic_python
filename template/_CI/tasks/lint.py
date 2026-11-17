@@ -139,18 +139,28 @@ def unpushed_range(context: Context) -> str | None:
     """
     if not resolves(context, 'HEAD'):
         return None
+    for candidate in range_candidates(context):
+        if has_commits(context, candidate):
+            return candidate
+    # The tip alone. `HEAD` is the form for a root commit, where `HEAD~1` does not exist — and
+    # a shallow graft is that same shape, its tip having no parent in the clone.
+    return 'HEAD~1..HEAD' if resolves(context, 'HEAD^') else 'HEAD'
+
+
+def range_candidates(context: Context) -> list[str]:
+    """Return the ranges that could bound the check, best-informed first, each end resolving in this clone."""
     from_ref, to_ref = os.environ.get('PRE_COMMIT_FROM_REF', ''), os.environ.get('PRE_COMMIT_TO_REF', '')
     candidates = []
     if from_ref and to_ref and resolves(context, from_ref) and resolves(context, to_ref):
         candidates.append(f'{from_ref}..{to_ref}')
     candidates.extend(f'{base}..HEAD' for base in ('@{upstream}', 'origin/HEAD') if resolves(context, base))
-    for candidate in candidates:
-        counted = context.run(f'git rev-list --count {candidate}', hide=True, warn=True)
-        if not counted.failed and counted.stdout.strip() not in ('', '0'):
-            return candidate
-    # The tip alone. `HEAD` is the form for a root commit, where `HEAD~1` does not exist — and
-    # a shallow graft is that same shape, its tip having no parent in the clone.
-    return 'HEAD~1..HEAD' if resolves(context, 'HEAD^') else 'HEAD'
+    return candidates
+
+
+def has_commits(context: Context, revision_range: str) -> bool:
+    """Report whether ``revision_range`` holds at least one commit."""
+    counted = context.run(f'git rev-list --count {revision_range}', hide=True, warn=True)
+    return not counted.failed and counted.stdout.strip() not in ('', '0')
 
 
 @task
