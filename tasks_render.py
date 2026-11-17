@@ -95,6 +95,36 @@ def load_uv_release() -> ModuleType | None:
     return module
 
 
+def python_floor(content: str) -> str | None:
+    """Return the minimum Python version `requires-python` declares, or None when it cannot be read."""
+    match = REQUIRES_PYTHON_PATTERN.search(content)
+    return match.group(1) if match else None
+
+
+def choose_uv_target(uv_release: ModuleType, pinned: str) -> tuple[str, str] | None:
+    """Return the uv version to pin and why, or None after saying why the pin stays.
+
+    `TEMPLATE_UV_VERSION` names the target outright; otherwise it is the newest release that
+    has cleared the cool-down. A target no newer than the pin, or one whose build backend is
+    not published yet, leaves the pin alone.
+    """
+    override = os.environ.get(UV_VERSION_ENV, '').strip()
+    if override:
+        target, reason = override, f'pinned by {UV_VERSION_ENV}'
+        stays = f'{UV_VERSION_ENV} asks for {target}'
+    else:
+        target, released = uv_release.latest_eligible()
+        reason = f'released {uv_release.describe_age(released)}'
+        stays = f'nothing newer has cleared the {uv_release.COOLDOWN_DAYS}-day cool-down'
+    if uv_release.version_key(target) <= uv_release.version_key(pinned):
+        print(f'uv stays at {pinned}: {stays}.')
+        return None
+    if not uv_release.has_uv_build(target):
+        print(f'note: uv-build {target} is not published; keeping uv {pinned}.')
+        return None
+    return target, reason
+
+
 def stamp_uv_version() -> None:
     """Pin the newest uv release that has been public for the cool-down period.
 
@@ -115,34 +145,19 @@ def stamp_uv_version() -> None:
     uv_release = load_uv_release()
     if uv_release is None:
         return
-
-    override = os.environ.get(UV_VERSION_ENV, '').strip()
     try:
         content = PYPROJECT.read_text(encoding='utf-8')
         pinned = uv_release.current_pin(content)
         # The image is per-Python, so the digest to fetch depends on this project's minimum.
-        python_version = REQUIRES_PYTHON_PATTERN.search(content)
-        if python_version is None:
+        floor = python_floor(content)
+        if floor is None:
             print(f'note: could not read requires-python; keeping uv {pinned}.')
             return
-        if override:
-            target, reason = override, f'pinned by {UV_VERSION_ENV}'
-        else:
-            target, released = uv_release.latest_eligible()
-            reason = f'released {uv_release.describe_age(released)}'
-        if uv_release.version_key(target) <= uv_release.version_key(pinned):
-            why = (
-                f'{UV_VERSION_ENV} asks for {target}'
-                if override
-                else f'nothing newer has cleared the {uv_release.COOLDOWN_DAYS}-day cool-down'
-            )
-            print(f'uv stays at {pinned}: {why}.')
+        chosen = choose_uv_target(uv_release, pinned)
+        if chosen is None:
             return
-        if not uv_release.has_uv_build(target):
-            print(f'note: uv-build {target} is not published; keeping uv {pinned}.')
-            return
-        digest = uv_release.image_digest(target, python_version.group(1))
-        uv_release.apply_to_pyproject(PYPROJECT, target, digest)
+        target, reason = chosen
+        uv_release.apply_to_pyproject(PYPROJECT, target, uv_release.image_digest(target, floor))
     except uv_release.UvReleaseError as exc:
         print(f'note: keeping the template default uv pin — {exc}')
         return
