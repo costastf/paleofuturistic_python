@@ -191,6 +191,46 @@ def security_override_env() -> dict[str, str]:
     return {f'{PROJECT_SLUG.upper()}_SECURITY_OVERRIDE': ','.join(override_parts)}
 
 
+def generate_project(
+    workspace: ComboWorkspace, extra_context: dict | None, label: str, log_file: Path | None
+) -> Path | None:
+    """Generate the cell's project under ``output_root/label``. Return its directory, or None when copier failed."""
+    combo_root = workspace.output_root / label
+    combo_root.mkdir(parents=True, exist_ok=True)
+    data_file = combo_root / 'data.json'
+    data_file.write_text(json.dumps(extra_context or {}), encoding='utf-8')
+    project_dir = combo_root / 'generated' / PROJECT_SLUG
+    copier_cmd = f'uvx copier copy --defaults --trust --data-file {data_file} {workspace.template_repo} {project_dir}'
+    # Pin what generation stamps, so the generated `required-version` matches the uv this run
+    # is using — otherwise every `uv sync` afterwards fails on a version mismatch.
+    if not run_command(copier_cmd, env=generation_env(), log_file=log_file):
+        return None
+    return project_dir
+
+
+def init_steps(branch: str, *, mature: bool) -> tuple[str, ...]:
+    """Return the commands that turn a generated tree into a committed, synced repository."""
+    return (
+        f'git init -b {branch}',
+        *((f'git remote add origin {MATURE_ORIGIN}',) if mature else ()),
+        'git add -A',
+        (
+            'git -c commit.gpgsign=false -c user.name=ci -c user.email=ci@localhost '
+            'commit -m "feat: initial project from template" '
+            '--author "ci <ci@localhost>"'
+        ),
+        'uv sync --all-extras --dev',
+    )
+
+
+def initialise_project(project_dir: Path, extra_context: dict | None, log_file: Path | None, *, mature: bool) -> bool:
+    """Run the init steps in ``project_dir``, stopping at the first failure. Return True when all passed."""
+    # The project's first branch has to be the one it was generated for: `release` refuses to
+    # start anywhere else, and the matured cell's badge names it.
+    branch = (extra_context or {}).get('default_branch', DEFAULT_BRANCH)
+    return all(run_command(step, cwd=project_dir, log_file=log_file) for step in init_steps(branch, mature=mature))
+
+
 def run_combo(
     workspace: ComboWorkspace,
     extra_context: dict | None,
@@ -204,38 +244,15 @@ def run_combo(
     `mature` makes the cell look like a project on day two, dependency audit included — see
     `qa_cells`, `AUDIT_STEP` and docs/maintaining/how-to/test-the-template.md#why-a-matured-cell.
     """
-    combo_root = workspace.output_root / label
-    combo_root.mkdir(parents=True, exist_ok=True)
-
-    data_file = combo_root / 'data.json'
-    data_file.write_text(json.dumps(extra_context or {}), encoding='utf-8')
-    project_dir = combo_root / 'generated' / PROJECT_SLUG
-    copier_cmd = f'uvx copier copy --defaults --trust --data-file {data_file} {workspace.template_repo} {project_dir}'
-    # Pin what generation stamps, so the generated `required-version` matches the uv this run
-    # is using — otherwise every `uv sync` below fails on a version mismatch.
-    if not run_command(copier_cmd, env=generation_env(), log_file=log_file):
+    project_dir = generate_project(workspace, extra_context, label, log_file)
+    if project_dir is None:
         return False
 
     if mature:
         write_mature_project(project_dir, extra_context)
 
-    # The project's first branch has to be the one it was generated for: `release` refuses to
-    # start anywhere else, and the matured cell's badge names it.
-    branch = (extra_context or {}).get('default_branch', DEFAULT_BRANCH)
-    init_steps = (
-        f'git init -b {branch}',
-        *((f'git remote add origin {MATURE_ORIGIN}',) if mature else ()),
-        'git add -A',
-        (
-            'git -c commit.gpgsign=false -c user.name=ci -c user.email=ci@localhost '
-            'commit -m "feat: initial project from template" '
-            '--author "ci <ci@localhost>"'
-        ),
-        'uv sync --all-extras --dev',
-    )
-    for step in init_steps:
-        if not run_command(step, cwd=project_dir, log_file=log_file):
-            return False
+    if not initialise_project(project_dir, extra_context, log_file, mature=mature):
+        return False
 
     step_env = {'CI': 'true', **security_override_env()}
 

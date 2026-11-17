@@ -87,11 +87,11 @@ def test_exactly_one_matrix_cell_audits_its_dependencies(tmp_path):
     advisory service about ~125 packages each.
     """
     runner_source = (REPO_ROOT / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
-    # `run_combo` was split so it reads in one pass; the two extracted helpers are exec'd
-    # alongside it rather than stubbed, since `write_mature_project` is exactly the branch this
-    # test does not otherwise exercise the content of, and `security_override_env` needs to
-    # observe the same `os.environ`/`read_template_overrides` stubs the rest of this namespace
-    # sets up, not new ones of its own.
+    # `run_combo` was split so it reads in one pass; the extracted helpers are exec'd alongside
+    # it rather than stubbed, since `write_mature_project` is exactly the branch this test does
+    # not otherwise exercise the content of, `security_override_env` needs to observe the same
+    # `os.environ`/`read_template_overrides` stubs the rest of this namespace sets up, not new
+    # ones of its own, and generation and init are what put the commands on record.
 
     from _CI.tasks.configuration import PROJECT_SLUG, qa_sequence  # noqa: PLC0415
 
@@ -128,7 +128,16 @@ def test_exactly_one_matrix_cell_audits_its_dependencies(tmp_path):
         'MATURE_GATED_MODULE': '"""{slug} {boundary}."""\n',
         'ComboWorkspace': ComboWorkspace,
     }
-    namespace = exec_from(runner_source, 'write_mature_project', 'security_override_env', 'run_combo', **namespace)
+    namespace = exec_from(
+        runner_source,
+        'write_mature_project',
+        'security_override_env',
+        'generate_project',
+        'init_steps',
+        'initialise_project',
+        'run_combo',
+        **namespace,
+    )
 
     from _CI.tasks.configuration import qa_cells  # noqa: PLC0415
 
