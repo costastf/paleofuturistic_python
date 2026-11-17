@@ -18,6 +18,11 @@ TEMPLATE_PYPROJECT = PROJECT_ROOT_DIRECTORY / 'template' / 'pyproject.toml.jinja
 # committed pin makes generation deterministic and keeps it matching the installed uv.
 UV_VERSION_ENV = 'TEMPLATE_UV_VERSION'
 
+# The copier the harness generates with, in the matrix and in the invariant fixture. Unpinned,
+# `uvx copier` was whatever PyPI had that morning, so a copier release could fail every cell
+# with no commit behind it. Bump it like any other pin: here, under the exclude-newer boundary.
+COPIER_VERSION = '9.19.1'
+
 PROJECT_SLUG = 'paleofuturistic_python_project'
 
 

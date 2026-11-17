@@ -33,6 +33,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 # E402: the sys.path wiring above has to run first — this import is what it exists for.
 from _CI.tasks.configuration import (  # noqa: E402
+    COPIER_VERSION,
     PROJECT_SLUG,
     combo_context,
     copy_template_snapshot,
@@ -67,7 +68,7 @@ def generate(template_snapshot):
         return subprocess.run(
             [
                 'uvx',
-                'copier',
+                f'copier@{COPIER_VERSION}',
                 'copy',
                 '--defaults',
                 '--trust',

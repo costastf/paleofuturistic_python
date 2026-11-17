@@ -142,10 +142,11 @@ def exec_runner(record):
     `os.environ`/`read_template_overrides` stubs the rest of this namespace sets up, not new
     ones of its own, and generation, init and the gate are what put the commands on record.
     """
-    from _CI.tasks.configuration import PROJECT_SLUG, qa_sequence  # noqa: PLC0415
+    from _CI.tasks.configuration import COPIER_VERSION, PROJECT_SLUG, qa_sequence  # noqa: PLC0415
 
     runner_source = (REPO_ROOT / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
     namespace = {
+        'COPIER_VERSION': COPIER_VERSION,
         'json': json,
         'os': os,
         'Path': Path,

@@ -15,6 +15,7 @@ from invoke import Context, task
 
 from _CI import PROJECT_ROOT_DIRECTORY, emojize_message
 from _CI.tasks.configuration import (
+    COPIER_VERSION,
     DEFAULT_BRANCH,
     PROJECT_SLUG,
     TEMPLATE_SECURITY_OVERRIDE_ENV,
@@ -201,7 +202,10 @@ def generate_project(
     data_file = combo_root / 'data.json'
     data_file.write_text(json.dumps(extra_context or {}), encoding='utf-8')
     project_dir = combo_root / 'generated' / PROJECT_SLUG
-    copier_cmd = f'uvx copier copy --defaults --trust --data-file {data_file} {workspace.template_repo} {project_dir}'
+    copier_cmd = (
+        f'uvx copier@{COPIER_VERSION} copy --defaults --trust --data-file {data_file} '
+        f'{workspace.template_repo} {project_dir}'
+    )
     # Pin what generation stamps, so the generated `required-version` matches the uv this run
     # is using — otherwise every `uv sync` afterwards fails on a version mismatch.
     if not run_command(copier_cmd, env=generation_env(), log_file=log_file):
