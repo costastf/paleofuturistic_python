@@ -280,22 +280,36 @@ def image_digest_reference(context: Context, engine: str, image: str) -> str:
     which keeps the command free of braces needing shell quoting and avoids docker and
     podman disagreeing on which template field carries the repository digest.
     """
-    repository = image.rsplit(':', 1)[0]
+    entries = inspect_image(context, engine, image)
+    if entries is None:
+        return image
+    digest = repo_digest(entries, repository=image.rsplit(':', 1)[0])
+    if digest is None:
+        print(f'No repo digest recorded for {image}; falling back to the tag.')
+        return image
+    return digest
+
+
+def inspect_image(context: Context, engine: str, image: str) -> list[dict] | None:
+    """Return the parsed ``inspect`` entries for a local ``image``, or None with a note when there are none."""
     result = context.run(f'{engine} image inspect {image}', hide=True, warn=True)
     if result.failed:
         print(f'Could not inspect {image} for a digest; falling back to the tag.')
-        return image
+        return None
     try:
-        entries = json.loads(result.stdout)
+        return json.loads(result.stdout)
     except json.JSONDecodeError:
         print(f'Could not parse {engine} inspect output for {image}; falling back to the tag.')
-        return image
+        return None
+
+
+def repo_digest(entries: list[dict], repository: str) -> str | None:
+    """Return the first ``repository@sha256:…`` reference among the entries' ``RepoDigests``, if any."""
     for entry in entries:
         for reference in entry.get('RepoDigests') or []:
             if reference.startswith(f'{repository}@sha256:'):
                 return reference
-    print(f'No repo digest recorded for {image}; falling back to the tag.')
-    return image
+    return None
 
 
 def apply_badge(  # noqa: PLR0913 — one general-purpose writer for every badge, each parameter orthogonal
@@ -467,30 +481,33 @@ def logged(name: str) -> Callable[[Callable[..., None]], Callable[..., None]]:
     def decorator(fn: Callable[..., None]) -> Callable[..., None]:
         @wraps(fn)
         def wrapper(context: Context, *args: object, **kwargs: object) -> None:
+            def body() -> None:
+                fn(context, *args, **kwargs)
+
+            def indented_body() -> None:
+                with indented_streams(INDENT):
+                    body()
+
             depth_before = DEPTH.get()
             token = DEPTH.set(depth_before + 1)
             try:
-                if depth_before == 0:
-                    try:
-                        with indented_streams(INDENT):
-                            fn(context, *args, **kwargs)
-                        print(f'✅ {name} passed 👍')
-                    except SystemExit:
-                        print(f'❌ {name} failed 👎')
-                        raise
-                else:
-                    try:
-                        fn(context, *args, **kwargs)
-                        print(f'✅ {name} passed 👍')
-                    except SystemExit:
-                        print(f'❌ {name} failed 👎')
-                        raise
+                with_banner(name, indented_body if depth_before == 0 else body)
             finally:
                 DEPTH.reset(token)
 
         return wrapper
 
     return decorator
+
+
+def with_banner(name: str, body: Callable[[], None]) -> None:
+    """Run ``body`` and print the ✅ banner for ``name``, or the ❌ one before a `SystemExit` goes on."""
+    try:
+        body()
+    except SystemExit:
+        print(f'❌ {name} failed 👎')
+        raise
+    print(f'✅ {name} passed 👍')
 
 
 def run_steps(*steps: Callable[[Context], None]) -> Callable[[Context], None]:

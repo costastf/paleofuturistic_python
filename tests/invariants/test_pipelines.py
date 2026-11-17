@@ -199,10 +199,12 @@ def test_deps_image_reference_is_digest_pinned(generated_project):
     assert 'image_digest_reference' in host_py
     shared = load_generated_shared(project)
     resolver = inspect.getsource(shared.image_digest_reference)
-    assert 'RepoDigests' in resolver
+    assert 'inspect_image' in resolver, 'the resolver no longer inspects the local image'
+    assert 'repo_digest' in resolver, 'the resolver no longer reads the repo digest out of the inspection'
+    assert 'RepoDigests' in inspect.getsource(shared.repo_digest)
     # Parsed as JSON rather than via a Go --format template, which docker and
     # podman expose differently and which needs brace quoting in a shell command.
-    assert 'json.loads' in resolver
+    assert 'json.loads' in inspect.getsource(shared.inspect_image)
 
 
 def test_deps_image_is_built_unless_reuse_is_asked_for(generated_project):
