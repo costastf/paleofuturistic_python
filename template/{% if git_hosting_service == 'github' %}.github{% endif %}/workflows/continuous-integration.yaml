@@ -21,6 +21,11 @@ on:
 permissions:
   contents: read
 
+# The uv cache and the checkout sit on different filesystems on a runner, so uv's hardlinks
+# fail over to copies with a warning on every sync; asking for copies is the same result, quiet.
+env:
+  UV_LINK_MODE: copy
+
 # Why every checkout below sets `persist-credentials: false`, stated once rather than in
 # each job: auth goes into an `http.extraheader` that is removed once the fetch is done, so
 # no credential is left in `.git/config` and `origin` stays a clean URL. That matters

@@ -1,3 +1,7 @@
+# check=skip=InvalidDefaultArgInFrom
+# BASE_IMAGE has no default on purpose: every builder passes the digest-pinned image the
+# project's uv pin maps to (`container.tag` prints it), and a default would hide a build that
+# forgot to. BuildKit warns about the empty default; the directive above silences that one warning.
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
@@ -11,6 +15,9 @@ RUN uv sync --frozen --all-extras --dev --no-install-project
 
 ENV UV_PROJECT_ENVIRONMENT=/app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
+# The runner mounts the workspace and the uv cache from other filesystems than this image's
+# layers, so hardlinking fails over to copying with a warning on every job; ask for copying.
+ENV UV_LINK_MODE=copy
 
 # Drop root. uid 1001 is not arbitrary: it is the uid GitHub's hosted runners own the
 # mounted workspace with, and a mismatch would leave that workspace unwritable to the
