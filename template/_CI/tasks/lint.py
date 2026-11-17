@@ -92,17 +92,22 @@ def pyproject(context: Context, paths: str = '') -> None:
     execute(context, f'uv run validate-pyproject {paths or "pyproject.toml"}')
 
 
+# The cognitive complexity a function may reach before the gate fails it. complexipy's own
+# default is 15; the template holds itself and the projects it generates to 8 (ADR-0051).
+COMPLEXITY_BAR = 8
+
+
 @task
 @logged('lint.complexipy')
 def complexipy(context: Context, paths: str = '') -> None:
-    """Run complexipy cognitive complexity checker.
+    """Run complexipy, failing any function whose cognitive complexity is above ``COMPLEXITY_BAR``.
 
     Args:
         context: Invoke context.
         paths: Space-separated paths to check. Defaults to ``src/``.
 
     """
-    execute(context, f'uv run complexipy {paths or "src/"}')
+    execute(context, f'uv run complexipy --max-complexity-allowed {COMPLEXITY_BAR} {paths or "src/"}')
 
 
 def resolves(context: Context, revision: str) -> bool:

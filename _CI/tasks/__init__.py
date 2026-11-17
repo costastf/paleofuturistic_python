@@ -8,6 +8,7 @@ from _CI.tasks.document import build as document_build
 from _CI.tasks.document import deploy_github as document_deploy_github
 from _CI.tasks.document import document
 from _CI.tasks.document import view as document_view
+from _CI.tasks.lint import complexipy as lint_complexipy
 from _CI.tasks.lint import format_ as lint_format
 from _CI.tasks.lint import lint
 from _CI.tasks.lint import pylint as lint_pylint
@@ -40,6 +41,7 @@ lint_collection.add_task(cast(Task, lint_ruff), name='ruff')
 lint_collection.add_task(cast(Task, lint_format), name='format')
 lint_collection.add_task(cast(Task, lint_pylint), name='pylint')
 lint_collection.add_task(cast(Task, lint_ty), name='ty')
+lint_collection.add_task(cast(Task, lint_complexipy), name='complexipy')
 
 namespace = Collection()
 namespace.add_collection(test_collection)
