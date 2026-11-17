@@ -40,8 +40,10 @@ This updates both `pyproject.toml` and `uv.lock`. Commit both. See [How-to: add 
 ## Why everything is pinned, and what bounds the rest
 
 Every entry in every group is pinned to an exact version, and `[tool.uv] exclude-newer`
-carries a fixed date that bounds the transitive closure. Together they mean a resolution
-only changes when a commit changes it.
+carries a fixed instant, midnight UTC of a date, that bounds the transitive closure. Together
+they mean a resolution only changes when a commit changes it. The instant is spelled in UTC
+rather than as a bare date because uv reads a bare date as local midnight and writes that
+into `uv.lock`, so a lock written in one time zone would fail `uv lock --check` in another.
 
 That date used to be a rolling `"1 week"` window, which moved forward on its own — so a
 newly published package could alter a resolution, and turn a gate red, with nothing in the

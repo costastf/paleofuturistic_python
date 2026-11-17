@@ -175,15 +175,21 @@ def boundary_date(boundary: str) -> str:
 
 
 def raise_boundary(target: str) -> tuple[str, str]:
-    """Write ``exclude-newer = "target"`` into pyproject.toml. Return the content before and after."""
+    """Write ``exclude-newer`` as midnight UTC of ``target`` into pyproject.toml. Return the content before and after.
+
+    Spelled in UTC, as generation stamps it: uv reads a bare date as local midnight and writes
+    that instant into ``uv.lock``, so a lock written in one zone fails ``uv lock --check`` in
+    another (ADR-0054).
+    """
     original = PYPROJECT.read_text(encoding='utf-8')
     match = EXCLUDE_NEWER.search(original)
     if not match:
         print('No `exclude-newer = "…"` line in pyproject.toml; nothing to raise.')
         raise SystemExit(1)
-    content = EXCLUDE_NEWER.sub(f'exclude-newer = "{target}"', original)
+    boundary = f'{target}T00:00:00Z'
+    content = EXCLUDE_NEWER.sub(f'exclude-newer = "{boundary}"', original)
     PYPROJECT.write_text(content, encoding='utf-8')
-    print(f'exclude-newer {match["boundary"]} → {target}')
+    print(f'exclude-newer {match["boundary"]} → {boundary}')
     return original, content
 
 

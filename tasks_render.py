@@ -66,11 +66,15 @@ def stamp_dependency_quarantine_date() -> None:
 
     Jinja cannot express this: copier exposes no clock, and ``jinja2-time`` would add a
     barely-maintained extension to the generation path for one substitution.
+
+    Midnight UTC of the day, spelled out: uv reads a bare date as local midnight and writes
+    that instant into ``uv.lock``, so a lock written in one zone fails ``uv lock --check`` in
+    another (ADR-0054).
     """
     if not PYPROJECT.exists():
         return
     content = PYPROJECT.read_text(encoding='utf-8')
-    updated, replaced = EXCLUDE_NEWER_PATTERN.subn(f'exclude-newer = "{TODAY.isoformat()}"', content)
+    updated, replaced = EXCLUDE_NEWER_PATTERN.subn(f'exclude-newer = "{TODAY.isoformat()}T00:00:00Z"', content)
     if replaced:
         PYPROJECT.write_text(updated, encoding='utf-8')
 

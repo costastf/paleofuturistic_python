@@ -90,3 +90,4 @@ anywhere in the repository resolves to a file.
 | [ADR-0051](0051-the-complexity-bar-is-8-and-the-parent-holds-it.md) | The complexity bar is 8, and the parent holds it |
 | [ADR-0052](0052-the-parent-checks-its-commit-messages-over-the-unpushed-range.md) | The parent checks its commit messages over the unpushed range |
 | [ADR-0053](0053-ci-hands-the-commit-check-the-range-it-cannot-infer.md) | CI hands the commit-message check the range it cannot infer |
+| [ADR-0054](0054-the-quarantine-boundary-is-an-instant-in-utc.md) | The quarantine boundary is an instant in UTC |

@@ -43,7 +43,7 @@ No license header or dunder metadata is added to individual source files. The ma
 
 ### Stamp the quarantine date
 
-Sets `[tool.uv] exclude-newer` in the generated `pyproject.toml` to the generation date, so the new project's resolutions are frozen at the day it was made rather than inheriting the template's own boundary.
+Sets `[tool.uv] exclude-newer` in the generated `pyproject.toml` to midnight UTC of the generation date (a bare date would mean local midnight, and the lock would record that zone), so the new project's resolutions are frozen at the day it was made rather than inheriting the template's own boundary.
 
 ### Stamp the uv pin
 

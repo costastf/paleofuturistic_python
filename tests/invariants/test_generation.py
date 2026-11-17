@@ -2,7 +2,7 @@
 
 import re
 import tomllib
-from datetime import date
+from datetime import date, datetime
 
 import pytest
 import yaml
@@ -182,17 +182,20 @@ def test_default_branch_is_spelled_from_one_answer(generate, tmp_path_factory, h
     assert not lines_naming_main(project)
 
 
-def test_exclude_newer_is_a_fixed_date(generated_project):
-    """`exclude-newer` is an absolute date, not a rolling window.
+def test_exclude_newer_is_a_fixed_instant_in_utc(generated_project):
+    """`exclude-newer` is an absolute instant spelled in UTC, not a rolling window or a bare date.
 
     A relative `"1 week"` moved forward daily, so a resolution — and a green gate — could
-    change with no commit behind it. That is how the toolchain drifted into a red lint run
-    with no code change.
+    change with no commit behind it. A bare date was an instant too, but local midnight: uv
+    wrote it into `uv.lock` as such, so a lock written in one zone failed `uv lock --check`
+    in another, and the launcher re-locked inside the UTC container (ADR-0054).
     """
     project, _ = generated_project
     for pyproject in (project / 'pyproject.toml', REPO_ROOT / 'pyproject.toml'):
         value = tomllib.loads(pyproject.read_text(encoding='utf-8'))['tool']['uv']['exclude-newer']
-        assert re.fullmatch(r'\d{4}-\d{2}-\d{2}', value), f'{pyproject} has a relative window: {value!r}'
+        assert re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z', value), (
+            f'{pyproject} has a boundary that is not an instant in UTC: {value!r}'
+        )
 
 
 def test_generated_quarantine_date_is_stamped_not_inherited(generated_project):
@@ -204,9 +207,9 @@ def test_generated_quarantine_date_is_stamped_not_inherited(generated_project):
     case the fallback literal shows through and is already days stale.
     """
     project, _ = generated_project
-    stamped = date.fromisoformat(
+    stamped = datetime.fromisoformat(
         tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))['tool']['uv']['exclude-newer']
-    )
+    ).date()
     # A day of slack absorbs a suite running across midnight; a missed stamp is far staler.
     today = date.today()  # noqa: DTZ011 - compared against a stamped calendar date
     assert abs((today - stamped).days) <= 1, f'quarantine date {stamped} was not stamped at generation'

@@ -41,6 +41,8 @@ Three things could change what a project resolved to without a commit changing i
   stamped the same day.
 - Raising the quarantine date was a three-step manual flow until ADR-0042 added
   `develop.refresh-deps`.
+- The date is spelled as midnight UTC since ADR-0054: as a bare date it meant local
+  midnight, which the lock recorded, so the lock depended on the zone it was written in.
 
 ## References
 

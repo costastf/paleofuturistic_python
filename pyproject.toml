@@ -11,17 +11,19 @@ package = false
 # is the uv CI installs before generating anything, and the floor a generated project falls
 # back to when it cannot reach PyPI.
 required-version = "==0.13.7"
-# Fixed date, not a relative window. `exclude-newer = "1 week"` moved forward every day,
-# so a resolution could change — and a gate could go red — with no commit behind it.
+# A fixed instant, not a relative window. `exclude-newer = "1 week"` moved forward every day,
+# so a resolution could change — and a gate could go red — with no commit behind it. Spelled
+# in UTC, not as a bare date: uv reads a bare date as local midnight and writes that instant
+# into uv.lock, so a lock written in one zone failed `uv lock --check` in another (ADR-0054).
 #
-# Bumping it is a deliberate act: raise the date, re-resolve, and land the resulting
+# Bumping it is a deliberate act: raise the boundary, re-resolve, and land the resulting
 # dependency-group bumps in the same commit so the quarantine boundary and the pins always
 # agree.
 #
 # This is the template repository's own boundary, maintained by hand. Generated projects
 # get theirs stamped with their generation date by tasks_render.py, so a project created
 # later does not inherit a boundary that has receded into the past.
-exclude-newer = "2026-11-10"
+exclude-newer = "2026-11-10T23:00:00Z"
 
 [dependency-groups]
 # PyYAML parses copier.yml in _CI.tasks.configuration.base_context; the `dev` group is

@@ -108,5 +108,6 @@ nav:
       - ADR-0051 The complexity bar is 8, and the parent holds it: maintaining/decisions/0051-the-complexity-bar-is-8-and-the-parent-holds-it.md
       - ADR-0052 The parent checks its commit messages over the unpushed range: maintaining/decisions/0052-the-parent-checks-its-commit-messages-over-the-unpushed-range.md
       - ADR-0053 CI hands the commit-message check the range it cannot infer: maintaining/decisions/0053-ci-hands-the-commit-check-the-range-it-cannot-infer.md
+      - ADR-0054 The quarantine boundary is an instant in UTC: maintaining/decisions/0054-the-quarantine-boundary-is-an-instant-in-utc.md
 
 copyright: Copyright &copy; 2024 <a href="https://schubergphilis.com/">Schuberg Philis</a>
