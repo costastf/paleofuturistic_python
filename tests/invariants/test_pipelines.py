@@ -582,6 +582,51 @@ def invoked_tasks(pipeline):
         yield command, invoked[0] if invoked else ''
 
 
+COMMIT_RANGE_REFS = ('PRE_COMMIT_FROM_REF', 'PRE_COMMIT_TO_REF')
+
+
+def step_running(job, command):
+    """Return the step of a GitHub job whose `run:` is exactly ``command``."""
+    return next(step for step in job['steps'] if step.get('run') == command)
+
+
+def checkout_of(job):
+    """Return the `actions/checkout` step of a GitHub job."""
+    return next(step for step in job['steps'] if str(step.get('uses', '')).startswith('actions/checkout@'))
+
+
+def assert_github_job_hands_over_the_range(job, job_name, command):
+    """A GitHub job running ``command`` fetches full history and exports both range refs to it."""
+    assert checkout_of(job)['with'].get('fetch-depth') == 0, f'{job_name} clones one commit, so no range can resolve'
+    env = step_running(job, command).get('env') or {}
+    assert set(COMMIT_RANGE_REFS) <= set(env), f'{job_name} hands the commit-message check no range: {env}'
+
+
+def test_ci_hands_the_commit_check_the_range_it_cannot_infer(generated_project):
+    """Every job running the gate fetches full history and exports the commit range (ADR-0053).
+
+    A depth-1 clone holds one commit, and on a pull request that is the merge commit, whose
+    "Merge" subject commitizen accepts, so the check used to read nothing there. The event
+    knows the range; the job hands it over under the names pre-commit uses, so the task has
+    one reader for the hook and for CI. The parent's own lint job does the same.
+    """
+    project, cell = generated_project
+    if cell['git_hosting_service'] == 'github':
+        workflow = yaml.safe_load(
+            (project / '.github' / 'workflows' / 'continuous-integration.yaml').read_text(encoding='utf-8')
+        )
+        for job_name in ('preflight', 'preflight-from-fork'):
+            assert_github_job_hands_over_the_range(workflow['jobs'][job_name], job_name, './workflow.cmd preflight')
+    else:
+        job = yaml.safe_load((project / '.gitlab-ci.yml').read_text(encoding='utf-8'))['preflight']
+        assert job['variables']['GIT_DEPTH'] == 0, 'the preflight job clones a depth no range can resolve in'
+        exported = '\n'.join(job['before_script'])
+        for ref in COMMIT_RANGE_REFS:
+            assert f'export {ref}=' in exported, f'the preflight job does not export {ref}'
+    parent = yaml.safe_load((REPO_ROOT / '.github' / 'workflows' / 'template-matrix.yaml').read_text(encoding='utf-8'))
+    assert_github_job_hands_over_the_range(parent['jobs']['lint'], 'the parent lint job', './workflow.cmd lint')
+
+
 def test_ci_runs_the_same_gate_as_the_pre_push_hook(generated_project):
     """CI's preflight job runs the identical command the pre-push hook does.
 

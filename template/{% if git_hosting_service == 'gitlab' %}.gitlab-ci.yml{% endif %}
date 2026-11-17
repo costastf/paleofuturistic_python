@@ -91,8 +91,17 @@ preflight:
   needs:
     - job: build-deps-image
       artifacts: true
+  variables:
+    # Full history, so both ends of the commit-message check's range resolve (ADR-0053).
+    GIT_DEPTH: 0
   before_script:
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    # The range the commit-message check cannot infer from the clone: a merge request's diff
+    # base, else what the push added, to the pipeline's commit. The names are the ones
+    # pre-commit hands the pre-push hook, so the task has one reader for both. A first push
+    # has an all-zero before, which does not resolve, and the task falls through to the tip.
+    - export PRE_COMMIT_FROM_REF="${CI_MERGE_REQUEST_DIFF_BASE_SHA:-$CI_COMMIT_BEFORE_SHA}"
+    - export PRE_COMMIT_TO_REF="$CI_COMMIT_SHA"
   script:
     - ./workflow.cmd preflight
 

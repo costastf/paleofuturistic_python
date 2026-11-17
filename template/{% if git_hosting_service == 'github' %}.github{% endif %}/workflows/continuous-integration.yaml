@@ -60,6 +60,9 @@ jobs:
         with:
           # See the note above the jobs for why.
           persist-credentials: false
+          # The commit-message check reads a range; a depth-1 clone holds one commit, and on
+          # a pull request that is the merge commit, which commitizen waves through.
+          fetch-depth: 0
 
       # The same command the pre-push hook runs, so anything failing here would have failed
       # the push: format, lint, ty, commitizen, the docs build, pyscn, the tox matrix, the wheel, and the badges and
@@ -68,8 +71,15 @@ jobs:
       # No `--write`: `contents: read` and the credential-less checkout above mean this job
       # could not commit a refreshed badge anyway, so its only useful move is to fail and name
       # the command that fixes it.
+      #
+      # The two refs are the range the commit-message check cannot infer from the clone: what
+      # the push added, or on a pull request its base and head. The names are the ones
+      # pre-commit hands the pre-push hook, so the task has one reader for both (ADR-0053).
       - name: Verify checks and derived files
         run: ./workflow.cmd preflight
+        env:
+          PRE_COMMIT_FROM_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+          PRE_COMMIT_TO_REF: ${{ github.event.pull_request.head.sha || github.sha }}
 
   # The same gate for a pull request from a fork, on the runner's own image: no registry
   # push is possible with that token, so the dependencies are installed at job time instead
@@ -90,6 +100,8 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           persist-credentials: false
+          # Full history, for the commit-message check's range; see the job above.
+          fetch-depth: 0
 
       # Reads `[tool.uv] required-version` from pyproject.toml, so the uv it installs is the
       # one the launcher insists on.
@@ -98,8 +110,12 @@ jobs:
         with:
           enable-cache: true
 
+      # The pull request's base and head, as the job above exports them; see ADR-0053.
       - name: Verify checks and derived files
         run: ./workflow.cmd preflight
+        env:
+          PRE_COMMIT_FROM_REF: ${{ github.event.pull_request.base.sha }}
+          PRE_COMMIT_TO_REF: ${{ github.event.pull_request.head.sha }}
 
       - name: Minimize uv cache
         run: uv cache prune --ci

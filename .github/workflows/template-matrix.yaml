@@ -42,10 +42,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          # The commit-message check reads a range, and a depth-1 clone holds one commit: on
+          # a pull request the merge commit, whose "Merge" subject commitizen waves through.
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
         with:
           version: ${{ needs.plan.outputs.uv-version }}
       - run: ./workflow.cmd lint
+        # The range the commit-message check cannot infer from the clone: the pull request's
+        # commits, or what the push added. The names are the ones pre-commit hands a pre-push
+        # hook, so the task has one reader for the hook and for CI (ADR-0053).
+        env:
+          PRE_COMMIT_FROM_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+          PRE_COMMIT_TO_REF: ${{ github.event.pull_request.head.sha || github.sha }}
 
   invariants:
     needs: plan

@@ -107,5 +107,6 @@ nav:
       - ADR-0050 The deps image is built every run unless asked to reuse: maintaining/decisions/0050-the-deps-image-is-built-every-run-unless-asked-to-reuse.md
       - ADR-0051 The complexity bar is 8, and the parent holds it: maintaining/decisions/0051-the-complexity-bar-is-8-and-the-parent-holds-it.md
       - ADR-0052 The parent checks its commit messages over the unpushed range: maintaining/decisions/0052-the-parent-checks-its-commit-messages-over-the-unpushed-range.md
+      - ADR-0053 CI hands the commit-message check the range it cannot infer: maintaining/decisions/0053-ci-hands-the-commit-check-the-range-it-cannot-infer.md
 
 copyright: Copyright &copy; 2024 <a href="https://schubergphilis.com/">Schuberg Philis</a>

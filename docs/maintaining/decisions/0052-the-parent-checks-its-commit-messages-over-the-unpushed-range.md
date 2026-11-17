@@ -33,8 +33,9 @@ rather than listed in the static `CHECKS` table the other commands sit in.
 
 - A commit whose message breaks the convention fails `lint` locally before it is pushed, and
   CI's `lint` job on the commit that arrived. The early history stays as it is.
-- The `lint` job's checkout is shallow, so in CI the check reads the tip commit alone, as a
-  generated project's does; a bad message already pushed fails until a good one lands on it.
+- The `lint` job's checkout was shallow, so in CI the check read the tip commit alone, and on
+  a pull request that tip was the merge commit, which commitizen accepts. ADR-0053 has the job
+  export the range instead.
 - The pyproject validator is now the only step of a generated project's `lint` the parent does
   not run.
 

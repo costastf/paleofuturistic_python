@@ -30,6 +30,8 @@ made, in CI the commit that arrived.
   any other way.
 - This repository ran no commit-message check of its own at the time; ADR-0052 gave it one over
   the same range.
+- "In CI the commit that arrived" was the merge commit on a pull request, which commitizen
+  accepts; ADR-0053 has the jobs export the range instead.
 
 ## References
 

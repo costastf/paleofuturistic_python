@@ -7,6 +7,7 @@ way as the code it produces (ADR-0048, ADR-0051, ADR-0052). The pyproject valida
 step of a generated project's `lint` not run here: this repository publishes no package.
 """
 
+import os
 import re
 import shutil
 from collections.abc import Callable
@@ -55,19 +56,33 @@ def has_commits(context: Context, revision_range: str) -> bool:
     return not counted.failed and counted.stdout.strip() not in ('', '0')
 
 
-def unpushed_range(context: Context) -> str:
-    """Return the range `cz check` reads: what a push would add, else what the branch adds, else the tip.
+def range_candidates(context: Context) -> list[str]:
+    """Return the ranges that could bound the check, best-informed first, each end resolving in this clone.
 
-    The same bound a generated project's `lint.commitizen` applies (ADR-0024), without the
-    pre-commit refs: this repository installs no hooks. The tracking branch first, which is
-    what a push would add; then the remote's default branch, which is everything the branch
-    holds over it, pushed or not. An empty range falls through, since in CI the branch tracks
-    a ref that *is* `HEAD`. The tip is `HEAD~1..HEAD` where a parent exists and `HEAD` where it
-    does not, which is a root commit or a shallow clone (ADR-0052).
+    The `lint` job exports `PRE_COMMIT_FROM_REF` and `PRE_COMMIT_TO_REF`, the names pre-commit
+    hands a generated project's pre-push hook, so one reader serves the hook there and CI here
+    (ADR-0053): a pull request's base and head, or what a push added. Then the tracking
+    branch, which is what a push would add; then the remote's default branch, which is
+    everything the branch holds over it, pushed or not.
     """
-    for base in ('@{upstream}', 'origin/HEAD'):
-        candidate = f'{base}..HEAD'
-        if resolves(context, base) and has_commits(context, candidate):
+    from_ref, to_ref = os.environ.get('PRE_COMMIT_FROM_REF', ''), os.environ.get('PRE_COMMIT_TO_REF', '')
+    candidates = []
+    if from_ref and to_ref and resolves(context, from_ref) and resolves(context, to_ref):
+        candidates.append(f'{from_ref}..{to_ref}')
+    candidates.extend(f'{base}..HEAD' for base in ('@{upstream}', 'origin/HEAD') if resolves(context, base))
+    return candidates
+
+
+def unpushed_range(context: Context) -> str:
+    """Return the range `cz check` reads: the first candidate holding a commit, else the tip alone.
+
+    The same bound a generated project's `lint.commitizen` applies (ADR-0024, ADR-0052). An
+    empty candidate falls through, since in CI the branch tracks a ref that *is* `HEAD`. The
+    tip is `HEAD~1..HEAD` where a parent exists and `HEAD` where it does not, which is a root
+    commit or a shallow clone.
+    """
+    for candidate in range_candidates(context):
+        if has_commits(context, candidate):
             return candidate
     return 'HEAD~1..HEAD' if resolves(context, 'HEAD^') else 'HEAD'
 
