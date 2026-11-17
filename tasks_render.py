@@ -7,10 +7,13 @@ steps that cannot be expressed declaratively:
 * install the chosen LICENSE (substituting author/year tokens) and drop the staging dir,
 * stamp today's date as the dependency-quarantine boundary,
 * stamp a fresh uv pin, so a project is current on the day it is created,
-* ensure ``workflow.cmd`` keeps its executable bit.
+* ensure ``workflow.cmd`` keeps its executable bit,
+* resolve the lockfile with the uv just pinned, so the project starts reproducible.
 
 Answer validation lives in the ``copier.yml`` validators and host/pages pruning in conditional
-file names, so this script only receives the two answers it needs, as CLI arguments.
+file names, so this script only receives the two answers it needs, as CLI arguments. It is the
+only task copier runs, and it runs no shell: generation works from a Windows prompt as it does
+from a POSIX one (ADR-0055).
 """
 
 import argparse
@@ -18,6 +21,7 @@ import importlib.util
 import os
 import re
 import stat
+import subprocess
 from datetime import date
 from pathlib import Path
 from types import ModuleType
@@ -31,6 +35,7 @@ YEAR = str(TODAY.year)
 
 EXCLUDE_NEWER_PATTERN = re.compile(r'^exclude-newer = "[^"]*"$', re.MULTILINE)
 REQUIRES_PYTHON_PATTERN = re.compile(r'^requires-python = ">=([^"]+)"$', re.MULTILINE)
+REQUIRED_VERSION_PATTERN = re.compile(r'^required-version = "==([^"]+)"$', re.MULTILINE)
 
 # Lets the template's own harness pin what generation stamps. Without it the ambient uv that
 # CI installed — taken from the template's committed pin — would not satisfy a freshly stamped
@@ -171,6 +176,27 @@ def stamp_uv_version() -> None:
         print(f'  this crosses a minor version ({pinned} → {target}); uv is pre-1.0, so behaviour may differ.')
 
 
+def lock_with_pinned_uv() -> None:
+    """Resolve ``uv.lock`` with the uv the project pins, so the new project starts reproducible.
+
+    Without a lock, ``Dockerfile.deps`` (``COPY … uv.lock`` + ``uv sync --frozen``) and the
+    deps-image tag both depended on one created as a side effect of the first ``uv run``, and
+    every environment re-resolved from scratch.
+
+    The version is read back out of the rendered ``pyproject.toml`` rather than repeated here,
+    so it cannot drift from ``[tool.uv] required-version``. It runs through ``uvx uv@<version>``
+    instead of the ambient ``uv`` because the project pins an exact uv, so any other version
+    refuses to run at all, which would fail generation for everyone whose local uv differs.
+    A missing pin is a template defect and stops generation, as a failed resolution does.
+    """
+    match = REQUIRED_VERSION_PATTERN.search(PYPROJECT.read_text(encoding='utf-8'))
+    if match is None:
+        print(f'{PYPROJECT} pins no uv version; cannot resolve the lockfile.')
+        raise SystemExit(1)
+    # A fixed argument list and no shell; `uvx` is found on the path, as copier itself was.
+    subprocess.run(['uvx', f'uv@{match.group(1)}', 'lock'], check=True)  # noqa: S603, S607
+
+
 def make_workflow_cmd_executable() -> None:
     """Set the executable bit on workflow.cmd so the Unix launcher works."""
     if WORKFLOW_CMD.exists():
@@ -188,11 +214,12 @@ def main() -> None:
     args = parser.parse_args()
 
     install_license(args.license, args.author)
-    # Both stamps must precede the `uv lock` task in copier.yml: it resolves against the
-    # quarantine boundary and runs `uvx uv@<version>` read back out of the file this writes.
+    # Both stamps precede the lock: it resolves against the quarantine boundary and runs the
+    # `uvx uv@<version>` read back out of the file they write.
     stamp_dependency_quarantine_date()
     stamp_uv_version()
     make_workflow_cmd_executable()
+    lock_with_pinned_uv()
 
 
 if __name__ == '__main__':

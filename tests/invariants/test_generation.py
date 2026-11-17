@@ -20,6 +20,7 @@ from .support import (
     REPO_ROOT,
     VENDOR_TREES,
     WELL_KNOWN_URL_LABELS,
+    function_source,
     lines_naming_main,
     load_generated_configuration,
     manifest_packages,
@@ -316,18 +317,27 @@ def test_repo_uv_pin_points_at_its_own_command():
     assert 'maintain.bump-uv' in content[:index].rsplit('\n\n', 1)[-1]
 
 
-def test_lock_task_derives_the_uv_version_from_the_project():
-    """The copier lock task reads the uv version out of the rendered pyproject.
+def test_generation_runs_one_python_task_and_no_shell():
+    """Copier runs the render hook alone, and the hook locks with the uv the project pins (ADR-0055).
 
-    Hardcoding it in copier.yml would silently drift from `[tool.uv] required-version`, and
-    the generated project pins uv exactly — so a stale value there fails generation outright.
+    A second task once ran `uvx uv@$(sed … pyproject.toml) lock`, which needed a POSIX shell
+    and failed generation from a Windows prompt after every file was written. The lock lives
+    in the hook now, which reads the pin out of the rendered pyproject rather than repeating
+    it: a hardcoded value would drift from `[tool.uv] required-version`, and the project pins
+    uv exactly, so a stale value fails generation outright.
     """
-    # Parsed, not grepped: the surrounding comments also mention `uvx uv@`.
     tasks = yaml.safe_load((REPO_ROOT / 'copier.yml').read_text(encoding='utf-8'))['_tasks']
     commands = [task['command'] if isinstance(task, dict) else task for task in tasks]
-    lock_task = next(command for command in commands if 'uvx uv@' in command)
-    assert 'required-version' in lock_task, 'lock task hardcodes a uv version instead of deriving it'
-    assert 'pyproject.toml' in lock_task, 'lock task does not read the version from the rendered project'
+    assert len(commands) == 1, f'copier runs {len(commands)} tasks, not the render hook alone'
+    assert 'tasks_render.py' in commands[0], f'the one task is not the render hook: {commands[0]!r}'
+    assert '$(' not in commands[0], f'the task needs a shell: {commands[0]!r}'
+
+    render = (REPO_ROOT / 'tasks_render.py').read_text(encoding='utf-8')
+    lock = function_source(render, 'lock_with_pinned_uv')
+    assert 'REQUIRED_VERSION_PATTERN' in lock, 'the lock does not read the pin out of the rendered project'
+    assert "'uvx', f'uv@" in lock, 'the lock does not run through the pinned uv'
+    assert 'shell=True' not in lock, 'the lock runs through a shell'
+    assert 'lock_with_pinned_uv()' in function_source(render, 'main'), 'the hook no longer locks'
 
 
 def test_local_task_module_is_protected_from_updates():

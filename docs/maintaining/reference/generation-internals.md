@@ -49,6 +49,10 @@ Sets `[tool.uv] exclude-newer` in the generated `pyproject.toml` to midnight UTC
 
 Resolves the newest uv release that has cleared its cool-down and writes it to every pin in `pyproject.toml`, digest included. `TEMPLATE_UV_VERSION` forces a version (the matrix sets it to the template's own pin so generation is deterministic), and an unreachable PyPI falls back to that pin too.
 
+### Resolve the lockfile
+
+Runs `uvx uv@<version> lock` with the version just pinned, read back out of the rendered `pyproject.toml`, so the new project starts with a lock the deps image and its tag can rely on. The ambient `uv` would refuse to run under the exact pin unless it happened to match. This used to be a second copier task shelling out to `sed`, which made generation fail from a Windows prompt; the script runs no shell (ADR-0055).
+
 ### Make `workflow.cmd` executable
 
 Sets the executable bit on `workflow.cmd`. On Windows the `.cmd` extension is sufficient; on Unix this step is what lets `./workflow.cmd …` work.
