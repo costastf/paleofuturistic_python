@@ -548,6 +548,11 @@ def invoked_task(hook):
     return match.group(1) if match else ''
 
 
+def hook_invoking(project, task):
+    """Return the shipped pre-commit hook that runs the workflow task ``task``."""
+    return next(hook for hook in pre_commit_hooks(project) if invoked_task(hook) == task)
+
+
 def step_declarations(source):
     """Yield each `Step(...)` call in the STEPS registry as ``{argument: value node}``.
 

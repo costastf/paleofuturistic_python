@@ -28,6 +28,7 @@ from .support import (
     function_named,
     function_source,
     git,
+    hook_invoking,
     hook_stages,
     imported_names,
     invoked_task,
@@ -105,16 +106,25 @@ def test_commit_stage_filter_is_the_union_of_the_steps_it_runs(generated_project
     project, _ = generated_project
     filters = per_file_step_filters(project)
     assert filters, 'the registry declares no per-file steps'
-    staged = next(hook for hook in pre_commit_hooks(project) if invoked_task(hook) == 'preflight.staged')
-    hook_filter = re.compile(staged['files'])
+    hook_filter = re.compile(hook_invoking(project, 'preflight.staged')['files'])
     for path in STAGEABLE_PATHS:
-        readers = sorted(name for name, pattern in filters.items() if pattern.search(path))
+        readers = steps_reading(filters, path)
         wakes = bool(hook_filter.search(path))
         assert wakes == bool(readers), (
             f'{path!r}: the hook {"wakes" if wakes else "sleeps"} but the steps that read it are {readers}'
         )
-    accepted = {name for name, pattern in filters.items() if any(pattern.search(p) for p in STAGEABLE_PATHS)}
+    accepted = {name for name, pattern in filters.items() if reads_any(pattern, STAGEABLE_PATHS)}
     assert accepted == set(filters), f'per-file steps no probe path exercises: {sorted(set(filters) - accepted)}'
+
+
+def steps_reading(filters, path):
+    """The per-file steps whose filter matches ``path``, by name."""
+    return sorted(name for name, pattern in filters.items() if pattern.search(path))
+
+
+def reads_any(pattern, paths):
+    """Whether a per-file step's filter matches at least one of ``paths``."""
+    return any(pattern.search(path) for path in paths)
 
 
 def test_whole_program_steps_are_never_scoped_to_a_diff(generated_project):
@@ -196,19 +206,10 @@ def test_the_coverage_floor_is_enforced_where_it_was_measured(generated_project)
     assert 'fail_under' in data['tool']['coverage']['report']
 
     test_py = (project / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
-    combine = function_source(test_py, 'combine_coverage')
-    # Command lines, not any line mentioning the command: the comments here discuss
-    # `coverage json` too, and an earlier version of this test inspected one of those and
-    # passed for that reason.
-    union_writes = [line for line in combine.splitlines() if 'coverage json -o' in line and '{COVERAGE_REPORT}' in line]
-    enforcing = [line.strip() for line in union_writes if '--fail-under' not in line]
+    enforcing = floor_enforcing_commands(function_source(test_py, 'combine_coverage'))
     assert len(enforcing) == 1, f'the floor is enforced by {len(enforcing)} commands, not one: {enforcing}'
 
-    reads = [
-        line.strip()
-        for line in test_py.splitlines()
-        if re.search(r'uv run coverage (report|json|html)', line) and line.strip() not in enforcing
-    ]
+    reads = other_coverage_commands(test_py, enforcing)
     assert reads, 'no coverage commands left to check, so this walk has stopped walking'
     for command in reads:
         assert '--fail-under=0' in command, f'{command} is gated by a floor its data cannot clear'
@@ -223,6 +224,26 @@ def test_the_coverage_floor_is_enforced_where_it_was_measured(generated_project)
     assert 'tox_matrix' in imported_from_test, (
         'the registry no longer runs the shared tox task, so the floor it enforces can drift'
     )
+
+
+def floor_enforcing_commands(combine):
+    """The `coverage json` writes of the combined report in ``combine`` that do not switch the floor off.
+
+    Command lines, not any line mentioning the command: the comments there discuss
+    `coverage json` too, and an earlier version of the floor test inspected one of those and
+    passed for that reason.
+    """
+    union_writes = [line for line in combine.splitlines() if 'coverage json -o' in line and '{COVERAGE_REPORT}' in line]
+    return [line.strip() for line in union_writes if '--fail-under' not in line]
+
+
+def other_coverage_commands(test_py, enforcing):
+    """Every coverage report, json or html command in the module that is not one of ``enforcing``."""
+    return [
+        line.strip()
+        for line in test_py.splitlines()
+        if re.search(r'uv run coverage (report|json|html)', line) and line.strip() not in enforcing
+    ]
 
 
 def test_the_gate_offers_no_way_to_run_less_than_ci(generated_project):
@@ -503,27 +524,29 @@ def test_the_push_hook_names_every_check_it_runs(generated_project):
     added without either updating the string or deciding, explicitly, that it needs no name.
     """
     project, _ = generated_project
-    # The phrase each step is called in prose. `audit` is deliberately absent: it is in the
-    # registry but off by default, being an answer about the advisory database rather than
-    # about this tree.
-    phrases = {
-        'ty': 'ty (types)',
-        'commitizen': 'commit messages',
-        'docs': 'docs build',
-        'pyscn': 'pyscn',
-        'tox': 'test matrix',
-        'build': 'wheel',
-        'artifacts': 'derived files',
-    }
-    gate = next(hook for hook in pre_commit_hooks(project) if invoked_task(hook) == 'preflight')
+    gate = hook_invoking(project, 'preflight')
     whole_program = [name for name, scope in registry_steps(project).items() if scope == 'WHOLE_PROGRAM']
-    unnamed = [name for name in whole_program if name != 'audit' and name not in phrases]
+    named = [name for name in whole_program if name != 'audit']
+    unnamed = [name for name in named if name not in PUSH_HOOK_PHRASES]
     assert not unnamed, f'steps with no agreed phrase for the hook name: {unnamed}'
-    for name in whole_program:
-        if name == 'audit':
-            assert 'audit' not in gate['name'], 'the hook name promises an audit it does not run'
-            continue
-        assert phrases[name] in gate['name'], f'{name!r} runs on every push and the hook does not say so'
+    for name in named:
+        assert PUSH_HOOK_PHRASES[name] in gate['name'], f'{name!r} runs on every push and the hook does not say so'
+    if 'audit' in whole_program:
+        assert 'audit' not in gate['name'], 'the hook name promises an audit it does not run'
+
+
+# The phrase each whole-program step is called in the push hook's name. `audit` is deliberately
+# absent: it is in the registry but off by default, being an answer about the advisory database
+# rather than about this tree.
+PUSH_HOOK_PHRASES = {
+    'ty': 'ty (types)',
+    'commitizen': 'commit messages',
+    'docs': 'docs build',
+    'pyscn': 'pyscn',
+    'tox': 'test matrix',
+    'build': 'wheel',
+    'artifacts': 'derived files',
+}
 
 
 def test_the_formatting_failure_names_a_command_you_can_paste(generated_project):
@@ -873,8 +896,7 @@ def test_matrix_envs_do_not_share_report_paths(generated_project):
     project, _ = generated_project
     data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
     addopts = data['tool']['pytest']['ini_options']['addopts']
-    commands = data['tool']['tox']['env_run_base']['commands']
-    specs = [argument for command in commands for argument in command if isinstance(argument, str)]
+    specs = tox_arguments(data['tool']['tox']['env_run_base']['commands'])
 
     overrides = [spec for spec in specs if spec.startswith('--cov-report=json:')]
     assert overrides, 'no per-env override for --cov-report=json:'
@@ -882,13 +904,23 @@ def test_matrix_envs_do_not_share_report_paths(generated_project):
         assert '{envname}' in spec, f'{spec!r} is fixed, so parallel envs clobber each other'
 
     for flag in ('--cov-report=html:', '--html='):
-        rendered = [spec for spec in (*addopts, *specs) if spec.startswith(flag)]
+        rendered = arguments_starting(flag, (*addopts, *specs))
         assert not rendered, f'a plain run renders {flag} for nobody: {rendered}'
 
     # `-n auto` under `run-parallel` asks for one pool per env, which measured slower on
     # sixteen cores than the same config on four.
     assert 'auto' not in addopts, 'every env spawns a pool sized for the whole machine'
     assert '-n' in addopts, 'the worker count is no longer pinned'
+
+
+def tox_arguments(commands):
+    """Every string argument of every tox command, in order; the `{envname}`-style substitution tables left out."""
+    return [argument for command in commands for argument in command if isinstance(argument, str)]
+
+
+def arguments_starting(flag, arguments):
+    """The arguments that start with ``flag``."""
+    return [argument for argument in arguments if argument.startswith(flag)]
 
 
 def test_matrix_coverage_is_combined_before_anything_reads_it(generated_project):
@@ -1055,9 +1087,19 @@ def test_derived_values_are_computed_in_both_modes_by_one_function(generated_pro
         'document.py': ['update_package_version_badge', 'update_python_badge', 'update_pipeline_badge'],
     }
     for filename, names in updaters.items():
-        tree = ast.parse((tasks / filename).read_text(encoding='utf-8'))
-        functions = {node.name: node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)}
+        functions = functions_defined((tasks / filename).read_text(encoding='utf-8'))
         for name in names:
             assert name in functions, f'{filename} no longer defines {name}'
-            kwonly = [argument.arg for argument in functions[name].args.kwonlyargs]
-            assert 'write' in kwonly, f'{name} takes no keyword-only `write`, so it cannot verify without writing'
+            assert 'write' in keyword_only(functions[name]), (
+                f'{name} takes no keyword-only `write`, so it cannot verify without writing'
+            )
+
+
+def functions_defined(source):
+    """``{name: node}`` for every function defined anywhere in ``source``."""
+    return {node.name: node for node in ast.walk(ast.parse(source)) if isinstance(node, ast.FunctionDef)}
+
+
+def keyword_only(function):
+    """The names of a function's keyword-only parameters."""
+    return [argument.arg for argument in function.args.kwonlyargs]
