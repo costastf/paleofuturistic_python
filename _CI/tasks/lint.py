@@ -25,6 +25,9 @@ PATHS = '_CI/__init__.py _CI/tasks/ tasks_render.py tests/'
 # With the test group: pylint and ty follow imports, so the modules `tests/` imports have to be
 # installed where they run, or every `import pytest` is an error. CI syncs nothing else.
 LINT = 'uv run --group lint --group test'
+# The branch releases land on; what a push to any other branch is measured against when
+# nothing more specific bounds the commit-message check.
+DEFAULT_BRANCH = 'main'
 # What a generated project's `lint.complexipy` allows, held here over the same paths the other
 # checks read and over the template's own `_CI` modules, named one by one so the vendored tree
 # under `template/_CI/lib` stays out. The `.jinja` task modules are read too, with their tags
@@ -69,7 +72,11 @@ def range_candidates(context: Context) -> list[str]:
     candidates = []
     if from_ref and to_ref and resolves(context, from_ref) and resolves(context, to_ref):
         candidates.append(f'{from_ref}..{to_ref}')
-    candidates.extend(f'{base}..HEAD' for base in ('@{upstream}', 'origin/HEAD') if resolves(context, base))
+    # `origin/HEAD` is what a clone names the remote's default branch; a CI checkout names
+    # no such ref, so the branch is tried by name too. That is what bounds the first push
+    # of a new branch, whose `before` is all zeros (ADR-0053).
+    bases = ('@{upstream}', 'origin/HEAD', f'origin/{DEFAULT_BRANCH}')
+    candidates.extend(f'{base}..HEAD' for base in bases if resolves(context, base))
     return candidates
 
 

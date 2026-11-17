@@ -656,7 +656,7 @@ def range_resolver(project):
     """
     source = (project / '_CI' / 'tasks' / 'lint.py').read_text(encoding='utf-8')
     resolver = ('resolves', 'range_candidates', 'has_commits', 'unpushed_range')
-    namespace = exec_from(source, *resolver, os=os, Context=object)
+    namespace = exec_from(source, *resolver, os=os, Context=object, DEFAULT_BRANCH='main')
 
     class GitContext:
         """The slice of invoke's Context these functions touch: `run` returning stdout and failure."""

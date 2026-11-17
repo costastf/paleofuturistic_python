@@ -5,7 +5,7 @@ from typing import cast
 
 from invoke import Collection, Context, Task, task
 
-from .configuration import PATHS
+from .configuration import DEFAULT_BRANCH, PATHS
 from .shared import execute, logged, run_steps
 
 
@@ -158,7 +158,11 @@ def range_candidates(context: Context) -> list[str]:
     candidates = []
     if from_ref and to_ref and resolves(context, from_ref) and resolves(context, to_ref):
         candidates.append(f'{from_ref}..{to_ref}')
-    candidates.extend(f'{base}..HEAD' for base in ('@{upstream}', 'origin/HEAD') if resolves(context, base))
+    # `origin/HEAD` is what a clone names the remote's default branch; a CI checkout names
+    # no such ref, so the branch is tried by name too. That is what bounds the first push
+    # of a new branch, whose `before` is all zeros (ADR-0053).
+    bases = ('@{upstream}', 'origin/HEAD', f'origin/{DEFAULT_BRANCH}')
+    candidates.extend(f'{base}..HEAD' for base in bases if resolves(context, base))
     return candidates
 
 

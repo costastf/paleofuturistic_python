@@ -611,6 +611,23 @@ def test_the_formatting_failure_names_a_command_you_can_paste(generated_project)
     assert not any('$(' in command for command in commands), 'the how-to assembles a path list in the shell again'
 
 
+def new_branch_checkout(root, origin):
+    """Clone ``origin`` as CI checks out a new branch's first push, and return the clone.
+
+    Full history, a branch that tracks nothing, two commits over the default branch, and no
+    `origin/HEAD`, which `actions/checkout` does not create. The default branch by name is
+    then what bounds the check, to what the branch adds (ADR-0053).
+    """
+    feature = root / 'feature'
+    git(root, 'clone', '--quiet', str(origin), str(feature))
+    git(feature, 'checkout', '--quiet', '-b', 'topic')
+    git(feature, 'commit', '--quiet', '--allow-empty', '-m', 'nope: first on the branch')
+    git(feature, 'commit', '--quiet', '--allow-empty', '-m', 'feat: second on the branch')
+    # `update-ref -d` would follow the symbolic ref and delete `origin/main` instead.
+    git(feature, 'remote', 'set-head', 'origin', '--delete')
+    return feature
+
+
 def test_the_commit_message_check_sees_the_tip_in_every_checkout_shape(generated_project):
     """Whatever the clone looks like, the range covers the commit that just arrived.
 
@@ -697,6 +714,12 @@ def test_the_commit_message_check_sees_the_tip_in_every_checkout_shape(generated
         )
     finally:
         del os.environ['PRE_COMMIT_FROM_REF'], os.environ['PRE_COMMIT_TO_REF']
+
+    # A CI checkout of a new branch's first push is bounded by the default branch by name.
+    subjects = commits_in(new_branch_checkout(root, origin), resolve(root / 'feature'))
+    assert subjects == ['feat: second on the branch', 'nope: first on the branch'], (
+        f'a new branch is not measured against the default branch: {subjects}'
+    )
 
     # No commits at all is the one case with nothing to say.
     empty = root / 'fresh'

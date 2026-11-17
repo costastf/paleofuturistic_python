@@ -33,6 +33,10 @@ the push's before, to the pipeline's commit, with `GIT_DEPTH: 0` for the same re
 
 - A pull request with one bad message among several fails `Preflight`, which is the job a
   branch rule requires. A push of several commits is checked whole.
+- The first push of a new branch has an all-zero `before`, which resolves to nothing. The
+  range reader then tries the remote's default branch by name, `origin/<default branch>`,
+  after `origin/HEAD`, which a CI checkout does not create; with full history fetched, that
+  bounds the push to what the branch adds over the default branch.
 - The parent reads the same two variables the template does; its range reader is the
   template's again, pre-commit refs included, where ADR-0052 had left those out.
 - An invariant holds that every job running the check exports both refs and fetches full
