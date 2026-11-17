@@ -311,6 +311,29 @@ def test_every_decision_reference_resolves():
     assert not dangling, f'references to records that do not exist: {dangling}'
 
 
+PYPA_SPECIFICATION = re.compile(r'packaging\.python\.org/en/latest/specifications/([a-z0-9-]+)')
+
+
+def test_both_packaging_specification_pages_cover_the_same_specifications():
+    """The parent's and the shipped packaging-specifications pages name the same PyPA specs.
+
+    The two are written by hand for two readers, someone deciding whether the template fits
+    and someone developing a generated project, so neither renders from the other. What must
+    not drift is coverage: a specification one page gained and the other did not.
+    """
+    parent = (REPO_ROOT / 'docs' / 'using' / 'reference' / 'packaging-specifications.md').read_text(encoding='utf-8')
+    shipped = (
+        REPO_ROOT / 'template' / 'docs' / 'developer' / 'reference' / 'packaging-specifications.md.jinja'
+    ).read_text(encoding='utf-8')
+    covered_by_parent = set(PYPA_SPECIFICATION.findall(parent))
+    covered_by_shipped = set(PYPA_SPECIFICATION.findall(shipped))
+    assert covered_by_parent, 'the parent page links no PyPA specification'
+    assert covered_by_parent == covered_by_shipped, (
+        f'only the parent covers {sorted(covered_by_parent - covered_by_shipped)}; '
+        f'only the shipped page covers {sorted(covered_by_shipped - covered_by_parent)}'
+    )
+
+
 def test_no_heading_starts_with_a_digit():
     """Every heading on both sites starts with a word, so its id is a selector the theme can use.
 

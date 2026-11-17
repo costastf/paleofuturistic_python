@@ -5,7 +5,11 @@ This is the first thing to do after this project was generated. By the end of it
 ## You need
 
 - [`uv`](https://docs.astral.sh/uv/) on your PATH.
-- A shell. macOS/Linux: bash or zsh. Windows: PowerShell or git-bash.
+- `git`, which the hooks and the release tasks drive.
+- A shell. macOS/Linux: bash or zsh. Windows: PowerShell or git-bash. Under WSL, use WSL 2 and
+  work inside the distribution; the docs preview opens in your Windows browser from there.
+- Docker or Podman, only for the container tasks. On Windows that is Docker Desktop with its
+  WSL 2 backend.
 
 You do *not* need to pre-install Python — uv will fetch the versions declared in `.python-version`.
 
@@ -87,6 +91,10 @@ before you push. The individual commands above are there for when you want one t
 its own. Places to go next:
 
 - **Make a real change** — write a function, then [Make your first release](make-your-first-release.md).
+- **Try things at a prompt** — `uvx --with-editable . ptpython` opens a REPL with your package
+  importable from the working tree, so an edit is one re-import away. ptpython completes names
+  and signatures, keeps history across sessions and shows docstrings as you type, which makes it
+  the fastest way to try a function before writing the test for it.
 - **Add dependencies** — [Add a dependency](../how-to/add-a-dependency.md).
 - **Document it** — [Document your project](../how-to/document-your-project.md) shows how to write docs for
   your software and get an API reference from your docstrings.

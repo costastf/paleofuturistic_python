@@ -2,13 +2,29 @@
 
 This tutorial walks you from an empty directory to a working Python project generated from this template, in about ten minutes. You will not customise anything — the goal is to see the whole cycle once.
 
+## Which path to take
+
+Do this tutorial first, on your own machine, with no remote: everything in it works offline once uv is installed. Then do [From zero to published package](from-zero-to-published-package.md), which takes the same project to GitHub, in a public repository, and to PyPI; that is the path the template is tuned for and the one every how-to assumes. A private repository works the same way except for Pages, which GitHub serves publicly from a public repository only. GitLab is the other host the template supports: answer `gitlab` to the host question and read [Choose a git host](../how-to/choose-a-git-host.md) for what differs.
+
 ## Prerequisites
 
-You need [`uv`](https://docs.astral.sh/uv/) installed. uv is the only tool you need; it can run copier for you and will manage every other tool the generated project uses.
+You need [`uv`](https://docs.astral.sh/uv/) and `git`. uv is the only Python tool you install; it runs copier for you and manages every other tool the generated project uses, Python interpreters included. git is what the generated project commits to and what the release tasks drive.
+
+On macOS and Linux:
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
+
+On Windows, in PowerShell:
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+Generation runs no shell of its own, so it works from a Windows prompt as it does from bash. The generated project's tasks run anywhere uv runs; the container tasks need Docker or Podman, which on Windows means Docker Desktop with its WSL 2 backend.
+
+Under WSL, follow the Linux instructions inside the distribution. WSL 2 is the version to use: WSL 1 runs the tasks too, but cannot run Docker Desktop's engine, and its file access across the Windows boundary is slow enough to feel in every `uv sync`. Opening the rendered docs from either hands the page to the Windows browser, as the generated how-to on previewing docs explains.
 
 ## Step 1 — Generate the project
 

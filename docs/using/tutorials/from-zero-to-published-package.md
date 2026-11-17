@@ -100,6 +100,14 @@ After all the pipelines ran you should see your project published on PyPI. Each 
 
 For GitHub-hosted projects, see [Publish docs to GitHub Pages](../how-to/publish-docs-to-github-pages.md) for the workflow file and Pages setup.
 
+## When a service is unreachable
+
+Nothing in this tutorial needs a service that is down, except the steps that are that service.
+
+- **GitHub or GitLab down.** Generate from a local clone instead of the URL: `git clone` the template once, then `uvx copier copy --trust /path/to/clone <destination-dir>`, which the update how-to describes for air-gapped updates too. Everything up to Step 2 is local. Push when the host is back; the gate ran on your machine already, and the pipeline reruns it on arrival.
+- **PyPI down.** Generation keeps the uv pin the template commits instead of resolving a fresh one, and says so. `uv sync` and `uv lock` work from uv's cache for anything it has seen; a first resolution of a new dependency waits. Publishing waits too: `release.ship` runs again on the next push to the default branch and finds the same release, and `release.publish` by hand uploads whenever you run it. A private index is the other option, and the generated how-to *Publish to a private index* sets one up.
+- **Pages down.** The site builds locally with `./workflow.cmd document.view`, and the Pages workflow can be rerun from the Actions tab once Pages is back.
+
 ## You're done
 
 A tagged release exists, a wheel is on PyPI, and your docs are live.
