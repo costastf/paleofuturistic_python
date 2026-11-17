@@ -806,7 +806,7 @@ def test_the_gate_exits_non_zero_when_any_step_failed(generated_project):
             if fails:
                 raise SystemExit(1)
 
-        return runner, derived
+        return name, runner, derived
 
     def plan(steps):
         return lambda *_args, **_kwargs: steps

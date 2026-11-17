@@ -252,23 +252,24 @@ def plan_scope(
     write: bool,
     paths: str = '',
     network: bool = False,
-) -> list[tuple[Callable[[Context], None], bool]]:
-    """Return ``(runner, writes_derived_files)`` for every step in ``scope``, in registry order.
+) -> list[tuple[str, Callable[[Context], None], bool]]:
+    """Return ``(name, runner, writes_derived_files)`` for every step in ``scope``, in registry order.
 
-    The second element is what lets ``run_scope`` skip the derived-value steps after a failure,
-    in either mode: their inputs are reports the failed step should have produced.
+    The last element is what lets ``run_scope`` skip the derived-value steps after a failure,
+    in either mode: their inputs are reports the failed step should have produced. The name is
+    what it reports the outcome under.
     """
-    planned: list[tuple[Callable[[Context], None], bool]] = []
+    planned: list[tuple[str, Callable[[Context], None], bool]] = []
     for step in steps_for(scope, network=network):
         derived = step.write is not None
         runner = step.runner(write=write)
         if step.scope == WHOLE_PROGRAM:
-            planned.append((runner, derived))
+            planned.append((step.name, runner, derived))
             continue
         narrowed = scoped_paths(step, paths)
         if narrowed is None:
             continue
-        planned.append((partial(runner, paths=narrowed), derived))
+        planned.append((step.name, partial(runner, paths=narrowed), derived))
     return planned
 
 
@@ -307,21 +308,24 @@ def run_scope(
 
     """
     # Not `run_steps`, which cannot express the skip — it runs everything it is given. The
-    # accumulate-and-report-at-the-end behaviour is the same.
-    failed = False
-    skipped = False
-    for runner, derived in plan_scope(scope, write=write, paths=paths, network=network):
+    # accumulate-and-report-at-the-end behaviour is the same, with the failures named at the
+    # end: a long run's log is read bottom-up, and the ❌ lines are a screen away by then.
+    failed: list[str] = []
+    skipped: list[str] = []
+    for name, runner, derived in plan_scope(scope, write=write, paths=paths, network=network):
         if failed and derived:
-            skipped = True
+            skipped.append(name)
             continue
+        print(f'▶ {name}')
         try:
             runner(context)
         except SystemExit:
-            failed = True
+            failed.append(name)
     if skipped:
-        print(f'Derived files skipped: a check failed, so there is nothing for `{FIX_COMMAND}` to')
-        print('write that would be true of this tree. Fix what failed above and run it again.')
+        print(f'Derived files skipped ({", ".join(skipped)}): a check failed, so there is nothing for')
+        print(f'`{FIX_COMMAND}` to write that would be true of this tree. Fix what failed above and run it again.')
     if failed:
+        print(f'{len(failed)} step(s) failed: {", ".join(failed)}')
         raise SystemExit(1)
 
 
