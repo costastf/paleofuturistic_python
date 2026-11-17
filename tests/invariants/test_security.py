@@ -7,6 +7,7 @@ import tomllib
 from datetime import date, timedelta
 from pathlib import Path
 from types import SimpleNamespace
+from typing import NamedTuple
 
 import pytest
 
@@ -230,6 +231,59 @@ def test_the_audit_routes_every_query_through_the_retry(generated_project):
     )
     reader = function_named(secure, 'audit_requirement_files')
     assert 'UV_LOCK' in ast.dump(reader), 'the writer does not read uv.lock'
+
+
+def test_the_sbom_hashes_every_locked_version(generated_project, tmp_path):
+    """The SBOM's hash lookup is keyed by version as well as name, so two locked versions both ship a hash.
+
+    Executed against a fixture lock, as the audit's input test is. An index by name alone kept
+    whichever version came last, and the other shipped with no hash: the audit's marker gap
+    one file over, inside every published wheel.
+    """
+    project, _ = generated_project
+    source = (project / '_CI' / 'tasks' / 'sbom.py').read_text(encoding='utf-8')
+    lock = tmp_path / 'uv.lock'
+    lock.write_text(
+        f"""
+version = 1
+
+[[package]]
+name = "three-ways"
+version = "1.0.0"
+source = {{ registry = "https://pypi.org/simple" }}
+wheels = [{{ url = "https://files.example/three_ways-1.0.0-py3-none-any.whl", hash = "sha256:{'a' * 64}" }}]
+
+[[package]]
+name = "three-ways"
+version = "2.0.0"
+source = {{ registry = "https://pypi.org/simple" }}
+sdist = {{ url = "https://files.example/three_ways-2.0.0.tar.gz", hash = "sha256:{'b' * 64}" }}
+""",
+        encoding='utf-8',
+    )
+
+    class HashType(NamedTuple):
+        """The two fields of cyclonedx's HashType this lookup fills."""
+
+        alg: str
+        content: str
+
+    namespace = exec_from(
+        source,
+        'load_uv_lock_index',
+        'UV_LOCK_INDEX',
+        'sha256_of',
+        'lookup_pypi_hash',
+        tomllib=tomllib,
+        UV_LOCK=lock,
+        HashType=HashType,
+        HashAlgorithm=SimpleNamespace(SHA_256='sha256'),
+    )
+    lookup = namespace['lookup_pypi_hash']
+    assert lookup('three-ways', '1.0.0') == HashType('sha256', 'a' * 64), 'the first locked version lost its hash'
+    assert lookup('three-ways', '2.0.0') == HashType('sha256', 'b' * 64), 'the second locked version lost its hash'
+    assert lookup('Three-Ways', '2.0.0') == HashType('sha256', 'b' * 64), 'the name is not compared as the lock has it'
+    assert lookup('three-ways', '3.0.0') is None, 'a version the lock does not pin got a hash'
 
 
 def test_the_retry_reports_a_verdict_and_retries_anything_else(generated_project):

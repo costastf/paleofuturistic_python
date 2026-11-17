@@ -162,12 +162,18 @@ def uv_version() -> str:
     return result.stdout.strip().removeprefix('uv ').strip() or 'unknown'
 
 
-def load_uv_lock_index() -> dict:
-    """Return a `{name: package_dict}` index of `uv.lock`."""
+def load_uv_lock_index() -> dict[tuple[str, str], dict]:
+    """Return a ``{(name, version): package}`` index of `uv.lock`.
+
+    Keyed by version as well as name: a lockfile pins two versions of one package behind
+    different markers, and an index by name alone kept whichever came last, so the other
+    version shipped in the SBOM with no hash. The audit reads the lock the same way, one
+    file per version slot.
+    """
     if not UV_LOCK.exists():
         return {}
     data = tomllib.loads(UV_LOCK.read_text(encoding='utf-8'))
-    return {pkg['name'].lower(): pkg for pkg in data.get('package', [])}
+    return {(pkg['name'].lower(), pkg.get('version', '')): pkg for pkg in data.get('package', [])}
 
 
 UV_LOCK_INDEX = load_uv_lock_index()
@@ -310,8 +316,8 @@ def vendored_spdx_ids(vendor_dir: Path) -> set[str]:
 # value returned. See the override comment in pyproject.toml.jinja.
 def lookup_pypi_hash(name: str, ver: str) -> HashType | None:  # ty: ignore[invalid-type-form]
     """SHA-256 hash from `uv.lock` for the matching name+version."""
-    entry = UV_LOCK_INDEX.get(name)
-    if not entry or entry.get('version') != ver:
+    entry = UV_LOCK_INDEX.get((name.lower(), ver))
+    if not entry:
         return None
     sdist = entry.get('sdist')
     artefacts = [*(entry.get('wheels', []) or []), *([sdist] if isinstance(sdist, dict) else [])]
