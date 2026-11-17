@@ -141,3 +141,5 @@ commit = "4810777da7b297eb3c1b3c3f6e608dc64ca25b7d"
 [tool.properdocs]
 version = "1.6.7"
 theme-mkdocs-version = "1.6.7"
+# For pymdownx.superfences in properdocs.yml; the template's document group pins the same.
+pymdown-extensions-version = "12.3"

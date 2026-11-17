@@ -11,6 +11,11 @@ theme:
 
 use_directory_urls: false
 
+# Fenced code inside list items. python-markdown's own fenced_code reads fences at the top
+# level only, so a numbered step's example rendered as prose; superfences nests them.
+markdown_extensions:
+  - pymdownx.superfences
+
 nav:
   - Home: index.md
   - Tutorials:

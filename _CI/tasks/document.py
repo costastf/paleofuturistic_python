@@ -12,18 +12,19 @@ from _CI import PROJECT_ROOT_DIRECTORY, emojize_message, open_in_default_applica
 SITE_INDEX = PROJECT_ROOT_DIRECTORY / 'site' / 'index.html'
 
 
-def docs_versions() -> tuple[str, str]:
-    """Return (properdocs, properdocs-theme-mkdocs) version pins from pyproject.toml."""
+def docs_versions() -> tuple[str, str, str]:
+    """Return the (properdocs, properdocs-theme-mkdocs, pymdown-extensions) pins from pyproject.toml."""
     data = tomllib.loads((PROJECT_ROOT_DIRECTORY / 'pyproject.toml').read_text(encoding='utf-8'))
     pd = data['tool']['properdocs']
-    return pd['version'], pd['theme-mkdocs-version']
+    return pd['version'], pd['theme-mkdocs-version'], pd['pymdown-extensions-version']
 
 
 def properdocs_command(args: str) -> str:
     """Compose a `uvx properdocs …` invocation using the pinned versions."""
-    properdocs_version, theme_version = docs_versions()
+    properdocs_version, theme_version, extensions_version = docs_versions()
     return (
-        f'uvx --from properdocs=={properdocs_version} --with properdocs-theme-mkdocs=={theme_version} properdocs {args}'
+        f'uvx --from properdocs=={properdocs_version} --with properdocs-theme-mkdocs=={theme_version} '
+        f'--with pymdown-extensions=={extensions_version} properdocs {args}'
     )
 
 

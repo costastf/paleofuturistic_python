@@ -7,6 +7,11 @@ edit_uri: blob/main/docs/
 
 use_directory_urls: false
 
+# Fenced code inside list items. python-markdown's own fenced_code reads fences at the top
+# level only, so a numbered step's example rendered as prose; superfences nests them (ADR-0056).
+markdown_extensions:
+  - pymdownx.superfences
+
 theme:
   name: mkdocs
   custom_dir: docs-theme
@@ -110,5 +115,6 @@ nav:
       - ADR-0053 CI hands the commit-message check the range it cannot infer: maintaining/decisions/0053-ci-hands-the-commit-check-the-range-it-cannot-infer.md
       - ADR-0054 The quarantine boundary is an instant in UTC: maintaining/decisions/0054-the-quarantine-boundary-is-an-instant-in-utc.md
       - ADR-0055 Generation runs no shell: maintaining/decisions/0055-generation-runs-no-shell.md
+      - ADR-0056 Fenced code nests in lists: maintaining/decisions/0056-fenced-code-nests-in-lists.md
 
 copyright: Copyright &copy; 2024 <a href="https://schubergphilis.com/">Schuberg Philis</a>
