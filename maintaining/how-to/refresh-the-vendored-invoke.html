@@ -429,6 +429,22 @@
 <li>
     <a href="../decisions/0055-generation-runs-no-shell.html" class="dropdown-item">ADR-0055 Generation runs no shell</a>
 </li>
+            
+<li>
+    <a href="../decisions/0056-fenced-code-nests-in-lists.html" class="dropdown-item">ADR-0056 Fenced code nests in lists</a>
+</li>
+            
+<li>
+    <a href="../decisions/0057-every-push-runs-the-whole-matrix.html" class="dropdown-item">ADR-0057 Every push runs the whole matrix</a>
+</li>
+            
+<li>
+    <a href="../decisions/0058-shipped-pipelines-are-checked-by-reading-them.html" class="dropdown-item">ADR-0058 Shipped pipelines are checked by reading them</a>
+</li>
+            
+<li>
+    <a href="../decisions/0059-formatting-conventions-are-not-configurable.html" class="dropdown-item">ADR-0059 Formatting conventions are the template's, not configurable</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -847,6 +863,18 @@
             <li class="nav-item">
                 <a href="../decisions/0055-generation-runs-no-shell.html" class="nav-link">ADR-0055 Generation runs no shell</a>
             </li>
+            <li class="nav-item">
+                <a href="../decisions/0056-fenced-code-nests-in-lists.html" class="nav-link">ADR-0056 Fenced code nests in lists</a>
+            </li>
+            <li class="nav-item">
+                <a href="../decisions/0057-every-push-runs-the-whole-matrix.html" class="nav-link">ADR-0057 Every push runs the whole matrix</a>
+            </li>
+            <li class="nav-item">
+                <a href="../decisions/0058-shipped-pipelines-are-checked-by-reading-them.html" class="nav-link">ADR-0058 Shipped pipelines are checked by reading them</a>
+            </li>
+            <li class="nav-item">
+                <a href="../decisions/0059-formatting-conventions-are-not-configurable.html" class="nav-link">ADR-0059 Formatting conventions are the template's, not configurable</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -889,11 +917,10 @@ are not maintained here: upstream builds them, and this repository copies the re
 verbatim, so the only edit you make is the pin.</p>
 <h2 id="what-the-pin-is">What the pin is</h2>
 <p><code>pyproject.toml</code> records the upstream release in two fields that say the same thing twice:</p>
-<pre><code class="language-toml">[tool.vendored-invoke]
-repository = &quot;schubergphilis/vendored_invoke&quot;
-version = &quot;v3.0.0&quot;
-commit = &quot;4810777da7b297eb3c1b3c3f6e608dc64ca25b7d&quot;
-</code></pre>
+<pre class="highlight"><code class="language-toml">[tool.vendored-invoke]
+repository = "schubergphilis/vendored_invoke"
+version = "v3.0.0"
+commit = "4810777da7b297eb3c1b3c3f6e608dc64ca25b7d"</code></pre>
 <p><code>version</code> is the upstream release tag, for people. <code>commit</code> is the commit that tag points at,
 for the sync: tags can be moved, commits cannot, so the sync fetches the commit. The version of
 invoke itself is not here; <code>_CI/lib/vendor.txt</code> records it.</p>
@@ -901,8 +928,7 @@ invoke itself is not here; <code>_CI/lib/vendor.txt</code> records it.</p>
 <ol>
 <li>Find the commit the new tag points at:</li>
 </ol>
-<p><code>bash
-   git ls-remote --tags https://github.com/schubergphilis/vendored_invoke</code></p>
+<pre class="highlight"><code class="language-bash">git ls-remote --tags https://github.com/schubergphilis/vendored_invoke</code></pre>
 <ol>
 <li>
 <p>Set both fields in <code>[tool.vendored-invoke]</code> and commit that change on its own. The sync
@@ -912,8 +938,7 @@ invoke itself is not here; <code>_CI/lib/vendor.txt</code> records it.</p>
 <p>Copy the release in:</p>
 </li>
 </ol>
-<p><code>bash
-   ./workflow.cmd maintain.sync-vendor</code></p>
+<pre class="highlight"><code class="language-bash">./workflow.cmd maintain.sync-vendor</code></pre>
 <p>It downloads the pinned commit and replaces <code>vendor/</code>, <code>vendor.txt</code> and <code>patches/</code> in both
    trees. <code>vendor.txt</code>'s <code># via</code> attribution is rewritten to this repository's own <code>_CI</code>
    package name; nothing else is edited.</p>

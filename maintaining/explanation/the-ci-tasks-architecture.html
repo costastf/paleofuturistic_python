@@ -429,6 +429,22 @@
 <li>
     <a href="../decisions/0055-generation-runs-no-shell.html" class="dropdown-item">ADR-0055 Generation runs no shell</a>
 </li>
+            
+<li>
+    <a href="../decisions/0056-fenced-code-nests-in-lists.html" class="dropdown-item">ADR-0056 Fenced code nests in lists</a>
+</li>
+            
+<li>
+    <a href="../decisions/0057-every-push-runs-the-whole-matrix.html" class="dropdown-item">ADR-0057 Every push runs the whole matrix</a>
+</li>
+            
+<li>
+    <a href="../decisions/0058-shipped-pipelines-are-checked-by-reading-them.html" class="dropdown-item">ADR-0058 Shipped pipelines are checked by reading them</a>
+</li>
+            
+<li>
+    <a href="../decisions/0059-formatting-conventions-are-not-configurable.html" class="dropdown-item">ADR-0059 Formatting conventions are the template's, not configurable</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -847,6 +863,18 @@
             <li class="nav-item">
                 <a href="../decisions/0055-generation-runs-no-shell.html" class="nav-link">ADR-0055 Generation runs no shell</a>
             </li>
+            <li class="nav-item">
+                <a href="../decisions/0056-fenced-code-nests-in-lists.html" class="nav-link">ADR-0056 Fenced code nests in lists</a>
+            </li>
+            <li class="nav-item">
+                <a href="../decisions/0057-every-push-runs-the-whole-matrix.html" class="nav-link">ADR-0057 Every push runs the whole matrix</a>
+            </li>
+            <li class="nav-item">
+                <a href="../decisions/0058-shipped-pipelines-are-checked-by-reading-them.html" class="nav-link">ADR-0058 Shipped pipelines are checked by reading them</a>
+            </li>
+            <li class="nav-item">
+                <a href="../decisions/0059-formatting-conventions-are-not-configurable.html" class="nav-link">ADR-0059 Formatting conventions are the template's, not configurable</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -938,10 +966,9 @@
 <h2 id="the-polyglot-launcher">The polyglot launcher</h2>
 <p><code>workflow.cmd</code> is a single script that both sh and Windows cmd read as valid — three lines,
 each doing different work depending on who is reading:</p>
-<pre><code class="language-sh">#!/bin/sh
-: ; exec uv run python _CI/lib/vendor/bin/invoke --search-root _CI &quot;$@&quot;
-@uv run python _CI\lib\vendor\bin\invoke --search-root _CI %*
-</code></pre>
+<pre class="highlight"><code class="language-sh">#!/bin/sh
+: ; exec uv run python _CI/lib/vendor/bin/invoke --search-root _CI "$@"
+@uv run python _CI\lib\vendor\bin\invoke --search-root _CI %*</code></pre>
 <p>The trick is line 2, and it hinges on <code>:</code> meaning two different things:</p>
 <ul>
 <li><strong>sh</strong> treats <code>:</code> as the do-nothing builtin, runs the rest of the line, and <code>exec</code> replaces
@@ -954,7 +981,7 @@ the task package. uv creates and syncs the virtualenv on the way through; the ve
 means there is nothing to install first. No global installs, and no second copy of the
 launcher to keep in step.</p>
 <h2 id="module-structure">Module structure</h2>
-<pre><code>_CI/tasks/
+<pre class="highlight"><code>_CI/tasks/
 ├── __init__.py          # Namespace aggregation + bootstrap pre-task wiring
 ├── bootstrap.py         # First-run setup framework
 ├── configuration.py     # Shared constants (paths, env vars, registry settings)
@@ -962,8 +989,7 @@ launcher to keep in step.</p>
 ├── github.py / gitlab.py  # Host-specific helpers (only one is present)
 ├── local.py             # The project's own tasks. Never overwritten by `copier update`
 └── &lt;feature&gt;.py         # build, container, develop, document, format_, lint,
-                         #   grade, preflight, release, sbom, secure, test
-</code></pre>
+                         #   grade, preflight, release, sbom, secure, test</code></pre>
 <p>Everything there except <code>local.py</code> is template-owned and replaced on update, which is why
 project-specific tasks belong in <code>local.py</code> — <code>__init__.py</code> picks it up automatically.</p>
 <p>Each feature module:</p>
@@ -976,18 +1002,16 @@ project-specific tasks belong in <code>local.py</code> — <code>__init__.py</co
 <p><code>__init__.py</code> aggregates all module namespaces into one <code>namespace</code> that Invoke discovers.</p>
 <h2 id="logged-and-indented-output"><code>@logged</code> and indented output</h2>
 <p>The <code>@logged</code> decorator wraps a task to print a clean status line:</p>
-<pre><code>    ✅ lint.ruff passed 👍
-</code></pre>
+<pre class="highlight"><code>    ✅ lint.ruff passed 👍</code></pre>
 <p>For tasks that call other tasks (a "workflow task" like <code>release</code> that calls <code>validate</code>, <code>bump</code> and <code>changelog</code>), nested output is indented under the parent banner via the <code>IndentingStream</code> class in <code>shared.py</code>. The indent is applied at the stdout/stderr layer, so even commands invoked through <code>context.run()</code> get their output indented.</p>
 <p>This single design choice does a lot of heavy lifting — terminal output for <code>./workflow.cmd release</code> is hierarchical and scannable instead of a flat dump.</p>
 <h2 id="bootstrap-as-a-pre-task">Bootstrap as a pre-task</h2>
 <p>Every top-level task has <code>bootstrap_task</code> inserted as its first <code>pre</code>. This means the first run of <em>any</em> workflow command triggers the bootstrap; subsequent runs see the sentinel file (<code>_CI/.bootstrapped</code>) and skip.</p>
 <p>Wired in <code>__init__.py</code>:</p>
-<pre><code class="language-python">bootstrap_task = bootstrap.bootstrap
+<pre class="highlight"><code class="language-python">bootstrap_task = bootstrap.bootstrap
 for module in (build, container, develop, ...):
     for task in module.namespace.tasks.values():
-        task.pre.insert(0, bootstrap_task)
-</code></pre>
+        task.pre.insert(0, bootstrap_task)</code></pre>
 <p>This is why a fresh clone "just works" — <code>./workflow.cmd test</code> on day one is bootstrap-then-test; on day two it's just test.</p>
 <h2 id="run_steps-fail-last-no-short-circuiting"><code>run_steps</code>: fail-last, no short-circuiting</h2>
 <p>A workflow task that runs N steps (e.g. <code>lint</code> runs ruff + the format check + validate-pyproject + pylint + ty + complexipy + commitizen) doesn't short-circuit on the first failure. The <code>run_steps()</code> helper in <code>shared.py</code> runs every step, accumulates failures, and raises <code>SystemExit(1)</code> at the end with all the failures reported.</p>

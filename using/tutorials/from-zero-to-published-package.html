@@ -429,6 +429,22 @@
 <li>
     <a href="../../maintaining/decisions/0055-generation-runs-no-shell.html" class="dropdown-item">ADR-0055 Generation runs no shell</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/decisions/0056-fenced-code-nests-in-lists.html" class="dropdown-item">ADR-0056 Fenced code nests in lists</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/decisions/0057-every-push-runs-the-whole-matrix.html" class="dropdown-item">ADR-0057 Every push runs the whole matrix</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/decisions/0058-shipped-pipelines-are-checked-by-reading-them.html" class="dropdown-item">ADR-0058 Shipped pipelines are checked by reading them</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.html" class="dropdown-item">ADR-0059 Formatting conventions are the template's, not configurable</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -847,6 +863,18 @@
             <li class="nav-item">
                 <a href="../../maintaining/decisions/0055-generation-runs-no-shell.html" class="nav-link">ADR-0055 Generation runs no shell</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0056-fenced-code-nests-in-lists.html" class="nav-link">ADR-0056 Fenced code nests in lists</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0057-every-push-runs-the-whole-matrix.html" class="nav-link">ADR-0057 Every push runs the whole matrix</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0058-shipped-pipelines-are-checked-by-reading-them.html" class="nav-link">ADR-0058 Shipped pipelines are checked by reading them</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.html" class="nav-link">ADR-0059 Formatting conventions are the template's, not configurable</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -879,6 +907,10 @@
               <ul class="nav flex-column">
               </ul>
             </li>
+            <li class="nav-item" data-bs-level="2"><a href="#when-a-service-is-unreachable" class="nav-link">When a service is unreachable</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
             <li class="nav-item" data-bs-level="2"><a href="#youre-done" class="nav-link">You're done</a>
               <ul class="nav flex-column">
               </ul>
@@ -895,8 +927,8 @@
 <p>You'll need a <a href="https://pypi.org/account/register/">PyPI account</a> and a public <a href="https://docs.github.com/en/get-started/git-basics/about-remote-repositories#creating-remote-repositories">git remote</a> before the publish step.</p>
 <h2 id="step-1-write-a-feature">Step 1 — Write a feature</h2>
 <p>Open <code>src/&lt;your_project_slug&gt;/&lt;your_project_slug&gt;.py</code> and replace the body of <code>hello()</code> with something more interesting, for example:</p>
-<pre><code class="language-python">def hello(greeting: str = 'Hello', someone: str = 'you') -&gt; str:
-    &quot;&quot;&quot;Greet someone.
+<pre class="highlight"><code class="language-python">def hello(greeting: str = 'Hello', someone: str = 'you') -&gt; str:
+    """Greet someone.
 
     Args:
         greeting: The greeting message.
@@ -904,14 +936,12 @@
 
     Returns:
         A greeting message.
-    &quot;&quot;&quot;
-    return f'{greeting} {someone} from test_260708!'
-</code></pre>
+    """
+    return f'{greeting} {someone} from test_260708!'</code></pre>
 <p>Update the smoke test under <code>tests/</code> to match if needed.
 Commit:</p>
-<pre><code class="language-bash">git add -A
-git commit -m &quot;feat: greet someone with a specific word&quot;
-</code></pre>
+<pre class="highlight"><code class="language-bash">git add -A
+git commit -m "feat: greet someone with a specific word"</code></pre>
 <p>Reminders:</p>
 <ul>
 <li>All relevant checks for pre-commit run on staged files (Ruff format/check, validate-pyproject, pylint, complexipy, conventional commit messages).</li>
@@ -924,12 +954,11 @@ It must be public if you want to publish public GH pages, as we do at the end of
 Do not add any files like README, LICENSE etc.</p>
 <p>Run the following commands in your project directory to connect to the remote
 (replace your_handle / test_260708 with your git remote handle / project name here and in the following examples):</p>
-<pre><code class="language-bash">git remote add origin git@github.com:your_handle/test_260708.git
+<pre class="highlight"><code class="language-bash">git remote add origin git@github.com:your_handle/test_260708.git
 ./workflow.cmd preflight --write
 git add README.md
-git commit -m &quot;docs: point the build badge at the repository&quot;
-git push -u origin main
-</code></pre>
+git commit -m "docs: point the build badge at the repository"
+git push -u origin main</code></pre>
 <p>Preflight might fail if you did some more exotic edits than the example above.
 Don't worry.
 It will tell you what to fix; do that, commit and then try to push all.
@@ -943,8 +972,7 @@ A couple of pipelines will have started running.
 For now only Continuous Integration is the interesting one.
 It runs the same preflight as before, this time where everyone can see its outcome.</p>
 <h2 id="step-3-cut-the-release">Step 3 — Cut the release</h2>
-<pre><code class="language-bash">./workflow.cmd release -i minor
-</code></pre>
+<pre class="highlight"><code class="language-bash">./workflow.cmd release -i minor</code></pre>
 <p>The <code>-i minor</code> is your explicit choice. Valid values: <code>major</code>, <code>minor</code>, <code>patch</code>, <code>alpha</code>, <code>beta</code>, <code>rc</code>.</p>
 <p>This task:</p>
 <ol>
@@ -964,6 +992,13 @@ The version bump lands on <code>main</code>; the publish job sees it, creates th
 <p>After all the pipelines ran you should see your project published on PyPI. Each file's details show a <em>Provenance</em> section naming your repository; if you answered <code>repository_url</code>, the sidebar shows its links.</p>
 <h2 id="step-5-publish-the-docs">Step 5 — Publish the docs</h2>
 <p>For GitHub-hosted projects, see <a href="../how-to/publish-docs-to-github-pages.html">Publish docs to GitHub Pages</a> for the workflow file and Pages setup.</p>
+<h2 id="when-a-service-is-unreachable">When a service is unreachable</h2>
+<p>Nothing in this tutorial needs a service that is down, except the steps that are that service.</p>
+<ul>
+<li><strong>GitHub or GitLab down.</strong> Generate from a local clone instead of the URL: <code>git clone</code> the template once, then <code>uvx copier copy --trust /path/to/clone &lt;destination-dir&gt;</code>, which the update how-to describes for air-gapped updates too. Everything up to Step 2 is local. Push when the host is back; the gate ran on your machine already, and the pipeline reruns it on arrival.</li>
+<li><strong>PyPI down.</strong> Generation keeps the uv pin the template commits instead of resolving a fresh one, and says so. <code>uv sync</code> and <code>uv lock</code> work from uv's cache for anything it has seen; a first resolution of a new dependency waits. Publishing waits too: <code>release.ship</code> runs again on the next push to the default branch and finds the same release, and <code>release.publish</code> by hand uploads whenever you run it. A private index is the other option, and the generated how-to <em>Publish to a private index</em> sets one up.</li>
+<li><strong>Pages down.</strong> The site builds locally with <code>./workflow.cmd document.view</code>, and the Pages workflow can be rerun from the Actions tab once Pages is back.</li>
+</ul>
 <h2 id="youre-done">You're done</h2>
 <p>A tagged release exists, a wheel is on PyPI, and your docs are live.</p>
 <p>Where to go next:</p>

@@ -429,6 +429,22 @@
 <li>
     <a href="../decisions/0055-generation-runs-no-shell.html" class="dropdown-item">ADR-0055 Generation runs no shell</a>
 </li>
+            
+<li>
+    <a href="../decisions/0056-fenced-code-nests-in-lists.html" class="dropdown-item">ADR-0056 Fenced code nests in lists</a>
+</li>
+            
+<li>
+    <a href="../decisions/0057-every-push-runs-the-whole-matrix.html" class="dropdown-item">ADR-0057 Every push runs the whole matrix</a>
+</li>
+            
+<li>
+    <a href="../decisions/0058-shipped-pipelines-are-checked-by-reading-them.html" class="dropdown-item">ADR-0058 Shipped pipelines are checked by reading them</a>
+</li>
+            
+<li>
+    <a href="../decisions/0059-formatting-conventions-are-not-configurable.html" class="dropdown-item">ADR-0059 Formatting conventions are the template's, not configurable</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -847,6 +863,18 @@
             <li class="nav-item">
                 <a href="../decisions/0055-generation-runs-no-shell.html" class="nav-link">ADR-0055 Generation runs no shell</a>
             </li>
+            <li class="nav-item">
+                <a href="../decisions/0056-fenced-code-nests-in-lists.html" class="nav-link">ADR-0056 Fenced code nests in lists</a>
+            </li>
+            <li class="nav-item">
+                <a href="../decisions/0057-every-push-runs-the-whole-matrix.html" class="nav-link">ADR-0057 Every push runs the whole matrix</a>
+            </li>
+            <li class="nav-item">
+                <a href="../decisions/0058-shipped-pipelines-are-checked-by-reading-them.html" class="nav-link">ADR-0058 Shipped pipelines are checked by reading them</a>
+            </li>
+            <li class="nav-item">
+                <a href="../decisions/0059-formatting-conventions-are-not-configurable.html" class="nav-link">ADR-0059 Formatting conventions are the template's, not configurable</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -894,30 +922,25 @@
 <p>In this tutorial you clone the template repo, make a small change to what it generates, prove the change is correct at every level of the test pyramid, and open a pull request. At the end you'll know the edit-test loop every template change goes through.</p>
 <p>Prerequisite: <a href="https://docs.astral.sh/uv/">uv</a>.</p>
 <h2 id="step-1-clone-and-orient-yourself">Step 1. Clone and orient yourself</h2>
-<pre><code class="language-bash">git clone https://github.com/schubergphilis/paleofuturistic_python
-cd paleofuturistic_python
-</code></pre>
+<pre class="highlight"><code class="language-bash">git clone https://github.com/schubergphilis/paleofuturistic_python
+cd paleofuturistic_python</code></pre>
 <p>Everything under <code>template/</code> is what copier copies into a generated project; files ending in <code>.jinja</code> are rendered with the answers from <code>copier.yml</code>, everything else is copied verbatim. Everything <em>outside</em> <code>template/</code> — this repo's own <code>_CI/</code>, <code>docs/</code>, <code>tests/</code> — exists to develop and verify the template itself.</p>
 <h2 id="step-2-make-a-change">Step 2. Make a change</h2>
 <p>Pick something harmless: open <code>template/README.md.jinja</code> and adjust a sentence, or tweak a page under <code>template/docs/</code>. If the file you edit ends in <code>.jinja</code>, remember that <code>{{ ... }}</code> and <code>{% ... %}</code> are rendered at generation time — plain text edits are safe.</p>
 <h2 id="step-3-run-the-fast-check">Step 3. Run the fast check</h2>
-<pre><code class="language-bash">./workflow.cmd test.invariants
-</code></pre>
+<pre class="highlight"><code class="language-bash">./workflow.cmd test.invariants</code></pre>
 <p>This generates a project for each of the four knob cells once, the cartesian product of git host × Pages, and asserts structural invariants over the results — the right files exist, conditional content matches the chosen knobs, nothing forbidden ships. It's the best signal-per-second check and should be your default while iterating.</p>
 <h2 id="step-4-run-one-full-cell">Step 4. Run one full cell</h2>
-<pre><code class="language-bash">./workflow.cmd test
-</code></pre>
+<pre class="highlight"><code class="language-bash">./workflow.cmd test</code></pre>
 <p>This generates a project with the default answers and runs the generated project's <em>own</em> gate inside it — <code>preflight --write</code>, then the bare <code>preflight</code> on the tree it wrote. If your change breaks the generated project's linters or docs build, this is where it surfaces.</p>
 <p>To reproduce a specific CI matrix cell instead, use <code>test.combo</code>:</p>
-<pre><code class="language-bash">./workflow.cmd test.combo --git-hosting-service gitlab --no-integrate-pages
-</code></pre>
+<pre class="highlight"><code class="language-bash">./workflow.cmd test.combo --git-hosting-service gitlab --no-integrate-pages</code></pre>
 <p>If your change touches the coverage ratchet, the CI badge, or the dependency audit, add <code>--mature</code> instead — the ordinary cells generate a pristine day-one project and never exercise any of the three. See <a href="../how-to/test-the-template.html#why-a-matured-cell">Why a matured cell</a>.</p>
 <h2 id="step-5-commit-and-open-a-pull-request">Step 5. Commit and open a pull request</h2>
-<p>Commit messages follow <a href="https://www.conventionalcommits.org/">Conventional Commits</a> — <code>feat(template): …</code>, <code>fix(ci): …</code> — by review convention; this repository ships no commit-message hook.</p>
-<pre><code class="language-bash">git checkout -b feat/my-first-change
-git commit -am &quot;feat(template): clarify the generated README wording&quot;
-git push -u origin feat/my-first-change
-</code></pre>
+<p>Commit messages follow <a href="https://www.conventionalcommits.org/">Conventional Commits</a> — <code>feat(template): …</code>, <code>fix(ci): …</code>. This repository installs no hook, but <code>./workflow.cmd lint</code> checks the messages a push would add with commitizen, and CI's <code>lint</code> job checks the pushed range or the pull request's commits (ADR-0052, ADR-0053), so a message that breaks the convention fails before review.</p>
+<pre class="highlight"><code class="language-bash">git checkout -b feat/my-first-change
+git commit -am "feat(template): clarify the generated README wording"
+git push -u origin feat/my-first-change</code></pre>
 <p>CI runs the repository's <code>lint</code>, <code>test.invariants</code> and a fanned-out <code>test.combo</code> per matrix cell, matured cell included, on every pull request, so a green local run of <code>./workflow.cmd lint</code> and steps 3–4 is a good predictor of a green PR.</p>
 <h2 id="where-to-go-next">Where to go next</h2>
 <ul>

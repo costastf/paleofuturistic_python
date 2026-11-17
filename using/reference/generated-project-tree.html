@@ -429,6 +429,22 @@
 <li>
     <a href="../../maintaining/decisions/0055-generation-runs-no-shell.html" class="dropdown-item">ADR-0055 Generation runs no shell</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/decisions/0056-fenced-code-nests-in-lists.html" class="dropdown-item">ADR-0056 Fenced code nests in lists</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/decisions/0057-every-push-runs-the-whole-matrix.html" class="dropdown-item">ADR-0057 Every push runs the whole matrix</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/decisions/0058-shipped-pipelines-are-checked-by-reading-them.html" class="dropdown-item">ADR-0058 Shipped pipelines are checked by reading them</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.html" class="dropdown-item">ADR-0059 Formatting conventions are the template's, not configurable</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -847,6 +863,18 @@
             <li class="nav-item">
                 <a href="../../maintaining/decisions/0055-generation-runs-no-shell.html" class="nav-link">ADR-0055 Generation runs no shell</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0056-fenced-code-nests-in-lists.html" class="nav-link">ADR-0056 Fenced code nests in lists</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0057-every-push-runs-the-whole-matrix.html" class="nav-link">ADR-0057 Every push runs the whole matrix</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0058-shipped-pipelines-are-checked-by-reading-them.html" class="nav-link">ADR-0058 Shipped pipelines are checked by reading them</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.html" class="nav-link">ADR-0059 Formatting conventions are the template's, not configurable</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -876,7 +904,7 @@
 
 <h1 id="generated-project-tree">Generated project tree</h1>
 <p>An annotated tour of what copier creates. Tree is for a project named <code>example_project</code> with <code>git_hosting_service=github</code> and <code>integrate_pages=true</code>. Differences for <code>gitlab</code> and Pages-off variants are noted inline.</p>
-<pre><code>example_project/
+<pre class="highlight"><code>example_project/
 ├── .copier-answers.yml          Copier state — template URL + answers + revision
 ├── .gitignore                   Includes .pypirc, dist/, reports/
 ├── .pre-commit-config.yaml      Hooks: lint-commit, staged, preflight (pre-push), security-overrides
@@ -938,8 +966,7 @@
 ├── tests/
 │   └── test_example_project.py  Smoke test for hello()
 ├── uv.lock                      Locked dependency graph
-└── workflow.cmd                 Polyglot launcher (sh on Unix, cmd on Windows)
-</code></pre>
+└── workflow.cmd                 Polyglot launcher (sh on Unix, cmd on Windows)</code></pre>
 <h2 id="file-ownership">File ownership</h2>
 <table>
 <thead>

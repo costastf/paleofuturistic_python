@@ -429,6 +429,22 @@
 <li>
     <a href="../../maintaining/decisions/0055-generation-runs-no-shell.html" class="dropdown-item">ADR-0055 Generation runs no shell</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/decisions/0056-fenced-code-nests-in-lists.html" class="dropdown-item">ADR-0056 Fenced code nests in lists</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/decisions/0057-every-push-runs-the-whole-matrix.html" class="dropdown-item">ADR-0057 Every push runs the whole matrix</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/decisions/0058-shipped-pipelines-are-checked-by-reading-them.html" class="dropdown-item">ADR-0058 Shipped pipelines are checked by reading them</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.html" class="dropdown-item">ADR-0059 Formatting conventions are the template's, not configurable</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -847,6 +863,18 @@
             <li class="nav-item">
                 <a href="../../maintaining/decisions/0055-generation-runs-no-shell.html" class="nav-link">ADR-0055 Generation runs no shell</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0056-fenced-code-nests-in-lists.html" class="nav-link">ADR-0056 Fenced code nests in lists</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0057-every-push-runs-the-whole-matrix.html" class="nav-link">ADR-0057 Every push runs the whole matrix</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0058-shipped-pipelines-are-checked-by-reading-them.html" class="nav-link">ADR-0058 Shipped pipelines are checked by reading them</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.html" class="nav-link">ADR-0059 Formatting conventions are the template's, not configurable</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -1024,8 +1052,7 @@ impossible to build a wheel from code that built yesterday. <code>./workflow.cmd
 <!-- template-only -->
 <p>The SBOM says what is <em>inside</em> an artifact. Provenance says where the artifact <em>came from</em>, and unlike the SBOM it is not self-reported. On both hosts, <code>release.attest</code> signs a <a href="https://packaging.python.org/en/latest/specifications/index-hosted-attestations/">PEP 740</a> attestation for every wheel and sdist: a statement binding the file's digest to the repository, workflow and commit that published it. The signing identity is the CI job's own OIDC token, the signature chains to Sigstore's public instance, and the signing event lands in Sigstore's transparency log, so nothing the project controls can mint one after the fact. A forged SBOM is a text edit; a forged attestation is not.</p>
 <p><code>uv publish</code> uploads each <code>&lt;file&gt;.publish.attestation</code> with its file, and PyPI shows the publishing repository and workflow on the release page. A consumer verifies a release on PyPI with:</p>
-<pre><code class="language-bash">pypi-attestations verify pypi --repository https://github.com/&lt;owner&gt;/&lt;repo&gt; pypi:&lt;package&gt;-&lt;version&gt;-py3-none-any.whl
-</code></pre>
+<pre class="highlight"><code class="language-bash">pypi-attestations verify pypi --repository https://github.com/&lt;owner&gt;/&lt;repo&gt; pypi:&lt;package&gt;-&lt;version&gt;-py3-none-any.whl</code></pre>
 <p>GitHub projects also get GitHub's own provenance attestation from <code>actions/attest-build-provenance</code>, stored with the repository and checked with <code>gh attestation verify &lt;file&gt; --repo &lt;owner&gt;/&lt;repo&gt;</code>. The two answer the same question for different audiences: the PEP 740 one travels with the package to PyPI, the GitHub one stays where the source is.</p>
 <p>Order matters in the publish job, and <code>release.ship</code> fixes it: <code>release.dist</code> builds into <code>dist/</code>, <code>release.attest</code> signs those files, and the upload sends them <em>without</em> rebuilding. Rebuilding in between would publish files that no attestation refers to, and verification would then fail — reading as tampering rather than as a fresh build. GitHub's provenance step runs after the upload over the same files, still in <code>dist/</code>; a statement about file contents proves the same thing whichever side of the upload it is taken on.</p>
 <p>PyPI accepts attestations only through <a href="https://docs.pypi.org/trusted-publishers/">Trusted Publishing</a>. A project that publishes with <code>UV_PUBLISH_*</code> credentials instead (a private index, say) uploads none: <code>release.publish</code> passes <code>--no-attestations</code> on that path, because indexes that do not support attestations may reject the upload.</p>
@@ -1035,18 +1062,12 @@ The SBOM says what is *inside* your artifact. Provenance says where it *came fro
 
 `uv publish` uploads each `<file>.publish.attestation` with its file, and PyPI shows the publishing repository and workflow on the release page. Anyone who downloads a release can verify it:
 
-
-<pre><code class="language-bash">pypi-attestations verify pypi --repository &lt;repository URL&gt; pypi:{{ project_slug }}-&lt;version&gt;-py3-none-any.whl
-</code></pre>
-
+<pre class="highlight"><code class="language-bash">pypi-attestations verify pypi --repository &lt;repository URL&gt; pypi:{{ project_slug }}-&lt;version&gt;-py3-none-any.whl</code></pre>
 {%- if git_hosting_service == 'github' %}
 
 The publish job also records GitHub's own provenance attestation (`actions/attest-build-provenance`), stored with the repository:
 
-
-<pre><code class="language-bash">gh attestation verify {{ project_slug }}-&lt;version&gt;-py3-none-any.whl --repo &lt;owner&gt;/&lt;repo&gt;
-</code></pre>
-
+<pre class="highlight"><code class="language-bash">gh attestation verify {{ project_slug }}-&lt;version&gt;-py3-none-any.whl --repo &lt;owner&gt;/&lt;repo&gt;</code></pre>
 
 The two answer the same question for different audiences: the PEP 740 one travels with the package to PyPI, the GitHub one stays where the source is.
 {%- endif %}

@@ -429,6 +429,22 @@
 <li>
     <a href="../../maintaining/decisions/0055-generation-runs-no-shell.html" class="dropdown-item">ADR-0055 Generation runs no shell</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/decisions/0056-fenced-code-nests-in-lists.html" class="dropdown-item">ADR-0056 Fenced code nests in lists</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/decisions/0057-every-push-runs-the-whole-matrix.html" class="dropdown-item">ADR-0057 Every push runs the whole matrix</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/decisions/0058-shipped-pipelines-are-checked-by-reading-them.html" class="dropdown-item">ADR-0058 Shipped pipelines are checked by reading them</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.html" class="dropdown-item">ADR-0059 Formatting conventions are the template's, not configurable</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -847,6 +863,18 @@
             <li class="nav-item">
                 <a href="../../maintaining/decisions/0055-generation-runs-no-shell.html" class="nav-link">ADR-0055 Generation runs no shell</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0056-fenced-code-nests-in-lists.html" class="nav-link">ADR-0056 Fenced code nests in lists</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0057-every-push-runs-the-whole-matrix.html" class="nav-link">ADR-0057 Every push runs the whole matrix</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0058-shipped-pipelines-are-checked-by-reading-them.html" class="nav-link">ADR-0058 Shipped pipelines are checked by reading them</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.html" class="nav-link">ADR-0059 Formatting conventions are the template's, not configurable</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -887,6 +915,30 @@
               <ul class="nav flex-column">
               </ul>
             </li>
+            <li class="nav-item" data-bs-level="2"><a href="#upgrading-past-the-one-sequence-publish" class="nav-link">Upgrading past the one-sequence publish</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#upgrading-past-building-the-deps-image-every-run" class="nav-link">Upgrading past building the deps image every run</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#upgrading-past-the-exported-commit-range" class="nav-link">Upgrading past the exported commit range</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#upgrading-past-the-utc-quarantine-boundary" class="nav-link">Upgrading past the UTC quarantine boundary</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#upgrading-past-nested-code-blocks-in-the-docs" class="nav-link">Upgrading past nested code blocks in the docs</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#upgrading-past-the-formatting-conventions" class="nav-link">Upgrading past the formatting conventions</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
             <li class="nav-item" data-bs-level="2"><a href="#upgrading-past-the-tag-on-main-release-flow" class="nav-link">Upgrading past the tag-on-main release flow</a>
               <ul class="nav flex-column">
               </ul>
@@ -922,8 +974,7 @@
 <p>When this template ships a new version, you can pull the changes into an existing generated project without re-generating from scratch. <a href="https://copier.readthedocs.io/">copier</a> records the template revision your project was generated from — it's stored in <code>.copier-answers.yml</code> — and produces a reviewable diff against the latest version.</p>
 <h2 id="the-basic-update">The basic update</h2>
 <p>From the root of your generated project:</p>
-<pre><code class="language-bash">uvx copier update --trust
-</code></pre>
+<pre class="highlight"><code class="language-bash">uvx copier update --trust</code></pre>
 <p><code>--trust</code> is required because the template runs a post-copy task (<code>tasks_render.py</code>). Copier will not execute tasks from a template it doesn't trust.</p>
 <p>copier:</p>
 <ol>
@@ -962,6 +1013,18 @@
 <p><code>copier update</code> asks <code>default_branch</code>, with <code>main</code> as the default. Accept it if your default branch is <code>main</code> and nothing changes. Answer with your branch's name otherwise: the publish and Pages workflows start triggering on it, <code>release</code> starts from it, release pull or merge requests target it, and the CI badge reads it. Before the question, all of those spelled <code>main</code>, so a project on another branch had to edit each by hand after every update. See <a href="../../maintaining/decisions/0040-the-default-branch-is-a-copier-answer.html">ADR-0040</a>.</p>
 <h2 id="upgrading-past-the-grade-rename">Upgrading past the <code>grade</code> rename</h2>
 <p>The pyscn tasks answer to <code>grade</code> instead of <code>quality</code>: <code>./workflow.cmd grade</code>, <code>grade.pyscn</code>, <code>grade.pyscn-analyze</code> and <code>grade.pyscn-check</code>. The module moved with them, <code>_CI/tasks/quality.py</code> to <code>_CI/tasks/grade.py</code>, and so did the dependency group, <code>quality</code> to <code>grade</code>. After the update, <code>uv lock</code> records the new group name, and a <code>quality.py</code> left behind under <code>_CI/tasks/</code> is yours to delete: nothing imports it. Only your own scripts or notes that spelled the old command or group need the new name; the hooks and the pipelines run <code>preflight</code>, which never named either.</p>
+<h2 id="upgrading-past-the-one-sequence-publish">Upgrading past the one-sequence publish</h2>
+<p><code>release.publish</code> is <code>release.dist</code>, <code>release.attest</code> and the upload, in that order, and <code>release.ship</code> runs it; the <code>--prebuilt</code> flag is gone. A pipeline or script of your own that ran <code>release.dist</code>, <code>release.attest</code> and <code>release.publish --prebuilt</code> as three commands runs <code>release.publish</code> alone now, or <code>release.ship</code> where it detects the release itself. See <a href="../../maintaining/decisions/0049-publish-is-one-sequence.html">ADR-0049</a>.</p>
+<h2 id="upgrading-past-building-the-deps-image-every-run">Upgrading past building the deps image every run</h2>
+<p>On GitHub, <code>build-deps-image</code> no longer reuses a tag that already exists in the registry: every run builds and pushes, and reuse is the opt-in <code>container.publish --reuse</code>. The shipped workflow passes no flag. If you want the old behaviour in a job of your own, restrict who can write to the <code>&lt;repo&gt;-deps</code> package first, then add the flag; the generated CI framework reference explains what a reused tag trusts. See <a href="../../maintaining/decisions/0050-the-deps-image-is-built-every-run-unless-asked-to-reuse.html">ADR-0050</a>.</p>
+<h2 id="upgrading-past-the-exported-commit-range">Upgrading past the exported commit range</h2>
+<p>The shipped <code>Preflight</code> jobs fetch full history and export <code>PRE_COMMIT_FROM_REF</code> and <code>PRE_COMMIT_TO_REF</code>, so <code>lint.commitizen</code> checks a pull request's commits, or what a push added, instead of the one commit a shallow checkout holds. A CI job of your own that runs the gate needs the same two things, <code>fetch-depth: 0</code> on the checkout and the two variables from the event, or it checks only the tip and, on a pull request, only the merge commit, which commitizen accepts. See <a href="../../maintaining/decisions/0053-ci-hands-the-commit-check-the-range-it-cannot-infer.html">ADR-0053</a>.</p>
+<h2 id="upgrading-past-the-utc-quarantine-boundary">Upgrading past the UTC quarantine boundary</h2>
+<p><code>[tool.uv] exclude-newer</code> is spelled as an instant, <code>YYYY-MM-DDT00:00:00Z</code>, where it was a bare date. Your <code>pyproject.toml</code> holds the date stamped at generation, so the update may show a conflict on that line: keep your own date and give it the suffix, then <code>uv lock</code>. The lock records the boundary as an instant already; the spelling fixes it to midnight UTC instead of midnight in the zone the lock was last written in, so <code>uv lock</code> may move the recorded instant by your zone's offset and nothing else. See <a href="../../maintaining/decisions/0054-the-quarantine-boundary-is-an-instant-in-utc.html">ADR-0054</a>.</p>
+<h2 id="upgrading-past-nested-code-blocks-in-the-docs">Upgrading past nested code blocks in the docs</h2>
+<p>The <code>document</code> group pins <code>pymdown-extensions</code>, and <code>properdocs.yml</code> enables <code>pymdownx.superfences</code>, so a fenced block indented under a list item renders as code. Run <code>uv lock</code> after the update and commit <code>uv.lock</code> with it. Pages already written need no change. See <a href="../../maintaining/decisions/0056-fenced-code-nests-in-lists.html">ADR-0056</a>.</p>
+<h2 id="upgrading-past-the-formatting-conventions">Upgrading past the formatting conventions</h2>
+<p>Ruff formats with a line length of 120 and single quotes, and checks docstrings against the Google convention. None of the three is a copier question, and the template does not carry the numpy convention it used before 2026-04-13. A project generated before then meets the Google rules on its first <code>lint</code> after the update: ruff reports each docstring section it cannot read, and the fixes are by hand, since the docstring rules have no autofix. Keeping <code>convention = "numpy"</code> in your <code>pyproject.toml</code> works, at the cost of resolving that line at every update. See <a href="../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.html">ADR-0059</a>.</p>
 <h2 id="upgrading-past-the-tag-on-main-release-flow">Upgrading past the tag-on-main release flow</h2>
 <p><code>release</code> used to create the tag on the release branch and push it with the branch. On GitLab that published the version before the MR was reviewed; on both hosts a squash merge left the tag pointing at a commit <code>main</code> never saw, and nothing published. Now <code>release</code> creates no tag. The publish job runs on every push to the default branch and hands it to <code>release.ship</code>, which publishes when <code>[project].version</code> changed between the previous tip and the new one: it creates the tag on the new tip through the host's Release API (a Release entry appears on the releases page), then builds, signs and uploads. Merge release PRs/MRs any way you like.</p>
 <p>Updating changes:</p>
@@ -982,12 +1045,10 @@
 <p>Copier uses a three-way merge; conflicts appear as standard conflict markers in the affected files. The most common cause is that you customised a file the template also changed. Resolve them by hand and re-run <code>./workflow.cmd test</code>.</p>
 <h2 id="pinning-a-specific-template-version">Pinning a specific template version</h2>
 <p>By default <code>copier update</code> fetches the latest tagged release. To pin to a specific ref:</p>
-<pre><code class="language-bash">uvx copier update --trust --vcs-ref &lt;tag-or-commit&gt;
-</code></pre>
+<pre class="highlight"><code class="language-bash">uvx copier update --trust --vcs-ref &lt;tag-or-commit&gt;</code></pre>
 <h2 id="when-the-upstream-is-unreachable">When the upstream is unreachable</h2>
 <p><code>copier update</code> needs network access to fetch the template. In an air-gapped environment, clone the template repo separately and point copier at the local path:</p>
-<pre><code class="language-bash">uvx copier update --trust /path/to/local/clone
-</code></pre>
+<pre class="highlight"><code class="language-bash">uvx copier update --trust /path/to/local/clone</code></pre>
 <h2 id="see-also">See also</h2>
 <ul>
 <li><a href="https://copier.readthedocs.io/en/stable/updating/">Copier documentation</a> — the full update workflow.</li>

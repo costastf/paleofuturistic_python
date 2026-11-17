@@ -429,6 +429,22 @@
 <li>
     <a href="../../maintaining/decisions/0055-generation-runs-no-shell.html" class="dropdown-item">ADR-0055 Generation runs no shell</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/decisions/0056-fenced-code-nests-in-lists.html" class="dropdown-item">ADR-0056 Fenced code nests in lists</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/decisions/0057-every-push-runs-the-whole-matrix.html" class="dropdown-item">ADR-0057 Every push runs the whole matrix</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/decisions/0058-shipped-pipelines-are-checked-by-reading-them.html" class="dropdown-item">ADR-0058 Shipped pipelines are checked by reading them</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.html" class="dropdown-item">ADR-0059 Formatting conventions are the template's, not configurable</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -847,6 +863,18 @@
             <li class="nav-item">
                 <a href="../../maintaining/decisions/0055-generation-runs-no-shell.html" class="nav-link">ADR-0055 Generation runs no shell</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0056-fenced-code-nests-in-lists.html" class="nav-link">ADR-0056 Fenced code nests in lists</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0057-every-push-runs-the-whole-matrix.html" class="nav-link">ADR-0057 Every push runs the whole matrix</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0058-shipped-pipelines-are-checked-by-reading-them.html" class="nav-link">ADR-0058 Shipped pipelines are checked by reading them</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.html" class="nav-link">ADR-0059 Formatting conventions are the template's, not configurable</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -919,10 +947,9 @@ and the floor it missed. Two honest ways out: cover the new code, or lower <code
 same commit, where a reviewer sees the bar move. Nothing in the workflow lowers it for you.</p>
 <h3 id="dormant-during-scaffold">Dormant during scaffold</h3>
 <p>The ratchet starts <strong>dormant</strong>. The smoke test (<code>def test_sanity</code> in <code>tests/test_&lt;slug&gt;.py</code>) drives the scaffolded project to 100% coverage on its very first run; if the ratchet engaged on that signal, the first real change would crash the build at a 100% floor. So the ratchet (run by <code>preflight</code> and <code>test.tox</code>) checks for the presence of <code>def test_sanity</code> and, while it's still there, prints a status line on every run explaining the dormant state and how to engage:</p>
-<pre><code>[ratchet] coverage=100% — scaffold still pristine (test_sanity present); ratchet dormant
+<pre class="highlight"><code>[ratchet] coverage=100% — scaffold still pristine (test_sanity present); ratchet dormant
 [ratchet]   ratchet engages when you remove `test_sanity` in tests/test_&lt;slug&gt;.py
-[ratchet]   to engage immediately, set [tool.test-ratchet] mode = &quot;strict&quot; in pyproject.toml
-</code></pre>
+[ratchet]   to engage immediately, set [tool.test-ratchet] mode = "strict" in pyproject.toml</code></pre>
 <p>The moment <code>test_sanity</code> is deleted or renamed — i.e., the moment real tests start getting written — the ratchet engages and works exactly as described above. Once any non-zero <code>fail_under</code> is written, dormancy is over for good; re-adding <code>test_sanity</code> later doesn't reactivate it.</p>
 <p>If the template is being seeded into a codebase that's already covered, set <code>[tool.test-ratchet] mode = "strict"</code> in <code>pyproject.toml</code> to bypass the dormancy check entirely.</p>
 <p>Coverage regressions still can't slip in silently — they just can't slip in <em>or out</em> during the scaffold phase.</p>
@@ -935,11 +962,10 @@ renders no browsable report — the same reason it asks pyscn for JSON only. <co
 test.coverage</code> renders the combined HTML from whatever the last run measured, and
 <code>./workflow.cmd test.view</code> runs the tests and opens it.</p>
 <p>A union is the only correct reading of a version matrix, and version-gated code shows why:</p>
-<pre><code class="language-python">if sys.version_info &gt;= (3, 13):
+<pre class="highlight"><code class="language-python">if sys.version_info &gt;= (3, 13):
     from warnings import deprecated
 else:
-    from typing_extensions import deprecated
-</code></pre>
+    from typing_extensions import deprecated</code></pre>
 <p>Under py311 and py312 the <code>else</code> runs; under py313+ the <code>if</code> does. No single env covers both, so each reports a miss on code the matrix as a whole exercises completely, while the combined report counts both arms as covered. Averaging the percentages would understate code that is fully exercised.</p>
 <p>The union does not tell you that a line reached only under py315 also works under py311. Coverage measures reach, not correctness; the tests check the latter on every interpreter.</p>
 <p>One consequence: because the ratchet bumps <code>fail_under</code> against the union, trimming <code>env_list</code> later can genuinely lower measured coverage and fail the next run. That is the ratchet working, and lowering the bar is a deliberate, reviewable change as it is everywhere else.</p>

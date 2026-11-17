@@ -429,6 +429,22 @@
 <li>
     <a href="../../maintaining/decisions/0055-generation-runs-no-shell.html" class="dropdown-item">ADR-0055 Generation runs no shell</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/decisions/0056-fenced-code-nests-in-lists.html" class="dropdown-item">ADR-0056 Fenced code nests in lists</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/decisions/0057-every-push-runs-the-whole-matrix.html" class="dropdown-item">ADR-0057 Every push runs the whole matrix</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/decisions/0058-shipped-pipelines-are-checked-by-reading-them.html" class="dropdown-item">ADR-0058 Shipped pipelines are checked by reading them</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.html" class="dropdown-item">ADR-0059 Formatting conventions are the template's, not configurable</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -847,6 +863,18 @@
             <li class="nav-item">
                 <a href="../../maintaining/decisions/0055-generation-runs-no-shell.html" class="nav-link">ADR-0055 Generation runs no shell</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0056-fenced-code-nests-in-lists.html" class="nav-link">ADR-0056 Fenced code nests in lists</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0057-every-push-runs-the-whole-matrix.html" class="nav-link">ADR-0057 Every push runs the whole matrix</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0058-shipped-pipelines-are-checked-by-reading-them.html" class="nav-link">ADR-0058 Shipped pipelines are checked by reading them</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.html" class="nav-link">ADR-0059 Formatting conventions are the template's, not configurable</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -894,36 +922,32 @@
 <p>The template generates a library by default. Adding a command-line entry point is a small additive change.</p>
 <h2 id="step-1-add-a-__main__">Step 1 — Add a <code>__main__</code></h2>
 <p>Create <code>src/&lt;your_project_slug&gt;/__main__.py</code>:</p>
-<pre><code class="language-python">&quot;&quot;&quot;Command-line entry point.&quot;&quot;&quot;
+<pre class="highlight"><code class="language-python">"""Command-line entry point."""
 
 from &lt;your_project_slug&gt; import hello
 
 
 def main() -&gt; None:
-    &quot;&quot;&quot;Print a greeting.&quot;&quot;&quot;
+    """Print a greeting."""
     print(hello())
 
 
 if __name__ == '__main__':
-    main()
-</code></pre>
+    main()</code></pre>
 <p>This makes <code>python -m &lt;your_project_slug&gt;</code> work.</p>
 <h2 id="step-2-register-a-console-script">Step 2 — Register a console script</h2>
 <p>In <code>pyproject.toml</code>:</p>
-<pre><code class="language-toml">[project.scripts]
-&lt;your-project-slug&gt; = &quot;&lt;your_project_slug&gt;.__main__:main&quot;
-</code></pre>
+<pre class="highlight"><code class="language-toml">[project.scripts]
+&lt;your-project-slug&gt; = "&lt;your_project_slug&gt;.__main__:main"</code></pre>
 <p>The key on the left is the executable name installed on <code>PATH</code>. Hyphens are fine; the import target on the right must use underscores. The format is the <a href="https://packaging.python.org/en/latest/specifications/entry-points/">entry points specification</a>; <code>./workflow.cmd lint.pyproject</code> checks the table's shape, and a generated project's <em>Add a console script</em> how-to covers GUI scripts and plugin entry points too.</p>
 <h2 id="step-3-verify">Step 3 — Verify</h2>
-<pre><code class="language-bash">uv sync
+<pre class="highlight"><code class="language-bash">uv sync
 uv run &lt;your-project-slug&gt;          # via console script
-uv run python -m &lt;your_project_slug&gt; # via __main__
-</code></pre>
+uv run python -m &lt;your_project_slug&gt; # via __main__</code></pre>
 <p>Both should print <code>Hello you from &lt;your_project_slug&gt;!</code>.</p>
 <h2 id="step-4-run-it-as-a-uvx-installable-tool">Step 4 — Run it as a uvx-installable tool</h2>
 <p>After publishing the package:</p>
-<pre><code class="language-bash">uvx &lt;your-project-slug&gt;
-</code></pre>
+<pre class="highlight"><code class="language-bash">uvx &lt;your-project-slug&gt;</code></pre>
 <p>uv fetches the wheel from PyPI, installs it into an ephemeral environment, and runs the console script.</p>
 <h2 id="picking-an-argument-parsing-framework">Picking an argument-parsing framework</h2>
 <p>The example above is enough for trivial CLIs. For anything real:</p>
@@ -933,8 +957,7 @@ uv run python -m &lt;your_project_slug&gt; # via __main__
 <li><strong><a href="https://click.palletsprojects.com/">Click</a></strong> — Typer's underlying library; more control, more boilerplate.</li>
 </ul>
 <p>Add your choice as a runtime dependency:</p>
-<pre><code class="language-bash">uv add typer
-</code></pre>
+<pre class="highlight"><code class="language-bash">uv add typer</code></pre>
 <h2 id="when-a-script-makes-more-sense">When a script makes more sense</h2>
 <p>For one-off automations, <a href="https://docs.astral.sh/uv/guides/scripts/#declaring-script-dependencies">uv inline-dependency scripts</a> skip the package layer entirely. Use the template for things you intend to version, distribute, and document.</p></div>
             </div>
