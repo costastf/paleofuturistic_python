@@ -7,9 +7,10 @@ requires-python = ">=3.12"
 [tool.uv]
 package = false
 # Bump with `./workflow.cmd maintain.bump-uv`, which moves this, the template's four version
-# literals and all five per-Python image digests in one step. This value does double duty: it
-# is the uv CI installs before generating anything, and the floor a generated project falls
-# back to when it cannot reach PyPI.
+# literals and all five per-Python image digests in one step. This is the uv the parent's own
+# tasks run under. CI installs the template's pin, read from template/pyproject.toml.jinja by
+# the matrix's plan job, which is also the floor a generated project falls back to when it
+# cannot reach PyPI; an invariant holds the two pins equal.
 required-version = "==0.13.7"
 # A fixed instant, not a relative window. `exclude-newer = "1 week"` moved forward every day,
 # so a resolution could change — and a gate could go red — with no commit behind it. Spelled

@@ -317,6 +317,17 @@ def test_repo_uv_pin_points_at_its_own_command():
     assert 'maintain.bump-uv' in content[:index].rsplit('\n\n', 1)[-1]
 
 
+def test_the_parent_runs_under_the_uv_it_ships():
+    """The parent's `required-version` is the template's pin, so one bump moves both or neither.
+
+    `maintain.bump-uv` writes both; this is what makes that a rule. CI installs the template's
+    pin before generating, so a parent pin that drifted would also be the one uv the matrix
+    never ran under.
+    """
+    parent = tomllib.loads((REPO_ROOT / 'pyproject.toml').read_text(encoding='utf-8'))['tool']['uv']['required-version']
+    assert parent == f'=={template_uv_version()}', f'the parent pins uv {parent}, the template {template_uv_version()}'
+
+
 def test_generation_runs_one_python_task_and_no_shell():
     """Copier runs the render hook alone, and the hook locks with the uv the project pins (ADR-0055).
 
