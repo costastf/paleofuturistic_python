@@ -8,7 +8,7 @@ import warnings
 from collections.abc import Iterable, Iterator
 from datetime import UTC, datetime
 from email.message import Message
-from importlib.metadata import PackageNotFoundError, distribution, metadata, version
+from importlib.metadata import PackageNotFoundError, PackagePath, distribution, metadata, version
 from pathlib import Path
 from typing import NamedTuple, cast
 
@@ -187,17 +187,17 @@ def license_from_dist_files(name: str) -> str | None:
         dist = distribution(name)
     except PackageNotFoundError:
         return None
-    for file in dist.files or []:
-        if 'license' not in file.name.lower():
-            continue
-        try:
-            text = file.read_text(encoding='utf-8')
-        except (OSError, UnicodeDecodeError):
-            continue
-        spdx = detect_spdx_id(text or '')
-        if spdx:
-            return spdx
-    return None
+    license_files = (file for file in dist.files or [] if 'license' in file.name.lower())
+    return next((spdx for spdx in map(spdx_from_dist_file, license_files) if spdx), None)
+
+
+def spdx_from_dist_file(file: PackagePath) -> str | None:
+    """Detect an SPDX id in one dist-info file, or None when it cannot be read as text."""
+    try:
+        text = file.read_text(encoding='utf-8')
+    except (OSError, UnicodeDecodeError):
+        return None
+    return detect_spdx_id(text or '')
 
 
 def license_from_classifiers(name: str) -> str | None:
@@ -289,16 +289,18 @@ def lookup_vendored_license(name: str) -> LicenseRepository | None:
     pinned identically in both worlds.
     """
     vendor_dir = vendor_directory_for(name)
-    if vendor_dir is not None:
-        license_files = sorted(vendor_dir.glob('LICENSE*'))
-        if license_files:
-            spdx_ids = {detect_spdx_id(p.read_text(encoding='utf-8', errors='replace')) for p in license_files}
-            spdx_ids.discard(None)
-            if spdx_ids:
-                if len(spdx_ids) == 1:
-                    return LicenseRepository([DisjunctiveLicense(id=spdx_ids.pop())])
-                return LicenseRepository([LicenseExpression(value=' OR '.join(sorted(spdx_ids)))])
-    return lookup_pypi_license(name)
+    spdx_ids = vendored_spdx_ids(vendor_dir) if vendor_dir is not None else set()
+    if not spdx_ids:
+        return lookup_pypi_license(name)
+    if len(spdx_ids) == 1:
+        return LicenseRepository([DisjunctiveLicense(id=spdx_ids.pop())])
+    return LicenseRepository([LicenseExpression(value=' OR '.join(sorted(spdx_ids)))])
+
+
+def vendored_spdx_ids(vendor_dir: Path) -> set[str]:
+    """Return the SPDX ids detected across every ``LICENSE*`` file in a vendored directory."""
+    detected = {detect_spdx_id(p.read_text(encoding='utf-8', errors='replace')) for p in vendor_dir.glob('LICENSE*')}
+    return {spdx for spdx in detected if spdx}
 
 
 # invalid-type-form justification, for every ty-ignore tag below: each return annotation
@@ -311,15 +313,17 @@ def lookup_pypi_hash(name: str, ver: str) -> HashType | None:  # ty: ignore[inva
     entry = UV_LOCK_INDEX.get(name)
     if not entry or entry.get('version') != ver:
         return None
-    for wheel in entry.get('wheels', []) or []:
-        hash_value = wheel.get('hash')
-        if hash_value and hash_value.startswith('sha256:'):
-            return HashType(alg=HashAlgorithm.SHA_256, content=hash_value.removeprefix('sha256:'))
     sdist = entry.get('sdist')
-    if sdist and isinstance(sdist, dict):
-        hash_value = sdist.get('hash')
-        if hash_value and hash_value.startswith('sha256:'):
-            return HashType(alg=HashAlgorithm.SHA_256, content=hash_value.removeprefix('sha256:'))
+    artefacts = [*(entry.get('wheels', []) or []), *([sdist] if isinstance(sdist, dict) else [])]
+    digest = next((sha256_of(artefact) for artefact in artefacts if sha256_of(artefact)), None)
+    return None if digest is None else HashType(alg=HashAlgorithm.SHA_256, content=digest)
+
+
+def sha256_of(artefact: dict) -> str | None:
+    """Return the hex digest of a locked wheel or sdist entry, when its hash is a SHA-256 one."""
+    hash_value = artefact.get('hash')
+    if hash_value and hash_value.startswith('sha256:'):
+        return hash_value.removeprefix('sha256:')
     return None
 
 

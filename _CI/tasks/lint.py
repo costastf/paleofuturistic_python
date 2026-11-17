@@ -7,9 +7,14 @@ way as the code it produces (ADR-0048, ADR-0051, ADR-0052). The pyproject valida
 step of a generated project's `lint` not run here: this repository publishes no package.
 """
 
+import re
+import shutil
+from collections.abc import Callable
+from pathlib import Path
+
 from invoke import Context, task
 
-from _CI import emojize_message
+from _CI import PROJECT_ROOT_DIRECTORY, emojize_message
 
 # Ruff resolves the nearest config for each file, however it is invoked, so `_CI/` is judged by
 # `_CI/pyproject.toml` here — the same lighter rule set a generated project applies to its own
@@ -21,10 +26,14 @@ PATHS = '_CI/__init__.py _CI/tasks/ tasks_render.py tests/'
 LINT = 'uv run --group lint --group test'
 # What a generated project's `lint.complexipy` allows, held here over the same paths the other
 # checks read and over the template's own `_CI` modules, named one by one so the vendored tree
-# under `template/_CI/lib` stays out. The `.jinja` modules are not read: complexipy sees only
-# `.py` files, and the generated gate reads `src/` alone.
+# under `template/_CI/lib` stays out. The `.jinja` task modules are read too, with their tags
+# stripped into `reports/` first, since complexipy sees only `.py` files (ADR-0051).
 COMPLEXITY_BAR = 8
 COMPLEXITY_PATHS = f'{PATHS} template/_CI/tasks/ template/_CI/info.py template/_CI/uv_release.py'
+JINJA_TASKS = PROJECT_ROOT_DIRECTORY / 'template' / '_CI' / 'tasks'
+STRIPPED_TASKS = PROJECT_ROOT_DIRECTORY / 'reports' / 'stripped-tasks'
+JINJA_BLOCK = re.compile(r'\{%-?.*?-?%\}')
+JINJA_EXPRESSION = re.compile(r'\{\{.*?\}\}')
 
 
 def run_check(context: Context, command: str, label: str) -> bool:
@@ -63,8 +72,37 @@ def unpushed_range(context: Context) -> str:
     return 'HEAD~1..HEAD' if resolves(context, 'HEAD^') else 'HEAD'
 
 
-# Each check as a command, so the aggregate and the single tasks run the same thing. The
-# commit-message check joins in `checks`, since its range is read from the clone at run time.
+def strip_jinja_modules() -> Path:
+    """Write every `.jinja` task module with its tags removed under `reports/`, and return the directory.
+
+    A block tag goes and both arms of an `if` stay, so every function the module can render is
+    counted; an expression becomes a plain name, since what it renders to is a string the
+    complexity does not depend on. The directory is rebuilt each time, so a renamed module
+    leaves no stale copy behind to be read.
+    """
+    shutil.rmtree(STRIPPED_TASKS, ignore_errors=True)
+    STRIPPED_TASKS.mkdir(parents=True)
+    for path in JINJA_TASKS.glob('*.jinja'):
+        name = JINJA_BLOCK.sub('', path.name.removesuffix('.jinja'))
+        text = JINJA_EXPRESSION.sub('X', JINJA_BLOCK.sub('', path.read_text(encoding='utf-8')))
+        (STRIPPED_TASKS / name).write_text(text, encoding='utf-8')
+    return STRIPPED_TASKS
+
+
+def complexipy_command(context: Context) -> str:  # noqa: ARG001 — built like the commitizen command, which needs it
+    """Build the complexity check over the plain modules and the stripped `.jinja` ones."""
+    stripped = strip_jinja_modules().relative_to(PROJECT_ROOT_DIRECTORY)
+    return f'complexipy --max-complexity-allowed {COMPLEXITY_BAR} {COMPLEXITY_PATHS} {stripped}'
+
+
+def commitizen_command(context: Context) -> str:
+    """Build the commit-message check over the range this clone says a push would add."""
+    return f'cz check --rev-range {unpushed_range(context)}'
+
+
+# Each check as a command, so the aggregate and the single tasks run the same thing. The two
+# in `BUILT_CHECKS` are made at run time: one strips the `.jinja` modules first, the other
+# reads its range from the clone.
 CHECKS = {
     'lint.ruff': f'ruff check {PATHS}',
     'lint.format': f'ruff format --check {PATHS}',
@@ -73,23 +111,26 @@ CHECKS = {
     'lint.pylint': f'pylint -j 4 {PATHS}',
     # Whole-program, never narrowed: a signature change surfaces in its callers.
     'lint.ty': f'ty check {PATHS}',
-    'lint.complexipy': f'complexipy --max-complexity-allowed {COMPLEXITY_BAR} {COMPLEXITY_PATHS}',
+}
+BUILT_CHECKS: dict[str, Callable[[Context], str]] = {
+    'lint.complexipy': complexipy_command,
+    'lint.commitizen': commitizen_command,
 }
 
 
+def command_for(context: Context, label: str) -> str:
+    """Return the command behind ``label``, building it only when the label needs that."""
+    return CHECKS[label] if label in CHECKS else BUILT_CHECKS[label](context)
+
+
 def checks(context: Context) -> dict[str, str]:
-    """Return every check as ``{label: command}``, the commit-message check bound to this clone."""
-    return {**CHECKS, 'lint.commitizen': f'cz check --rev-range {unpushed_range(context)}'}
+    """Return every check as ``{label: command}``, the built ones bound to this clone."""
+    return {**CHECKS, **{label: build(context) for label, build in BUILT_CHECKS.items()}}
 
 
 def run_one(context: Context, label: str) -> None:
-    """Run one named check and exit non-zero when it fails.
-
-    The static table serves every label it holds, so a single task such as `lint.ruff` asks git
-    nothing; only the commit-message check reads its range from the clone.
-    """
-    command = CHECKS[label] if label in CHECKS else checks(context)[label]
-    if not run_check(context, command, label):
+    """Run one named check and exit non-zero when it fails."""
+    if not run_check(context, command_for(context, label), label):
         raise SystemExit(1)
 
 

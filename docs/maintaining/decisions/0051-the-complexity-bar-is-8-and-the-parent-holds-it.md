@@ -13,9 +13,14 @@ yet".
 A scan of everything this repository owns, the vendored trees excluded, found 33 functions
 above 8 and three above 15. The three above 15 were all readers in the invariant suite's
 support module and the docs renderer; the parent's own tooling was over the bar it shipped.
-Taking the 33 down, one module per commit, left 477 functions with a maximum of 8 and gave
-the template its opinion: a function in tooling or in tests splits at the same point one in
-`src/` does.
+Taking the 33 down, one module per commit, left every plain `.py` function at 8 or under and
+gave the template its opinion: a function in tooling or in tests splits at the same point one
+in `src/` does.
+
+The scan had read only `.py` files. The template's eight `.jinja` task modules, which
+complexipy skips, held seven more functions above 8, the audit's lockfile reader at 19 among
+them. A review found them the same day; they were decomposed, and the parent's check now
+reads those modules with their tags stripped.
 
 ## Decision
 
@@ -25,16 +30,21 @@ and the same bar over the paths its other checks read, `_CI/`, `tasks_render.py`
 `tests/`, and over the template's own `_CI` modules as well: `_CI/tasks/`, `info.py` and
 `uv_release.py`, named one by one so the vendored tree under `template/_CI/lib` stays out.
 
+The `.jinja` task modules are read too. Before the check runs, each is copied under
+`reports/stripped-tasks/` with every block tag removed and every expression replaced by a
+name, so both arms of a template `if` are counted and what an expression renders to, a string
+the complexity does not depend on, is not. The copies are rebuilt on every run.
+
 The pin joins the `lint` group and the invariant that holds the parent's lint pins equal to
 the template's covers it.
 
 ## Consequences
 
-- The next function over 8 fails locally and in CI's `lint` job, on either side.
-- The template's `.jinja` task modules are not read by complexipy, which sees only `.py`
-  files, and the generated gate reads `src/` alone, so those five modules are held by review
-  rather than by a check. Widening the generated gate to `_CI/tasks/` would close that; it
-  would also widen the commit-stage filter and is not decided here.
+- The next function over 8 fails locally and in CI's `lint` job, on either side, the `.jinja`
+  task modules included.
+- The generated gate still reads `src/` alone, so a project that edits its own `_CI/tasks/`
+  past the bar is not told by its gate. Widening it to `_CI/tasks/` would also widen the
+  commit-stage filter and is not decided here.
 - The pyproject validator is now the only step of a generated project's `lint` the parent
   does not run.
 

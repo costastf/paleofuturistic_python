@@ -305,16 +305,20 @@ def iter_pipeline_components() -> Iterator[PipelineComponent]:
     (those starting with `./`) and re-usable workflows in the same repo are
     skipped because they have no external version to record.
     """
+    seen: set[tuple[str, str]] = set()
+    for name, ref in action_uses():
+        if (name, ref) in seen:
+            continue
+        seen.add((name, ref))
+        yield PipelineComponent(name=name, version=ref, purl=f'pkg:github/{name}@{ref}')
+
+
+def action_uses() -> Iterator[tuple[str, str]]:
+    """Yield ``(action, ref)`` for every third-party `uses:` line in the workflow files, repeats included."""
     if not WORKFLOWS_DIR.is_dir():
         return
-    seen: set[tuple[str, str]] = set()
     for workflow in sorted(WORKFLOWS_DIR.glob('*.y*ml')):
         for line in workflow.read_text(encoding='utf-8').splitlines():
             match = USES_PATTERN.match(line)
-            if not match:
-                continue
-            name, ref = match.group(1), match.group(2)
-            if (name, ref) in seen:
-                continue
-            seen.add((name, ref))
-            yield PipelineComponent(name=name, version=ref, purl=f'pkg:github/{name}@{ref}')
+            if match:
+                yield match.group(1), match.group(2)

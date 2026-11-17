@@ -108,29 +108,46 @@ def audit_requirement_files() -> list[Path]:
     The project and any workspace members are skipped without comment — they are what is being
     audited, not dependencies of it.
     """
-    packages: list[tuple[str, str]] = []
-    unauditable: list[str] = []
     locked = tomllib.loads(UV_LOCK.read_text(encoding='utf-8'))
-    for package in locked.get('package', []):
-        # A key of the source table, not a substring of it: a `url` source pointing at
-        # `https://registry.example.com/thing.whl` matched the string form and was then audited
-        # as though a PyPI release of that name and version were the artefact in use.
-        source = package.get('source', {})
-        version = package.get('version')
-        if 'registry' in source and version:
-            packages.append((package['name'], version))
-            continue
-        # The project and its workspace members are what is being audited, not dependencies.
-        if not source.keys() & {'editable', 'virtual'}:
-            kind = ', '.join(sorted(source)) or 'no source'
-            unauditable.append(f'{package["name"]} ({kind})')
-
+    packages, unauditable = registry_packages(locked.get('package', []))
     if unauditable:
         # Said out loud, because everything written about this audit claims every locked
         # version: a git or URL dependency has no registry release to compare against, so
         # nothing here can speak for it.
         print(f'Not audited, having no registry release to compare against: {", ".join(unauditable)}')
+    AUDIT_REQUIREMENTS.parent.mkdir(parents=True, exist_ok=True)
+    written = []
+    for index, slot in enumerate(version_slots(packages)):
+        target = AUDIT_REQUIREMENTS if index == 0 else AUDIT_REQUIREMENTS.with_suffix(f'.{index}.txt')
+        body = ''.join(f'{name}=={version}\n' for name, version in sorted(slot.items()))
+        target.write_text(body, encoding='utf-8')
+        written.append(target)
+    return written
 
+
+def registry_packages(packages: list[dict]) -> tuple[list[tuple[str, str]], list[str]]:
+    """Split locked packages into ``(name, version)`` pairs with a registry release and the names without one.
+
+    A key of the source table, not a substring of it: a `url` source pointing at
+    `https://registry.example.com/thing.whl` matched the string form and was then audited as
+    though a PyPI release of that name and version were the artefact in use. The project and
+    its workspace members are neither: they are what is being audited.
+    """
+    auditable: list[tuple[str, str]] = []
+    unauditable: list[str] = []
+    for package in packages:
+        source = package.get('source', {})
+        version = package.get('version')
+        if 'registry' in source and version:
+            auditable.append((package['name'], version))
+        elif not source.keys() & {'editable', 'virtual'}:
+            kind = ', '.join(sorted(source)) or 'no source'
+            unauditable.append(f'{package["name"]} ({kind})')
+    return auditable, unauditable
+
+
+def version_slots(packages: list[tuple[str, str]]) -> list[dict[str, str]]:
+    """Pack ``(name, version)`` pairs into the fewest files that name no package twice."""
     slots: list[dict[str, str]] = []
     for name, version in sorted(packages):
         slot = next((candidate for candidate in slots if name not in candidate), None)
@@ -138,15 +155,7 @@ def audit_requirement_files() -> list[Path]:
             slot = {}
             slots.append(slot)
         slot[name] = version
-
-    AUDIT_REQUIREMENTS.parent.mkdir(parents=True, exist_ok=True)
-    written = []
-    for index, slot in enumerate(slots):
-        target = AUDIT_REQUIREMENTS if index == 0 else AUDIT_REQUIREMENTS.with_suffix(f'.{index}.txt')
-        body = ''.join(f'{name}=={version}\n' for name, version in sorted(slot.items()))
-        target.write_text(body, encoding='utf-8')
-        written.append(target)
-    return written
+    return slots
 
 
 def parse_suppressions(raw: str, source: str, *, require_expiry: bool = False) -> list[Suppression]:
@@ -184,6 +193,33 @@ def load_overrides_file() -> list[Suppression]:
             continue
         suppressions.extend(parse_suppressions(entry, f'{SECURITY_OVERRIDES_FILE}:{lineno}'))
     return suppressions
+
+
+def active_suppressions(suppressions: list[Suppression], today: date) -> dict[str, Suppression]:
+    """Return the suppressions still in force by vulnerability id, saying which ones have expired.
+
+    First wins, which is the documented precedence: --ignore, then env, then file.
+    """
+    active: dict[str, Suppression] = {}
+    for suppression in suppressions:
+        if suppression.expires is not None and suppression.expires <= today:
+            print(
+                f'{suppression.source}: suppression for {suppression.vulnerability_id} expired on '
+                f'{suppression.expires}; it will be reported again until re-reviewed.'
+            )
+            continue
+        active.setdefault(suppression.vulnerability_id, suppression)
+    return active
+
+
+def report_suppressions(active: dict[str, Suppression]) -> None:
+    """Print every suppression being applied with its expiry and where it came from."""
+    if not active:
+        return
+    print(f'Applying {len(active)} suppression(s):')
+    for suppression in active.values():
+        expiry = f'expires {suppression.expires}' if suppression.expires else 'permanent'
+        print(f'  {suppression.vulnerability_id} ({expiry}) from {suppression.source}')
 
 
 @task
@@ -227,21 +263,8 @@ def audit(context: Context, ignore: str | None = None) -> None:
         ),
         *load_overrides_file(),
     ]
-    active: dict[str, Suppression] = {}
-    for suppression in suppressions:
-        if suppression.expires is not None and suppression.expires <= today:
-            print(
-                f'{suppression.source}: suppression for {suppression.vulnerability_id} expired on '
-                f'{suppression.expires}; it will be reported again until re-reviewed.'
-            )
-            continue
-        # First wins, which is the documented precedence: --ignore, then env, then file.
-        active.setdefault(suppression.vulnerability_id, suppression)
-    if active:
-        print(f'Applying {len(active)} suppression(s):')
-        for suppression in active.values():
-            expiry = f'expires {suppression.expires}' if suppression.expires else 'permanent'
-            print(f'  {suppression.vulnerability_id} ({expiry}) from {suppression.source}')
+    active = active_suppressions(suppressions, today)
+    report_suppressions(active)
     ignore_args = ' '.join(f'--ignore-vuln {vulnerability_id}' for vulnerability_id in active)
     ignore_opts = f' {ignore_args}' if ignore_args else ''
     # `--disable-pip`: without it pip-audit builds a resolution environment for the

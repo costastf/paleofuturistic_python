@@ -178,10 +178,13 @@ def test_applied_suppressions_are_logged_with_their_source(generated_project):
     """Whatever is applied is printed with its origin, so an env-only mute leaves a footprint."""
     project, _ = generated_project
     secure_py = (project / '_CI' / 'tasks' / 'secure.py').read_text(encoding='utf-8')
-    audit_source = task_source(secure_py, 'secure.audit')
-    assert 'Applying' in audit_source, 'applied suppressions are not announced'
-    assert 'suppression.source' in audit_source, 'the origin of each suppression is not printed'
-    assert 'expired on' in audit_source, 'expired suppressions are not reported'
+    called = calls_in(function_named(secure_py, 'audit'))
+    assert 'active_suppressions' in called, 'the audit no longer sorts the expired suppressions out'
+    assert 'report_suppressions' in called, 'the audit no longer announces what it applies'
+    reporter = function_source(secure_py, 'report_suppressions')
+    assert 'Applying' in reporter, 'applied suppressions are not announced'
+    assert 'suppression.source' in reporter, 'the origin of each suppression is not printed'
+    assert 'expired on' in function_source(secure_py, 'active_suppressions'), 'expired suppressions are not reported'
 
 
 def test_parent_overrides_document_the_expiry_requirement():
@@ -352,7 +355,14 @@ source = { editable = "." }
     )
     requirements = tmp_path / 'reports' / 'audit-requirements.txt'
     written = exec_from(
-        source, 'audit_requirement_files', tomllib=tomllib, Path=Path, UV_LOCK=lock, AUDIT_REQUIREMENTS=requirements
+        source,
+        'registry_packages',
+        'version_slots',
+        'audit_requirement_files',
+        tomllib=tomllib,
+        Path=Path,
+        UV_LOCK=lock,
+        AUDIT_REQUIREMENTS=requirements,
     )['audit_requirement_files']()
 
     pins = [line for path in written for line in path.read_text(encoding='utf-8').splitlines() if line]
