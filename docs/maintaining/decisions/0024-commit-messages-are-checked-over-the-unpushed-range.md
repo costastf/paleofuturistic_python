@@ -28,8 +28,8 @@ made, in CI the commit that arrived.
   to one commit rather than to all of history.
 - The commit-msg hook catches a bad message as it is written; the gate catches one that arrived
   any other way.
-- This repository's own check still scans full history, which is the parked item recorded in
-  the maintainer notes.
+- This repository ran no commit-message check of its own at the time; ADR-0052 gave it one over
+  the same range.
 
 ## References
 

@@ -1,10 +1,10 @@
 """Lint task definitions for the parent template repository.
 
-The repository that defines the standard is held to it: ruff, the formatter, pylint, ty and
-complexipy run here over `_CI/`, `tasks_render.py` and `tests/` under the same pins and the
-same rule set a generated project gets, so a change made here is judged the same way as the
-code it produces (ADR-0048, ADR-0051). The pyproject validator is the one step of a generated
-project's `lint` not run here: this repository publishes no package.
+The repository that defines the standard is held to it: ruff, the formatter, pylint, ty,
+complexipy and commitizen run here over `_CI/`, `tasks_render.py` and `tests/` under the same
+pins and the same rule set a generated project gets, so a change made here is judged the same
+way as the code it produces (ADR-0048, ADR-0051, ADR-0052). The pyproject validator is the one
+step of a generated project's `lint` not run here: this repository publishes no package.
 """
 
 from invoke import Context, task
@@ -35,7 +35,35 @@ def run_check(context: Context, command: str, label: str) -> bool:
     return passed
 
 
-# Each check as a command, so the aggregate and the single tasks run the same thing.
+def resolves(context: Context, revision: str) -> bool:
+    """Report whether git can resolve ``revision`` in this clone."""
+    return not context.run(f'git rev-parse --verify --quiet {revision}', hide=True, warn=True).failed
+
+
+def has_commits(context: Context, revision_range: str) -> bool:
+    """Report whether ``revision_range`` holds at least one commit."""
+    counted = context.run(f'git rev-list --count {revision_range}', hide=True, warn=True)
+    return not counted.failed and counted.stdout.strip() not in ('', '0')
+
+
+def unpushed_range(context: Context) -> str:
+    """Return the range `cz check` reads: what a push would add, else the tip commit alone.
+
+    The same bound a generated project's `lint.commitizen` applies (ADR-0024), without the
+    pre-commit refs: this repository installs no hooks. The tracking branch first, then the
+    remote's default branch; an empty range falls through, since in CI the branch tracks a ref
+    that *is* `HEAD`. The tip is `HEAD~1..HEAD` where a parent exists and `HEAD` where it does
+    not, which is a root commit or a shallow clone (ADR-0052).
+    """
+    for base in ('@{upstream}', 'origin/HEAD'):
+        candidate = f'{base}..HEAD'
+        if resolves(context, base) and has_commits(context, candidate):
+            return candidate
+    return 'HEAD~1..HEAD' if resolves(context, 'HEAD^') else 'HEAD'
+
+
+# Each check as a command, so the aggregate and the single tasks run the same thing. The
+# commit-message check joins in `checks`, since its range is read from the clone at run time.
 CHECKS = {
     'lint.ruff': f'ruff check {PATHS}',
     'lint.format': f'ruff format --check {PATHS}',
@@ -48,9 +76,14 @@ CHECKS = {
 }
 
 
+def checks(context: Context) -> dict[str, str]:
+    """Return every check as ``{label: command}``, the commit-message check bound to this clone."""
+    return {**CHECKS, 'lint.commitizen': f'cz check --rev-range {unpushed_range(context)}'}
+
+
 def run_one(context: Context, label: str) -> None:
     """Run one named check and exit non-zero when it fails."""
-    if not run_check(context, CHECKS[label], label):
+    if not run_check(context, checks(context)[label], label):
         raise SystemExit(1)
 
 
@@ -84,12 +117,18 @@ def complexipy(context: Context) -> None:
     run_one(context, 'lint.complexipy')
 
 
+@task(name='commitizen')
+def commitizen(context: Context) -> None:
+    """Check the commit messages a push would add against the conventional format."""
+    run_one(context, 'lint.commitizen')
+
+
 @task(default=True, name='all')
 def lint(context: Context) -> None:
     """Run every parent lint check, reporting all failures before exiting."""
     # Every check runs even when an earlier one fails: a single pass should surface every
     # problem rather than making the caller re-run to discover the next one.
-    results = [run_check(context, command, label) for label, command in CHECKS.items()]
+    results = [run_check(context, command, label) for label, command in checks(context).items()]
     if not all(results):
         raise SystemExit(1)
     print(emojize_message('All parent lint checks passed'))

@@ -88,3 +88,4 @@ anywhere in the repository resolves to a file.
 | [ADR-0049](0049-publish-is-one-sequence.md) | `release.publish` is one sequence, and `release.ship` runs it |
 | [ADR-0050](0050-the-deps-image-is-built-every-run-unless-asked-to-reuse.md) | The deps image is built every run unless asked to reuse |
 | [ADR-0051](0051-the-complexity-bar-is-8-and-the-parent-holds-it.md) | The complexity bar is 8, and the parent holds it |
+| [ADR-0052](0052-the-parent-checks-its-commit-messages-over-the-unpushed-range.md) | The parent checks its commit messages over the unpushed range |

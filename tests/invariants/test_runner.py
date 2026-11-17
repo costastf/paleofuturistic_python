@@ -190,16 +190,22 @@ def run_stubbed_cell(namespace, tmp_path, cell):
     )
 
 
+# The generated gate's lint tools the parent runs over itself; the pyproject validator is the
+# one it does not, since this repository publishes no package.
+PARENT_LINT_TOOLS = frozenset({'commitizen', 'complexipy', 'pylint', 'ruff', 'ty'})
+
+
 def test_the_parent_lints_with_the_pins_it_ships():
-    """The parent's ruff, pylint, ty and complexipy are the template's, so both sides are judged by one version.
+    """The parent's lint tools are the template's, so both sides are judged by one version of each.
 
     The root `pyproject.toml` says "bump each pair together"; this is what makes that a rule
-    rather than a request (ADR-0048, ADR-0051).
+    rather than a request (ADR-0048, ADR-0051, ADR-0052).
     """
     parent = tomllib.loads((REPO_ROOT / 'pyproject.toml').read_text(encoding='utf-8'))
     parent_pins = dict(pin.split('==', 1) for pin in parent['dependency-groups']['lint'])
     template = (REPO_ROOT / 'template' / 'pyproject.toml.jinja').read_text(encoding='utf-8')
-    template_pins = dict(re.findall(r'^\s*"(complexipy|pylint|ruff|ty)==([^"]+)",', template, re.MULTILINE))
-    expected = {'complexipy', 'pylint', 'ruff', 'ty'}
+    tools = '|'.join(sorted(PARENT_LINT_TOOLS))
+    template_pins = dict(re.findall(rf'^\s*"({tools})==([^"]+)",', template, re.MULTILINE))
+    expected = PARENT_LINT_TOOLS
     assert set(parent_pins) == expected, f'the parent lint group grew or shrank: {parent_pins}'
     assert parent_pins == template_pins, 'the parent and the template are linted by different versions'
