@@ -98,6 +98,14 @@ def test_repository_url_is_suggested_from_the_host_the_email_and_the_slug(genera
     assert urls['Issues'] == f'https://gitlab.com/jane.doe/{PROJECT_SLUG}/-/issues'
 
 
+def test_the_github_suggestion_spells_an_owner_github_allows(generate, tmp_path_factory):
+    """GitHub owner names hold letters, digits and hyphens only, so a dotted local part is hyphenated."""
+    workdir = tmp_path_factory.mktemp('github-owner')
+    generate(workdir / PROJECT_SLUG, {'email': 'jane.doe+ci@example.org', 'git_hosting_service': 'github'})
+    urls = tomllib.loads((workdir / PROJECT_SLUG / 'pyproject.toml').read_text(encoding='utf-8'))['project']['urls']
+    assert urls['Source'] == f'https://github.com/jane-doe-ci/{PROJECT_SLUG}'
+
+
 @pytest.mark.parametrize(
     'bad_url',
     [

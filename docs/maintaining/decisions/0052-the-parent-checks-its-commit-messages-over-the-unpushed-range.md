@@ -20,9 +20,10 @@ them; a check over the tip passes.
 
 `./workflow.cmd lint` in this repository runs `cz check` over the range a push would add,
 computed the way the template's `unpushed_range` computes it minus the pre-commit refs the
-parent never receives: the tracking branch, then the remote's default branch, each skipped
-when the range it gives is empty, then `HEAD~1..HEAD`, or `HEAD` alone where there is no
-parent to name. commitizen joins the `lint` group at the template's pin, and the invariant
+parent never receives: the tracking branch, which is what a push would add; then the remote's
+default branch, which is everything the branch holds over it, pushed or not; each skipped when
+the range it gives is empty; then `HEAD~1..HEAD`, or `HEAD` alone where there is no parent to
+name. commitizen joins the `lint` group at the template's pin, and the invariant
 holding the parent's lint pins equal to the template's covers it.
 
 The range is read from the clone at run time, so the check is built by `checks(context)`

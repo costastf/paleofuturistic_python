@@ -83,7 +83,7 @@ def released_versions(package: str = 'uv') -> dict[str, datetime]:
     releases = data.get('releases') or {}
     dated: dict[str, datetime] = {}
     for version, files in releases.items():
-        released = first_upload(files) if is_release(version) else None
+        released = first_upload(files or []) if is_release(version) else None
         if released is not None:
             dated[version] = released
     if not dated:

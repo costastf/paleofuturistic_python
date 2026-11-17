@@ -56,6 +56,9 @@ is two named steps rather than three.
 - Four load-by-path sites became one `load_module` helper in the invariant support module and
   a guard each in `tasks_render.py`, `maintain.py` and `conftest.py`. The resolver loader in
   `tasks_render.py` now reports a missing module the same way it reports an unreadable one.
+- The gap narrowed afterwards: ADR-0051 brought complexipy in, once the template had an
+  opinion on tooling and test complexity, and ADR-0052 brought commitizen in. The validator
+  is the one step still out.
 
 ## References
 

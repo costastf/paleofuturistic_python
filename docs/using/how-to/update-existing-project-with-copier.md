@@ -45,7 +45,7 @@ After the update:
 
 This change adds a question and three checks:
 
-- **`repository_url`** is asked once. Answer it to get `[project.urls]` (PyPI's sidebar links); leave it empty to skip.
+- **`repository_url`** is asked once, with a suggestion built from the host, your email's local part and the slug. Accept or correct it to get `[project.urls]` (PyPI's sidebar links); clear it to skip. `copier update --defaults` takes the suggestion without asking, so check the result before committing.
 - **New gates.** `lint.pyproject` (validate-pyproject) runs on commits that stage `pyproject.toml` and in `preflight`; `build.package` now runs `twine check --strict` and `check-wheel-contents`. A `pyproject.toml` you edited may fail the first run. The error names the field; fix it rather than skip the gate.
 - **New dependency group** `build`, and new pins in `lint` and `security`. Run `uv lock` after the update and commit `uv.lock` with it.
 - **Publishing.** The publish job now signs PEP 740 attestations. On GitLab it also requests `id_tokens:`, and PyPI needs a Trusted Publisher registered for the project (the new *Set up Trusted Publishing* how-to). If you publish with `UV_PUBLISH_*` credentials, nothing changes: that path uploads without attestations.

@@ -125,15 +125,22 @@ default_branch:
     {% if not default_branch %}default_branch cannot be empty
     {% elif not (default_branch | regex_search('^[A-Za-z0-9][A-Za-z0-9._/-]*$')) or '..' in default_branch or default_branch.endswith('/') or default_branch.endswith('.lock') %}'{{ default_branch }}' is not a branch name git accepts: letters, digits, `.`, `_`, `/` and `-`, starting with a letter or digit, no `..`, not ending in `/` or `.lock`{% endif %}
 
-# Feeds `[project.urls]`, the links PyPI shows in the sidebar of the project page. Optional
-# because a project may not have a public home yet; empty ships no `[project.urls]` at all
-# rather than placeholder links that would 404 on PyPI forever. Normalised in
-# pyproject.toml.jinja (trailing `/` and `.git` dropped), so a pasted clone URL works too.
+# Feeds `[project.urls]`, the links PyPI shows in the sidebar of the project page. Suggested
+# from the host's public instance, the email's local part as the owner, and the slug: right
+# for most projects and one edit away for the rest. A project with no public home yet clears
+# it, which ships no `[project.urls]` at all rather than links that would 404 on PyPI forever.
+# Normalised in pyproject.toml.jinja (trailing `/` and `.git` dropped), so a pasted clone URL
+# works too.
 repository_url:
   type: str
-  # The host's public instance, the owner spelled as the local part of the email, and the slug:
-  # right for most projects and one edit away for the rest. Clearing it ships no [project.urls].
-  default: "https://{{ git_hosting_service }}.com/{{ email.split('@') | first }}/{{ project_slug }}"
+  # GitHub owner names allow only letters, digits and hyphens, so on GitHub the local part's
+  # other characters become hyphens (`jane.doe` suggests `jane-doe`). GitLab allows dots.
+  default: >-
+    {%- set owner = email.split('@') | first -%}
+    {%- if git_hosting_service == 'github' -%}
+    {%- set owner = owner | regex_replace('[^A-Za-z0-9-]+', '-') -%}
+    {%- endif -%}
+    https://{{ git_hosting_service }}.com/{{ owner }}/{{ project_slug }}
   help: >-
     Public https URL of the repository, e.g. https://github.com/acme/widget
     (clear it to ship no [project.urls] for now)

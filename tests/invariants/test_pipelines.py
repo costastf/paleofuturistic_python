@@ -16,6 +16,7 @@ from .support import (
     TEMPLATE_WORKFLOWS,
     action_pins,
     action_uses,
+    calls_in,
     exec_from,
     fork_pair,
     function_named,
@@ -198,9 +199,10 @@ def test_deps_image_reference_is_digest_pinned(generated_project):
     # the local image. GitLab's pipeline job is the exception, and has its own test above.
     assert 'image_digest_reference' in host_py
     shared = load_generated_shared(project)
-    resolver = inspect.getsource(shared.image_digest_reference)
-    assert 'inspect_image' in resolver, 'the resolver no longer inspects the local image'
-    assert 'repo_digest' in resolver, 'the resolver no longer reads the repo digest out of the inspection'
+    shared_py = (project / '_CI' / 'tasks' / 'shared.py').read_text(encoding='utf-8')
+    called = calls_in(function_named(shared_py, 'image_digest_reference'))
+    assert 'inspect_image' in called, 'the resolver no longer inspects the local image'
+    assert 'repo_digest' in called, 'the resolver no longer reads the repo digest out of the inspection'
     assert 'RepoDigests' in inspect.getsource(shared.repo_digest)
     # Parsed as JSON rather than via a Go --format template, which docker and
     # podman expose differently and which needs brace quoting in a shell command.

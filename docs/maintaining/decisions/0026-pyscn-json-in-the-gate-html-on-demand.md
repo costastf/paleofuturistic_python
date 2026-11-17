@@ -37,4 +37,5 @@ to suppress output unless issues are found, suppresses the issues too: a failure
 ## References
 
 - Commits `1bc1b6e` (`--no-open`), `a9a78db` (JSON only in the gate), `cf69fe4` (why not `--quiet`).
-- `template/_CI/tasks/quality.py`.
+- `template/_CI/tasks/grade.py`, named `quality.py` when this record was written; the module
+  and its namespace were renamed to `grade` on 2026-11-16.

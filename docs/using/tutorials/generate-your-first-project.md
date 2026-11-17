@@ -54,7 +54,7 @@ These commands are the heartbeat of every project this template generates:
 ./workflow.cmd format    # format with Ruff (also sort imports, otherwise a normal ruff format)
 ./workflow.cmd lint      # lint with Ruff check, validate-pyproject, pylint, ty (type checker), complexipy, commitizen
 ./workflow.cmd test      # test with pytest (in parallel with xdist using the active Python interpreter)
-./workflow.cmd grade   # scan code quality with pyscn
+./workflow.cmd grade     # scan code quality with pyscn
 ./workflow.cmd build     # produce a wheel + sdist in dist/ and export an SBOM
 ./workflow.cmd secure    # alert on vulnerable dependencies with pip-audit (also produce an SBOM and lint pip-audit security overrides)
 ```

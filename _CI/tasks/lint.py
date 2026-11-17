@@ -47,13 +47,14 @@ def has_commits(context: Context, revision_range: str) -> bool:
 
 
 def unpushed_range(context: Context) -> str:
-    """Return the range `cz check` reads: what a push would add, else the tip commit alone.
+    """Return the range `cz check` reads: what a push would add, else what the branch adds, else the tip.
 
     The same bound a generated project's `lint.commitizen` applies (ADR-0024), without the
-    pre-commit refs: this repository installs no hooks. The tracking branch first, then the
-    remote's default branch; an empty range falls through, since in CI the branch tracks a ref
-    that *is* `HEAD`. The tip is `HEAD~1..HEAD` where a parent exists and `HEAD` where it does
-    not, which is a root commit or a shallow clone (ADR-0052).
+    pre-commit refs: this repository installs no hooks. The tracking branch first, which is
+    what a push would add; then the remote's default branch, which is everything the branch
+    holds over it, pushed or not. An empty range falls through, since in CI the branch tracks
+    a ref that *is* `HEAD`. The tip is `HEAD~1..HEAD` where a parent exists and `HEAD` where it
+    does not, which is a root commit or a shallow clone (ADR-0052).
     """
     for base in ('@{upstream}', 'origin/HEAD'):
         candidate = f'{base}..HEAD'
@@ -82,8 +83,13 @@ def checks(context: Context) -> dict[str, str]:
 
 
 def run_one(context: Context, label: str) -> None:
-    """Run one named check and exit non-zero when it fails."""
-    if not run_check(context, checks(context)[label], label):
+    """Run one named check and exit non-zero when it fails.
+
+    The static table serves every label it holds, so a single task such as `lint.ruff` asks git
+    nothing; only the commit-message check reads its range from the clone.
+    """
+    command = CHECKS[label] if label in CHECKS else checks(context)[label]
+    if not run_check(context, command, label):
         raise SystemExit(1)
 
 

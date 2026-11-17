@@ -84,7 +84,7 @@ The branch releases land on. The publish workflow or pipeline triggers on it by 
 ### `repository_url`
 
 - **Type**: string
-- **Default**: `https://<git_hosting_service>.com/<local part of email>/<project_slug>`, so `jane@example.org` on GitHub with slug `widget` suggests `https://github.com/jane/widget`
+- **Default**: `https://<git_hosting_service>.com/<local part of email>/<project_slug>`, so `jane@example.org` on GitHub with slug `widget` suggests `https://github.com/jane/widget`. On GitHub, whose owner names hold letters, digits and hyphens only, other characters in the local part become hyphens: `jane.doe` suggests `jane-doe`. Clear the answer to ship no `[project.urls]`.
 - **Allowed**: empty, or an `https://` URL with a path, e.g. `https://github.com/acme/widget`
 
 The public home of the repository. It renders `[project.urls]` in `pyproject.toml`, the links PyPI shows in the project sidebar, under [well-known labels](https://packaging.python.org/en/latest/specifications/well-known-project-urls/) so each gets its own icon:
