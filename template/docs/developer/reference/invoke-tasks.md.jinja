@@ -130,7 +130,7 @@ Calling one directly is how to run a single tool over a single file:
 | `secure.sbom` | — | The half `build` depends on: `sbom-extract --write` + `sbom-validate`. |
 | `secure.sbom-extract` | `--write` | Compose a CycloneDX 1.7 SBOM with metadata header (lifecycles, tools, supplier, authors), a two-level dependency graph (project → runtime + dev + build-environment; build-environment → vendored + pipeline), and per-component licence + hash + external-reference enrichment. Prints to stdout; with `--write` lands at `src/<slug>/sbom.cdx.json` so `uv build` ships it inside the wheel. |
 | `secure.validate-overrides` | — | Check every `.security-overrides` entry (format, real expiry date, no merge-conflict markers) without running the audit. The commit hook runs it when the file is staged. |
-| `secure.sbom-validate` | — | Validate the SBOM against the CycloneDX 1.7 JSON schema. Re-runs sbom-extract first if the file is missing. |
+| `secure.sbom-validate` | — | Validate the SBOM against the CycloneDX 1.7 JSON schema. Re-runs sbom-extract first if the file is missing. A pass is recorded in `reports/sbom-validated` against a digest of the lockfile, `pyproject.toml`, the composer and `vendor.txt`, and the validator is skipped while those are unchanged. |
 
 ## `document` — documentation site
 
