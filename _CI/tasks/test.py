@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+from functools import partial
 from pathlib import Path
 from typing import NamedTuple
 
@@ -253,32 +254,33 @@ def run_combo(
 
     if not initialise_project(project_dir, extra_context, log_file, mature=mature):
         return False
+    return run_gate(project_dir, label, log_file, mature=mature)
 
+
+def run_gate(project_dir: Path, label: str, log_file: Path | None, *, mature: bool) -> bool:
+    """Run the cell's QA steps and the litter check in ``project_dir``. Return True when all passed.
+
+    Accumulate rather than stop at the first failure, matching what the matrix already does
+    across cells and what `run_scope` does across steps. This loop is the slowest feedback
+    in the system — five cells at tens of seconds each — so one run reporting everything is
+    worth the seconds it costs when something is already red. Stopping early also skipped the
+    litter check in precisely the cells that were already unhappy.
+    """
     step_env = {'CI': 'true', **security_override_env()}
-
-    # Accumulate rather than stop at the first failure, matching what the matrix already does
-    # across cells and what `run_scope` does across steps. This loop is the slowest feedback
-    # in the system — five cells at tens of seconds each — so one run reporting everything is
-    # worth the seconds it costs when something is already red. Stopping early also skipped the
-    # litter check below in precisely the cells that were already unhappy.
-    steps = qa_sequence(audit=mature)
     failed = [
         step
-        for step in steps
+        for step in qa_sequence(audit=mature)
         if not run_command(f'./workflow.cmd {step}', cwd=project_dir, env=step_env, log_file=log_file)
     ]
-
     untracked = untracked_after_qa(project_dir)
     if untracked:
         report_failure(
             f'[{label}] the workflow left untracked files, so .gitignore has a hole: {", ".join(untracked)}',
             log_file,
         )
-    if failed or untracked:
-        if failed:
-            report_failure(f'[{label}] failed: {", ".join(failed)}', log_file)
-        return False
-    return True
+    if failed:
+        report_failure(f'[{label}] failed: {", ".join(failed)}', log_file)
+    return not failed and not untracked
 
 
 @task
@@ -366,50 +368,52 @@ def matrix(context: Context, workers: int = 1) -> None:  # noqa: ARG001 — invo
         output_root = tmpdir / 'generated'
         output_root.mkdir()
         workspace = ComboWorkspace(template_repo, output_root)
-
-        def worker(cell: dict) -> tuple[str, bool, float]:
-            label = cell['label']
-            log_path = REPORTS_DIR / f'{label}.log'
-            if log_path.exists():
-                log_path.unlink()
-            start = time.monotonic()
-            try:
-                ok = run_combo(
-                    workspace,
-                    extra_context=combo_context(
-                        git_hosting_service=cell['git_hosting_service'],
-                        integrate_pages=cell['integrate_pages'],
-                    ),
-                    label=label,
-                    log_file=log_path,
-                    mature=cell['mature'],
-                )
-            # A worker must not crash the pool, whatever the cell raised.
-            except Exception as exc:  # noqa: BLE001  # pylint: disable=broad-exception-caught
-                with log_path.open('a', encoding='utf-8') as handle:
-                    handle.write(f'\nEXCEPTION: {exc}\n')
-                ok = False
-            return label, ok, time.monotonic() - start
-
         with concurrent.futures.ThreadPoolExecutor(max_workers=effective_workers) as pool:
-            results = list(pool.map(worker, combos))
-
-        print()
-        print(f'{"combo":<18} {"result":<7} duration')
-        any_failed = False
-        for label, ok, duration in results:
-            mins, secs = divmod(int(duration), 60)
-            status = 'PASS' if ok else 'FAIL'
-            log_hint = '' if ok else f'  (log: {REPORTS_DIR.relative_to(PROJECT_ROOT_DIRECTORY)}/{label}.log)'
-            print(f'{label:<18} {status:<7} {mins}m{secs:02d}s{log_hint}')
-            any_failed = any_failed or not ok
-
-        if any_failed:
+            results = list(pool.map(partial(run_cell, workspace), combos))
+        if not report_matrix(results):
             print(emojize_message('Matrix had failing combos', success=False))
             raise SystemExit(1)
         print(emojize_message('All matrix combos passed'))
     finally:
         shutil.rmtree(str(tmpdir), ignore_errors=True)
+
+
+def run_cell(workspace: ComboWorkspace, cell: dict) -> tuple[str, bool, float]:
+    """Run one matrix cell with its own log under ``REPORTS_DIR``. Return ``(label, passed, seconds)``."""
+    label = cell['label']
+    log_path = REPORTS_DIR / f'{label}.log'
+    if log_path.exists():
+        log_path.unlink()
+    start = time.monotonic()
+    try:
+        ok = run_combo(
+            workspace,
+            extra_context=combo_context(
+                git_hosting_service=cell['git_hosting_service'],
+                integrate_pages=cell['integrate_pages'],
+            ),
+            label=label,
+            log_file=log_path,
+            mature=cell['mature'],
+        )
+    # A worker must not crash the pool, whatever the cell raised.
+    except Exception as exc:  # noqa: BLE001  # pylint: disable=broad-exception-caught
+        with log_path.open('a', encoding='utf-8') as handle:
+            handle.write(f'\nEXCEPTION: {exc}\n')
+        ok = False
+    return label, ok, time.monotonic() - start
+
+
+def report_matrix(results: list[tuple[str, bool, float]]) -> bool:
+    """Print one line per cell with its result and duration. Return True when every cell passed."""
+    print()
+    print(f'{"combo":<18} {"result":<7} duration')
+    for label, ok, duration in results:
+        mins, secs = divmod(int(duration), 60)
+        status = 'PASS' if ok else 'FAIL'
+        log_hint = '' if ok else f'  (log: {REPORTS_DIR.relative_to(PROJECT_ROOT_DIRECTORY)}/{label}.log)'
+        print(f'{label:<18} {status:<7} {mins}m{secs:02d}s{log_hint}')
+    return all(ok for _, ok, _ in results)
 
 
 @task(help={'as_json': 'Emit the matrix as JSON (for GH Actions consumption)'})

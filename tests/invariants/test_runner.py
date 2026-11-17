@@ -86,29 +86,65 @@ def test_exactly_one_matrix_cell_audits_its_dependencies(tmp_path):
     cannot differ between them — what differs is the exposure, five concurrent jobs querying an
     advisory service about ~125 packages each.
     """
-    runner_source = (REPO_ROOT / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
-    # `run_combo` was split so it reads in one pass; the extracted helpers are exec'd alongside
-    # it rather than stubbed, since `write_mature_project` is exactly the branch this test does
-    # not otherwise exercise the content of, `security_override_env` needs to observe the same
-    # `os.environ`/`read_template_overrides` stubs the rest of this namespace sets up, not new
-    # ones of its own, and generation and init are what put the commands on record.
+    from _CI.tasks.configuration import qa_cells, qa_sequence  # noqa: PLC0415
 
-    from _CI.tasks.configuration import PROJECT_SLUG, qa_sequence  # noqa: PLC0415
+    recorder = WorkflowRecorder()
+    namespace = exec_runner(recorder)
+    for cell in qa_cells():
+        recorder.label = cell['label']
+        assert run_stubbed_cell(namespace, tmp_path, cell), (
+            f'{cell["label"]} failed with every command stubbed as successful'
+        )
 
-    workflow_commands: list[tuple[str, str]] = []
-    current_label = {'value': ''}
+    audited = [label for label, command in recorder.commands if command == 'secure.audit']
+    assert len(audited) == 1, f'{len(audited)} cells audit their dependencies, not one: {audited}'
+    matured = [cell['label'] for cell in qa_cells() if cell['mature']]
+    assert audited == matured, f'the audit rides with {audited} rather than the matured cell {matured}'
 
-    def record(command, cwd=None, env=None, log_file=None):  # noqa: ARG001
+    # And every cell still writes, documents and then re-checks itself.
+    for cell in qa_cells():
+        ran = recorder.ran_in(cell['label'])
+        assert ran == list(qa_sequence(audit=cell['mature'])), f'{cell["label"]} ran {ran}'
+
+
+class WorkflowRecorder:
+    """A `run_command` stand-in that records every workflow command under the cell running it."""
+
+    def __init__(self) -> None:
+        """Start with no cell running and nothing recorded."""
+        self.label = ''
+        self.commands: list[tuple[str, str]] = []
+
+    def ran_in(self, label):
+        """The workflow commands recorded while ``label`` was the running cell, in order."""
+        return [command for recorded, command in self.commands if recorded == label]
+
+    def __call__(self, command, cwd=None, env=None, log_file=None) -> bool:  # noqa: ARG002
+        """Record a workflow command against the current label and report success."""
         if command.startswith('./workflow.cmd '):
-            workflow_commands.append((current_label['value'], command.removeprefix('./workflow.cmd ')))
+            self.commands.append((self.label, command.removeprefix('./workflow.cmd ')))
         return True
 
-    class ComboWorkspace(NamedTuple):
-        """Mirrors `_CI.tasks.test.ComboWorkspace`'s shape for this exec'd slice."""
 
-        template_repo: Path
-        output_root: Path
+class ComboWorkspace(NamedTuple):
+    """Mirrors `_CI.tasks.test.ComboWorkspace`'s shape for the exec'd runner slice."""
 
+    template_repo: Path
+    output_root: Path
+
+
+def exec_runner(record):
+    """Exec `run_combo` and its helpers from the runner source over a namespace of stubs.
+
+    `run_combo` was split so it reads in one pass; the extracted helpers are exec'd alongside
+    it rather than stubbed, since `write_mature_project` is exactly the branch this test does
+    not otherwise exercise the content of, `security_override_env` needs to observe the same
+    `os.environ`/`read_template_overrides` stubs the rest of this namespace sets up, not new
+    ones of its own, and generation, init and the gate are what put the commands on record.
+    """
+    from _CI.tasks.configuration import PROJECT_SLUG, qa_sequence  # noqa: PLC0415
+
+    runner_source = (REPO_ROOT / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
     namespace = {
         'json': json,
         'os': os,
@@ -128,40 +164,30 @@ def test_exactly_one_matrix_cell_audits_its_dependencies(tmp_path):
         'MATURE_GATED_MODULE': '"""{slug} {boundary}."""\n',
         'ComboWorkspace': ComboWorkspace,
     }
-    namespace = exec_from(
+    return exec_from(
         runner_source,
         'write_mature_project',
         'security_override_env',
         'generate_project',
         'init_steps',
         'initialise_project',
+        'run_gate',
         'run_combo',
         **namespace,
     )
 
-    from _CI.tasks.configuration import qa_cells  # noqa: PLC0415
 
-    for cell in qa_cells():
-        current_label['value'] = cell['label']
-        project = tmp_path / cell['label'] / 'generated' / PROJECT_SLUG
-        for directory in ('tests', f'src/{PROJECT_SLUG}'):
-            (project / directory).mkdir(parents=True, exist_ok=True)
-        assert namespace['run_combo'](
-            namespace['ComboWorkspace'](tmp_path / 'template', tmp_path),
-            {'min_python_version': '3.11'},
-            cell['label'],
-            mature=cell['mature'],
-        ), f'{cell["label"]} failed with every command stubbed as successful'
-
-    audited = [label for label, command in workflow_commands if command == 'secure.audit']
-    assert len(audited) == 1, f'{len(audited)} cells audit their dependencies, not one: {audited}'
-    matured = [cell['label'] for cell in qa_cells() if cell['mature']]
-    assert audited == matured, f'the audit rides with {audited} rather than the matured cell {matured}'
-
-    # And every cell still writes, documents and then re-checks itself.
-    for cell in qa_cells():
-        ran = [command for label, command in workflow_commands if label == cell['label']]
-        assert ran == list(qa_sequence(audit=cell['mature'])), f'{cell["label"]} ran {ran}'
+def run_stubbed_cell(namespace, tmp_path, cell):
+    """Run one matrix cell through the exec'd `run_combo`, with the directories the matured path writes into."""
+    project = tmp_path / cell['label'] / 'generated' / namespace['PROJECT_SLUG']
+    for directory in ('tests', f'src/{namespace["PROJECT_SLUG"]}'):
+        (project / directory).mkdir(parents=True, exist_ok=True)
+    return namespace['run_combo'](
+        ComboWorkspace(tmp_path / 'template', tmp_path),
+        {'min_python_version': '3.11'},
+        cell['label'],
+        mature=cell['mature'],
+    )
 
 
 def test_the_parent_lints_with_the_pins_it_ships():
