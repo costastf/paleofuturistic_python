@@ -425,6 +425,10 @@
 <li>
     <a href="../decisions/0054-the-quarantine-boundary-is-an-instant-in-utc.html" class="dropdown-item">ADR-0054 The quarantine boundary is an instant in UTC</a>
 </li>
+            
+<li>
+    <a href="../decisions/0055-generation-runs-no-shell.html" class="dropdown-item">ADR-0055 Generation runs no shell</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -840,6 +844,9 @@
             <li class="nav-item">
                 <a href="../decisions/0054-the-quarantine-boundary-is-an-instant-in-utc.html" class="nav-link">ADR-0054 The quarantine boundary is an instant in UTC</a>
             </li>
+            <li class="nav-item">
+                <a href="../decisions/0055-generation-runs-no-shell.html" class="nav-link">ADR-0055 Generation runs no shell</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -942,6 +949,8 @@
 <p>Sets <code>[tool.uv] exclude-newer</code> in the generated <code>pyproject.toml</code> to midnight UTC of the generation date (a bare date would mean local midnight, and the lock would record that zone), so the new project's resolutions are frozen at the day it was made rather than inheriting the template's own boundary.</p>
 <h3 id="stamp-the-uv-pin">Stamp the uv pin</h3>
 <p>Resolves the newest uv release that has cleared its cool-down and writes it to every pin in <code>pyproject.toml</code>, digest included. <code>TEMPLATE_UV_VERSION</code> forces a version (the matrix sets it to the template's own pin so generation is deterministic), and an unreachable PyPI falls back to that pin too.</p>
+<h3 id="resolve-the-lockfile">Resolve the lockfile</h3>
+<p>Runs <code>uvx uv@&lt;version&gt; lock</code> with the version just pinned, read back out of the rendered <code>pyproject.toml</code>, so the new project starts with a lock the deps image and its tag can rely on. The ambient <code>uv</code> would refuse to run under the exact pin unless it happened to match. This used to be a second copier task shelling out to <code>sed</code>, which made generation fail from a Windows prompt; the script runs no shell (ADR-0055).</p>
 <h3 id="make-workflowcmd-executable">Make <code>workflow.cmd</code> executable</h3>
 <p>Sets the executable bit on <code>workflow.cmd</code>. On Windows the <code>.cmd</code> extension is sufficient; on Unix this step is what lets <code>./workflow.cmd …</code> work.</p>
 <h2 id="rendering-model">Rendering model</h2>
