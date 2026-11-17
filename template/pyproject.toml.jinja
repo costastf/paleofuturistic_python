@@ -177,13 +177,15 @@ ignore = [
     # Formatter conflicts
     "COM812",  # missing-trailing-comma (conflicts with formatter)
     "Q000",    # bad-quotes-inline-string (conflicts with format.quote-style)
-    "Q003",
+    "Q003",    # avoidable-escaped-quote (the formatter chooses the quotes, under quote-style)
 ]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
+# Tests assert (S101), may use the plain random module (S311), hold mutable class defaults
+# such as parametrize tables (RUF012) and compare against literal expected values (PLR2004).
 "tests/*.py" = ["S101", "S311", "RUF012", "PLR2004"]
 
 [tool.ruff.format]
@@ -241,23 +243,23 @@ init-hook = "import sys; sys.path.append('src/'); sys.path.append('_CI/lib/vendo
 [tool.pylint."MESSAGES CONTROL"]
 max-line-length = 120
 disable = [
-    "too-few-public-methods",
-    "duplicate-code",
-    "logging-fstring-interpolation",
-    "too-many-ancestors",
-    "import-outside-toplevel",
-    # Complexity thresholds — already enforced by ruff (PLR0912/PLR0913/PLR0915)
+    "too-few-public-methods",        # a class with one method is often the right shape (a dataclass, a NamedTuple)
+    "duplicate-code",                # the task modules share shapes on purpose: one module per subject, same skeleton
+    "logging-fstring-interpolation",  # f-strings in log calls are readable; ruff's G004 is off for the same reason
+    "too-many-ancestors",            # inheritance depth is a library's design, not something a user of it can fix
+    "import-outside-toplevel",       # deferred imports are deliberate here and each site says why; ruff PLC0415 governs
+    # Size and complexity. Branches, arguments and statements are ruff's PLR0912, PLR0913 and
+    # PLR0915; locals, positional arguments and instance attributes have no stable ruff rule,
+    # and complexipy's cognitive-complexity bar is the one measure the gate holds (ADR-0051).
     "too-many-arguments",
     "too-many-positional-arguments",
     "too-many-branches",
     "too-many-statements",
     "too-many-locals",
     "too-many-instance-attributes",
-    # Design choices
+    # Covered by ruff
     "unused-argument",           # handled by ruff ARG rules
     "wrong-import-position",     # handled by ruff isort
-    # "broad-exception-caught",    # legitimate in network/auth code
-    # "protected-access",          # companion-object pattern
 ]
 
 [tool.pytest.ini_options]

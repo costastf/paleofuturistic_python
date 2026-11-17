@@ -49,8 +49,8 @@ ignore = [
     "N999",    # invalid-module-name — `_CI` is a project-wide convention, not a per-file choice
     # Every `@task` here takes its options as `name: bool = False`, which is what invoke turns
     # into a `--name` flag — there is no other way to write an optional CLI switch. The root
-    # config leaves these two commented out because they are a case-by-case call in library
-    # code; here every hit is this one systemic shape, not a call site worth a per-line noqa.
+    # config keeps these two on because they are a case-by-case call in library code; here
+    # every hit is this one systemic shape, not a call site worth a per-line noqa.
     "FBT001",  # boolean-type-hint-positional-argument
     "FBT002",  # boolean-default-value-positional-argument
     # Every namespace registration ends in `cast(Task, some_task)`, and `Task` is imported
