@@ -11,15 +11,16 @@ import yaml
 # conftest.py wires sys.path so _CI.tasks.* is importable; pytest loads it
 # before this module, which is why no path setup is needed here.
 from .support import (
-    ACTION_USE,
     RELEASE_DETECTION,
     REPO_ROOT,
     TEMPLATE_WORKFLOWS,
     action_pins,
+    action_uses,
     exec_from,
     fork_pair,
     function_named,
     function_source,
+    github_jobs,
     github_workflows,
     load_generated_shared,
     parameter_defaults,
@@ -241,24 +242,27 @@ def test_security_audit_is_automated_without_failing_unrelated_changes(generated
     # that changes what is installed changes `uv.lock` with it, while the edits that do not —
     # a ratchet bump, a `cz bump` — used to fire a full audit of an untouched dependency set.
     dependency_surface = {'uv.lock'}
-    if cell['git_hosting_service'] == 'github':
-        pipeline = (project / '.github' / 'workflows' / 'continuous-integration.yaml').read_text(encoding='utf-8')
-        assert 'secure.audit' not in pipeline, 'the per-push pipeline audits every change'
-        audit_workflow = yaml.safe_load(
-            (project / '.github' / 'workflows' / 'security-audit.yaml').read_text(encoding='utf-8')
-        )
-        # yaml parses a bare `on:` key as the boolean True, hence the lookup.
-        triggers = audit_workflow.get('on') or audit_workflow[True]
-        paths = set(triggers['push']['paths'])
-        assert dependency_surface <= paths, f'the audit is not triggered by {dependency_surface - paths}'
-        assert 'pyproject.toml' not in paths, 'a version bump fires a full dependency audit'
-    else:
-        jobs = yaml.safe_load((project / '.gitlab-ci.yml').read_text(encoding='utf-8'))
-        rules = jobs['secure']['rules']
-        assert any('schedule' in str(rule.get('if', '')) for rule in rules), 'no scheduled audit'
-        changes = {path for rule in rules for path in rule.get('changes') or []}
-        assert dependency_surface <= changes, f'the audit is not triggered by {dependency_surface - changes}'
-        assert 'pyproject.toml' not in changes, 'a version bump fires a full dependency audit'
+    paths = github_audit_paths(project) if cell['git_hosting_service'] == 'github' else gitlab_audit_changes(project)
+    assert dependency_surface <= paths, f'the audit is not triggered by {dependency_surface - paths}'
+    assert 'pyproject.toml' not in paths, 'a version bump fires a full dependency audit'
+
+
+def github_audit_paths(project):
+    """The paths a push has to touch for the GitHub audit workflow to run, the per-push pipeline auditing nothing."""
+    pipeline = (project / '.github' / 'workflows' / 'continuous-integration.yaml').read_text(encoding='utf-8')
+    assert 'secure.audit' not in pipeline, 'the per-push pipeline audits every change'
+    audit = project / '.github' / 'workflows' / 'security-audit.yaml'
+    audit_workflow = yaml.safe_load(audit.read_text(encoding='utf-8'))
+    # yaml parses a bare `on:` key as the boolean True, hence the lookup.
+    triggers = audit_workflow.get('on') or audit_workflow[True]
+    return set(triggers['push']['paths'])
+
+
+def gitlab_audit_changes(project):
+    """The paths a push has to touch for the GitLab `secure` job to run, which a schedule also runs."""
+    rules = yaml.safe_load((project / '.gitlab-ci.yml').read_text(encoding='utf-8'))['secure']['rules']
+    assert any('schedule' in str(rule.get('if', '')) for rule in rules), 'no scheduled audit'
+    return {path for rule in rules for path in rule.get('changes') or []}
 
 
 def test_fork_pull_requests_run_the_same_gate_on_the_runners_image(generated_project):
@@ -362,16 +366,41 @@ def test_checkouts_do_not_persist_credentials(generated_project):
     if cell['git_hosting_service'] != 'github':
         pytest.skip('GitHub-only workflows')
     exempt = ('pages.yaml', 'deploy')
-    for name, config in github_workflows(project):
-        for job_name, job in config['jobs'].items():
-            for step in job.get('steps') or []:
-                if not str(step.get('uses', '')).startswith('actions/checkout@'):
-                    continue
-                persists = (step.get('with') or {}).get('persist-credentials')
-                if (name, job_name) == exempt:
-                    assert persists is True, f'{name}:{job_name} cannot push gh-pages without the credential'
-                    continue
-                assert persists is False, f'{name}:{job_name} checkout persists credentials'
+    for name, job_name, step in checkout_steps(project):
+        persists = (step.get('with') or {}).get('persist-credentials')
+        if (name, job_name) == exempt:
+            assert persists is True, f'{name}:{job_name} cannot push gh-pages without the credential'
+        else:
+            assert persists is False, f'{name}:{job_name} checkout persists credentials'
+
+
+def checkout_steps(project):
+    """Yield ``(workflow name, job name, step)`` for every `actions/checkout` step in the shipped workflows."""
+    for name, _, job_name, job in github_jobs(project):
+        for step in job.get('steps') or []:
+            if str(step.get('uses', '')).startswith('actions/checkout@'):
+                yield name, job_name, step
+
+
+# Only the image build (pushes to ghcr) and the docs deploy (pushes gh-pages) may mutate
+# anything, and the publish job may write `contents` alone: that is the scope the Releases
+# API checks when `release.tag` creates the tag, and the job's checkout persists no
+# credential, so the scope reaches git only through that one API call. Two write scopes are
+# exempt everywhere because neither grants access to repository contents: `id-token` mints an
+# OIDC token for PyPI Trusted Publishing, and `attestations` records a signed build-provenance
+# statement. Both produce a signature; neither can change what is in the repo.
+SIGNING_SCOPES = ('id-token', 'attestations')
+ALLOWED_WRITES = {'build-deps-image': None, 'deploy': None, 'publish': {'contents'}}
+
+
+def unexpected_writes(job_name, declared):
+    """The write scopes a job asks for beyond the signing scopes and what `ALLOWED_WRITES` grants it."""
+    allowed = ALLOWED_WRITES.get(job_name) or ()
+    return [
+        scope
+        for scope, level in declared.items()
+        if level == 'write' and scope not in SIGNING_SCOPES and scope not in allowed
+    ]
 
 
 def test_every_github_job_declares_least_privilege_permissions(generated_project):
@@ -379,30 +408,13 @@ def test_every_github_job_declares_least_privilege_permissions(generated_project
     project, cell = generated_project
     if cell['git_hosting_service'] != 'github':
         pytest.skip('GitHub-only workflows')
-    for name, config in github_workflows(project):
-        for job_name, job in config['jobs'].items():
-            declared = job.get('permissions') or config.get('permissions')
-            assert declared, f'{name}:{job_name} inherits default token permissions'
-            # Only the image build (pushes to ghcr) and the docs deploy (pushes gh-pages)
-            # may mutate anything, and the publish job may write `contents` alone: that is
-            # the scope the Releases API checks when `release.tag` creates the tag, and the
-            # job's checkout persists no credential, so the scope reaches git only through
-            # that one API call. Two write scopes are exempt everywhere because neither
-            # grants access to repository contents: `id-token` mints an OIDC token for PyPI
-            # Trusted Publishing, and `attestations` records a signed build-provenance
-            # statement. Both produce a signature; neither can change what is in the repo.
-            signing_scopes = ('id-token', 'attestations')
-            allowed_writes = {'build-deps-image': None, 'deploy': None, 'publish': {'contents'}}
-            if job_name in allowed_writes and allowed_writes[job_name] is None:
-                continue
-            writes = [
-                scope
-                for scope, level in declared.items()
-                if level == 'write'
-                and scope not in signing_scopes
-                and scope not in (allowed_writes.get(job_name) or ())
-            ]
-            assert not writes, f'{name}:{job_name} asks for write scopes {writes}'
+    for name, config, job_name, job in github_jobs(project):
+        declared = job.get('permissions') or config.get('permissions')
+        assert declared, f'{name}:{job_name} inherits default token permissions'
+        if ALLOWED_WRITES.get(job_name, ()) is None:
+            continue
+        writes = unexpected_writes(job_name, declared)
+        assert not writes, f'{name}:{job_name} asks for write scopes {writes}'
 
 
 def test_gitlab_publish_mints_both_tokens_and_ships(generated_project):
@@ -451,14 +463,12 @@ def test_generated_actions_are_pinned_to_a_sha_with_a_version_comment(generated_
     project, cell = generated_project
     if cell['git_hosting_service'] != 'github':
         pytest.skip('GitHub-only workflows')
-    for action, refs in action_pins(project / '.github' / 'workflows').items():
+    workflows = project / '.github' / 'workflows'
+    for action, refs in action_pins(workflows).items():
         for ref, places in refs.items():
             assert re.fullmatch(r'[0-9a-f]{40}', ref), f'{action} pinned to {ref!r} at {places[0]}, not a SHA'
-    for path in sorted((project / '.github' / 'workflows').glob('*')):
-        for lineno, line in enumerate(path.read_text(encoding='utf-8').splitlines(), start=1):
-            match = ACTION_USE.match(line)
-            if match:
-                assert match.group('comment'), f'{path.name}:{lineno} pins {match.group("action")} with no # vX.Y.Z'
+    for where, match in action_uses(workflows):
+        assert match.group('comment'), f'{where} pins {match.group("action")} with no # vX.Y.Z'
 
 
 def test_action_pins_never_drift_apart():
@@ -524,34 +534,48 @@ def test_no_ci_job_reruns_what_the_gate_already_covers(generated_project):
     parallelism bought, not diagnosis; `run_steps` still reports every failure in one pass.
     """
     project, cell = generated_project
-    duplicated = ('./workflow.cmd lint', './workflow.cmd test', './workflow.cmd build')
-    if cell['git_hosting_service'] == 'github':
-        pipeline = (project / '.github' / 'workflows' / 'continuous-integration.yaml').read_text(encoding='utf-8')
-        jobs = set(yaml.safe_load(pipeline)['jobs'])
-        # Two gate jobs, one per event shape (ADR-0041); both run the same command, which
-        # `test_fork_pull_requests_run_the_same_gate_on_the_runners_image` asserts.
-        assert jobs == {'build-deps-image', 'preflight', 'preflight-from-fork'}, f'the pipeline runs {jobs}'
-    else:
-        pipeline = (project / '.gitlab-ci.yml').read_text(encoding='utf-8')
-        jobs = {name for name in yaml.safe_load(pipeline) if not name.startswith(('stages', 'variables'))}
-        assert jobs == {'plan-deps-image', 'build-deps-image', 'preflight', 'secure', 'publish'}, (
-            f'the pipeline runs {jobs}'
-        )
+    host = cell['git_hosting_service']
+    pipeline, jobs = pipeline_jobs(project, host)
+    assert jobs == PIPELINE_JOBS[host], f'the pipeline runs {jobs}'
     # The task name, not the whole line: `startswith` also forbade a future
     # `test.list-combos`, exact-match let `./workflow.cmd test --args=…` through, and
     # `lstrip('- ')` strips any run of those two characters rather than one list marker.
-    forbidden = {command.split()[-1] for command in duplicated}
+    forbidden = {'lint', 'test', 'build'}
+    for command, task in invoked_tasks(pipeline):
+        assert task not in forbidden, f'{command!r} re-runs what preflight covers'
+
+
+# GitHub has two gate jobs, one per event shape (ADR-0041); both run the same command, which
+# `test_fork_pull_requests_run_the_same_gate_on_the_runners_image` asserts.
+PIPELINE_JOBS = {
+    'github': {'build-deps-image', 'preflight', 'preflight-from-fork'},
+    'gitlab': {'plan-deps-image', 'build-deps-image', 'preflight', 'secure', 'publish'},
+}
+
+
+def pipeline_jobs(project, host):
+    """Return the per-push pipeline's text and the names of the jobs it declares."""
+    if host == 'github':
+        pipeline = (project / '.github' / 'workflows' / 'continuous-integration.yaml').read_text(encoding='utf-8')
+        return pipeline, set(yaml.safe_load(pipeline)['jobs'])
+    pipeline = (project / '.gitlab-ci.yml').read_text(encoding='utf-8')
+    return pipeline, {name for name in yaml.safe_load(pipeline) if not name.startswith(('stages', 'variables'))}
+
+
+def invoked_tasks(pipeline):
+    """Yield ``(command, task name)`` for every `./workflow.cmd` command in a pipeline file.
+
+    Comments are stripped first: a line that only mentioned the launcher in prose has nothing
+    left to check.
+    """
     for line in pipeline.splitlines():
         if './workflow.cmd' not in line:
             continue
-        # After the comment is stripped, a line that only mentioned the launcher in prose has
-        # nothing left to check.
         command = re.sub(r'^\s*-\s*', '', line.split('#', 1)[0]).strip()
         if './workflow.cmd' not in command:
             continue
         invoked = command.split('./workflow.cmd', 1)[1].split()
-        task = invoked[0] if invoked else ''
-        assert task not in forbidden, f'{command!r} re-runs what preflight covers'
+        yield command, invoked[0] if invoked else ''
 
 
 def test_ci_runs_the_same_gate_as_the_pre_push_hook(generated_project):

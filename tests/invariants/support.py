@@ -420,18 +420,30 @@ TEMPLATE_WORKFLOWS = REPO_ROOT / 'template' / "{% if git_hosting_service == 'git
 ACTION_USE = re.compile(r'^\s*-?\s*uses:\s*(?P<action>[^@\s]+)@(?P<ref>\S+)(?:\s+#\s*(?P<comment>.+?))?\s*$')
 
 
-def action_pins(directory):
-    """Return {action: {ref: [where, ...]}} for every third-party `uses:` under `directory`."""
-    pins = {}
+def action_uses(directory):
+    """Yield ``(where, match)`` for every third-party `uses:` line under `directory`, as `ACTION_USE` reads it."""
     for path in sorted(directory.glob('*')):
         if not path.is_file():
             continue
         for lineno, line in enumerate(path.read_text(encoding='utf-8').splitlines(), start=1):
             match = ACTION_USE.match(line)
             if match:
-                where = f'{path.name}:{lineno}'
-                pins.setdefault(match.group('action'), {}).setdefault(match.group('ref'), []).append(where)
+                yield f'{path.name}:{lineno}', match
+
+
+def action_pins(directory):
+    """Return {action: {ref: [where, ...]}} for every third-party `uses:` under `directory`."""
+    pins = {}
+    for where, match in action_uses(directory):
+        pins.setdefault(match.group('action'), {}).setdefault(match.group('ref'), []).append(where)
     return pins
+
+
+def github_jobs(project):
+    """Yield ``(workflow name, workflow, job name, job)`` for every job in the shipped GitHub workflows."""
+    for name, config in github_workflows(project):
+        for job_name, job in config['jobs'].items():
+            yield name, config, job_name, job
 
 
 class RecordingContext:
