@@ -200,21 +200,24 @@ def extract_vendor_tree(archive: Path, destination: Path) -> int:
             tar.extractall(unpacked, filter='data')
             source = Path(unpacked) / root / '_CI' / 'lib'
             for artefact in VENDOR_ARTEFACTS:
-                target = destination / artefact
-                if target.is_dir():
-                    shutil.rmtree(target)
-                elif target.exists():
-                    target.unlink()
-                target.parent.mkdir(parents=True, exist_ok=True)
-                origin = source / artefact
-                if origin.is_dir():
-                    # `copytree` keeps the mode bits, which matters: bin/invoke must stay
-                    # executable or every `./workflow.cmd` invocation exits 126.
-                    shutil.copytree(origin, target)
-                else:
-                    shutil.copy2(origin, target)
+                replace_artefact(source / artefact, destination / artefact)
             retarget_manifest(destination, upstream_name=project_name(Path(unpacked) / root / '_CI'))
     return sum(1 for path in (destination / 'vendor').rglob('*') if path.is_file())
+
+
+def replace_artefact(origin: Path, target: Path) -> None:
+    """Put ``origin``, a file or a directory, at ``target``, removing whatever was there."""
+    if target.is_dir():
+        shutil.rmtree(target)
+    elif target.exists():
+        target.unlink()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if origin.is_dir():
+        # `copytree` keeps the mode bits, which matters: bin/invoke must stay executable or
+        # every `./workflow.cmd` invocation exits 126.
+        shutil.copytree(origin, target)
+    else:
+        shutil.copy2(origin, target)
 
 
 def project_name(ci_directory: Path) -> str:
