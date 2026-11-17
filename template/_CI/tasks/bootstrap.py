@@ -53,20 +53,27 @@ STEPS: list[BootstrapStep] = [
 ]
 
 
+def run_unattended(step: BootstrapStep, context: Context) -> None:
+    """Run or skip a step with nobody to ask, as its ``ci_behavior`` says."""
+    if step.ci_behavior == 'run':
+        print(f'  Running {step.name}...')
+        step.action(context)
+    else:
+        print(f'  Skipping {step.name} (non-interactive mode)')
+
+
+def wanted(step: BootstrapStep) -> bool:
+    """Ask the step's question at the terminal; a step without one is always wanted."""
+    return not step.prompt or input(step.prompt).strip().lower() in ('y', 'yes')
+
+
 def run_steps(context: Context) -> None:
     """Execute all registered bootstrap steps, respecting CI and TTY context."""
     non_interactive = is_ci() or not sys.stdin.isatty()
     for step in STEPS:
         if non_interactive:
-            if step.ci_behavior == 'run':
-                print(f'  Running {step.name}...')
-                step.action(context)
-            else:
-                print(f'  Skipping {step.name} (non-interactive mode)')
-        elif step.prompt:
-            if input(step.prompt).strip().lower() in ('y', 'yes'):
-                step.action(context)
-        else:
+            run_unattended(step, context)
+        elif wanted(step):
             step.action(context)
 
 
