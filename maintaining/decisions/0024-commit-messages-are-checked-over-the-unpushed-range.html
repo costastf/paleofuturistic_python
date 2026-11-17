@@ -413,6 +413,10 @@
 <li>
     <a href="0051-the-complexity-bar-is-8-and-the-parent-holds-it.html" class="dropdown-item">ADR-0051 The complexity bar is 8, and the parent holds it</a>
 </li>
+            
+<li>
+    <a href="0052-the-parent-checks-its-commit-messages-over-the-unpushed-range.html" class="dropdown-item">ADR-0052 The parent checks its commit messages over the unpushed range</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -819,6 +823,9 @@
             <li class="nav-item">
                 <a href="0051-the-complexity-bar-is-8-and-the-parent-holds-it.html" class="nav-link">ADR-0051 The complexity bar is 8, and the parent holds it</a>
             </li>
+            <li class="nav-item">
+                <a href="0052-the-parent-checks-its-commit-messages-over-the-unpushed-range.html" class="nav-link">ADR-0052 The parent checks its commit messages over the unpushed range</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -880,8 +887,8 @@ made, in CI the commit that arrived.</p>
   to one commit rather than to all of history.</li>
 <li>The commit-msg hook catches a bad message as it is written; the gate catches one that arrived
   any other way.</li>
-<li>This repository's own check still scans full history, which is the parked item recorded in
-  the maintainer notes.</li>
+<li>This repository ran no commit-message check of its own at the time; ADR-0052 gave it one over
+  the same range.</li>
 </ul>
 <h2 id="references">References</h2>
 <ul>
