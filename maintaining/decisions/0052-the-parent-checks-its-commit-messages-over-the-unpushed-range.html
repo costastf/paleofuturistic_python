@@ -879,9 +879,10 @@ them; a check over the tip passes.</p>
 <h2 id="decision">Decision</h2>
 <p><code>./workflow.cmd lint</code> in this repository runs <code>cz check</code> over the range a push would add,
 computed the way the template's <code>unpushed_range</code> computes it minus the pre-commit refs the
-parent never receives: the tracking branch, then the remote's default branch, each skipped
-when the range it gives is empty, then <code>HEAD~1..HEAD</code>, or <code>HEAD</code> alone where there is no
-parent to name. commitizen joins the <code>lint</code> group at the template's pin, and the invariant
+parent never receives: the tracking branch, which is what a push would add; then the remote's
+default branch, which is everything the branch holds over it, pushed or not; each skipped when
+the range it gives is empty; then <code>HEAD~1..HEAD</code>, or <code>HEAD</code> alone where there is no parent to
+name. commitizen joins the <code>lint</code> group at the template's pin, and the invariant
 holding the parent's lint pins equal to the template's covers it.</p>
 <p>The range is read from the clone at run time, so the check is built by <code>checks(context)</code>
 rather than listed in the static <code>CHECKS</code> table the other commands sit in.</p>

@@ -911,6 +911,9 @@ is two named steps rather than three.</p>
 <li>Four load-by-path sites became one <code>load_module</code> helper in the invariant support module and
   a guard each in <code>tasks_render.py</code>, <code>maintain.py</code> and <code>conftest.py</code>. The resolver loader in
   <code>tasks_render.py</code> now reports a missing module the same way it reports an unreadable one.</li>
+<li>The gap narrowed afterwards: ADR-0051 brought complexipy in, once the template had an
+  opinion on tooling and test complexity, and ADR-0052 brought commitizen in. The validator
+  is the one step still out.</li>
 </ul>
 <h2 id="references">References</h2>
 <ul>

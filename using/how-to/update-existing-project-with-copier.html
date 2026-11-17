@@ -930,7 +930,7 @@
 <h2 id="upgrading-past-the-packaging-conformance-change">Upgrading past the packaging-conformance change</h2>
 <p>This change adds a question and three checks:</p>
 <ul>
-<li><strong><code>repository_url</code></strong> is asked once. Answer it to get <code>[project.urls]</code> (PyPI's sidebar links); leave it empty to skip.</li>
+<li><strong><code>repository_url</code></strong> is asked once, with a suggestion built from the host, your email's local part and the slug. Accept or correct it to get <code>[project.urls]</code> (PyPI's sidebar links); clear it to skip. <code>copier update --defaults</code> takes the suggestion without asking, so check the result before committing.</li>
 <li><strong>New gates.</strong> <code>lint.pyproject</code> (validate-pyproject) runs on commits that stage <code>pyproject.toml</code> and in <code>preflight</code>; <code>build.package</code> now runs <code>twine check --strict</code> and <code>check-wheel-contents</code>. A <code>pyproject.toml</code> you edited may fail the first run. The error names the field; fix it rather than skip the gate.</li>
 <li><strong>New dependency group</strong> <code>build</code>, and new pins in <code>lint</code> and <code>security</code>. Run <code>uv lock</code> after the update and commit <code>uv.lock</code> with it.</li>
 <li><strong>Publishing.</strong> The publish job now signs PEP 740 attestations. On GitLab it also requests <code>id_tokens:</code>, and PyPI needs a Trusted Publisher registered for the project (the new <em>Set up Trusted Publishing</em> how-to). If you publish with <code>UV_PUBLISH_*</code> credentials, nothing changes: that path uploads without attestations.</li>
