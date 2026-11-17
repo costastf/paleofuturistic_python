@@ -421,6 +421,10 @@
 <li>
     <a href="../decisions/0053-ci-hands-the-commit-check-the-range-it-cannot-infer.html" class="dropdown-item">ADR-0053 CI hands the commit-message check the range it cannot infer</a>
 </li>
+            
+<li>
+    <a href="../decisions/0054-the-quarantine-boundary-is-an-instant-in-utc.html" class="dropdown-item">ADR-0054 The quarantine boundary is an instant in UTC</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -833,6 +837,9 @@
             <li class="nav-item">
                 <a href="../decisions/0053-ci-hands-the-commit-check-the-range-it-cannot-infer.html" class="nav-link">ADR-0053 CI hands the commit-message check the range it cannot infer</a>
             </li>
+            <li class="nav-item">
+                <a href="../decisions/0054-the-quarantine-boundary-is-an-instant-in-utc.html" class="nav-link">ADR-0054 The quarantine boundary is an instant in UTC</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -932,7 +939,7 @@
 </ul>
 <p>No license header or dunder metadata is added to individual source files. The main module (<code>src/&lt;slug&gt;/&lt;slug&gt;.py</code>) ships its <code>import logging</code> + <code>LOGGER</code> setup directly from the template, so it needs no copy-time injection.</p>
 <h3 id="stamp-the-quarantine-date">Stamp the quarantine date</h3>
-<p>Sets <code>[tool.uv] exclude-newer</code> in the generated <code>pyproject.toml</code> to the generation date, so the new project's resolutions are frozen at the day it was made rather than inheriting the template's own boundary.</p>
+<p>Sets <code>[tool.uv] exclude-newer</code> in the generated <code>pyproject.toml</code> to midnight UTC of the generation date (a bare date would mean local midnight, and the lock would record that zone), so the new project's resolutions are frozen at the day it was made rather than inheriting the template's own boundary.</p>
 <h3 id="stamp-the-uv-pin">Stamp the uv pin</h3>
 <p>Resolves the newest uv release that has cleared its cool-down and writes it to every pin in <code>pyproject.toml</code>, digest included. <code>TEMPLATE_UV_VERSION</code> forces a version (the matrix sets it to the template's own pin so generation is deterministic), and an unreachable PyPI falls back to that pin too.</p>
 <h3 id="make-workflowcmd-executable">Make <code>workflow.cmd</code> executable</h3>

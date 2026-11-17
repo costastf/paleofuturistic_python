@@ -421,6 +421,10 @@
 <li>
     <a href="0053-ci-hands-the-commit-check-the-range-it-cannot-infer.html" class="dropdown-item">ADR-0053 CI hands the commit-message check the range it cannot infer</a>
 </li>
+            
+<li>
+    <a href="0054-the-quarantine-boundary-is-an-instant-in-utc.html" class="dropdown-item">ADR-0054 The quarantine boundary is an instant in UTC</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -833,6 +837,9 @@
             <li class="nav-item">
                 <a href="0053-ci-hands-the-commit-check-the-range-it-cannot-infer.html" class="nav-link">ADR-0053 CI hands the commit-message check the range it cannot infer</a>
             </li>
+            <li class="nav-item">
+                <a href="0054-the-quarantine-boundary-is-an-instant-in-utc.html" class="nav-link">ADR-0054 The quarantine boundary is an instant in UTC</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -910,6 +917,8 @@
   stamped the same day.</li>
 <li>Raising the quarantine date was a three-step manual flow until ADR-0042 added
   <code>develop.refresh-deps</code>.</li>
+<li>The date is spelled as midnight UTC since ADR-0054: as a bare date it meant local
+  midnight, which the lock recorded, so the lock depended on the zone it was written in.</li>
 </ul>
 <h2 id="references">References</h2>
 <ul>
