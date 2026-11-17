@@ -98,10 +98,12 @@ def ratchet_fail_under(*, write: bool = True) -> str | None:
     # No pyproject.toml, or no `fail_under` in it, means there is no ratchet to move — not a
     # staleness anyone can act on, so both read as up to date.
     content = PYPROJECT.read_text(encoding='utf-8') if PYPROJECT.exists() else ''
-    match = re.search(r'^fail_under\s*=\s*(\d+)', content, re.MULTILINE)
+    # A number, not a run of digits: a hand-edited `99.5` read as 99 and had its digits alone
+    # rewritten, which produced `fail_under = 100.5`, a bar no run can clear.
+    match = re.search(r'^fail_under\s*=\s*(\d+(?:\.\d+)?)', content, re.MULTILINE)
     if not match:
         return None
-    current = int(match.group(1))
+    current = float(match.group(1))
 
     try:
         ratchet_config = tomllib.loads(content).get('tool', {}).get('test-ratchet', {})
@@ -116,22 +118,22 @@ def ratchet_fail_under(*, write: bool = True) -> str | None:
         return None
 
     if pct <= current:
-        print(f'[ratchet] coverage={pct}% — fail_under stays at {current}')
+        print(f'[ratchet] coverage={pct}% — fail_under stays at {match.group(1)}')
         return None
     # Anchored to the start of a line so the bar in `[tool.coverage.report]` is the only
     # `fail_under` this can reach; a `fail_under` inside a docstring or comment is indented.
     reason = apply_badge(
         PYPROJECT,
-        r'^fail_under\s*=\s*\d+',
+        r'^fail_under\s*=\s*\d+(?:\.\d+)?',
         f'fail_under = {pct}',
         label='coverage ratchet',
-        detail=f'fail_under = {pct} (was {current})',
+        detail=f'fail_under = {pct} (was {match.group(1)})',
         write=write,
         flags=re.MULTILINE,
         announce=False,
     )
     if write:
-        print(f'[ratchet] coverage={pct}% — fail_under bumped {current} → {pct}')
+        print(f'[ratchet] coverage={pct}% — fail_under bumped {match.group(1)} → {pct}')
     return reason
 
 

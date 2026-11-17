@@ -32,6 +32,7 @@ from .support import (
     hook_stages,
     imported_names,
     invoked_task,
+    load_generated_shared,
     parameter_defaults,
     per_file_step_filters,
     pre_commit_hooks,
@@ -224,6 +225,39 @@ def test_the_coverage_floor_is_enforced_where_it_was_measured(generated_project)
     assert 'tox_matrix' in imported_from_test, (
         'the registry no longer runs the shared tox task, so the floor it enforces can drift'
     )
+
+
+def test_the_ratchet_reads_a_decimal_floor_as_a_number(generated_project, tmp_path):
+    """A hand-edited decimal `fail_under` is compared as a number and rewritten whole, never above the measurement.
+
+    Executed. The floor was matched as a run of digits, so `99.5` read as 99 and only its
+    digits were rewritten: full coverage produced `fail_under = 100.5`, a bar no run can clear.
+    """
+    project, _ = generated_project
+    source = (project / '_CI' / 'tasks' / 'test.py').read_text(encoding='utf-8')
+    pyproject = tmp_path / 'pyproject.toml'
+    floor = '[tool.coverage.report]\nfail_under = 99.5\n\n[tool.test-ratchet]\nmode = "strict"\n'
+    pyproject.write_text(floor, encoding='utf-8')
+    namespace = exec_from(
+        source,
+        'ratchet_fail_under',
+        re=re,
+        tomllib=tomllib,
+        PYPROJECT=pyproject,
+        COVERAGE_REPORT=tmp_path / 'coverage.json',
+        SCAFFOLD_TEST_FILE=tmp_path / 'absent.py',
+        read_coverage_pct=lambda: 100,
+        scaffold_is_pristine=lambda: False,
+        apply_badge=load_generated_shared(project).apply_badge,
+    )
+    namespace['ratchet_fail_under'](write=True)
+    assert 'fail_under = 100\n' in pyproject.read_text(encoding='utf-8'), 'the decimal floor was rewritten past 100'
+
+    # A floor above the measurement stays where it is, decimal included.
+    pyproject.write_text(floor, encoding='utf-8')
+    namespace['read_coverage_pct'] = lambda: 99
+    namespace['ratchet_fail_under'](write=True)
+    assert 'fail_under = 99.5\n' in pyproject.read_text(encoding='utf-8'), 'a floor above the measurement moved'
 
 
 def floor_enforcing_commands(combine):
