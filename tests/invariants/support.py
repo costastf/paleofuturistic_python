@@ -316,15 +316,18 @@ def suppression_calls(secure_py, function_name='audit'):
     wrapped across lines, and a regex stops at the wrong parenthesis because one call nests
     `os.environ.get(...)` inside it. The AST is indifferent to both.
     """
-    tree = ast.parse(secure_py)
-    func = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == function_name)
     calls = {}
-    for node in ast.walk(func):
-        if not (isinstance(node, ast.Call) and getattr(node.func, 'id', '') == 'parse_suppressions'):
-            continue
+    for node in calls_to('parse_suppressions', function_named(secure_py, function_name)):
         label = ast.unparse(node.args[1]) if len(node.args) > 1 else ''
         calls[label] = {kw.arg: ast.unparse(kw.value) for kw in node.keywords}
     return calls
+
+
+def calls_to(name, node):
+    """Yield every call of the plain function `name` anywhere inside `node`."""
+    for inner in ast.walk(node):
+        if isinstance(inner, ast.Call) and getattr(inner.func, 'id', '') == name:
+            yield inner
 
 
 def github_workflows(project):
@@ -376,22 +379,37 @@ MAIN_NOT_THE_BRANCH = (
 MAIN_WORD = re.compile(r'\bmain\b')
 
 
-def lines_naming_main(project):
-    """Every `path:line` in a generated project that says `main` as a branch would be said."""
-    found = []
+def is_scanned_for_branch_names(path):
+    """Whether a generated file is one a branch name could be written in: not git's, not vendored."""
+    return (
+        path.is_file() and '.git' not in path.parts and '_CI/lib' not in path.as_posix() and path.name != '.gitignore'
+    )
+
+
+def text_files(project):
+    """Yield ``(path, text)`` for every scanned file of a generated project that decodes as UTF-8."""
     for path in sorted(project.rglob('*')):
-        if not path.is_file() or '.git' in path.parts or '_CI/lib' in path.as_posix() or path.name == '.gitignore':
+        if not is_scanned_for_branch_names(path):
             continue
         try:
-            text = path.read_text(encoding='utf-8')
+            yield path, path.read_text(encoding='utf-8')
         except UnicodeDecodeError:
             continue
-        found.extend(
-            f'{path.relative_to(project)}:{number}'
-            for number, line in enumerate(text.splitlines(), start=1)
-            if MAIN_WORD.search(line) and not any(allowed in line for allowed in MAIN_NOT_THE_BRANCH)
-        )
-    return found
+
+
+def names_the_branch(line):
+    """Whether a line says `main` the way a branch would be said, and not one of the allowed phrases."""
+    return bool(MAIN_WORD.search(line)) and not any(allowed in line for allowed in MAIN_NOT_THE_BRANCH)
+
+
+def lines_naming_main(project):
+    """Every `path:line` in a generated project that says `main` as a branch would be said."""
+    return [
+        f'{path.relative_to(project)}:{number}'
+        for path, text in text_files(project)
+        for number, line in enumerate(text.splitlines(), start=1)
+        if names_the_branch(line)
+    ]
 
 
 TEMPLATE_WORKFLOWS = REPO_ROOT / 'template' / "{% if git_hosting_service == 'github' %}.github{% endif %}" / 'workflows'
@@ -525,18 +543,32 @@ def step_declarations(source):
     task module behind it, which this suite has no reason to install just to read a declaration.
     Keywords as well as positions: `Step('ty', scope=WHOLE_PROGRAM)` is the same declaration.
     """
-    for node in ast.walk(parsed(source)):
-        if not isinstance(node, ast.Assign) or not isinstance(node.value, (ast.Tuple, ast.List)):
-            continue
-        if not any(isinstance(target, ast.Name) and target.id == 'STEPS' for target in node.targets):
-            continue
-        for call in node.value.elts:
-            assert isinstance(call, ast.Call), f'STEPS holds something other than a Step call: {ast.dump(call)}'
-            supplied = dict(zip(('name', 'scope'), call.args, strict=False))
-            supplied.update({word.arg: word.value for word in call.keywords if word.arg})
-            yield supplied
-        return
-    pytest.fail('preflight.py declares no STEPS registry')
+    registry = steps_registry(parsed(source))
+    if registry is None:
+        pytest.fail('preflight.py declares no STEPS registry')
+    for call in registry.elts:
+        assert isinstance(call, ast.Call), f'STEPS holds something other than a Step call: {ast.dump(call)}'
+        yield call_arguments(call, ('name', 'scope'))
+
+
+def steps_registry(tree):
+    """Return the tuple or list assigned to ``STEPS`` in ``tree``, or None when there is none."""
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and isinstance(node.value, (ast.Tuple, ast.List)) and assigns(node, 'STEPS'):
+            return node.value
+    return None
+
+
+def assigns(node, name):
+    """Whether an assignment has the plain name ``name`` among its targets."""
+    return any(isinstance(target, ast.Name) and target.id == name for target in node.targets)
+
+
+def call_arguments(call, positions):
+    """Return a call's arguments as ``{name: value node}``, the positional ones named by ``positions``."""
+    supplied = dict(zip(positions, call.args, strict=False))
+    supplied.update({word.arg: word.value for word in call.keywords if word.arg})
+    return supplied
 
 
 def registry_steps(project):
@@ -688,18 +720,21 @@ def exec_from(source, *names: str, **namespace: object):
     importing `_CI.tasks.*`, which pulls invoke and every sibling module behind it.
     """
     wanted = set(names)
-    body: list[ast.stmt] = [
-        node
-        for node in ast.parse(source).body
-        if (isinstance(node, ast.FunctionDef) and node.name in wanted)
-        or (isinstance(node, ast.Assign) and any(getattr(t, 'id', None) in wanted for t in node.targets))
-    ]
-    found = {node.name for node in body if isinstance(node, ast.FunctionDef)}
-    found |= {t.id for node in body if isinstance(node, ast.Assign) for t in node.targets if isinstance(t, ast.Name)}
+    body: list[ast.stmt] = [node for node in ast.parse(source).body if defined_names(node) & wanted]
+    found = set().union(*(defined_names(node) for node in body))
     assert wanted <= found, f'missing from the source: {sorted(wanted - found)}'
     module = ast.Module(body=body, type_ignores=[])
     exec(compile(module, '<generated>', 'exec'), namespace)  # noqa: S102  # pylint: disable=exec-used
     return namespace
+
+
+def defined_names(node):
+    """Return the names a top-level statement defines: a function's own, or an assignment's targets."""
+    if isinstance(node, ast.FunctionDef):
+        return {node.name}
+    if isinstance(node, ast.Assign):
+        return {target.id for target in node.targets if isinstance(target, ast.Name)}
+    return set()
 
 
 def failing(*, failed: bool = True):
@@ -760,15 +795,21 @@ def registered_tasks(project):
     for module in sorted((project / '_CI' / 'tasks').glob('*.py')):
         tree = ast.parse(module.read_text(encoding='utf-8'))
         collection = collection_name(tree)
-        names, default = set(), None
-        for call in add_task_calls(tree):
-            name, is_default = registered_name(call)
-            names.add(name)
-            if is_default:
-                default = name
+        names, default = module_registrations(tree)
         if collection and names:
             registered[collection] = (names, default)
     return registered
+
+
+def module_registrations(tree):
+    """Return ``(task names, default task name)`` from every ``add_task`` call in a module."""
+    names, default = set(), None
+    for call in add_task_calls(tree):
+        name, is_default = registered_name(call)
+        names.add(name)
+        if is_default:
+            default = name
+    return names, default
 
 
 VENDOR_TREES = ('_CI/lib', 'template/_CI/lib')
