@@ -22,9 +22,12 @@ jobs:
             exit 1
           fi
           echo "version=${version}" >> "$GITHUB_OUTPUT"
+      # The uv cache is kept between runs in every job. Several jobs saving the same key on
+      # one push log "unable to reserve cache", which is one of them winning, not a failure.
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
         with:
           version: ${{ steps.uv-pin.outputs.version }}
+          enable-cache: true
       - id: gen
         # Tasks run through `./workflow.cmd`, never a hand-assembled invoke invocation. The
         # launcher uses the vendored invoke, which is patched to put the search root on
@@ -49,6 +52,7 @@ jobs:
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
         with:
           version: ${{ needs.plan.outputs.uv-version }}
+          enable-cache: true
       - run: ./workflow.cmd lint
         # The range the commit-message check cannot infer from the clone: the pull request's
         # commits, or what the push added. The names are the ones pre-commit hands a pre-push
@@ -65,6 +69,7 @@ jobs:
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
         with:
           version: ${{ needs.plan.outputs.uv-version }}
+          enable-cache: true
       - run: ./workflow.cmd test.invariants
 
   run:
@@ -80,6 +85,7 @@ jobs:
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
         with:
           version: ${{ needs.plan.outputs.uv-version }}
+          enable-cache: true
       - run: |
           ./workflow.cmd test.combo \
             --git-hosting-service ${{ matrix.combo.git_hosting_service }} \
