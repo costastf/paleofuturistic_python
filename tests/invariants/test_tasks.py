@@ -18,10 +18,12 @@ from .support import (
     UNION_WORKAROUND_RULES,
     exec_from,
     failing,
+    function_named,
     function_source,
     load_generated_shared,
     module_imports,
     opener,
+    statement_calls,
     strip_prose,
 )
 
@@ -212,9 +214,12 @@ def test_refresh_deps_moves_every_exact_pin_except_uv(generated_project):
     assert 'requires = ["uv_build>=0.8.15,<=0.13.7"]' in content, 'the build backend range was rewritten'
     assert '# Newest version clearing the [tool.uv] exclude-newer boundary.' in content
     assert helpers['HELD_BACK'] == frozenset({'uv'})
-    # The task says a newer uv exists rather than taking it; the body spells the hand-off.
+    # The task says a newer uv exists rather than taking it; the report it calls spells the
+    # hand-off, and the body re-resolves and says what has to pass before the commit.
     body = function_source(source, 'refresh_deps')
-    assert 'develop.bump-uv' in body, 'a held-back uv is not pointed at the task that moves it'
+    assert 'report_moved_pins' in statement_calls(function_named(source, 'refresh_deps'))
+    report = function_source(source, 'report_moved_pins')
+    assert 'develop.bump-uv' in report, 'a held-back uv is not pointed at the task that moves it'
     assert 'uv lock --upgrade' in body, 'the transitive closure is not re-resolved'
     assert 'preflight' in body, 'the task does not say what has to pass before the commit'
 

@@ -163,6 +163,69 @@ def locked_versions() -> dict[str, str]:
     return {package['name']: package['version'] for package in packages}
 
 
+def boundary_date(boundary: str) -> str:
+    """Return ``boundary`` checked as a YYYY-MM-DD date, or today when it is empty."""
+    target = boundary or date.today().isoformat()  # noqa: DTZ011 - a calendar date, like the one it replaces
+    try:
+        date.fromisoformat(target)
+    except ValueError:
+        print(f'`{target}` is not a date of the form YYYY-MM-DD.')
+        raise SystemExit(1) from None
+    return target
+
+
+def raise_boundary(target: str) -> tuple[str, str]:
+    """Write ``exclude-newer = "target"`` into pyproject.toml. Return the content before and after."""
+    original = PYPROJECT.read_text(encoding='utf-8')
+    match = EXCLUDE_NEWER.search(original)
+    if not match:
+        print('No `exclude-newer = "…"` line in pyproject.toml; nothing to raise.')
+        raise SystemExit(1)
+    content = EXCLUDE_NEWER.sub(f'exclude-newer = "{target}"', original)
+    PYPROJECT.write_text(content, encoding='utf-8')
+    print(f'exclude-newer {match["boundary"]} → {target}')
+    return original, content
+
+
+def pins_behind(context: Context, original: str) -> dict[str, str]:
+    """Ask uv which direct pins are behind the boundary now in pyproject.toml.
+
+    Asked under the new boundary, so "latest" means the newest release the date admits. When
+    uv cannot answer, pyproject.toml goes back to ``original`` before the task exits.
+    """
+    tree = context.run('uv tree --depth 1 --all-groups --outdated', hide=True, warn=True)
+    if tree.failed:
+        PYPROJECT.write_text(original, encoding='utf-8')
+        print(tree.stderr.strip())
+        print('Could not read which pins are behind; pyproject.toml is as it was.')
+        raise SystemExit(1)
+    return outdated_pins(tree.stdout)
+
+
+def report_moved_pins(moved: list[tuple[str, str, str]], latest: dict[str, str]) -> None:
+    """Print what moved, and which held-back pins have a newer release they were not taken to."""
+    for name, old, new in moved:
+        print(f'  {name} {old} → {new}')
+    if not moved:
+        print('  every exact pin is already the newest release under the boundary')
+    for name in sorted(HELD_BACK & latest.keys()):
+        print(f'  {name} {latest[name]} is available; `./workflow.cmd develop.bump-uv` is what moves it')
+
+
+def report_transitive_moves(moved: list[tuple[str, str, str]], before: dict[str, str], after: dict[str, str]) -> None:
+    """Print the packages ``uv lock --upgrade`` moved that are not direct pins."""
+    direct = {canonical(name) for name, _, _ in moved}
+    transitive = sorted(
+        f'{name} {before[name]} → {after[name]}'
+        for name in before.keys() & after.keys()
+        if before[name] != after[name] and canonical(name) not in direct
+    )
+    if transitive:
+        print(f'  {len(transitive)} transitive dependencies moved in uv.lock:')
+        for line in transitive:
+            print(f'    {line}')
+
+
 @task
 @logged('develop.refresh-deps')
 def refresh_deps(context: Context, boundary: str = '') -> None:
@@ -184,52 +247,16 @@ def refresh_deps(context: Context, boundary: str = '') -> None:
             that is not today, or to re-run a refresh at a boundary already chosen.
 
     """
-    target = boundary or date.today().isoformat()  # noqa: DTZ011 - a calendar date, like the one it replaces
-    try:
-        date.fromisoformat(target)
-    except ValueError:
-        print(f'`{target}` is not a date of the form YYYY-MM-DD.')
-        raise SystemExit(1) from None
-    original = PYPROJECT.read_text(encoding='utf-8')
-    match = EXCLUDE_NEWER.search(original)
-    if not match:
-        print('No `exclude-newer = "…"` line in pyproject.toml; nothing to raise.')
-        raise SystemExit(1)
-    previous = match['boundary']
-    content = EXCLUDE_NEWER.sub(f'exclude-newer = "{target}"', original)
-    PYPROJECT.write_text(content, encoding='utf-8')
-    print(f'exclude-newer {previous} → {target}')
-
-    # Asked under the new boundary, so "latest" means the newest release the date admits.
-    tree = context.run('uv tree --depth 1 --all-groups --outdated', hide=True, warn=True)
-    if tree.failed:
-        PYPROJECT.write_text(original, encoding='utf-8')
-        print(tree.stderr.strip())
-        print('Could not read which pins are behind; pyproject.toml is as it was.')
-        raise SystemExit(1)
-    latest = outdated_pins(tree.stdout)
+    target = boundary_date(boundary)
+    original, content = raise_boundary(target)
+    latest = pins_behind(context, original)
     content, moved = move_pins(content, latest)
     PYPROJECT.write_text(content, encoding='utf-8')
-    for name, old, new in moved:
-        print(f'  {name} {old} → {new}')
-    if not moved:
-        print('  every exact pin is already the newest release under the boundary')
-    for name in sorted(HELD_BACK & latest.keys()):
-        print(f'  {name} {latest[name]} is available; `./workflow.cmd develop.bump-uv` is what moves it')
+    report_moved_pins(moved, latest)
 
     before = locked_versions()
     execute(context, 'uv lock --upgrade')
-    after = locked_versions()
-    direct = {canonical(name) for name, _, _ in moved}
-    transitive = sorted(
-        f'{name} {before[name]} → {after[name]}'
-        for name in before.keys() & after.keys()
-        if before[name] != after[name] and canonical(name) not in direct
-    )
-    if transitive:
-        print(f'  {len(transitive)} transitive dependencies moved in uv.lock:')
-        for line in transitive:
-            print(f'    {line}')
+    report_transitive_moves(moved, before, locked_versions())
     print('Run `./workflow.cmd preflight` and commit pyproject.toml and uv.lock together.')
 
 
