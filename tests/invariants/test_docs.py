@@ -137,20 +137,36 @@ def test_task_catalog_matches_the_registered_tasks(generated_project):
     page = (project / 'docs' / 'developer' / 'reference' / 'invoke-tasks.md').read_text(encoding='utf-8')
     documented = set(re.findall(r'^\| `([a-z][a-z0-9_.-]*)`', page, re.MULTILINE))
 
-    unknown = sorted(name for name in documented if (name not in real if '.' in name else name not in registered))
+    unknown = sorted(name for name in documented if not is_registered(name, real, registered))
     assert not unknown, f'the catalog documents tasks that are not registered: {unknown}'
 
-    # A namespace's default is reachable by the bare namespace name, so a row for that counts.
-    defaults = {f'{namespace}.{default}' for namespace, (_, default) in registered.items() if namespace in documented}
-    undocumented = sorted(name for name in real if name not in documented and name not in defaults)
+    undocumented = sorted(real - documented - documented_defaults(registered, documented))
     assert not undocumented, f'registered tasks with no row in the catalog: {undocumented}'
 
-    shortcuts = page.split('## Top-level shortcuts', 1)[1].split('\n## ', 1)[0]
-    for namespace, default_of in re.findall(r'^\| `([a-z_-]+)` \| `([a-z_.-]+)` \|', shortcuts, re.MULTILINE):
+    for namespace, default_of in shortcut_rows(page):
         _, default = registered[namespace]
         assert default_of == f'{namespace}.{default}', (
             f'the shortcut `{namespace}` runs {namespace}.{default}, the catalog says {default_of}'
         )
+
+
+def is_registered(name, real, registered):
+    """Whether a catalog row names a registered task (`namespace.task`) or a registered namespace."""
+    return name in real if '.' in name else name in registered
+
+
+def documented_defaults(registered, documented):
+    """The default task of every namespace the catalog has a row for.
+
+    A namespace's default is reachable by the bare namespace name, so a row for that counts.
+    """
+    return {f'{namespace}.{default}' for namespace, (_, default) in registered.items() if namespace in documented}
+
+
+def shortcut_rows(page):
+    """``(namespace, task it runs)`` for every row of the catalog's top-level shortcuts table."""
+    shortcuts = page.split('## Top-level shortcuts', 1)[1].split('\n## ', 1)[0]
+    return re.findall(r'^\| `([a-z_-]+)` \| `([a-z_.-]+)` \|', shortcuts, re.MULTILINE)
 
 
 def test_sidebar_nav_override_ships(generated_project):
@@ -286,14 +302,18 @@ def test_every_decision_reference_resolves():
     A reference to a number nobody wrote, or one renumbered away, is worse than no reference.
     """
     known = {record.name[:4] for record in decision_records()}
-    dangling = []
+    dangling = [
+        f'{path.relative_to(REPO_ROOT)}: ADR-{number}'
+        for path in referencing_files()
+        for number in DECISION_REFERENCE.findall(path.read_text(encoding='utf-8'))
+        if number not in known
+    ]
+    assert not dangling, f'references to records that do not exist: {dangling}'
+
+
+def referencing_files():
+    """Every file under the reference roots that may name a record, the vendored trees left out."""
     for root in DECISION_REFERENCE_ROOTS:
         for path in (REPO_ROOT / root).rglob('*'):
-            if not path.is_file() or path.suffix not in DECISION_REFERENCE_SUFFIXES or 'lib/vendor' in str(path):
-                continue
-            dangling.extend(
-                f'{path.relative_to(REPO_ROOT)}: ADR-{number}'
-                for number in DECISION_REFERENCE.findall(path.read_text(encoding='utf-8'))
-                if number not in known
-            )
-    assert not dangling, f'references to records that do not exist: {dangling}'
+            if path.is_file() and path.suffix in DECISION_REFERENCE_SUFFIXES and 'lib/vendor' not in str(path):
+                yield path
