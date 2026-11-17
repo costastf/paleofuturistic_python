@@ -95,3 +95,4 @@ anywhere in the repository resolves to a file.
 | [ADR-0056](0056-fenced-code-nests-in-lists.md) | Fenced code nests in lists |
 | [ADR-0057](0057-every-push-runs-the-whole-matrix.md) | Every push runs the whole matrix |
 | [ADR-0058](0058-shipped-pipelines-are-checked-by-reading-them.md) | Shipped pipelines are checked by reading them |
+| [ADR-0059](0059-formatting-conventions-are-not-configurable.md) | Formatting conventions are the template's, not configurable |

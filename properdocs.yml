@@ -118,5 +118,6 @@ nav:
       - ADR-0056 Fenced code nests in lists: maintaining/decisions/0056-fenced-code-nests-in-lists.md
       - ADR-0057 Every push runs the whole matrix: maintaining/decisions/0057-every-push-runs-the-whole-matrix.md
       - ADR-0058 Shipped pipelines are checked by reading them: maintaining/decisions/0058-shipped-pipelines-are-checked-by-reading-them.md
+      - ADR-0059 Formatting conventions are the template's, not configurable: maintaining/decisions/0059-formatting-conventions-are-not-configurable.md
 
 copyright: Copyright &copy; 2024 <a href="https://schubergphilis.com/">Schuberg Philis</a>
