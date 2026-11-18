@@ -82,6 +82,17 @@ max_python_version:
     max_python_version must be greater than or equal to min_python_version
     {% endif %}
 
+# The exact version `requires-python` and `.python-version` carry for the chosen minimum.
+# 3.11 is in security-only maintenance, so every patch below the current one lacks fixes it
+# has, and the documentation stack (pymdown-extensions 13) needs at least 3.11.5: the floor
+# is the newest 3.11 release, spelled in full so uv fetches that one instead of settling for an
+# older 3.11 it finds on the machine. Every other series floors at its minor (ADR-0060).
+# Never asked and never stored: derived from `min_python_version` on every render.
+python_floor:
+  type: str
+  when: false
+  default: "{{ {'3.11': '3.11.18'}.get(min_python_version, min_python_version) }}"
+
 license:
   type: str
   choices:

@@ -47,7 +47,7 @@ Author email. Appears in `pyproject.toml` authors metadata.
 - **Default**: `3.11`
 - **Allowed**: `"3.11"`, `"3.12"`, `"3.13"`, `"3.14"`, `"3.15"`
 
-Lower bound. Drives `requires-python`, classifier list, tox envs, and CI matrix. See [Choose the Python version range](../how-to/choose-python-version-range.md).
+Lower bound. Drives `requires-python`, classifier list, tox envs, and CI matrix. For `3.11` the floor is spelled to the patch, `3.11.18`, in both `requires-python` and `.python-version`: the series is in security-only maintenance and the documentation stack needs at least 3.11.5, so uv fetches the current release instead of settling for an older 3.11 on the machine (see `python_floor` below and [ADR-0060](../../maintaining/decisions/0060-the-3-11-floor-is-its-current-patch-release.md)). See [Choose the Python version range](../how-to/choose-python-version-range.md).
 
 ### `max_python_version`
 
@@ -116,6 +116,14 @@ Validation is split between copier's built-in mechanisms and the `tasks_render.p
 3. **Repository URL** — a `validator` on `repository_url` accepts an empty value or `^https://[^/\s]+/[^\s]+$`, so `http://`, SSH remotes and a bare host are refused before any files are written.
 4. **Default branch** — a `validator` on `default_branch` refuses an empty value and the names `git check-ref-format --branch` would refuse that the pattern can express: a leading `-` or `.`, `..`, a trailing `/` or `.lock`, and any character outside letters, digits, `.`, `_`, `/` and `-`.
 5. **License installation** — `tasks_render.py` installs the chosen `LICENSE` file (substituting author/year tokens) and removes the `licenses/` staging directory. It runs only on `copier copy`, not on `copier update`.
+
+## Computed values
+
+Never asked and never written to `.copier-answers.yml`; derived from the answers above on every render.
+
+### `python_floor`
+
+The exact version `requires-python` and `.python-version` carry: `3.11.18` for a `min_python_version` of `3.11`, the minor itself for every other series. The table that maps a series to its patch floor lives on this question in `copier.yml`, and moving it is a template change. See [ADR-0060](../../maintaining/decisions/0060-the-3-11-floor-is-its-current-patch-release.md).
 
 ## See also
 

@@ -34,7 +34,9 @@ TODAY = date.today()  # noqa: DTZ011
 YEAR = str(TODAY.year)
 
 EXCLUDE_NEWER_PATTERN = re.compile(r'^exclude-newer = "[^"]*"$', re.MULTILINE)
-REQUIRES_PYTHON_PATTERN = re.compile(r'^requires-python = ">=([^"]+)"$', re.MULTILINE)
+# Major and minor only: the floor may be spelled to the patch (`3.11.18`), and the image the
+# digest is resolved for is tagged per minor.
+REQUIRES_PYTHON_PATTERN = re.compile(r'^requires-python = ">=(\d+\.\d+)', re.MULTILINE)
 REQUIRED_VERSION_PATTERN = re.compile(r'^required-version = "==([^"]+)"$', re.MULTILINE)
 
 # Lets the template's own harness pin what generation stamps. Without it the ambient uv that
@@ -105,7 +107,7 @@ def load_uv_release() -> ModuleType | None:
 
 
 def python_floor(content: str) -> str | None:
-    """Return the minimum Python version `requires-python` declares, or None when it cannot be read."""
+    """Return the `major.minor` of the floor `requires-python` declares, or None when it cannot be read."""
     match = REQUIRES_PYTHON_PATTERN.search(content)
     return match.group(1) if match else None
 

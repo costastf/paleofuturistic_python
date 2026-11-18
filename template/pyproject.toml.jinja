@@ -8,7 +8,9 @@ keywords = []
 authors = [
     {name = "{{ full_name }}", email = "{{ email }}"},
 ]
-requires-python = ">={{ min_python_version }}"
+# Spelled to the patch for 3.11, whose current release is the floor (ADR-0060); `.python-version`
+# names the same one, so uv fetches it rather than settling for an older 3.11 on the machine.
+requires-python = ">={{ python_floor }}"
 dependencies = []
 {%- if license != "None" %}
 license = "{{ license }}"
@@ -79,7 +81,8 @@ document = [
     "properdocs-theme-mkdocs==1.6.7",
     "mkdocs-include-markdown-plugin==7.3.1",
     "mkdocstrings[python]==1.0.8",
-    "pymdown-extensions==12.3",  # 13.0 needs Python 3.11.5, above the floor this template allows
+    # Needs Python 3.11.5; the 3.11 floor is the current patch release for it (ADR-0060).
+    "pymdown-extensions==13.1",
 ]
 lint = [
     "commitizen==4.19.3",

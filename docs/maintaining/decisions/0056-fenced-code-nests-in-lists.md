@@ -1,6 +1,7 @@
 # ADR-0056: Fenced code nests in lists
 
-- **Status**: accepted
+- **Status**: accepted; the pin moved to 13.1 once
+  [ADR-0060](0060-the-3-11-floor-is-its-current-patch-release.md) raised the 3.11 floor
 - **Date**: 2026-11-17
 
 ## Context

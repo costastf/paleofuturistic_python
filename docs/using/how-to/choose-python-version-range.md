@@ -33,6 +33,8 @@ For a cleaner re-derivation, `uvx copier update --trust` after the template's ch
 
 The template's floor is 3.11+ for a reason: it relies on `tomllib`, `ExceptionGroup`, and PEP 604 type unions. Older floors would require shims; the template doesn't ship them.
 
+A project that answers `3.11` floors at `3.11.18`, the current release of the series, in both `requires-python` and `.python-version`. The series only gets security fixes, so every older patch is one with known holes, and the documentation stack needs at least 3.11.5. Spelling the patch in `.python-version` is what makes uv fetch that release rather than settle for an older 3.11 it finds on the machine and then refuse it against the floor. Every other series floors at its minor. See [ADR-0060](../../maintaining/decisions/0060-the-3-11-floor-is-its-current-patch-release.md).
+
 If you need to support 3.10 or earlier for downstream consumers, generate at the template's minimum and patch the generated `pyproject.toml` manually — you're then off the template's update path for that file.
 
 ## See also

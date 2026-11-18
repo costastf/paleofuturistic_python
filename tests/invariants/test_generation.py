@@ -54,6 +54,37 @@ def test_ci_tooling_never_claims_a_newer_python_than_the_project(generated_proje
     )
 
 
+def test_the_version_file_names_the_floor_uv_must_fetch(generated_project):
+    """`.python-version` spells the same version `requires-python` floors at (ADR-0060).
+
+    The 3.11 floor is its current patch release, not the minor: pymdown-extensions 13 needs
+    3.11.5, and the series is in security-only maintenance, so an older patch is one with
+    known holes. uv resolves a minor-only `.python-version` to whatever 3.11 the machine has
+    and then refuses it against the patch-level floor, instead of fetching one that fits.
+    """
+    project, _ = generated_project
+    data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
+    floor = data['project']['requires-python'].removeprefix('>=')
+    pinned = (project / '.python-version').read_text(encoding='utf-8').strip()
+    assert pinned == floor, f'.python-version pins {pinned}; requires-python floors at {floor}'
+    if floor.startswith('3.11'):
+        assert floor.count('.') == 2, f'the 3.11 floor is a minor, not its current patch release: {floor}'
+
+
+def test_both_sides_render_the_docs_with_the_same_pymdown_extensions():
+    """The template's `document` group and the parent's docs build pin one pymdown-extensions.
+
+    The parent reads a generated project's pages into its own site, so a construct one version
+    renders and the other does not would show on one side only (ADR-0056).
+    """
+    template = (REPO_ROOT / 'template' / 'pyproject.toml.jinja').read_text(encoding='utf-8')
+    match = re.search(r'"pymdown-extensions==([^"]+)"', template)
+    assert match, 'the template pins no pymdown-extensions'
+    parent = tomllib.loads((REPO_ROOT / 'pyproject.toml').read_text(encoding='utf-8'))
+    pinned = parent['tool']['properdocs']['pymdown-extensions-version']
+    assert pinned == match.group(1), f'the parent builds with pymdown-extensions {pinned}; the template pins {match[1]}'
+
+
 def test_project_urls_use_well_known_labels(generated_project):
     """`[project.urls]` renders in every cell, every label is well-known, and links fit the host."""
     project, cell = generated_project
@@ -226,7 +257,8 @@ def test_base_image_is_pinned_by_digest(generated_project):
     project, _ = generated_project
     data = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
     images = data['tool']['docker-versions']
-    minimum = data['project']['requires-python'].removeprefix('>=')
+    # The image is tagged per minor; the floor itself may be spelled to the patch (ADR-0060).
+    minimum = '.'.join(str(part) for part in python_floor(project / 'pyproject.toml'))
     base = images['base-image']
     assert '@sha256:' in base, f'base image not pinned by digest: {base}'
     assert f'python{minimum}-trixie-slim@' in base, f'tag does not match requires-python {minimum}: {base}'
