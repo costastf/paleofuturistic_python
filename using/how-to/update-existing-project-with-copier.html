@@ -445,6 +445,14 @@
 <li>
     <a href="../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.html" class="dropdown-item">ADR-0059 Formatting conventions are the template's, not configurable</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/decisions/0060-the-3-11-floor-is-its-current-patch-release.html" class="dropdown-item">ADR-0060 The 3.11 floor is its current patch release</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/decisions/0061-line-length-and-quote-style-are-the-projects-to-answer.html" class="dropdown-item">ADR-0061 Line length and quote style are the project's to answer</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -875,6 +883,12 @@
             <li class="nav-item">
                 <a href="../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.html" class="nav-link">ADR-0059 Formatting conventions are the template's, not configurable</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0060-the-3-11-floor-is-its-current-patch-release.html" class="nav-link">ADR-0060 The 3.11 floor is its current patch release</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0061-line-length-and-quote-style-are-the-projects-to-answer.html" class="nav-link">ADR-0061 Line length and quote style are the project's to answer</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -936,6 +950,14 @@
               </ul>
             </li>
             <li class="nav-item" data-bs-level="2"><a href="#upgrading-past-the-formatting-conventions" class="nav-link">Upgrading past the formatting conventions</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#upgrading-past-the-line-length-and-quote-style-questions" class="nav-link">Upgrading past the line length and quote style questions</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#upgrading-past-the-311-patch-level-floor" class="nav-link">Upgrading past the 3.11 patch-level floor</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -1024,7 +1046,11 @@
 <h2 id="upgrading-past-nested-code-blocks-in-the-docs">Upgrading past nested code blocks in the docs</h2>
 <p>The <code>document</code> group pins <code>pymdown-extensions</code>, and <code>properdocs.yml</code> enables <code>pymdownx.superfences</code>, so a fenced block indented under a list item renders as code. Run <code>uv lock</code> after the update and commit <code>uv.lock</code> with it. Pages already written need no change. See <a href="../../maintaining/decisions/0056-fenced-code-nests-in-lists.html">ADR-0056</a>.</p>
 <h2 id="upgrading-past-the-formatting-conventions">Upgrading past the formatting conventions</h2>
-<p>Ruff formats with a line length of 120 and single quotes, and checks docstrings against the Google convention. None of the three is a copier question, and the template does not carry the numpy convention it used before 2026-04-13. A project generated before then meets the Google rules on its first <code>lint</code> after the update: ruff reports each docstring section it cannot read, and the fixes are by hand, since the docstring rules have no autofix. Keeping <code>convention = "numpy"</code> in your <code>pyproject.toml</code> works, at the cost of resolving that line at every update. See <a href="../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.html">ADR-0059</a>.</p>
+<p>Ruff checks docstrings against the Google convention, and the template does not carry the numpy convention it used before 2026-04-13. A project generated before then meets the Google rules on its first <code>lint</code> after the update: ruff reports each docstring section it cannot read, and the fixes are by hand, since the docstring rules have no autofix. Keeping <code>convention = "numpy"</code> in your <code>pyproject.toml</code> works, at the cost of resolving that line at every update. See <a href="../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.html">ADR-0059</a>.</p>
+<h2 id="upgrading-past-the-line-length-and-quote-style-questions">Upgrading past the line length and quote style questions</h2>
+<p><code>line_length</code> and <code>quote_style</code> are copier questions, defaulting to the 120 columns and single quotes every earlier project was formatted to, so an update that keeps the defaults changes nothing. Answer them otherwise and the update rewrites <code>[tool.ruff] line-length</code> and <code>[tool.ruff.format] quote-style</code>, but not your code: the render hook that formats a new project runs on <code>copier copy</code> only, so run <code>./workflow.cmd format</code> after the update and commit the result. The tooling under <code>_CI/</code> keeps the template's conventions through its own <code>_CI/pyproject.toml</code>, and <code>max-line-length</code> leaves the pylint block, where <code>line-too-long</code> is now off in favour of ruff's E501. A <code>max-line-length</code> you set by hand is a conflict to resolve by dropping it. See <a href="../../maintaining/decisions/0061-line-length-and-quote-style-are-the-projects-to-answer.html">ADR-0061</a>.</p>
+<h2 id="upgrading-past-the-311-patch-level-floor">Upgrading past the 3.11 patch-level floor</h2>
+<p>A project with <code>min_python_version</code> of <code>3.11</code> floors at <code>3.11.18</code> after the update: <code>requires-python</code> and <code>.python-version</code> both spell the patch, and the <code>document</code> group moves <code>pymdown-extensions</code> to 13.1, which needs 3.11.5. Run <code>uv lock</code> and commit <code>uv.lock</code> with the update. The first <code>uv run</code> afterwards fetches 3.11.18 if the machine has no such interpreter; a project that pinned another 3.11 by hand in <code>.python-version</code> shows that line as a conflict, and the patch spelling is the one to keep, since uv refuses a minor-only pin that resolves to an older 3.11 against the floor. The deps image already carries 3.11.18. See <a href="../../maintaining/decisions/0060-the-3-11-floor-is-its-current-patch-release.html">ADR-0060</a>.</p>
 <h2 id="upgrading-past-the-tag-on-main-release-flow">Upgrading past the tag-on-main release flow</h2>
 <p><code>release</code> used to create the tag on the release branch and push it with the branch. On GitLab that published the version before the MR was reviewed; on both hosts a squash merge left the tag pointing at a commit <code>main</code> never saw, and nothing published. Now <code>release</code> creates no tag. The publish job runs on every push to the default branch and hands it to <code>release.ship</code>, which publishes when <code>[project].version</code> changed between the previous tip and the new one: it creates the tag on the new tip through the host's Release API (a Release entry appears on the releases page), then builds, signs and uploads. Merge release PRs/MRs any way you like.</p>
 <p>Updating changes:</p>

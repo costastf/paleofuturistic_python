@@ -445,6 +445,14 @@
 <li>
     <a href="../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.html" class="dropdown-item">ADR-0059 Formatting conventions are the template's, not configurable</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/decisions/0060-the-3-11-floor-is-its-current-patch-release.html" class="dropdown-item">ADR-0060 The 3.11 floor is its current patch release</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/decisions/0061-line-length-and-quote-style-are-the-projects-to-answer.html" class="dropdown-item">ADR-0061 Line length and quote style are the project's to answer</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -875,6 +883,12 @@
             <li class="nav-item">
                 <a href="../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.html" class="nav-link">ADR-0059 Formatting conventions are the template's, not configurable</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0060-the-3-11-floor-is-its-current-patch-release.html" class="nav-link">ADR-0060 The 3.11 floor is its current patch release</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0061-line-length-and-quote-style-are-the-projects-to-answer.html" class="nav-link">ADR-0061 Line length and quote style are the project's to answer</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -892,6 +906,10 @@
               </ul>
             </li>
             <li class="nav-item" data-bs-level="2"><a href="#validation" class="nav-link">Validation</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#computed-values" class="nav-link">Computed values</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -946,7 +964,7 @@
 <li><strong>Default</strong>: <code>3.11</code></li>
 <li><strong>Allowed</strong>: <code>"3.11"</code>, <code>"3.12"</code>, <code>"3.13"</code>, <code>"3.14"</code>, <code>"3.15"</code></li>
 </ul>
-<p>Lower bound. Drives <code>requires-python</code>, classifier list, tox envs, and CI matrix. See <a href="../how-to/choose-python-version-range.html">Choose the Python version range</a>.</p>
+<p>Lower bound. Drives <code>requires-python</code>, classifier list, tox envs, and CI matrix. For <code>3.11</code> the floor is spelled to the patch, <code>3.11.18</code>, in both <code>requires-python</code> and <code>.python-version</code>: the series is in security-only maintenance and the documentation stack needs at least 3.11.5, so uv fetches the current release instead of settling for an older 3.11 on the machine (see <code>python_floor</code> below and <a href="../../maintaining/decisions/0060-the-3-11-floor-is-its-current-patch-release.html">ADR-0060</a>). See <a href="../how-to/choose-python-version-range.html">Choose the Python version range</a>.</p>
 <h3 id="max_python_version"><code>max_python_version</code></h3>
 <ul>
 <li><strong>Type</strong>: choice</li>
@@ -954,6 +972,20 @@
 <li><strong>Allowed</strong>: <code>"3.11"</code>, <code>"3.12"</code>, <code>"3.13"</code>, <code>"3.14"</code>, <code>"3.15"</code></li>
 </ul>
 <p>Upper bound. Must be <code>&gt;= min_python_version</code> and share the same major version. A validator on this question in <code>copier.yml</code> enforces both constraints at generation time and aborts with a clear error if they are violated.</p>
+<h3 id="line_length"><code>line_length</code></h3>
+<ul>
+<li><strong>Type</strong>: integer</li>
+<li><strong>Default</strong>: <code>120</code></li>
+<li><strong>Allowed</strong>: 79 to 320, the range ruff accepts</li>
+</ul>
+<p>The width ruff formats your code to and checks it against (<code>[tool.ruff] line-length</code>), for <code>src/</code> and <code>tests/</code>. The tooling under <code>_CI/</code> keeps the template's 120 through its own <code>_CI/pyproject.toml</code>, which ruff resolves for that tree, so a narrower answer does not fail the shipped modules on comments nothing rewraps. Pylint's <code>line-too-long</code> is off in the generated config for the same reason; ruff's E501 is the one width check. The render hook formats <code>src/</code> and <code>tests/</code> to the answer right after generation. See <a href="../../maintaining/decisions/0061-line-length-and-quote-style-are-the-projects-to-answer.html">ADR-0061</a>.</p>
+<h3 id="quote_style"><code>quote_style</code></h3>
+<ul>
+<li><strong>Type</strong>: choice</li>
+<li><strong>Default</strong>: <code>single</code></li>
+<li><strong>Allowed</strong>: <code>"single"</code>, <code>"double"</code></li>
+</ul>
+<p>The quote style ruff formats your strings to (<code>[tool.ruff.format] quote-style</code>), for <code>src/</code> and <code>tests/</code>; the render hook rewrites the shipped sources to it. Docstrings are double-quoted either way, and <code>_CI/</code> keeps the template's single quotes. See <a href="../../maintaining/decisions/0061-line-length-and-quote-style-are-the-projects-to-answer.html">ADR-0061</a>.</p>
 <h3 id="license"><code>license</code></h3>
 <ul>
 <li><strong>Type</strong>: choice</li>
@@ -1027,8 +1059,13 @@
 <li><strong>Project slug</strong> — a <code>validator</code> on the <code>project_slug</code> question checks the value is a valid Python identifier and PyPI project name (<code>^[a-z]([a-z0-9_]*[a-z0-9])?$</code>), rejecting empty values, leading digits, and punctuation such as apostrophes. Generation aborts before any files are written on failure.</li>
 <li><strong>Repository URL</strong> — a <code>validator</code> on <code>repository_url</code> accepts an empty value or <code>^https://[^/\s]+/[^\s]+$</code>, so <code>http://</code>, SSH remotes and a bare host are refused before any files are written.</li>
 <li><strong>Default branch</strong> — a <code>validator</code> on <code>default_branch</code> refuses an empty value and the names <code>git check-ref-format --branch</code> would refuse that the pattern can express: a leading <code>-</code> or <code>.</code>, <code>..</code>, a trailing <code>/</code> or <code>.lock</code>, and any character outside letters, digits, <code>.</code>, <code>_</code>, <code>/</code> and <code>-</code>.</li>
+<li><strong>Line length</strong> — a <code>validator</code> on <code>line_length</code> refuses a value outside 79 to 320, the range ruff itself accepts.</li>
 <li><strong>License installation</strong> — <code>tasks_render.py</code> installs the chosen <code>LICENSE</code> file (substituting author/year tokens) and removes the <code>licenses/</code> staging directory. It runs only on <code>copier copy</code>, not on <code>copier update</code>.</li>
 </ol>
+<h2 id="computed-values">Computed values</h2>
+<p>Never asked and never written to <code>.copier-answers.yml</code>; derived from the answers above on every render.</p>
+<h3 id="python_floor"><code>python_floor</code></h3>
+<p>The exact version <code>requires-python</code> and <code>.python-version</code> carry: <code>3.11.18</code> for a <code>min_python_version</code> of <code>3.11</code>, the minor itself for every other series. The table that maps a series to its patch floor lives on this question in <code>copier.yml</code>, and moving it is a template change. See <a href="../../maintaining/decisions/0060-the-3-11-floor-is-its-current-patch-release.html">ADR-0060</a>.</p>
 <h2 id="see-also">See also</h2>
 <ul>
 <li><a href="../../maintaining/reference/generation-internals.html">Generation internals</a> — what runs after these answers are collected.</li>

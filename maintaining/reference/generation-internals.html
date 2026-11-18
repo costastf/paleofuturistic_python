@@ -445,6 +445,14 @@
 <li>
     <a href="../decisions/0059-formatting-conventions-are-not-configurable.html" class="dropdown-item">ADR-0059 Formatting conventions are the template's, not configurable</a>
 </li>
+            
+<li>
+    <a href="../decisions/0060-the-3-11-floor-is-its-current-patch-release.html" class="dropdown-item">ADR-0060 The 3.11 floor is its current patch release</a>
+</li>
+            
+<li>
+    <a href="../decisions/0061-line-length-and-quote-style-are-the-projects-to-answer.html" class="dropdown-item">ADR-0061 Line length and quote style are the project's to answer</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -875,6 +883,12 @@
             <li class="nav-item">
                 <a href="../decisions/0059-formatting-conventions-are-not-configurable.html" class="nav-link">ADR-0059 Formatting conventions are the template's, not configurable</a>
             </li>
+            <li class="nav-item">
+                <a href="../decisions/0060-the-3-11-floor-is-its-current-patch-release.html" class="nav-link">ADR-0060 The 3.11 floor is its current patch release</a>
+            </li>
+            <li class="nav-item">
+                <a href="../decisions/0061-line-length-and-quote-style-are-the-projects-to-answer.html" class="nav-link">ADR-0061 Line length and quote style are the project's to answer</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -917,7 +931,7 @@
 <h1 id="generation-internals">Generation internals</h1>
 <p>What happens between answering the questionnaire and receiving a finished project directory. The work that was previously a single <code>hooks/post_gen_project.py</code> script is now split three ways across copier's own mechanisms and a dedicated copy-time script.</p>
 <h2 id="stage-1-answer-validation-copier-validators">Stage 1. Answer validation (copier validators)</h2>
-<p><code>validator</code> expressions in <code>copier.yml</code> run before any files are written. <code>project_slug</code> must be a valid Python identifier and PyPI name (lowercase letters, digits and inner underscores, starting with a letter); <code>repository_url</code> must be empty or an https URL with a path. The <code>max_python_version</code> validator checks:</p>
+<p><code>validator</code> expressions in <code>copier.yml</code> run before any files are written. <code>project_slug</code> must be a valid Python identifier and PyPI name (lowercase letters, digits and inner underscores, starting with a letter); <code>repository_url</code> must be empty or an https URL with a path; <code>line_length</code> must fall in 79 to 320, the range ruff accepts. The <code>max_python_version</code> validator checks:</p>
 <ul>
 <li><code>max_python_version &gt;= min_python_version</code></li>
 <li>Both values share the same major version (no cross-major ranges).</li>
@@ -966,13 +980,15 @@
 <p>The <code>from .{{ git_hosting_service }} import …</code> line in <code>_CI/tasks/container.py</code>, <code>release.py</code>, <code>document.py</code> and <code>sbom.py</code> is Jinja-substituted at copy time to name the surviving module — exactly one code path remains, no runtime branching.</p>
 <h2 id="stage-3-copy-time-script-tasks_renderpy">Stage 3. Copy-time script (<code>tasks_render.py</code>)</h2>
 <p><code>tasks_render.py</code> at the repo root is run via copier's <code>_tasks</code> configuration. It is <strong>gated to the copy operation only</strong> — <code>copier update</code> does not re-run it, so re-generation side-effects (like stamping the copyright year) don't fire on every update.</p>
-<p>It performs four actions, in order:</p>
+<p>It performs these actions, in order:</p>
 <h3 id="install-the-chosen-license">Install the chosen license</h3>
 <ul>
 <li>Copies <code>licenses/&lt;chosen-license&gt;</code> to <code>LICENSE</code> in the project root, interpolating <code>{year}</code> (current calendar year) and <code>{author}</code> (<code>full_name</code> answer). Skipped if the answer was <code>None</code>.</li>
 <li>Deletes the <code>licenses/</code> directory entirely.</li>
 </ul>
 <p>No license header or dunder metadata is added to individual source files. The main module (<code>src/&lt;slug&gt;/&lt;slug&gt;.py</code>) ships its <code>import logging</code> + <code>LOGGER</code> setup directly from the template, so it needs no copy-time injection.</p>
+<h3 id="format-the-project-code">Format the project code</h3>
+<p>Runs <code>uvx ruff@&lt;version&gt; format src tests</code> with the ruff the lint group pins, read back out of the rendered <code>pyproject.toml</code>, so <code>src/</code> and <code>tests/</code> match the <code>line_length</code> and <code>quote_style</code> answers before the first commit. The template's sources are written at 120 columns with single quotes, and a project answering otherwise would fail its own <code>lint</code> on the formatter without this pass. <code>_CI/</code> is not touched: its own <code>pyproject.toml</code> keeps the template's conventions for the shipped tooling, and ruff resolves that file for the tree (ADR-0061).</p>
 <h3 id="stamp-the-quarantine-date">Stamp the quarantine date</h3>
 <p>Sets <code>[tool.uv] exclude-newer</code> in the generated <code>pyproject.toml</code> to midnight UTC of the generation date (a bare date would mean local midnight, and the lock would record that zone), so the new project's resolutions are frozen at the day it was made rather than inheriting the template's own boundary.</p>
 <h3 id="stamp-the-uv-pin">Stamp the uv pin</h3>

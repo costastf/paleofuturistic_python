@@ -445,6 +445,14 @@
 <li>
     <a href="../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.html" class="dropdown-item">ADR-0059 Formatting conventions are the template's, not configurable</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/decisions/0060-the-3-11-floor-is-its-current-patch-release.html" class="dropdown-item">ADR-0060 The 3.11 floor is its current patch release</a>
+</li>
+            
+<li>
+    <a href="../../maintaining/decisions/0061-line-length-and-quote-style-are-the-projects-to-answer.html" class="dropdown-item">ADR-0061 Line length and quote style are the project's to answer</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -875,6 +883,12 @@
             <li class="nav-item">
                 <a href="../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.html" class="nav-link">ADR-0059 Formatting conventions are the template's, not configurable</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0060-the-3-11-floor-is-its-current-patch-release.html" class="nav-link">ADR-0060 The 3.11 floor is its current patch release</a>
+            </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0061-line-length-and-quote-style-are-the-projects-to-answer.html" class="nav-link">ADR-0061 Line length and quote style are the project's to answer</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -941,6 +955,7 @@
 <p>For a cleaner re-derivation, <code>uvx copier update --trust</code> after the template's choices list expands will regenerate all three locations in lockstep — see <a href="update-existing-project-with-copier.html">Update an existing project with copier</a>.</p>
 <h2 id="picking-a-sensible-minimum">Picking a sensible minimum</h2>
 <p>The template's floor is 3.11+ for a reason: it relies on <code>tomllib</code>, <code>ExceptionGroup</code>, and PEP 604 type unions. Older floors would require shims; the template doesn't ship them.</p>
+<p>A project that answers <code>3.11</code> floors at <code>3.11.18</code>, the current release of the series, in both <code>requires-python</code> and <code>.python-version</code>. The series only gets security fixes, so every older patch is one with known holes, and the documentation stack needs at least 3.11.5. Spelling the patch in <code>.python-version</code> is what makes uv fetch that release rather than settle for an older 3.11 it finds on the machine and then refuse it against the floor. Every other series floors at its minor. See <a href="../../maintaining/decisions/0060-the-3-11-floor-is-its-current-patch-release.html">ADR-0060</a>.</p>
 <p>If you need to support 3.10 or earlier for downstream consumers, generate at the template's minimum and patch the generated <code>pyproject.toml</code> manually — you're then off the template's update path for that file.</p>
 <h2 id="see-also">See also</h2>
 <ul>
