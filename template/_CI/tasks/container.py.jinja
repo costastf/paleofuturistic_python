@@ -1,6 +1,8 @@
 """Container task definitions for building and running the deps image."""
 
 import hashlib
+import json
+import os
 from pathlib import Path
 from typing import cast
 
@@ -8,9 +10,10 @@ from invoke import Collection, Context, Task, task
 
 from _CI import info
 
-from .configuration import DEPS_IMAGE_FILE, DOCKERFILE_DEPS, IMAGE_NAME, UV_LOCK
-from .{{ git_hosting_service }} import publish_deps_image
-from .shared import container_engine, execute, is_ci, logged
+from .configuration import DEPS_IMAGE_FILE, DEPS_IMAGE_SECRET_MARKERS, DOCKERFILE_DEPS, IMAGE_NAME, UV_LOCK
+from .{{ git_hosting_service }} import publish_deps_image, registry_read_credentials
+from .registry import RegistryError, image_config
+from .shared import available_container_engine, container_engine, execute, is_ci, logged
 
 
 def deps_image_tag() -> str:
@@ -103,7 +106,94 @@ def publish(context: Context, reuse: bool = False) -> None:
     DEPS_IMAGE_FILE.write_text(image, encoding='utf-8')
 
 
+def deps_image_reference() -> str:
+    """Return the image to audit by default: the one just published, else the pipeline's, else the local build."""
+    if DEPS_IMAGE_FILE.exists():
+        return DEPS_IMAGE_FILE.read_text(encoding='utf-8').strip()
+    return os.environ.get('DEPS_IMAGE') or f'{IMAGE_NAME}:latest'
+
+
+def holds_image(context: Context, engine: str, image: str) -> bool:
+    """Report whether ``engine`` has ``image`` locally, without the note a missing one would print."""
+    return not context.run(f'{engine} image inspect {image}', hide=True, warn=True).failed
+
+
+def local_image_facts(context: Context, engine: str, image: str) -> tuple[list[str], list[str]]:
+    """Return the history commands and the environment of a local ``image`` through ``engine``."""
+    # The Go template is assembled rather than written out: this module is rendered by Jinja
+    # at generation, which would read a literal pair of braces as an expression of its own.
+    created_by = '{' * 2 + ' .CreatedBy ' + '}' * 2
+    history = context.run(f"{engine} history --no-trunc --format '{created_by}' {image}", hide=True).stdout
+    entries = json.loads(context.run(f'{engine} image inspect {image}', hide=True).stdout)
+    environment = entries[0].get('Config', {}).get('Env') or []
+    return [line for line in history.splitlines() if line.strip()], list(environment)
+
+
+def registry_image_facts(image: str) -> tuple[list[str], list[str]]:
+    """Return the history commands and the environment of a pushed ``image`` from its registry."""
+    config = image_config(image, registry_read_credentials())
+    history = [entry.get('created_by', '') for entry in config.get('history', [])]
+    return history, list(config.get('config', {}).get('Env') or [])
+
+
+def image_facts(context: Context, image: str) -> tuple[list[str], list[str]]:
+    """Read ``image`` back from wherever it is: a local engine that holds it, else its registry."""
+    engine = available_container_engine()
+    if engine and holds_image(context, engine, image):
+        return local_image_facts(context, engine, image)
+    return registry_image_facts(image)
+
+
+def credential_marker(entry: str) -> str | None:
+    """Return the first credential marker ``entry`` mentions, or None when it is clean."""
+    return next((marker for marker in DEPS_IMAGE_SECRET_MARKERS if marker in entry), None)
+
+
+def credential_traces(history: list[str], environment: list[str]) -> list[str]:
+    """Return every history line or environment entry that names a credential marker."""
+    labelled = [('history', entry) for entry in history] + [('env', entry) for entry in environment]
+    found = ((kind, entry, credential_marker(entry)) for kind, entry in labelled)
+    return [f'{kind}: {marker!r} in {entry[:120]!r}' for kind, entry, marker in found if marker]
+
+
+@task
+@logged('container.audit')
+def audit(context: Context, image: str = '') -> None:
+    """Fail if the deps image carries any trace of the credentials its builder stage was given.
+
+    A build argument is written into the history of every layer of the stage that declares
+    it, so `Dockerfile.deps` confines the index credentials to a builder stage the final image
+    only copies from. This reads the image's configuration back and refuses any history line
+    or environment entry naming those arguments, the sync command that used them or the file
+    it used them through: any of them means the stage boundary was lost (ADR-0062).
+
+    Runs where the image is: through a container engine on the image just built, otherwise
+    through the registry API with the pipeline's read credentials, which is the GitLab case,
+    where the build job runs kaniko and the jobs after it run inside the image.
+
+    Args:
+        context: Invoke context.
+        image: The reference to audit. Defaults to `.deps-image`, then `DEPS_IMAGE`, then the
+            local build's tag.
+
+    """
+    reference = image or deps_image_reference()
+    try:
+        history, environment = image_facts(context, reference)
+    except RegistryError as exc:
+        print(f'Could not read {reference} back: {exc}')
+        raise SystemExit(1) from exc
+    traces = credential_traces(history, environment)
+    if traces:
+        print(f'{reference} carries credential traces; the builder stage leaked into the image:')
+        for trace in traces:
+            print(f'  {trace}')
+        raise SystemExit(1)
+    print(f'{reference}: {len(history)} history and {len(environment)} environment entries, no credential trace.')
+
+
 namespace = Collection('container')
 namespace.add_task(cast(Task, publish), default=True)
+namespace.add_task(cast(Task, audit))
 namespace.add_task(cast(Task, build))
 namespace.add_task(cast(Task, tag))

@@ -58,6 +58,17 @@ def registry_settings() -> RegistrySettings:
     )
 
 
+def registry_read_credentials() -> tuple[str, str] | None:
+    """Return what `container.audit` reads the pushed image back with: the job token, or nothing by hand.
+
+    Every job gets ``CI_REGISTRY_USER`` and ``CI_REGISTRY_PASSWORD``, which the registry accepts
+    for pulls from the project's own repository; the Deploy Token that pushes is scoped to the
+    build job's environment and is not needed to read.
+    """
+    user, password = os.environ.get('CI_REGISTRY_USER', ''), os.environ.get('CI_REGISTRY_PASSWORD', '')
+    return (user, password) if user and password else None
+
+
 def publish_deps_image(context: Context, tag: str, *, reuse: bool = False) -> str:
     """Build and push the deps image with docker or podman. Return a digest-pinned reference.
 

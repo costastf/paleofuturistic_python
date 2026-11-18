@@ -80,6 +80,12 @@ QA_STEPS = ('preflight --write',)
 # Last, as in the generated project's own registry: it reports on the world rather than on this
 # tree, so the top of a cell's log should be about the thing under test.
 AUDIT_STEP = 'secure.audit'
+# The deps image, built and read back in the same one cell. The four ordinary cells never
+# build it: the pipelines do, and an engine on the runner is the one thing a cell needs that
+# generation does not. Building it here is what proves `Dockerfile.deps` keeps its builder
+# stage's credentials out of the image that is pushed, before any pipeline hands it one
+# (ADR-0062).
+IMAGE_STEPS = ('container.build', 'container.audit')
 # Run after the writers: a project whose derived files were just written has to satisfy the
 # read-only gate the pipeline runs. A failure here is the writer and the checker disagreeing
 # about a value, which is invisible to a run that only ever writes.
@@ -201,12 +207,12 @@ def matrix_combos() -> list[dict]:
 
 
 def qa_sequence(*, audit: bool) -> tuple[str, ...]:
-    """Return the steps one matrix cell runs, in order: the writers, the audit, then the gate.
+    """Return the steps one matrix cell runs, in order: the writers, the audit and the image, then the gate.
 
     A function rather than a tuple literal in `run_combo`, so what a cell runs is a thing this
     suite can ask about.
     """
-    return (*QA_STEPS, *((AUDIT_STEP,) if audit else ()), QA_SETTLE_STEP)
+    return (*QA_STEPS, *((AUDIT_STEP, *IMAGE_STEPS) if audit else ()), QA_SETTLE_STEP)
 
 
 def qa_cells() -> list[dict]:

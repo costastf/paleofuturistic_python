@@ -3,7 +3,13 @@
 # project's uv pin maps to (`container.tag` prints it), and a default would hide a build that
 # forgot to. BuildKit warns about the empty default; the directive above silences that one warning.
 ARG BASE_IMAGE
-FROM ${BASE_IMAGE}
+
+# Three stages, so that index credentials never reach the image that is pushed. A build
+# argument is recorded in the history of every layer of the stage that declares it, so the
+# stage that syncs is thrown away and the final stage copies the environment it produced.
+# The arguments are empty for a project that resolves from PyPI; `container.audit` reads the
+# pushed image back and fails on any trace of them (ADR-0062).
+FROM ${BASE_IMAGE} AS base
 
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 
@@ -11,7 +17,25 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
 
-RUN uv sync --frozen --all-extras --dev --no-install-project
+FROM base AS builder
+
+# INDEX_URL names the index the lockfile resolves from; INDEX_USERNAME and INDEX_PASSWORD are
+# the credentials for its host. They reach uv through a netrc written for this one command and
+# removed in the same layer: never an ENV, never a file that outlives the RUN. uv matches a
+# netrc entry by host, so no index name has to be known here.
+ARG INDEX_URL
+ARG INDEX_USERNAME
+ARG INDEX_PASSWORD
+RUN if [ -n "$INDEX_PASSWORD" ]; then \
+        host="${INDEX_URL#*://}" \
+        && printf 'machine %s login %s password %s\n' "${host%%/*}" "$INDEX_USERNAME" "$INDEX_PASSWORD" > /tmp/netrc; \
+    fi \
+    && env ${INDEX_PASSWORD:+NETRC=/tmp/netrc} uv sync --frozen --all-extras --dev --no-install-project \
+    && rm -f /tmp/netrc
+
+FROM base
+
+COPY --from=builder /app/.venv /app/.venv
 
 ENV UV_PROJECT_ENVIRONMENT=/app/.venv
 ENV PATH="/app/.venv/bin:$PATH"

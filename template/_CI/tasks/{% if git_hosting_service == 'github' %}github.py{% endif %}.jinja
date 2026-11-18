@@ -42,6 +42,16 @@ def registry_settings() -> RegistrySettings:
     )
 
 
+def registry_read_credentials() -> tuple[str, str] | None:
+    """Return what `container.audit` reads a pushed image back with: the workflow token, or nothing by hand.
+
+    ghcr takes any username with ``GITHUB_TOKEN`` as the password for a pull the job's
+    ``packages: read`` permission allows; a public image needs no credentials at all.
+    """
+    token = os.environ.get('GITHUB_TOKEN', '')
+    return (os.environ.get('GITHUB_ACTOR', 'github'), token) if token else None
+
+
 def publish_deps_image(context: Context, tag: str, *, reuse: bool = False) -> str:
     """Build and push the deps image to ghcr.io. Return a digest-pinned reference.
 

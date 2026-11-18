@@ -30,7 +30,8 @@ A freshly generated project is a day-one project: the scaffolded smoke test keep
 - the coverage ratchet leaving dormancy and engaging for real,
 - the deadlock the coverage union exists to prevent (see [Testing strategy](../../using/explanation/testing-strategy.md)), since a dormant or 100%-coverage ratchet can't reach it,
 - the CI badge's origin-carrying slug, and
-- the dependency audit (`secure.audit`), which rides with this one cell rather than every cell, so a transient advisory-service error fails one job instead of five.
+- the dependency audit (`secure.audit`), which rides with this one cell rather than every cell, so a transient advisory-service error fails one job instead of five, and
+- the deps image: `container.build` then `container.audit`, which proves the builder stage of `Dockerfile.deps` leaves no credential trace in the image that would be pushed (ADR-0062). This is the one cell that needs docker or podman on the machine running it.
 
 `test.matrix` runs this cell alongside the four ordinary ones; `test.combo --mature` reproduces it alone. See `qa_cells()` in `_CI/tasks/configuration.py` for the authoritative reasoning on why it's one extra cell rather than a third combo axis.
 

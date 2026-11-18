@@ -103,6 +103,10 @@ preflight:
     - export PRE_COMMIT_FROM_REF="${CI_MERGE_REQUEST_DIFF_BASE_SHA:-$CI_COMMIT_BEFORE_SHA}"
     - export PRE_COMMIT_TO_REF="$CI_COMMIT_SHA"
   script:
+    # Read the image this job runs in back from the registry and refuse it if the builder
+    # stage's credentials left a trace. The build job cannot do this itself: it runs kaniko,
+    # which has no Python, so the first job with the project's Python does it (ADR-0062).
+    - ./workflow.cmd container.audit
     - ./workflow.cmd preflight
 
 # Not on every pipeline: the audit's answer depends on the advisory database on the day it

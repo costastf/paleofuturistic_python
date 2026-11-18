@@ -31,10 +31,15 @@ def test_qa_steps_cover_what_preflight_does_not():
     somewhere, because it is the step the `<PROJECT>_SECURITY_OVERRIDE` plumbing serves and the
     only automated run the `.security-overrides` expiry mechanism gates.
     """
-    from _CI.tasks.configuration import AUDIT_STEP, QA_STEPS, qa_cells  # noqa: PLC0415
+    from _CI.tasks.configuration import AUDIT_STEP, IMAGE_STEPS, QA_STEPS, qa_cells, qa_sequence  # noqa: PLC0415
 
     assert AUDIT_STEP == 'secure.audit', 'the matrix no longer audits dependencies anywhere'
     assert AUDIT_STEP not in QA_STEPS, 'the audit is back in every cell'
+    # The deps image rides with the same cell: built, then read back for credential traces,
+    # which is what proves the builder stage of `Dockerfile.deps` is discarded (ADR-0062).
+    assert IMAGE_STEPS == ('container.build', 'container.audit'), 'the matured cell no longer proves the deps image'
+    assert set(IMAGE_STEPS) <= set(qa_sequence(audit=True)), 'the matured cell skips the image'
+    assert not set(IMAGE_STEPS) & set(qa_sequence(audit=False)), 'every cell builds the image'
     assert QA_STEPS == ('preflight --write',), 'the matrix runs something the generated gate already covers'
 
     # It rides with the matured cell rather than carrying a knob of its own, and there is

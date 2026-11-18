@@ -121,5 +121,6 @@ nav:
       - ADR-0059 Formatting conventions are the template's, not configurable: maintaining/decisions/0059-formatting-conventions-are-not-configurable.md
       - ADR-0060 The 3.11 floor is its current patch release: maintaining/decisions/0060-the-3-11-floor-is-its-current-patch-release.md
       - ADR-0061 Line length and quote style are the project's to answer: maintaining/decisions/0061-line-length-and-quote-style-are-the-projects-to-answer.md
+      - ADR-0062 The deps image is built in stages and read back before it is trusted: maintaining/decisions/0062-the-deps-image-is-built-in-stages-and-read-back.md
 
 copyright: Copyright &copy; 2024 <a href="https://schubergphilis.com/">Schuberg Philis</a>

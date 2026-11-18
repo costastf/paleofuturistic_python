@@ -70,6 +70,22 @@ CI jobs run inside a prebuilt image holding the project's dependencies, so each 
 starts with a warm environment instead of resolving from scratch. `container.publish`
 builds and publishes it; `.deps-image` records the reference downstream jobs consume.
 
+### Credentials for a private index never reach it
+
+`Dockerfile.deps` builds in stages. A `builder` stage takes the index credentials as the
+build arguments `INDEX_URL`, `INDEX_USERNAME` and `INDEX_PASSWORD`, hands them to the one
+`uv sync` through a netrc it removes in the same layer, and is then discarded; the final
+stage copies the synced environment out of it and nothing else. A build argument is recorded
+in the history of every layer of the stage that declares it, which is why the stage that saw
+them is not the stage that is pushed. For a project resolving from PyPI the arguments are
+empty and the build is the same.
+
+`container.audit` makes sure of it: it reads the pushed image's configuration back and fails
+on any history line or environment entry naming an argument, the sync command or the netrc.
+{% if git_hosting_service == 'github' %}The `build-deps-image` job runs it right after the
+push.{% else %}The kaniko job cannot run it, having no Python, so `preflight` runs it first
+thing inside the image it was handed, through the registry API with the job token.{% endif %}
+
 **The tag is content-addressed.** `deps_image_tag()` hashes the lockfile, `Dockerfile.deps`
 and the resolved base-image string together (each input reduced to a fixed-width digest
 first, so no combination of inputs can collide with another). Change any one of them and you get a new tag — which

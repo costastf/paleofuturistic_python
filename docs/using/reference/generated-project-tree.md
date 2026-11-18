@@ -45,7 +45,7 @@ example_project/
 │       ├── secure.py            pip-audit, SBOM extract and validate
 │       ├── shared.py            @logged, @run, execute(), run_steps(), apply_badge()
 │       └── test.py              pytest + coverage
-├── Dockerfile.deps              Single-stage deps-cache image
+├── Dockerfile.deps              Staged deps-cache image; index credentials stop at its builder stage
 ├── LICENSE                      Selected at generation time
 ├── README.md
 ├── docs/                        Diátaxis-structured properdocs site

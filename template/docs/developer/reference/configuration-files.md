@@ -113,7 +113,7 @@ so a file of that name in the tree is a password about to be committed.
 
 ## `Dockerfile.deps`
 
-Single-stage build for the dependency-cache image. It takes the base image as a `BASE_IMAGE` build argument, which `container.build`, `container.publish` and the pipeline's deps job read out of `[tool.docker-versions]` in `pyproject.toml`. See [Build and push a container](../how-to/build-and-push-a-container.md).
+Staged build for the dependency-cache image. It takes the base image as a `BASE_IMAGE` build argument, which `container.build`, `container.publish` and the pipeline's deps job read out of `[tool.docker-versions]` in `pyproject.toml`, and three index-credential arguments that only its builder stage sees, empty for a project resolving from PyPI; `container.audit` reads the built image back to prove none of them survived. See [Build and push a container](../how-to/build-and-push-a-container.md) and the [CI framework reference](ci-framework.md).
 
 ## `properdocs.yml`
 

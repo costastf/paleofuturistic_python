@@ -23,6 +23,7 @@ from .support import (
     function_source,
     github_jobs,
     github_workflows,
+    load_generated_configuration,
     load_generated_shared,
     parameter_defaults,
     pre_commit_hooks,
@@ -517,6 +518,72 @@ def test_deps_image_runs_as_non_root(generated_project):
     # The uid is part of the tag inputs, so changing it cannot serve a stale image.
     container_py = (project / '_CI' / 'tasks' / 'container.py').read_text(encoding='utf-8')
     assert 'DOCKERFILE_DEPS' in container_py
+
+
+def dockerfile_stages(dockerfile):
+    """Return the text of each stage of a Dockerfile, keyed by its `AS` name, the last one keyed `final`."""
+    stages = {}
+    for chunk in re.split(r'^FROM ', dockerfile, flags=re.MULTILINE)[1:]:
+        header, _, body = chunk.partition('\n')
+        name = header.split(' AS ', 1)[1].strip() if ' AS ' in header else 'final'
+        stages[name] = body
+    return stages
+
+
+def test_index_credentials_stop_at_the_builder_stage(generated_project):
+    """`Dockerfile.deps` confines the credential build arguments to a stage the final image only copies from (ADR-0062).
+
+    A build argument is recorded in the history of every layer of the stage that declares it,
+    so the stage that syncs is discarded and the pushed image carries the environment it
+    produced and nothing it was told. No `ENV` may ever carry one, and the sync itself, which
+    is the command that used them, belongs to the builder alone.
+    """
+    project, _ = generated_project
+    configuration = load_generated_configuration(project)
+    stages = dockerfile_stages((project / 'Dockerfile.deps').read_text(encoding='utf-8'))
+    assert {'base', 'builder', 'final'} <= set(stages), f'stages are {sorted(stages)}'
+    for name in configuration.DEPS_IMAGE_BUILD_ARGS:
+        assert f'ARG {name}\n' in stages['builder'], f'the builder does not take {name}'
+        assert name not in stages['final'], f'{name} reached the final stage'
+        assert name not in stages['base'], f'{name} reached the base stage every other stage builds on'
+    assert 'uv sync' in stages['builder'], 'the builder does not sync'
+    assert 'uv sync' not in stages['final'], 'the sync, which uses the credentials, is in the final stage'
+    assert 'COPY --from=builder /app/.venv /app/.venv' in stages['final'], 'the final stage does not copy the venv'
+    assert not re.search(r'^ENV ', stages['builder'], flags=re.MULTILINE), 'an ENV in the builder may name a credential'
+    assert 'netrc' not in stages['final']
+
+
+def test_the_audit_markers_cover_every_credential_argument(generated_project):
+    """`container.audit` refuses every argument `Dockerfile.deps` declares beside the base image, and the sync."""
+    project, _ = generated_project
+    configuration = load_generated_configuration(project)
+    dockerfile = (project / 'Dockerfile.deps').read_text(encoding='utf-8')
+    declared = set(re.findall(r'^ARG (\w+)', dockerfile, flags=re.MULTILINE)) - {'BASE_IMAGE'}
+    assert declared == set(configuration.DEPS_IMAGE_BUILD_ARGS), f'Dockerfile declares {sorted(declared)}'
+    markers = set(configuration.DEPS_IMAGE_SECRET_MARKERS)
+    assert declared <= markers, f'the audit would miss {sorted(declared - markers)}'
+    assert 'uv sync' in markers, 'the audit would not notice the sync command in the final image'
+
+
+def test_the_deps_image_is_read_back_before_it_is_trusted(generated_project):
+    """Every pipeline audits the pushed deps image: GitHub where it builds it, GitLab in the first job with Python.
+
+    The kaniko job cannot run the audit, so on GitLab it is the first thing `preflight` does
+    inside the image it would otherwise trust unread.
+    """
+    project, cell = generated_project
+    if cell['git_hosting_service'] == 'github':
+        build = project / '.github' / 'workflows' / 'build-deps-image.yaml'
+        steps = yaml.safe_load(build.read_text(encoding='utf-8'))['jobs']['build-deps-image']['steps']
+        publish = next(step['run'] for step in steps if 'container.publish' in step.get('run', ''))
+        lines = publish.splitlines()
+        assert './workflow.cmd container.audit' in lines, f'the build job does not audit the image: {lines}'
+        assert lines.index('./workflow.cmd container.audit') > lines.index('./workflow.cmd container.publish')
+    else:
+        pipeline = yaml.safe_load((project / '.gitlab-ci.yml').read_text(encoding='utf-8'))
+        script = pipeline['preflight']['script']
+        assert './workflow.cmd container.audit' in script, f'preflight does not audit the image it runs in: {script}'
+        assert script.index('./workflow.cmd container.audit') < script.index('./workflow.cmd preflight')
 
 
 def test_gitlab_credentials_are_environment_scoped(generated_project):

@@ -35,6 +35,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ./workflow.cmd container.publish
+          ./workflow.cmd container.audit
           echo "image=$(cat .deps-image)" >> "$GITHUB_OUTPUT"
 
       - name: Minimize uv cache

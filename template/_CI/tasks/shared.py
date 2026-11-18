@@ -255,6 +255,11 @@ def open_target(context: Context, target: str) -> None:
     execute(context, f'{OPEN_COMMAND[system]} {target}')
 
 
+def available_container_engine() -> str | None:
+    """Return the container engine on the path, docker before podman, or None when there is none."""
+    return next((engine for engine in ('docker', 'podman') if shutil.which(engine)), None)
+
+
 def container_engine() -> str:
     """Return the available container engine ('docker' or 'podman').
 
@@ -262,11 +267,11 @@ def container_engine() -> str:
         SystemExit: If neither docker nor podman is found.
 
     """
-    for engine in ('docker', 'podman'):
-        if shutil.which(engine):
-            return engine
-    print('No container engine found. Install docker or podman.')
-    raise SystemExit(1)
+    engine = available_container_engine()
+    if engine is None:
+        print('No container engine found. Install docker or podman.')
+        raise SystemExit(1)
+    return engine
 
 
 def image_digest_reference(context: Context, engine: str, image: str) -> str:
