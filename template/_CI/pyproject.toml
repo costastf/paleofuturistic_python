@@ -19,11 +19,12 @@ requires-python = ">=3.11"
 vendor = ['invoke']
 
 [tool.ruff]
-# Must match the root pyproject's ruff `line-length` and pylint `max-line-length`, both 120.
-# Ruff resolves *this* file for anything under `_CI/`, while pylint is invoked from the project
-# root and uses the root config — so a higher value here creates a band of line lengths that
-# ruff accepts and `./workflow.cmd lint` then rejects on `line-too-long`. It was 121, and a
-# 121-character line duly passed every ruff run and failed the real gate.
+# The template's width for this tree, whatever `line_length` the project answered for its own
+# code. Ruff resolves *this* file for anything under `_CI/`, so the shipped modules, written at
+# 120, are checked at 120 and a narrower project width does not fail them on comments nothing
+# rewraps. Pylint reads one width from the project root, which is why its `line-too-long` is off
+# there and ruff's E501 is the width check (ADR-0061). It was 121 once, and a 121-character line
+# duly passed every ruff run and failed the gate on pylint; one checker, one width per tree.
 line-length = 120
 
 [tool.ruff.lint]
@@ -68,4 +69,5 @@ ignore = [
 docstring-quotes = "double"
 
 [tool.ruff.format]
+# The template's, as the width above; `quote_style` governs `src/` and `tests/` (ADR-0061).
 quote-style = "single"

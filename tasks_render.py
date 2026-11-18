@@ -5,6 +5,7 @@ Runs once, after copier writes the project (cwd is the generated project root), 
 steps that cannot be expressed declaratively:
 
 * install the chosen LICENSE (substituting author/year tokens) and drop the staging dir,
+* format ``src/`` and ``tests/`` to the line length and quote style the project answered,
 * stamp today's date as the dependency-quarantine boundary,
 * stamp a fresh uv pin, so a project is current on the day it is created,
 * ensure ``workflow.cmd`` keeps its executable bit,
@@ -38,6 +39,11 @@ EXCLUDE_NEWER_PATTERN = re.compile(r'^exclude-newer = "[^"]*"$', re.MULTILINE)
 # digest is resolved for is tagged per minor.
 REQUIRES_PYTHON_PATTERN = re.compile(r'^requires-python = ">=(\d+\.\d+)', re.MULTILINE)
 REQUIRED_VERSION_PATTERN = re.compile(r'^required-version = "==([^"]+)"$', re.MULTILINE)
+RUFF_PIN_PATTERN = re.compile(r'^\s*"ruff==([^"]+)",$', re.MULTILINE)
+
+# The trees the `line_length` and `quote_style` answers govern. `_CI/` is not among them: its
+# own `pyproject.toml` keeps the template's conventions for the shipped tooling (ADR-0061).
+PROJECT_CODE = ('src', 'tests')
 
 # Lets the template's own harness pin what generation stamps. Without it the ambient uv that
 # CI installed — taken from the template's committed pin — would not satisfy a freshly stamped
@@ -110,6 +116,23 @@ def python_floor(content: str) -> str | None:
     """Return the `major.minor` of the floor `requires-python` declares, or None when it cannot be read."""
     match = REQUIRES_PYTHON_PATTERN.search(content)
     return match.group(1) if match else None
+
+
+def format_project_code() -> None:
+    """Format ``src/`` and ``tests/`` to the line length and quote style the project answered.
+
+    The template's sources are written at 120 columns with single quotes, so a project that
+    answered otherwise would fail its own ``lint`` before its first commit. The ruff that runs
+    is the one the lint group pins, read back out of the rendered ``pyproject.toml``, so what
+    this writes is what the gate checks. ``_CI/`` is left alone: its own ``pyproject.toml``
+    keeps the template's conventions for the shipped tooling (ADR-0061).
+    """
+    match = RUFF_PIN_PATTERN.search(PYPROJECT.read_text(encoding='utf-8'))
+    if match is None:
+        print(f'{PYPROJECT} pins no ruff version; cannot format the project code.')
+        raise SystemExit(1)
+    # A fixed argument list and no shell, as the lock below.
+    subprocess.run(['uvx', f'ruff@{match.group(1)}', 'format', *PROJECT_CODE], check=True)  # noqa: S603, S607
 
 
 def choose_uv_target(uv_release: ModuleType, pinned: str) -> tuple[str, str] | None:
@@ -216,6 +239,7 @@ def main() -> None:
     args = parser.parse_args()
 
     install_license(args.license, args.author)
+    format_project_code()
     # Both stamps precede the lock: it resolves against the quarantine boundary and runs the
     # `uvx uv@<version>` read back out of the file they write.
     stamp_dependency_quarantine_date()

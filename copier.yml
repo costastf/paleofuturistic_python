@@ -93,6 +93,27 @@ python_floor:
   when: false
   default: "{{ {'3.11': '3.11.18'}.get(min_python_version, min_python_version) }}"
 
+# The two formatting choices a project is likely to hold an opinion on. They govern `src/`
+# and `tests/`; the tooling under `_CI/` keeps the template's 120 columns and single quotes
+# through its own `_CI/pyproject.toml`, which ruff resolves for that tree, so a narrower width
+# does not fail the shipped modules on comments nothing rewraps (ADR-0061). The docstring
+# convention is not asked: the shipped docstrings are written to Google's sections, and the
+# docstring rules have no autofix that could rewrite them to another.
+line_length:
+  type: int
+  default: 120
+  help: Line length ruff formats and checks your code to (the tooling under _CI keeps 120)
+  validator: >-
+    {% if line_length < 79 or line_length > 320 %}line_length must be between 79 and 320, the range ruff accepts{% endif %}
+
+quote_style:
+  type: str
+  choices:
+    - "single"
+    - "double"
+  default: "single"
+  help: Quote style ruff formats your strings to (docstrings are double-quoted either way)
+
 license:
   type: str
   choices:

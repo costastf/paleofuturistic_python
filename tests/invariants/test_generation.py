@@ -1,6 +1,7 @@
 """Invariants over what copier generates: the answers, the validators, the pins and the vendored tree."""
 
 import re
+import subprocess
 import tomllib
 from datetime import date, datetime
 
@@ -83,6 +84,56 @@ def test_both_sides_render_the_docs_with_the_same_pymdown_extensions():
     parent = tomllib.loads((REPO_ROOT / 'pyproject.toml').read_text(encoding='utf-8'))
     pinned = parent['tool']['properdocs']['pymdown-extensions-version']
     assert pinned == match.group(1), f'the parent builds with pymdown-extensions {pinned}; the template pins {match[1]}'
+
+
+def test_the_formatting_answers_default_to_the_template_conventions(generated_project):
+    """`line_length` and `quote_style` govern `src/` and `tests/`; `_CI/` keeps the template's (ADR-0061).
+
+    Ruff resolves `_CI/pyproject.toml` for that tree, so the shipped modules, written at 120
+    with single quotes, are checked at 120 whatever the project answered. Pylint reads one width
+    from the root, which would fail the tooling under a narrower answer, so its `line-too-long`
+    is off and ruff's E501 is the width check.
+    """
+    project, _ = generated_project
+    root = tomllib.loads((project / 'pyproject.toml').read_text(encoding='utf-8'))
+    tooling = tomllib.loads((project / '_CI' / 'pyproject.toml').read_text(encoding='utf-8'))
+    assert root['tool']['ruff']['line-length'] == 120
+    assert root['tool']['ruff']['format']['quote-style'] == 'single'
+    assert tooling['tool']['ruff']['line-length'] == 120
+    assert tooling['tool']['ruff']['format']['quote-style'] == 'single'
+    pylint = root['tool']['pylint']['MESSAGES CONTROL']
+    assert 'line-too-long' in pylint['disable'], "pylint checks one width for every tree; that is E501's job"
+    assert 'max-line-length' not in pylint, 'a width pylint no longer checks against'
+
+
+def test_a_project_answering_other_conventions_passes_its_own_format_check(generate, tmp_path_factory):
+    """The render hook formats `src/` and `tests/` to the answers, and leaves `_CI/` as shipped (ADR-0061).
+
+    The template's sources are single-quoted at 120 columns. Without the format pass, a project
+    answering 88 and double would fail `lint` on the formatter before its first commit; with
+    it, the tooling must not be rewritten, since its own config keeps the template's style.
+    """
+    workdir = tmp_path_factory.mktemp('other-conventions')
+    project = workdir / PROJECT_SLUG
+    generate(project, {'line_length': 88, 'quote_style': 'double'})
+    answers = yaml.safe_load((project / '.copier-answers.yml').read_text(encoding='utf-8'))
+    assert (answers['line_length'], answers['quote_style']) == (88, 'double')
+    assert 'python_floor' not in answers, 'a derived value was stored as an answer'
+    ruff = re.search(r'"ruff==([^"]+)"', (project / 'pyproject.toml').read_text(encoding='utf-8'))
+    assert ruff, 'the generated project pins no ruff'
+    for arguments in (['format', '--check', 'src', 'tests'], ['check', 'src', 'tests', '_CI/tasks']):
+        result = subprocess.run(
+            ['uvx', f'ruff@{ruff.group(1)}', *arguments],
+            cwd=project,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, f'ruff {" ".join(arguments)} failed:\n{result.stdout}{result.stderr}'
+    module = (project / 'src' / PROJECT_SLUG / f'{PROJECT_SLUG}.py').read_text(encoding='utf-8')
+    assert "'" not in module.replace("'''", ''), 'the project code was not formatted to double quotes'
+    tooling = (project / '_CI' / 'tasks' / 'configuration.py').read_text(encoding='utf-8')
+    assert "PATHS = 'src/ _CI/tasks/ tests/'" in tooling, 'the shipped tooling was rewritten to the project answers'
 
 
 def test_project_urls_use_well_known_labels(generated_project):

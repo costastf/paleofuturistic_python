@@ -57,6 +57,22 @@ Lower bound. Drives `requires-python`, classifier list, tox envs, and CI matrix.
 
 Upper bound. Must be `>= min_python_version` and share the same major version. A validator on this question in `copier.yml` enforces both constraints at generation time and aborts with a clear error if they are violated.
 
+### `line_length`
+
+- **Type**: integer
+- **Default**: `120`
+- **Allowed**: 79 to 320, the range ruff accepts
+
+The width ruff formats your code to and checks it against (`[tool.ruff] line-length`), for `src/` and `tests/`. The tooling under `_CI/` keeps the template's 120 through its own `_CI/pyproject.toml`, which ruff resolves for that tree, so a narrower answer does not fail the shipped modules on comments nothing rewraps. Pylint's `line-too-long` is off in the generated config for the same reason; ruff's E501 is the one width check. The render hook formats `src/` and `tests/` to the answer right after generation. See [ADR-0061](../../maintaining/decisions/0061-line-length-and-quote-style-are-the-projects-to-answer.md).
+
+### `quote_style`
+
+- **Type**: choice
+- **Default**: `single`
+- **Allowed**: `"single"`, `"double"`
+
+The quote style ruff formats your strings to (`[tool.ruff.format] quote-style`), for `src/` and `tests/`; the render hook rewrites the shipped sources to it. Docstrings are double-quoted either way, and `_CI/` keeps the template's single quotes. See [ADR-0061](../../maintaining/decisions/0061-line-length-and-quote-style-are-the-projects-to-answer.md).
+
 ### `license`
 
 - **Type**: choice
@@ -115,7 +131,8 @@ Validation is split between copier's built-in mechanisms and the `tasks_render.p
 2. **Project slug** — a `validator` on the `project_slug` question checks the value is a valid Python identifier and PyPI project name (`^[a-z]([a-z0-9_]*[a-z0-9])?$`), rejecting empty values, leading digits, and punctuation such as apostrophes. Generation aborts before any files are written on failure.
 3. **Repository URL** — a `validator` on `repository_url` accepts an empty value or `^https://[^/\s]+/[^\s]+$`, so `http://`, SSH remotes and a bare host are refused before any files are written.
 4. **Default branch** — a `validator` on `default_branch` refuses an empty value and the names `git check-ref-format --branch` would refuse that the pattern can express: a leading `-` or `.`, `..`, a trailing `/` or `.lock`, and any character outside letters, digits, `.`, `_`, `/` and `-`.
-5. **License installation** — `tasks_render.py` installs the chosen `LICENSE` file (substituting author/year tokens) and removes the `licenses/` staging directory. It runs only on `copier copy`, not on `copier update`.
+5. **Line length** — a `validator` on `line_length` refuses a value outside 79 to 320, the range ruff itself accepts.
+6. **License installation** — `tasks_render.py` installs the chosen `LICENSE` file (substituting author/year tokens) and removes the `licenses/` staging directory. It runs only on `copier copy`, not on `copier update`.
 
 ## Computed values
 

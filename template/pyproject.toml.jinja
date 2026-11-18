@@ -163,8 +163,10 @@ revert = "Reverts"
 
 [tool.ruff]
 target-version = "py{{ min_python_version | replace('.', '') }}"
-# Black's default of 88 quickly feels overly restricted.
-line-length = 120
+# The `line_length` answer, for `src/` and `tests/`. The tooling under `_CI/` keeps the
+# template's 120 through its own `_CI/pyproject.toml`, which ruff resolves for that tree
+# (ADR-0061). Black's default of 88 quickly feels overly restricted, so the template's is 120.
+line-length = {{ line_length }}
 # On top of ruff's own list, which already covers the usual caches and virtual environments.
 extend-exclude = ["build", "scratch", "_CI/lib"]
 
@@ -192,8 +194,9 @@ convention = "google"
 "tests/*.py" = ["S101", "S311", "RUF012", "PLR2004"]
 
 [tool.ruff.format]
-# Use single quotes for strings, because that is more readable.
-quote-style = "single"
+# The `quote_style` answer, for `src/` and `tests/`; `_CI/` keeps the template's single
+# quotes, which are quieter on the page (ADR-0061). Docstrings are double-quoted either way.
+quote-style = "{{ quote_style }}"
 docstring-code-format = true
 docstring-code-line-length = "dynamic"
 
@@ -244,7 +247,6 @@ invalid-argument-type = "ignore"
 init-hook = "import sys; sys.path.append('src/'); sys.path.append('_CI/lib/vendor/')"
 
 [tool.pylint."MESSAGES CONTROL"]
-max-line-length = 120
 disable = [
     "too-few-public-methods",        # a class with one method is often the right shape (a dataclass, a NamedTuple)
     "duplicate-code",                # the task modules share shapes on purpose: one module per subject, same skeleton
@@ -261,6 +263,7 @@ disable = [
     "too-many-locals",
     "too-many-instance-attributes",
     # Covered by ruff
+    "line-too-long",             # ruff E501, which reads a width per tree: `line_length` for src/ and tests/, 120 for _CI/
     "unused-argument",           # handled by ruff ARG rules
     "wrong-import-position",     # handled by ruff isort
 ]

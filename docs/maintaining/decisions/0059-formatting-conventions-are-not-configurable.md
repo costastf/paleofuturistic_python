@@ -1,6 +1,7 @@
 # ADR-0059: Formatting conventions are the template's, not configurable
 
-- **Status**: accepted
+- **Status**: accepted for the docstring convention; the line length and quote style are
+  questions since [ADR-0061](0061-line-length-and-quote-style-are-the-projects-to-answer.md)
 - **Date**: 2026-11-17
 
 ## Context

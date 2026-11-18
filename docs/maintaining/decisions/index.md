@@ -97,3 +97,4 @@ anywhere in the repository resolves to a file.
 | [ADR-0058](0058-shipped-pipelines-are-checked-by-reading-them.md) | Shipped pipelines are checked by reading them |
 | [ADR-0059](0059-formatting-conventions-are-not-configurable.md) | Formatting conventions are the template's, not configurable |
 | [ADR-0060](0060-the-3-11-floor-is-its-current-patch-release.md) | The 3.11 floor is its current patch release |
+| [ADR-0061](0061-line-length-and-quote-style-are-the-projects-to-answer.md) | Line length and quote style are the project's to answer |

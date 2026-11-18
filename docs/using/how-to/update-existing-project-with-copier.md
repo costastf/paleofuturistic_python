@@ -84,7 +84,11 @@ The `document` group pins `pymdown-extensions`, and `properdocs.yml` enables `py
 
 ## Upgrading past the formatting conventions
 
-Ruff formats with a line length of 120 and single quotes, and checks docstrings against the Google convention. None of the three is a copier question, and the template does not carry the numpy convention it used before 2026-04-13. A project generated before then meets the Google rules on its first `lint` after the update: ruff reports each docstring section it cannot read, and the fixes are by hand, since the docstring rules have no autofix. Keeping `convention = "numpy"` in your `pyproject.toml` works, at the cost of resolving that line at every update. See [ADR-0059](../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.md).
+Ruff checks docstrings against the Google convention, and the template does not carry the numpy convention it used before 2026-04-13. A project generated before then meets the Google rules on its first `lint` after the update: ruff reports each docstring section it cannot read, and the fixes are by hand, since the docstring rules have no autofix. Keeping `convention = "numpy"` in your `pyproject.toml` works, at the cost of resolving that line at every update. See [ADR-0059](../../maintaining/decisions/0059-formatting-conventions-are-not-configurable.md).
+
+## Upgrading past the line length and quote style questions
+
+`line_length` and `quote_style` are copier questions, defaulting to the 120 columns and single quotes every earlier project was formatted to, so an update that keeps the defaults changes nothing. Answer them otherwise and the update rewrites `[tool.ruff] line-length` and `[tool.ruff.format] quote-style`, but not your code: the render hook that formats a new project runs on `copier copy` only, so run `./workflow.cmd format` after the update and commit the result. The tooling under `_CI/` keeps the template's conventions through its own `_CI/pyproject.toml`, and `max-line-length` leaves the pylint block, where `line-too-long` is now off in favour of ruff's E501. A `max-line-length` you set by hand is a conflict to resolve by dropping it. See [ADR-0061](../../maintaining/decisions/0061-line-length-and-quote-style-are-the-projects-to-answer.md).
 
 ## Upgrading past the 3.11 patch-level floor
 

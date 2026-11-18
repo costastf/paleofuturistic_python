@@ -120,5 +120,6 @@ nav:
       - ADR-0058 Shipped pipelines are checked by reading them: maintaining/decisions/0058-shipped-pipelines-are-checked-by-reading-them.md
       - ADR-0059 Formatting conventions are the template's, not configurable: maintaining/decisions/0059-formatting-conventions-are-not-configurable.md
       - ADR-0060 The 3.11 floor is its current patch release: maintaining/decisions/0060-the-3-11-floor-is-its-current-patch-release.md
+      - ADR-0061 Line length and quote style are the project's to answer: maintaining/decisions/0061-line-length-and-quote-style-are-the-projects-to-answer.md
 
 copyright: Copyright &copy; 2024 <a href="https://schubergphilis.com/">Schuberg Philis</a>

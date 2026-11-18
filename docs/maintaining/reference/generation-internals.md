@@ -4,7 +4,7 @@ What happens between answering the questionnaire and receiving a finished projec
 
 ## Stage 1. Answer validation (copier validators)
 
-`validator` expressions in `copier.yml` run before any files are written. `project_slug` must be a valid Python identifier and PyPI name (lowercase letters, digits and inner underscores, starting with a letter); `repository_url` must be empty or an https URL with a path. The `max_python_version` validator checks:
+`validator` expressions in `copier.yml` run before any files are written. `project_slug` must be a valid Python identifier and PyPI name (lowercase letters, digits and inner underscores, starting with a letter); `repository_url` must be empty or an https URL with a path; `line_length` must fall in 79 to 320, the range ruff accepts. The `max_python_version` validator checks:
 
 - `max_python_version >= min_python_version`
 - Both values share the same major version (no cross-major ranges).
@@ -32,7 +32,7 @@ The `from .{{ git_hosting_service }} import …` line in `_CI/tasks/container.py
 
 `tasks_render.py` at the repo root is run via copier's `_tasks` configuration. It is **gated to the copy operation only** — `copier update` does not re-run it, so re-generation side-effects (like stamping the copyright year) don't fire on every update.
 
-It performs four actions, in order:
+It performs these actions, in order:
 
 ### Install the chosen license
 
@@ -40,6 +40,10 @@ It performs four actions, in order:
 - Deletes the `licenses/` directory entirely.
 
 No license header or dunder metadata is added to individual source files. The main module (`src/<slug>/<slug>.py`) ships its `import logging` + `LOGGER` setup directly from the template, so it needs no copy-time injection.
+
+### Format the project code
+
+Runs `uvx ruff@<version> format src tests` with the ruff the lint group pins, read back out of the rendered `pyproject.toml`, so `src/` and `tests/` match the `line_length` and `quote_style` answers before the first commit. The template's sources are written at 120 columns with single quotes, and a project answering otherwise would fail its own `lint` on the formatter without this pass. `_CI/` is not touched: its own `pyproject.toml` keeps the template's conventions for the shipped tooling, and ruff resolves that file for the tree (ADR-0061).
 
 ### Stamp the quarantine date
 
