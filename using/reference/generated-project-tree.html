@@ -453,6 +453,10 @@
 <li>
     <a href="../../maintaining/decisions/0061-line-length-and-quote-style-are-the-projects-to-answer.html" class="dropdown-item">ADR-0061 Line length and quote style are the project's to answer</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/decisions/0062-the-deps-image-is-built-in-stages-and-read-back.html" class="dropdown-item">ADR-0062 The deps image is built in stages and read back before it is trusted</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -889,6 +893,9 @@
             <li class="nav-item">
                 <a href="../../maintaining/decisions/0061-line-length-and-quote-style-are-the-projects-to-answer.html" class="nav-link">ADR-0061 Line length and quote style are the project's to answer</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0062-the-deps-image-is-built-in-stages-and-read-back.html" class="nav-link">ADR-0062 The deps image is built in stages and read back before it is trusted</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -960,7 +967,7 @@
 │       ├── secure.py            pip-audit, SBOM extract and validate
 │       ├── shared.py            @logged, @run, execute(), run_steps(), apply_badge()
 │       └── test.py              pytest + coverage
-├── Dockerfile.deps              Single-stage deps-cache image
+├── Dockerfile.deps              Staged deps-cache image; index credentials stop at its builder stage
 ├── LICENSE                      Selected at generation time
 ├── README.md
 ├── docs/                        Diátaxis-structured properdocs site

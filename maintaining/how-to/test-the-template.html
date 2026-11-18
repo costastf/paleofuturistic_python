@@ -453,6 +453,10 @@
 <li>
     <a href="../decisions/0061-line-length-and-quote-style-are-the-projects-to-answer.html" class="dropdown-item">ADR-0061 Line length and quote style are the project's to answer</a>
 </li>
+            
+<li>
+    <a href="../decisions/0062-the-deps-image-is-built-in-stages-and-read-back.html" class="dropdown-item">ADR-0062 The deps image is built in stages and read back before it is trusted</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -889,6 +893,9 @@
             <li class="nav-item">
                 <a href="../decisions/0061-line-length-and-quote-style-are-the-projects-to-answer.html" class="nav-link">ADR-0061 Line length and quote style are the project's to answer</a>
             </li>
+            <li class="nav-item">
+                <a href="../decisions/0062-the-deps-image-is-built-in-stages-and-read-back.html" class="nav-link">ADR-0062 The deps image is built in stages and read back before it is trusted</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -981,7 +988,8 @@
 <li>the coverage ratchet leaving dormancy and engaging for real,</li>
 <li>the deadlock the coverage union exists to prevent (see <a href="../../using/explanation/testing-strategy.html">Testing strategy</a>), since a dormant or 100%-coverage ratchet can't reach it,</li>
 <li>the CI badge's origin-carrying slug, and</li>
-<li>the dependency audit (<code>secure.audit</code>), which rides with this one cell rather than every cell, so a transient advisory-service error fails one job instead of five.</li>
+<li>the dependency audit (<code>secure.audit</code>), which rides with this one cell rather than every cell, so a transient advisory-service error fails one job instead of five, and</li>
+<li>the deps image: <code>container.build</code> then <code>container.audit</code>, which proves the builder stage of <code>Dockerfile.deps</code> leaves no credential trace in the image that would be pushed (ADR-0062). This is the one cell that needs docker or podman on the machine running it.</li>
 </ul>
 <p><code>test.matrix</code> runs this cell alongside the four ordinary ones; <code>test.combo --mature</code> reproduces it alone. See <code>qa_cells()</code> in <code>_CI/tasks/configuration.py</code> for the authoritative reasoning on why it's one extra cell rather than a third combo axis.</p>
 <h2 id="skipping-a-known-cve">Skipping a known CVE</h2>
