@@ -99,3 +99,4 @@ anywhere in the repository resolves to a file.
 | [ADR-0060](0060-the-3-11-floor-is-its-current-patch-release.md) | The 3.11 floor is its current patch release |
 | [ADR-0061](0061-line-length-and-quote-style-are-the-projects-to-answer.md) | Line length and quote style are the project's to answer |
 | [ADR-0062](0062-the-deps-image-is-built-in-stages-and-read-back.md) | The deps image is built in stages and read back before it is trusted |
+| [ADR-0063](0063-a-fenced-index-is-a-set-of-group-variables.md) | A fenced index is a set of group variables |

@@ -80,6 +80,13 @@ in the history of every layer of the stage that declares it, which is why the st
 them is not the stage that is pushed. For a project resolving from PyPI the arguments are
 empty and the build is the same.
 
+Where the arguments come from is the fence's business, and [Work behind a fenced
+index](../how-to/work-behind-a-fenced-index.md) has it: a set of variables the organisation
+sets once{% if git_hosting_service == 'gitlab' %}, with the `plan-deps-image` job minting the credentials from its ID token and
+handing them to the kaniko job in the dotenv it already writes{% else %}, forwarded by the build job as environment{% endif %}. Every builder of the image names
+them on the command line as `"$INDEX_PASSWORD"` and supplies them through the environment, so
+the command a task echoes shows no secret.
+
 `container.audit` makes sure of it: it reads the pushed image's configuration back and fails
 on any history line or environment entry naming an argument, the sync command or the netrc.
 {% if git_hosting_service == 'github' %}The `build-deps-image` job runs it right after the

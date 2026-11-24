@@ -166,10 +166,16 @@ def test_gitlab_deps_tag_reaches_kaniko_from_the_launcher(generated_project):
 
 
 def test_container_tag_writes_the_dotenv_the_kaniko_job_reads(generated_project):
-    """`container.tag --output` writes exactly the two keys the kaniko job substitutes."""
+    """`container.tag --output` writes the two keys the kaniko job substitutes, and the credentials behind a fence.
+
+    In the open the file holds the tag and the base image and nothing else. Behind a fenced
+    index it also carries the three build arguments the builder stage takes, which the kaniko
+    job cannot mint itself (ADR-0063); what it prints never includes them.
+    """
     project, _ = generated_project
     source = (project / '_CI' / 'tasks' / 'container.py').read_text(encoding='utf-8')
     printed = []
+    credentials = {}
     helpers = exec_from(
         source,
         'tag',
@@ -178,6 +184,7 @@ def test_container_tag_writes_the_dotenv_the_kaniko_job_reads(generated_project)
         task=lambda fn: fn,
         logged=lambda _name: lambda fn: fn,
         deps_image_tag=lambda: 'cafe' * 8,
+        build_environment=lambda: dict(credentials),
         info=SimpleNamespace(base_image=lambda: 'ghcr.io/astral-sh/uv:0.13.7-python3.11-trixie-slim@sha256:abc'),
         print=printed.append,
     )
@@ -189,6 +196,12 @@ def test_container_tag_writes_the_dotenv_the_kaniko_job_reads(generated_project)
     assert output.read_text(encoding='utf-8') == (
         f'DEPS_TAG={"cafe" * 8}\nBASE_IMAGE=ghcr.io/astral-sh/uv:0.13.7-python3.11-trixie-slim@sha256:abc\n'
     )
+    credentials.update({'INDEX_URL': 'https://pkgs.example.com/simple', 'INDEX_USERNAME': 'w-ci'})
+    credentials['INDEX_PASSWORD'] = 'minted'  # noqa: S105 — a test value
+    helpers['tag'](None, output=str(output))
+    written = output.read_text(encoding='utf-8')
+    assert written.endswith('INDEX_URL=https://pkgs.example.com/simple\nINDEX_USERNAME=w-ci\nINDEX_PASSWORD=minted\n')
+    assert not any('minted' in line for line in printed), 'the task printed the credential it minted'
 
 
 def test_deps_image_reference_is_digest_pinned(generated_project):
@@ -434,7 +447,12 @@ def test_gitlab_publish_mints_both_tokens_and_ships(generated_project):
     if cell['git_hosting_service'] != 'gitlab':
         pytest.skip('GitLab-only pipeline')
     job = yaml.safe_load((project / '.gitlab-ci.yml').read_text(encoding='utf-8'))['publish']
-    assert job['id_tokens'] == {'PYPI_ID_TOKEN': {'aud': 'pypi'}, 'SIGSTORE_ID_TOKEN': {'aud': 'sigstore'}}
+    assert job['id_tokens'] == {
+        'PYPI_ID_TOKEN': {'aud': 'pypi'},
+        'SIGSTORE_ID_TOKEN': {'aud': 'sigstore'},
+        # Exchanged for the upload credentials behind a fenced index, unused in the open (ADR-0063).
+        'JFROG_ID_TOKEN': {'aud': '$JFROG_AUDIENCE'},
+    }
     assert job['script'] == ['./workflow.cmd release.ship --before "$CI_COMMIT_BEFORE_SHA" --after "$CI_COMMIT_SHA"'], (
         f'the publish job runs {job["script"]}'
     )
@@ -563,6 +581,57 @@ def test_the_audit_markers_cover_every_credential_argument(generated_project):
     markers = set(configuration.DEPS_IMAGE_SECRET_MARKERS)
     assert declared <= markers, f'the audit would miss {sorted(declared - markers)}'
     assert 'uv sync' in markers, 'the audit would not notice the sync command in the final image'
+
+
+def test_every_builder_hands_the_builder_stage_its_credentials(generated_project):
+    """Each way the deps image gets built passes the credential arguments by name, never by value (ADR-0063).
+
+    By hand and in a job with an engine, every build goes through `deps_build_command`, whose
+    command line says `"$INDEX_PASSWORD"` and whose environment supplies it, so the echoed
+    command shows no secret. The kaniko job spells the same three flags from the plan job's
+    dotenv, and GitHub's build job forwards the three names from the repository's secrets.
+    """
+    project, cell = generated_project
+    configuration = load_generated_configuration(project)
+    tasks = project / '_CI' / 'tasks'
+    for module in ('container.py', f'{cell["git_hosting_service"]}.py'):
+        source = (tasks / module).read_text(encoding='utf-8')
+        assert '{engine} build ' not in source, f'{module} builds the image without deps_build_command'
+    index = (tasks / 'index.py').read_text(encoding='utf-8')
+    helpers = exec_from(index, 'build_arguments')
+    flags = helpers['build_arguments']({'INDEX_URL': 'https://x', 'INDEX_PASSWORD': 'hunter2'})
+    assert flags == '--build-arg INDEX_URL="$INDEX_URL" --build-arg INDEX_PASSWORD="$INDEX_PASSWORD"'
+    assert 'hunter2' not in flags
+    if cell['git_hosting_service'] == 'gitlab':
+        pipeline = (project / '.gitlab-ci.yml').read_text(encoding='utf-8')
+        deps_job = pipeline.split('build-deps-image:', 1)[1].split('\npreflight:', 1)[0]
+        for name in configuration.DEPS_IMAGE_BUILD_ARGS:
+            assert f'--build-arg={name}="${name}"' in deps_job, f'the kaniko job does not pass {name}'
+    else:
+        build = project / '.github' / 'workflows' / 'build-deps-image.yaml'
+        steps = yaml.safe_load(build.read_text(encoding='utf-8'))['jobs']['build-deps-image']['steps']
+        env = next(step['env'] for step in steps if 'container.publish' in step.get('run', ''))
+        assert set(configuration.DEPS_IMAGE_BUILD_ARGS) <= set(env), f'the build job forwards {sorted(env)}'
+        assert env['INDEX_PASSWORD'].startswith('${{ secrets.'), 'the password is not a secret'
+
+
+def test_the_token_minting_jobs_name_the_audience_the_group_sets(generated_project):
+    """The two GitLab jobs that exchange a token mint one for `$JFROG_AUDIENCE`, placeholder included (ADR-0063).
+
+    GitLab refuses an `id_tokens:` entry with an empty audience, so the pipeline file sets a
+    placeholder the group's variable overrides. The dotenv that carries the minted credentials
+    to the kaniko job expires in minutes, not the default month.
+    """
+    project, cell = generated_project
+    if cell['git_hosting_service'] != 'gitlab':
+        pytest.skip('GitLab-only pipeline')
+    config = yaml.safe_load((project / '.gitlab-ci.yml').read_text(encoding='utf-8'))
+    assert config['variables'].get('JFROG_AUDIENCE'), 'no placeholder audience; an unset one fails the pipeline'
+    for job in ('plan-deps-image', 'publish'):
+        token = config[job].get('id_tokens', {}).get('JFROG_ID_TOKEN')
+        assert token == {'aud': '$JFROG_AUDIENCE'}, f'{job} mints no token for the index: {token}'
+    assert config['plan-deps-image']['artifacts'].get('expire_in') == '1 hour', 'the credential dotenv outlives its use'
+    assert 'expire_in' not in config['build-deps-image']['artifacts'], 'the image reference needs no early expiry'
 
 
 def test_the_deps_image_is_read_back_before_it_is_trusted(generated_project):

@@ -13,6 +13,7 @@ from .build import build
 from .configuration import CHANGELOG_FILE, DEFAULT_BRANCH, DIST_DIR, OIDC_ENV_VARS, SBOM_FILE, UV_PUBLISH_SETTINGS
 from .document import update_package_version_badge
 from .{{ git_hosting_service }} import create_release, create_release_pr, pr_create_url, release_tag_commit
+from .index import index_login
 from .secure import audit
 from .shared import commit, execute, logged, note
 
@@ -200,6 +201,22 @@ def distribution_files() -> list[Path]:
     return sorted([*DIST_DIR.glob('*.whl'), *DIST_DIR.glob('*.tar.gz')])
 
 
+def apply_index_login() -> None:
+    """Fill ``UV_PUBLISH_USERNAME`` and ``UV_PUBLISH_PASSWORD`` from the organisation's index login.
+
+    Only when the URL alone is set: an organisation sets ``UV_PUBLISH_URL`` once at group level
+    and lets the publish job mint the rest from its ID token, so no upload credential is stored
+    anywhere (ADR-0063). Credentials already set are left as they are.
+    """
+    if not os.environ.get('UV_PUBLISH_URL', '').strip() or os.environ.get('UV_PUBLISH_PASSWORD', '').strip():
+        return
+    login = index_login()
+    if login is None:
+        return
+    os.environ['UV_PUBLISH_USERNAME'] = login.username
+    os.environ['UV_PUBLISH_PASSWORD'] = login.password
+
+
 def publishes_with_credentials() -> bool:
     """Report whether ``release.publish`` will upload with ``UV_PUBLISH_*`` rather than OIDC.
 
@@ -207,6 +224,7 @@ def publishes_with_credentials() -> bool:
     empty string, and `uv publish` treats UV_PUBLISH_URL="" as an explicit --publish-url with
     no base instead of falling back to PyPI. So empty reads as unset, here and in `uv`.
     """
+    apply_index_login()
     for var in UV_PUBLISH_SETTINGS:
         if not os.environ.get(var, '').strip():
             os.environ.pop(var, None)

@@ -376,9 +376,14 @@ def note(reason: str | None) -> None:
         print(reason)
 
 
-def execute(context: Context, cmd: str) -> None:
-    """Execute a shell command, raising SystemExit(1) on failure."""
-    result = context.run(cmd, echo=True, warn=True)
+def execute(context: Context, cmd: str, env: dict[str, str] | None = None) -> None:
+    """Execute a shell command, raising SystemExit(1) on failure.
+
+    ``env`` is added to the command's environment, on top of the task's own. The command is
+    echoed before it runs, so anything secret travels in ``env`` and the command names it as
+    ``"$NAME"``; that is how the deps-image build takes its credentials.
+    """
+    result = context.run(cmd, echo=True, warn=True, env=env or {})
     if result.failed:
         raise SystemExit(1)
 

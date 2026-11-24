@@ -5,6 +5,11 @@ registry, GitLab's package registry) instead of, or before, PyPI. Any index that
 [simple repository API](https://packaging.python.org/en/latest/specifications/simple-repository-api/)
 for downloads and the legacy upload API for uploads works.
 
+This page is for a token you hold. A project behind its organisation's Artifactory, with the
+credentials minted from the pipeline's OIDC token and nothing stored, follows [Work behind a
+fenced index](work-behind-a-fenced-index.md) instead, which sets `UV_PUBLISH_URL` and leaves
+the other two to the job.
+
 ## Step 1 — Point the release pipeline at the index
 
 Set three variables as masked {% if git_hosting_service == 'github' %}secrets on the `pypi` environment (*Settings → Environments → pypi*){% else %}CI/CD variables scoped to the `pypi` environment (*Settings → CI/CD → Variables*){% endif %}:

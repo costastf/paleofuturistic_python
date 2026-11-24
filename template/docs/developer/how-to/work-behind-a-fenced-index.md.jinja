@@ -1,0 +1,68 @@
+# Work behind a fenced index
+
+For a project whose packages come from, and go to, your organisation's Artifactory instead of
+PyPI. Nothing in the project changes for it: the fence is a set of variables your organisation
+sets once{% if git_hosting_service == 'gitlab' %}, at group level,{% else %} on the repository,{% endif %} and every project under it inherits. The same
+pipeline file, Dockerfile and tasks serve a project in the open with every variable unset.
+
+## The variables
+
+| Variable | Set where | What it does |
+| --- | --- | --- |
+| `UV_DEFAULT_INDEX` | {% if git_hosting_service == 'gitlab' %}the group{% else %}a repository variable{% endif %}, and your shell | uv resolves and installs from this index instead of PyPI, including the lock generation wrote. The URL is the index's simple API. |
+| `UV_PUBLISH_URL` | {% if git_hosting_service == 'gitlab' %}the group, scoped to the `pypi` environment{% else %}a repository secret{% endif %} | `release.publish` uploads here, with credentials and without attestations, as [Publish to a private index](publish-to-a-private-index.md) describes. |
+{%- if git_hosting_service == 'gitlab' %}
+| `JFROG_URL`, `JFROG_PROJECT`, `JFROG_AUDIENCE` | the group | The pipeline mints an ID token for the audience, and two jobs exchange it at `JFROG_URL/access/api/v1/oidc/token` for a token scoped to the project, as user `<project>-ci`. `JFROG_PROVIDER` names the identity provider Artifactory verifies against; `gitlab` unless set. No stored secret anywhere. |
+{%- else %}
+| `INDEX_USERNAME`, `INDEX_PASSWORD` | repository secrets | A token the index accepts for reads. The build job hands them to the builder stage of the deps image and nowhere else. |
+{%- endif %}
+
+`JFROG_AUDIENCE` has a placeholder in `.gitlab-ci.yml`, because GitLab refuses an `id_tokens:`
+entry with an empty audience and a project in the open has none to give. Variables set in the
+pipeline file rank below group variables, so the group's value wins wherever it is set.
+
+## What the pipeline does with them
+
+{% if git_hosting_service == 'gitlab' -%}
+- **`plan-deps-image`** exchanges its ID token and writes `INDEX_URL`, `INDEX_USERNAME` and
+  `INDEX_PASSWORD` into the dotenv it already hands the kaniko job, which passes them as build
+  arguments. The artifact expires after an hour.
+- **`build-deps-image`** builds with them. The builder stage of `Dockerfile.deps` is the only
+  stage that sees them; the pushed image carries the synced environment and no trace, which
+  `preflight` checks first thing with `container.audit`.
+- **`publish`** exchanges its own ID token, since the earlier one may have expired, and fills
+  `UV_PUBLISH_USERNAME` and `UV_PUBLISH_PASSWORD` beside the `UV_PUBLISH_URL` the group set.
+{%- else -%}
+- **`build-deps-image`** passes the three `INDEX_*` values to `container.publish`, which
+  names them on the build command line and supplies them through the environment, so the
+  echoed command shows none. The builder stage of `Dockerfile.deps` is the only stage that
+  sees them; `container.audit` runs right after the push and checks that they stayed there.
+- **`publish`** uploads with the `UV_PUBLISH_*` secrets it already forwards.
+{%- endif %}
+
+`preflight` and `secure` run inside the synced image and fetch nothing, so no job but those
+two ever holds a credential.
+
+## On your machine
+
+Put `UV_DEFAULT_INDEX` in your shell profile, then `uv auth login <host>` with your own
+Artifactory identity token, which uv stores for every request to that host. For
+`./workflow.cmd container.build` set `INDEX_USERNAME` and `INDEX_PASSWORD` the same way for the
+one command; the build names them and never echoes them.
+
+## The Artifactory side
+{% if git_hosting_service == 'gitlab' %}
+Artifactory needs an OIDC integration for your GitLab, with the audience in `JFROG_AUDIENCE`,
+and an identity mapping from this project's token claims to the `<project>-ci` user with read
+on the index and deploy on the upload repository. Both are your platform team's to set; this
+how-to only names what they map to.
+{% else %}
+Artifactory needs a user or access token with read on the index and deploy on the upload
+repository; its credentials go in the two secrets above. Trusted Publishing to Artifactory
+from GitHub is not wired here.
+{% endif %}
+## See also
+
+- [Publish to a private index](publish-to-a-private-index.md) — the upload side, with a token you hold.
+- [Build and push a container](build-and-push-a-container.md) — the image the credentials build.
+- [Environment variables and flags](../reference/environment-and-flags.md) — every variable above, with the task that reads it.

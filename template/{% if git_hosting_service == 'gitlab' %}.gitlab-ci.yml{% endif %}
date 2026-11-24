@@ -7,6 +7,12 @@ variables:
   # Recommended by uv's GitLab guide — hardlinks can't span GitLab's mount
   # boundaries, so downstream jobs that run `uv run` need copy mode.
   UV_LINK_MODE: copy
+  # The audience of the ID token two jobs below mint for the organisation's package index
+  # (ADR-0063). A placeholder, because `id_tokens:` refuses an empty audience and a project in
+  # the open has none to give; a group variable of the same name overrides it, variables set
+  # in this file ranking below group ones. Nothing consumes the token until `JFROG_URL` and
+  # `JFROG_PROJECT` are set beside it, at group level too.
+  JFROG_AUDIENCE: not-configured
 
 # The deps image is content-addressed on the lockfile, the Dockerfile and the base image
 # (ADR-0033), and `container.tag` is the one implementation of that address. The job that
@@ -23,10 +29,19 @@ plan-deps-image:
     # The tag needs nothing the project depends on, only the lockfile's bytes, so the
     # launcher runs on an empty environment instead of installing every group first.
     UV_NO_SYNC: "1"
+  # Behind a fenced index the dotenv also carries the credentials the builder stage of
+  # `Dockerfile.deps` takes, minted here from this ID token: the kaniko job below cannot mint
+  # them itself (ADR-0063).
+  id_tokens:
+    JFROG_ID_TOKEN:
+      aud: $JFROG_AUDIENCE
   script:
     - pip install --quiet "uv==$(sed -n 's/^required-version = "==\(.*\)"$/\1/p' pyproject.toml)"
     - ./workflow.cmd container.tag --output .deps-tag.env
   artifacts:
+    # Minutes, not the default month: the build job reads this right away, and behind a fence
+    # the file holds a token.
+    expire_in: 1 hour
     reports:
       dotenv: .deps-tag.env
 
@@ -69,7 +84,9 @@ build-deps-image:
     - '[ -n "$DEPS_IMAGE_USERNAME" ] && echo "DEPS_IMAGE_USERNAME is set" || echo "DEPS_IMAGE_USERNAME EMPTY"'
     - '[ -n "$DEPS_IMAGE_PASSWORD" ] && echo "DEPS_IMAGE_PASSWORD is set" || echo "DEPS_IMAGE_PASSWORD EMPTY"'
     - printf '{"auths":{"%s":{"username":"%s","password":"%s"}}}' "$CI_REGISTRY" "$DEPS_IMAGE_USERNAME" "$DEPS_IMAGE_PASSWORD" > /kaniko/.docker/config.json
-    - /kaniko/executor --dockerfile=Dockerfile.deps --context=. --destination="$IMAGE" --build-arg=BASE_IMAGE="$BASE_IMAGE" --digest-file=/tmp/deps-digest
+    # The three INDEX_* arguments come from the plan job's dotenv, empty in the open, and reach
+    # the builder stage only; `container.audit` in the next job checks that they stayed there.
+    - /kaniko/executor --dockerfile=Dockerfile.deps --context=. --destination="$IMAGE" --build-arg=BASE_IMAGE="$BASE_IMAGE" --build-arg=INDEX_URL="$INDEX_URL" --build-arg=INDEX_USERNAME="$INDEX_USERNAME" --build-arg=INDEX_PASSWORD="$INDEX_PASSWORD" --digest-file=/tmp/deps-digest
     # Hand downstream jobs a digest rather than the tag, so a tag repointed after
     # this job cannot change the image those jobs run in. kaniko is daemonless, so
     # --digest-file is the only way to learn what it pushed.
@@ -172,6 +189,10 @@ publish:
       aud: pypi
     SIGSTORE_ID_TOKEN:
       aud: sigstore
+    # Behind a fenced index, `release.publish` exchanges this one for the upload credentials
+    # `UV_PUBLISH_URL` alone does not carry (ADR-0063). Unused in the open.
+    JFROG_ID_TOKEN:
+      aud: $JFROG_AUDIENCE
   before_script:
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
   # Detect, tag (through the Releases API with the job token), build, sign PEP 740

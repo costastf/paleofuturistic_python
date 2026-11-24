@@ -12,6 +12,7 @@ from _CI import info
 
 from .configuration import DEPS_IMAGE_FILE, DEPS_IMAGE_SECRET_MARKERS, DOCKERFILE_DEPS, IMAGE_NAME, UV_LOCK
 from .{{ git_hosting_service }} import publish_deps_image, registry_read_credentials
+from .index import build_environment, deps_build_command
 from .registry import RegistryError, image_config
 from .shared import available_container_engine, container_engine, execute, is_ci, logged
 
@@ -43,28 +44,30 @@ def deps_image_tag() -> str:
 @task
 @logged('container.build')
 def build(context: Context) -> None:
-    """Build the dependency cache container image locally."""
-    engine = container_engine()
-    base_image = info.base_image()
-    execute(
-        context,
-        f'{engine} build --build-arg BASE_IMAGE={base_image} -f {DOCKERFILE_DEPS} -t {IMAGE_NAME}:latest .',
-    )
+    """Build the dependency cache container image locally.
+
+    Behind a fenced index the builder stage takes the credentials `index.build_environment`
+    finds, named on the command line and supplied by the environment (ADR-0063).
+    """
+    command, environment = deps_build_command(container_engine(), info.base_image(), f'{IMAGE_NAME}:latest')
+    execute(context, command, env=environment)
 
 
 @task
 @logged('container.tag')
 def tag(context: Context, output: str = '') -> None:  # noqa: ARG001
-    """Print the deps-image tag, or write it and the base image to a dotenv file.
+    """Print the deps-image tag, or write it, the base image and the index credentials to a dotenv file.
 
     The tag is the content address `container.publish` builds under. A pipeline job that
     builds the image without Python, such as GitLab's kaniko job, needs the address computed
     for it; with ``--output`` this writes ``DEPS_TAG`` and ``BASE_IMAGE`` as a dotenv artifact
-    that job reads, so the algorithm above stays the only one (ADR-0043).
+    that job reads, so the algorithm above stays the only one (ADR-0043). Behind a fenced
+    index the same file carries the credential arguments the builder stage takes, minted here
+    from the job's ID token, because the kaniko job cannot mint them itself (ADR-0063).
 
     Args:
         context: Invoke context.
-        output: File to write the two ``KEY=value`` lines to, instead of printing the tag.
+        output: File to write the ``KEY=value`` lines to, instead of printing the tag.
 
     """
     value = deps_image_tag()
@@ -72,8 +75,11 @@ def tag(context: Context, output: str = '') -> None:  # noqa: ARG001
     if not output:
         print(value)
         return
-    Path(output).write_text(f'DEPS_TAG={value}\nBASE_IMAGE={base_image}\n', encoding='utf-8')
-    print(f'Wrote {output}: deps-{value} on {base_image}')
+    environment = build_environment()
+    lines = [f'DEPS_TAG={value}', f'BASE_IMAGE={base_image}', *(f'{name}={val}' for name, val in environment.items())]
+    Path(output).write_text('\n'.join(lines) + '\n', encoding='utf-8')
+    handed = ', with the index credentials' if environment else ''
+    print(f'Wrote {output}: deps-{value} on {base_image}{handed}')
 
 
 @task
@@ -101,8 +107,8 @@ def publish(context: Context, reuse: bool = False) -> None:
         if not result.failed:
             print(f'Image already exists: {image}')
         else:
-            base_image = info.base_image()
-            execute(context, f'{engine} build --build-arg BASE_IMAGE={base_image} -f {DOCKERFILE_DEPS} -t {image} .')
+            command, environment = deps_build_command(engine, info.base_image(), image)
+            execute(context, command, env=environment)
     DEPS_IMAGE_FILE.write_text(image, encoding='utf-8')
 
 

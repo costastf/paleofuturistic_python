@@ -747,8 +747,8 @@ def exec_from(source, *names: str, **namespace: object):
 
 
 def defined_names(node):
-    """Return the names a top-level statement defines: a function's own, or an assignment's targets."""
-    if isinstance(node, ast.FunctionDef):
+    """Return the names a top-level statement defines: a function's or class's own, or an assignment's targets."""
+    if isinstance(node, ast.FunctionDef | ast.ClassDef):
         return {node.name}
     if isinstance(node, ast.Assign):
         return {target.id for target in node.targets if isinstance(target, ast.Name)}

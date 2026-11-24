@@ -15,6 +15,7 @@ from invoke import Context
 from _CI import info
 
 from .configuration import DEFAULT_BRANCH
+from .index import deps_build_command
 from .shared import PipelineComponent, container_engine, execute, image_digest_reference, strip_credentials
 
 WORKFLOWS_DIR = Path('.github/workflows')
@@ -76,8 +77,8 @@ def publish_deps_image(context: Context, tag: str, *, reuse: bool = False) -> st
         # unpullable image fails here rather than in every consumer job.
         execute(context, f'{engine} pull {image}')
     else:
-        base_image = info.base_image()
-        execute(context, f'{engine} build --build-arg BASE_IMAGE={base_image} -f Dockerfile.deps -t {image} .')
+        command, environment = deps_build_command(engine, info.base_image(), image)
+        execute(context, command, env=environment)
         execute(context, f'{engine} push {image}')
     return image_digest_reference(context, engine, image)
 
