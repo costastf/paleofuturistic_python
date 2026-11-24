@@ -1,7 +1,8 @@
 """Credentials for a fenced package index, minted from the job's OIDC token or taken from the environment.
 
 Everything a project needs to live behind an index of its own is a variable its organisation
-sets once, at group level (ADR-0063). `UV_DEFAULT_INDEX` tells uv where to resolve and
+sets once, on a GitLab group or a GitHub organisation (ADR-0063, ADR-0064). `UV_DEFAULT_INDEX`
+tells uv where to resolve and
 `UV_PUBLISH_URL` where to upload, both read by uv itself. The `JFROG_*` variables let a
 pipeline job trade the ID token its host minted for it for a short-lived Artifactory token, so
 no stored secret exists anywhere. A developer behind the same fence sets `INDEX_USERNAME` and

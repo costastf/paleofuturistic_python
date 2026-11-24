@@ -204,9 +204,9 @@ def distribution_files() -> list[Path]:
 def apply_index_login() -> None:
     """Fill ``UV_PUBLISH_USERNAME`` and ``UV_PUBLISH_PASSWORD`` from the organisation's index login.
 
-    Only when the URL alone is set: an organisation sets ``UV_PUBLISH_URL`` once at group level
-    and lets the publish job mint the rest from its ID token, so no upload credential is stored
-    anywhere (ADR-0063). Credentials already set are left as they are.
+    Only when the URL alone is set: an organisation sets ``UV_PUBLISH_URL`` once, on its GitLab
+    group or GitHub organisation, and lets the publish job mint the rest from its ID token, so
+    no upload credential is stored anywhere (ADR-0063). Credentials already set are left alone.
     """
     if not os.environ.get('UV_PUBLISH_URL', '').strip() or os.environ.get('UV_PUBLISH_PASSWORD', '').strip():
         return
