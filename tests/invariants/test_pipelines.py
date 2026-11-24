@@ -319,7 +319,7 @@ def test_fork_pull_requests_touching_the_dependency_surface_are_audited(generate
     assert triggers['pull_request']['paths'] == triggers['push']['paths'], 'the two path filters drifted apart'
     assert "github.event_name != 'pull_request'" in workflow['jobs']['build-deps-image']['if']
     container, fork = fork_pair(workflow, 'secure', 'secure-from-fork')
-    assert run_commands(container) == ['./workflow.cmd secure.audit']
+    assert run_commands(container) == ['./workflow.cmd index.login', './workflow.cmd secure.audit']
     assert './workflow.cmd secure.audit' in run_commands(fork)
 
 
@@ -338,7 +338,7 @@ def test_scheduled_security_audit_ships_for_github(generated_project):
     config = yaml.safe_load(content)
     # Least privilege: the audit only reads the repo; only the image build may publish.
     assert config['permissions'] == {'contents': 'read'}
-    assert config['jobs']['secure']['permissions'] == {'contents': 'read', 'packages': 'read'}
+    assert config['jobs']['secure']['permissions'] == {'contents': 'read', 'packages': 'read', 'id-token': 'write'}
 
 
 def test_this_repo_runs_tasks_only_through_the_launcher():
@@ -453,9 +453,9 @@ def test_gitlab_publish_mints_both_tokens_and_ships(generated_project):
         # Exchanged for the upload credentials behind a fenced index, unused in the open (ADR-0063).
         'JFROG_ID_TOKEN': {'aud': '$JFROG_AUDIENCE'},
     }
-    assert job['script'] == ['./workflow.cmd release.ship --before "$CI_COMMIT_BEFORE_SHA" --after "$CI_COMMIT_SHA"'], (
-        f'the publish job runs {job["script"]}'
-    )
+    ship = './workflow.cmd release.ship --before "$CI_COMMIT_BEFORE_SHA" --after "$CI_COMMIT_SHA"'
+    assert job['script'][-1] == ship, f'the publish job runs {job["script"]}'
+    assert job['script'][:-1] == ['./workflow.cmd index.login'], 'the publish job runs more than the login and the ship'
 
 
 def test_gitlab_publishes_only_once_the_tag_reaches_the_default_branch(generated_project):
@@ -627,11 +627,60 @@ def test_the_token_minting_jobs_name_the_audience_the_group_sets(generated_proje
         pytest.skip('GitLab-only pipeline')
     config = yaml.safe_load((project / '.gitlab-ci.yml').read_text(encoding='utf-8'))
     assert config['variables'].get('JFROG_AUDIENCE'), 'no placeholder audience; an unset one fails the pipeline'
-    for job in ('plan-deps-image', 'publish'):
-        token = config[job].get('id_tokens', {}).get('JFROG_ID_TOKEN')
-        assert token == {'aud': '$JFROG_AUDIENCE'}, f'{job} mints no token for the index: {token}'
+    assert config['default']['id_tokens'] == {'JFROG_ID_TOKEN': {'aud': '$JFROG_AUDIENCE'}}, 'jobs mint no index token'
+    assert 'id_tokens' not in config['plan-deps-image'], 'the plan job repeats what the default gives it'
+    token = config['publish']['id_tokens'].get('JFROG_ID_TOKEN')
+    assert token == {'aud': '$JFROG_AUDIENCE'}, f'publish, which lists its own tokens, lost the index one: {token}'
     assert config['plan-deps-image']['artifacts'].get('expire_in') == '1 hour', 'the credential dotenv outlives its use'
     assert 'expire_in' not in config['build-deps-image']['artifacts'], 'the image reference needs no early expiry'
+
+
+FETCHING_JOBS = {
+    'gitlab': (('.gitlab-ci.yml', 'preflight'), ('.gitlab-ci.yml', 'secure'), ('.gitlab-ci.yml', 'publish')),
+    'github': (
+        ('.github/workflows/continuous-integration.yaml', 'preflight'),
+        ('.github/workflows/security-audit.yaml', 'secure'),
+        ('.github/workflows/publish.yaml', 'publish'),
+    ),
+}
+FENCE_VARIABLES = ('UV_DEFAULT_INDEX', 'JFROG_URL', 'JFROG_PROJECT', 'JFROG_AUDIENCE', 'JFROG_PROVIDER')
+
+
+LOGIN = './workflow.cmd index.login'
+
+
+def github_job_logs_in_first(path, config, name):
+    """Assert one GitHub job logs in before its first other task, may mint the token, and gets the variables."""
+    job = config['jobs'][name]
+    commands = [step.get('run', '') for step in job['steps']]
+    assert LOGIN in commands, f'{name} in {path} never logs in: {commands}'
+    tasks = [at for at, command in enumerate(commands) if command.startswith('./workflow.cmd ') and command != LOGIN]
+    assert commands.index(LOGIN) < min(tasks), f'{name} logs in after it fetched'
+    assert job['permissions'].get('id-token') == 'write', f'{name} cannot mint the ID token the login exchanges'
+    build = config['jobs']['build-deps-image']['permissions']
+    assert build.get('id-token') == 'write', f'{path} denies the build its token'
+    handed = config.get('env', {})
+    missing = [variable for variable in FENCE_VARIABLES if handed.get(variable) != f'${{{{ vars.{variable} }}}}']
+    assert not missing, f'{path} does not hand down {missing}'
+
+
+def test_every_job_that_fetches_logs_in_to_the_index_first(generated_project):
+    """`preflight`, `secure` and `publish` run `index.login` before anything that may fetch (ADR-0064).
+
+    The tox matrix installs an environment per interpreter, `uv build` fetches the build
+    backend, and the audit resolves what it audits; behind a fence each needs the netrc the
+    login writes. On GitHub the login mints its own ID token, so those jobs may write one and
+    every workflow hands the fence variables down as environment.
+    """
+    project, cell = generated_project
+    host = cell['git_hosting_service']
+    for path, name in FETCHING_JOBS[host]:
+        config = yaml.safe_load((project / path).read_text(encoding='utf-8'))
+        if host == 'github':
+            github_job_logs_in_first(path, config, name)
+        else:
+            script = config[name]['script']
+            assert script[0] == LOGIN, f'{name} runs {script[0]!r} before logging in'
 
 
 def test_the_deps_image_is_read_back_before_it_is_trusted(generated_project):
@@ -699,7 +748,8 @@ def pipeline_jobs(project, host):
         pipeline = (project / '.github' / 'workflows' / 'continuous-integration.yaml').read_text(encoding='utf-8')
         return pipeline, set(yaml.safe_load(pipeline)['jobs'])
     pipeline = (project / '.gitlab-ci.yml').read_text(encoding='utf-8')
-    return pipeline, {name for name in yaml.safe_load(pipeline) if not name.startswith(('stages', 'variables'))}
+    # `stages`, `variables` and `default` are GitLab's global keywords, not jobs.
+    return pipeline, {name for name in yaml.safe_load(pipeline) if name not in {'stages', 'variables', 'default'}}
 
 
 def invoked_tasks(pipeline):

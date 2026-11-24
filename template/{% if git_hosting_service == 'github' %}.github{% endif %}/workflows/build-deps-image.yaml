@@ -7,6 +7,16 @@ on:
         description: Dependency image reference
         value: ${{ jobs.build-deps-image.outputs.image }}
 
+# The organisation's package index, when there is one: repository variables, empty in the
+# open. A called workflow inherits no `env:` from its caller, so they are named here too; the
+# build mints its credentials from them and the job's OIDC token (ADR-0063, ADR-0064).
+env:
+  UV_DEFAULT_INDEX: ${{ vars.UV_DEFAULT_INDEX }}
+  JFROG_URL: ${{ vars.JFROG_URL }}
+  JFROG_PROJECT: ${{ vars.JFROG_PROJECT }}
+  JFROG_AUDIENCE: ${{ vars.JFROG_AUDIENCE }}
+  JFROG_PROVIDER: ${{ vars.JFROG_PROVIDER }}
+
 jobs:
   build-deps-image:
     name: Build dependency image
@@ -14,6 +24,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+      # Behind a fenced index the build mints its credentials from an OIDC token; every caller
+      # grants the same scope, a called workflow getting no more than its caller has.
+      id-token: write
     outputs:
       image: ${{ steps.deps.outputs.image }}
 

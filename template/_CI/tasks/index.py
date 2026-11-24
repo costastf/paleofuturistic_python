@@ -3,27 +3,35 @@
 Everything a project needs to live behind an index of its own is a variable its organisation
 sets once, at group level (ADR-0063). `UV_DEFAULT_INDEX` tells uv where to resolve and
 `UV_PUBLISH_URL` where to upload, both read by uv itself. The `JFROG_*` variables let a
-pipeline job trade the ID token GitLab minted for it for a short-lived Artifactory token, so no
-stored secret exists anywhere. A developer behind the same fence sets `INDEX_USERNAME` and
+pipeline job trade the ID token its host minted for it for a short-lived Artifactory token, so
+no stored secret exists anywhere. A developer behind the same fence sets `INDEX_USERNAME` and
 `INDEX_PASSWORD` from their own identity token instead, and the same code hands those on. In
 the open every variable is unset and nothing here runs.
+
+`index.login` is the task: it writes the credentials into a netrc for the rest of a job, which
+uv, tox-uv and pip all read, so every fetch after it authenticates (ADR-0064).
 """
 
 import json
 import os
 import urllib.error
 import urllib.request
-from typing import NamedTuple
+from pathlib import Path
+from typing import NamedTuple, cast
+from urllib.parse import quote
 
-from .configuration import DEPS_IMAGE_BUILD_ARGS, DOCKERFILE_DEPS
+from invoke import Collection, Context, Task, task
+
+from .configuration import DEPS_IMAGE_BUILD_ARGS, DOCKERFILE_DEPS, INDEX_OIDC_PROVIDER
+from .shared import logged
 
 # Artifactory's token exchange: RFC 8693, plus two fields of its own naming the identity provider
 # to verify the token against and the project the resulting token is scoped to.
 JFROG_TOKEN_PATH = '/access/api/v1/oidc/token'  # noqa: S105 — a URL path, not a secret
 GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchange'
 SUBJECT_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:id_token'  # noqa: S105 — a type URN, not a secret
-DEFAULT_PROVIDER = 'gitlab'
 TIMEOUT_SECONDS = 30
+NETRC_MODE = 0o600
 
 
 class IndexLoginError(RuntimeError):
@@ -47,6 +55,54 @@ def index_url() -> str:
     return setting('INDEX_URL') or setting('UV_DEFAULT_INDEX')
 
 
+def index_host(url: str) -> str:
+    """Return the host a netrc entry for ``url`` names."""
+    return url.partition('://')[2].partition('/')[0]
+
+
+def fetch_json(request: urllib.request.Request, what: str) -> dict:
+    """Return the JSON document ``request`` answers with, over https only.
+
+    Raises:
+        IndexLoginError: When the URL is not https, the request fails, or the answer is not an object.
+
+    """
+    if not request.full_url.startswith('https://'):
+        msg = f'refusing to send a token over anything but https: {request.full_url}'
+        raise IndexLoginError(msg)
+    try:
+        with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # noqa: S310 — https enforced above
+            answer = json.loads(response.read())
+    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+        msg = f'{what} failed: {exc}'
+        raise IndexLoginError(msg) from exc
+    if not isinstance(answer, dict):
+        msg = f'{what} answered with something other than an object'
+        raise IndexLoginError(msg)
+    return answer
+
+
+def github_id_token(audience: str) -> str | None:
+    """Return an ID token for ``audience`` from GitHub Actions, or None outside a job that can mint one.
+
+    Actions injects ``ACTIONS_ID_TOKEN_REQUEST_URL`` and ``_TOKEN`` into a job with
+    ``id-token: write``, and the token comes from one request to that URL. GitLab needs no such
+    call: its ``id_tokens:`` block hands the token over as a variable.
+    """
+    url, bearer = setting('ACTIONS_ID_TOKEN_REQUEST_URL'), setting('ACTIONS_ID_TOKEN_REQUEST_TOKEN')
+    if not (url and bearer and audience):
+        return None
+    request = urllib.request.Request(  # noqa: S310 — https enforced in fetch_json
+        f'{url}&audience={quote(audience, safe="")}',
+        headers={'Authorization': f'Bearer {bearer}', 'Accept': 'application/json'},
+    )
+    token = fetch_json(request, 'minting the ID token at GitHub Actions').get('value')
+    if not token:
+        msg = 'GitHub Actions answered without an ID token'
+        raise IndexLoginError(msg)
+    return token
+
+
 def exchange_id_token(base_url: str, project: str, id_token: str, provider: str) -> str:
     """Trade the job's ID token for an Artifactory access token scoped to ``project``.
 
@@ -56,9 +112,6 @@ def exchange_id_token(base_url: str, project: str, id_token: str, provider: str)
 
     """
     url = f'{base_url.rstrip("/")}{JFROG_TOKEN_PATH}'
-    if not url.startswith('https://'):
-        msg = f'refusing to send an ID token over anything but https: {url}'
-        raise IndexLoginError(msg)
     body = {
         'grant_type': GRANT_TYPE,
         'subject_token_type': SUBJECT_TOKEN_TYPE,
@@ -66,19 +119,13 @@ def exchange_id_token(base_url: str, project: str, id_token: str, provider: str)
         'provider_name': provider,
         'project_key': project,
     }
-    request = urllib.request.Request(  # noqa: S310 — https enforced above
+    request = urllib.request.Request(  # noqa: S310 — https enforced in fetch_json
         url,
         data=json.dumps(body).encode('utf-8'),
         headers={'Content-Type': 'application/json'},
         method='POST',
     )
-    try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # noqa: S310
-            answer = json.loads(response.read())
-    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-        msg = f'the token exchange at {url} failed: {exc}'
-        raise IndexLoginError(msg) from exc
-    token = answer.get('access_token') if isinstance(answer, dict) else None
+    token = fetch_json(request, f'the token exchange at {url}').get('access_token')
     if not token:
         msg = f'{url} answered without an access token'
         raise IndexLoginError(msg)
@@ -90,26 +137,30 @@ def index_login() -> IndexLogin | None:
 
     ``INDEX_USERNAME`` and ``INDEX_PASSWORD`` already in the environment win: a developer's own
     identity token, or the kaniko job reading what the plan job minted. Otherwise a job holding
-    ``JFROG_URL``, ``JFROG_PROJECT`` and the ``JFROG_ID_TOKEN`` its ``id_tokens:`` block minted
-    exchanges that token; the username is the one Artifactory gives a project's CI identity,
-    ``<project>-ci``. Nothing is printed but who logged in where.
+    ``JFROG_URL`` and ``JFROG_PROJECT`` exchanges its ID token, the ``JFROG_ID_TOKEN`` GitLab's
+    ``id_tokens:`` block minted or the one GitHub Actions mints on request; the username is the
+    one Artifactory gives a project's CI identity, ``<project>-ci``. Nothing is printed but who
+    logged in where.
     """
     if setting('INDEX_PASSWORD'):
         return IndexLogin(setting('INDEX_USERNAME'), setting('INDEX_PASSWORD'))
-    base_url, project, id_token = setting('JFROG_URL'), setting('JFROG_PROJECT'), setting('JFROG_ID_TOKEN')
-    if not (base_url and project and id_token):
+    base_url, project = setting('JFROG_URL'), setting('JFROG_PROJECT')
+    if not (base_url and project):
         return None
-    token = exchange_id_token(base_url, project, id_token, setting('JFROG_PROVIDER') or DEFAULT_PROVIDER)
+    id_token = setting('JFROG_ID_TOKEN') or github_id_token(setting('JFROG_AUDIENCE'))
+    if not id_token:
+        return None
+    token = exchange_id_token(base_url, project, id_token, setting('JFROG_PROVIDER') or INDEX_OIDC_PROVIDER)
     print(f'Index credentials minted for {project}-ci at {base_url} from the job ID token.')
     return IndexLogin(f'{project}-ci', token)
 
 
 def build_environment() -> dict[str, str]:
     """Return the credential arguments of `Dockerfile.deps` by name, empty where there is no fence."""
-    url, login = index_url(), index_login()
-    if not url or login is None:
+    url, credentials = index_url(), index_login()
+    if not url or credentials is None:
         return {}
-    return dict(zip(DEPS_IMAGE_BUILD_ARGS, (url, login.username, login.password), strict=True))
+    return dict(zip(DEPS_IMAGE_BUILD_ARGS, (url, credentials.username, credentials.password), strict=True))
 
 
 def build_arguments(environment: dict[str, str]) -> str:
@@ -131,3 +182,43 @@ def deps_build_command(engine: str, base_image: str, image: str) -> tuple[str, d
     environment = build_environment()
     flags = ' '.join(filter(None, (f'--build-arg BASE_IMAGE={base_image}', build_arguments(environment))))
     return f'{engine} build {flags} -f {DOCKERFILE_DEPS} -t {image} .', environment
+
+
+def netrc_path() -> Path:
+    """Return the netrc uv, pip and tox-uv read: ``NETRC`` when set, else the one in the home directory."""
+    return Path(setting('NETRC') or Path.home() / '.netrc')
+
+
+def write_netrc(host: str, credentials: IndexLogin) -> Path:
+    """Add or replace the entry for ``host`` in the netrc, readable by its owner only."""
+    path = netrc_path()
+    existing = path.read_text(encoding='utf-8').splitlines() if path.exists() else []
+    kept = [line for line in existing if not line.startswith(f'machine {host} ')]
+    kept.append(f'machine {host} login {credentials.username} password {credentials.password}')
+    path.write_text('\n'.join(kept) + '\n', encoding='utf-8')
+    path.chmod(NETRC_MODE)
+    return path
+
+
+@task
+@logged('index.login')
+def login(context: Context) -> None:  # noqa: ARG001 — invoke always passes a Context to a @task
+    """Log the job in to the organisation's package index for every fetch that follows.
+
+    Writes a netrc entry for the index host from the credentials `index_login` finds, so uv,
+    tox-uv and pip, all of which read it, authenticate for the rest of the job: the tox matrix
+    installing every interpreter's environment, `uv build` fetching the build backend, the plan
+    job installing uv. Prints where it logged in, never what with. In the open there is no
+    index and nothing is written (ADR-0064).
+    """
+    url, credentials = index_url(), index_login()
+    if not url or credentials is None:
+        print('No fenced index configured; nothing to log in to.')
+        return
+    host = index_host(url)
+    path = write_netrc(host, credentials)
+    print(f'Logged in to {host} as {credentials.username}; credentials in {path} for this job.')
+
+
+namespace = Collection('index')
+namespace.add_task(cast(Task, login), default=True)

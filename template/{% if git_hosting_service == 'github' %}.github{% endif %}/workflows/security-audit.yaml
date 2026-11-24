@@ -43,6 +43,16 @@ on:
 permissions:
   contents: read
 
+# The organisation's package index, when there is one: repository variables, empty in the
+# open. `index.login` turns them and the job's OIDC token into a netrc before the audit
+# resolves anything (ADR-0064).
+env:
+  UV_DEFAULT_INDEX: ${{ vars.UV_DEFAULT_INDEX }}
+  JFROG_URL: ${{ vars.JFROG_URL }}
+  JFROG_PROJECT: ${{ vars.JFROG_PROJECT }}
+  JFROG_AUDIENCE: ${{ vars.JFROG_AUDIENCE }}
+  JFROG_PROVIDER: ${{ vars.JFROG_PROVIDER }}
+
 jobs:
   build-deps-image:
     # A pull request's token cannot push to ghcr; see continuous-integration.yaml. The fork
@@ -52,6 +62,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      # Behind a fenced index the build mints its credentials from an OIDC token (ADR-0064).
+      id-token: write
 
   secure:
     name: Security audit
@@ -60,6 +72,8 @@ jobs:
     permissions:
       contents: read
       packages: read
+      # For `index.login` below, behind a fenced index; unused in the open.
+      id-token: write
     container:
       image: ${{ needs.build-deps-image.outputs.image }}
       credentials:
@@ -71,6 +85,9 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           persist-credentials: false
+
+      - name: Log in to the organisation's index
+        run: ./workflow.cmd index.login
 
       - name: Audit dependencies
         run: ./workflow.cmd secure.audit

@@ -115,6 +115,8 @@ If you add the flag there, the mitigation is an access-control one, so keep it t
 
 - Restrict write access to the `<repo>-deps` package to this pipeline. Only
   `build-deps-image` needs `packages: write`; every other job runs at `packages: read`.
+  Every job that may fetch from a fenced index holds `id-token: write` for the ID token
+  `index.login` exchanges, which is also what Trusted Publishing needs (ADR-0064).
 - Audit who else can publish packages in the org, and treat that set as trusted to the
   same degree as the release credentials.
 {%- else %}

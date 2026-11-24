@@ -70,6 +70,9 @@ DEPS_IMAGE_FILE = Path('.deps-image')
 # kept (ADR-0062). `container.audit` holds the line.
 DEPS_IMAGE_BUILD_ARGS = ('INDEX_URL', 'INDEX_USERNAME', 'INDEX_PASSWORD')
 DEPS_IMAGE_SECRET_MARKERS = (*DEPS_IMAGE_BUILD_ARGS, 'uv sync', 'netrc')
+# The identity provider Artifactory verifies a job's ID token against, unless `JFROG_PROVIDER`
+# says otherwise: the host that minted the token, as the organisation most likely named it.
+INDEX_OIDC_PROVIDER = '{{ git_hosting_service }}'
 UV_PUBLISH_SETTINGS = ('UV_PUBLISH_URL', 'UV_PUBLISH_PASSWORD', 'UV_PUBLISH_USERNAME')
 {%- if git_hosting_service == 'github' %}
 # Presence of both signals an OIDC-capable job: GitHub Actions injects them when the job has

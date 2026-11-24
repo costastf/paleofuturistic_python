@@ -14,12 +14,26 @@ on:
 permissions:
   contents: read
 
+# The organisation's package index, when there is one: repository variables, empty in the
+# open. `index.login` turns them and the job's OIDC token into a netrc for `uv build`'s fetch
+# of the build backend, and `release.publish` into the upload credentials (ADR-0063, ADR-0064).
+{%- raw %}
+env:
+  UV_DEFAULT_INDEX: ${{ vars.UV_DEFAULT_INDEX }}
+  JFROG_URL: ${{ vars.JFROG_URL }}
+  JFROG_PROJECT: ${{ vars.JFROG_PROJECT }}
+  JFROG_AUDIENCE: ${{ vars.JFROG_AUDIENCE }}
+  JFROG_PROVIDER: ${{ vars.JFROG_PROVIDER }}
+{%- endraw %}
+
 jobs:
   build-deps-image:
     uses: ./.github/workflows/build-deps-image.yaml
     permissions:
       contents: read
       packages: write
+      # Behind a fenced index the build mints its credentials from an OIDC token (ADR-0064).
+      id-token: write
 
   publish:
     name: Publish package
@@ -71,6 +85,9 @@ jobs:
           # read from `origin` and ships inside the wheel to PyPI. A credential left in
           # the git config is the one that becomes permanent and public.
           persist-credentials: false
+
+      - name: Log in to the organisation's index
+        run: ./workflow.cmd index.login
 
       # Detect, tag, build, sign PEP 740 attestations, upload — or print why not and exit 0.
       # `dist/` is left in place for the provenance step below. UV_PUBLISH_* select the

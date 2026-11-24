@@ -1,6 +1,7 @@
 # ADR-0063: A fenced index is a set of group variables
 
-- **Status**: accepted
+- **Status**: accepted; the jobs that fetch, and GitHub's token, are corrected by
+  [ADR-0064](0064-every-job-that-fetches-logs-in-to-the-index.md)
 - **Date**: 2026-11-18
 
 ## Context

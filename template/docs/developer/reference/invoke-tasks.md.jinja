@@ -22,6 +22,7 @@ The shortcuts below resolve to a namespace's default task (the one added with `d
 | `secure` | `secure.all` | Every security task at once: pip-audit + SBOM compose/validate. Nothing automated calls it; the pieces have their own homes. |
 | `document` | `document.all` | properdocs build + view in browser. |
 | `container` | `container.publish` | Build deps image; in CI pushes to the registry. |
+| `index` | `index.login` | Log the job in to the organisation's package index, when there is one; a no-op in the open. |
 
 ## `preflight` — the one command that does it all
 
@@ -152,6 +153,12 @@ Calling one directly is how to run a single tool over a single file:
 | `container.build` | Build `{{ project_slug }}-deps:latest` locally. |
 | `container.publish` | In CI: build and push to the chosen host's registry; `--reuse` pulls a tag already there instead of building, a trade-off the CI framework reference explains. Locally: build only. |
 | `container.tag` | Print the deps image's content-addressed tag; `--output <file>` writes `DEPS_TAG` and `BASE_IMAGE` as a dotenv file instead{% if git_hosting_service == 'gitlab' %}, which is how the pipeline hands the address to its kaniko job{% endif %}, plus the index credentials the builder stage takes when the project sits behind a fenced index. |
+
+## `index` — the organisation's package index
+
+| Task | What it does |
+| --- | --- |
+| `index.login` | Write a netrc entry for the index host from the credentials the fence provides, `INDEX_USERNAME` and `INDEX_PASSWORD` when set, else an Artifactory token exchanged from the job's OIDC token, so uv, tox-uv and pip authenticate for the rest of the job. The pipelines run it first in every job that fetches. Prints where it logged in, never what with; with no fence configured it says so and writes nothing. See [Work behind a fenced index](../how-to/work-behind-a-fenced-index.md). |
 
 ## Shared helpers (not tasks)
 

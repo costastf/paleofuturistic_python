@@ -144,7 +144,10 @@ def test_publish_is_one_task_plus_provenance_over_what_it_uploaded(generated_pro
     assert job['permissions']['contents'] == 'write', 'release.tag cannot create the tag without Contents: write'
     steps = job['steps']
     commands = [step.get('run') for step in steps if step.get('run')]
-    assert commands == [RELEASE_DETECTION.format(task='release.ship')], f'the publish job runs {commands}'
+    # The login first: `uv build` fetches the build backend, from the organisation's index behind a fence (ADR-0064).
+    assert commands == ['./workflow.cmd index.login', RELEASE_DETECTION.format(task='release.ship')], (
+        f'the publish job runs {commands}'
+    )
     ship = step_index(steps, 'release.ship')
     assert 'GITHUB_TOKEN' in steps[ship]['env'], 'the ship step has no token to create the tag with'
     assert {'UV_PUBLISH_URL', 'UV_PUBLISH_USERNAME', 'UV_PUBLISH_PASSWORD'} <= set(steps[ship]['env'])

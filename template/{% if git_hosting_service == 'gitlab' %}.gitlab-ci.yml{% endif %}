@@ -14,6 +14,15 @@ variables:
   # `JFROG_PROJECT` are set beside it, at group level too.
   JFROG_AUDIENCE: not-configured
 
+# Every job holds an ID token for the organisation's index (ADR-0064): `preflight`, `secure`
+# and `publish` log in with it before they fetch anything, and `plan-deps-image` mints the
+# build's credentials from it. `publish` lists its own tokens and repeats this one, because a
+# job's `id_tokens:` replaces the default's rather than adding to it.
+default:
+  id_tokens:
+    JFROG_ID_TOKEN:
+      aud: $JFROG_AUDIENCE
+
 # The deps image is content-addressed on the lockfile, the Dockerfile and the base image
 # (ADR-0033), and `container.tag` is the one implementation of that address. The job that
 # builds the image runs in the kaniko image, which has no Python, so this job computes the
@@ -30,11 +39,9 @@ plan-deps-image:
     # launcher runs on an empty environment instead of installing every group first.
     UV_NO_SYNC: "1"
   # Behind a fenced index the dotenv also carries the credentials the builder stage of
-  # `Dockerfile.deps` takes, minted here from this ID token: the kaniko job below cannot mint
-  # them itself (ADR-0063).
-  id_tokens:
-    JFROG_ID_TOKEN:
-      aud: $JFROG_AUDIENCE
+  # `Dockerfile.deps` takes, minted here from the default ID token: the kaniko job below cannot
+  # mint them itself (ADR-0063). `pip` reads the same group variables uv does, `PIP_INDEX_URL`
+  # for the index and a netrc for the credentials, which is why the fence how-to names it.
   script:
     - pip install --quiet "uv==$(sed -n 's/^required-version = "==\(.*\)"$/\1/p' pyproject.toml)"
     - ./workflow.cmd container.tag --output .deps-tag.env
@@ -120,6 +127,9 @@ preflight:
     - export PRE_COMMIT_FROM_REF="${CI_MERGE_REQUEST_DIFF_BASE_SHA:-$CI_COMMIT_BEFORE_SHA}"
     - export PRE_COMMIT_TO_REF="$CI_COMMIT_SHA"
   script:
+    # Behind a fenced index, a netrc for the rest of the job: the tox matrix installs an
+    # environment per interpreter and fetches them from there. A no-op in the open (ADR-0064).
+    - ./workflow.cmd index.login
     # Read the image this job runs in back from the registry and refuse it if the builder
     # stage's credentials left a trace. The build job cannot do this itself: it runs kaniko,
     # which has no Python, so the first job with the project's Python does it (ADR-0062).
@@ -154,6 +164,7 @@ secure:
   before_script:
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
   script:
+    - ./workflow.cmd index.login
     - ./workflow.cmd secure.audit
 
 # Runs on every push to the default branch and publishes only when the push carried a release —
@@ -198,4 +209,6 @@ publish:
   # Detect, tag (through the Releases API with the job token), build, sign PEP 740
   # attestations, upload — or print why not and exit 0.
   script:
+    # `uv build` fetches the build backend, from the organisation's index behind a fence.
+    - ./workflow.cmd index.login
     - ./workflow.cmd release.ship --before "$CI_COMMIT_BEFORE_SHA" --after "$CI_COMMIT_SHA"
