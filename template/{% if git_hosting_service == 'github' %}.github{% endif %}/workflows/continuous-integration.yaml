@@ -29,6 +29,7 @@ env:
   # open. `index.login` turns them and the job's OIDC token into a netrc for every fetch that
   # follows, which is why the jobs below may write an ID token (ADR-0064).
   UV_DEFAULT_INDEX: ${{ vars.UV_DEFAULT_INDEX }}
+  UV_PYTHON_INSTALL_MIRROR: ${{ vars.UV_PYTHON_INSTALL_MIRROR }}
   JFROG_URL: ${{ vars.JFROG_URL }}
   JFROG_PROJECT: ${{ vars.JFROG_PROJECT }}
   JFROG_AUDIENCE: ${{ vars.JFROG_AUDIENCE }}

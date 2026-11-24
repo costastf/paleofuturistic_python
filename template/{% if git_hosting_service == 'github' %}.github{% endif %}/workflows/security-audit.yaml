@@ -48,6 +48,7 @@ permissions:
 # resolves anything (ADR-0064).
 env:
   UV_DEFAULT_INDEX: ${{ vars.UV_DEFAULT_INDEX }}
+  UV_PYTHON_INSTALL_MIRROR: ${{ vars.UV_PYTHON_INSTALL_MIRROR }}
   JFROG_URL: ${{ vars.JFROG_URL }}
   JFROG_PROJECT: ${{ vars.JFROG_PROJECT }}
   JFROG_AUDIENCE: ${{ vars.JFROG_AUDIENCE }}

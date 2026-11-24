@@ -643,7 +643,16 @@ FETCHING_JOBS = {
         ('.github/workflows/publish.yaml', 'publish'),
     ),
 }
-FENCE_VARIABLES = ('UV_DEFAULT_INDEX', 'JFROG_URL', 'JFROG_PROJECT', 'JFROG_AUDIENCE', 'JFROG_PROVIDER')
+# What GitLab injects from the group on its own and GitHub only through an explicit `env:`: a
+# fence variable missing from one workflow is a job that silently runs in the open.
+FENCE_VARIABLES = (
+    'UV_DEFAULT_INDEX',
+    'UV_PYTHON_INSTALL_MIRROR',
+    'JFROG_URL',
+    'JFROG_PROJECT',
+    'JFROG_AUDIENCE',
+    'JFROG_PROVIDER',
+)
 
 
 LOGIN = './workflow.cmd index.login'
