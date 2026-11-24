@@ -938,6 +938,10 @@
               <ul class="nav flex-column">
               </ul>
             </li>
+            <li class="nav-item" data-bs-level="2"><a href="#network-egress-during-generation" class="nav-link">Network egress during generation</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
             <li class="nav-item" data-bs-level="2"><a href="#see-also" class="nav-link">See also</a>
               <ul class="nav flex-column">
               </ul>
@@ -1020,6 +1024,8 @@
 <p>Sets the executable bit on <code>workflow.cmd</code>. On Windows the <code>.cmd</code> extension is sufficient; on Unix this step is what lets <code>./workflow.cmd …</code> work.</p>
 <h2 id="rendering-model">Rendering model</h2>
 <p>Copier renders only files whose names end in <code>.jinja</code> (the suffix is stripped from the output filename). Every other file — vendored <code>_CI/lib/**</code>, binaries, static configs — is copied verbatim. Jinja delimiters are unchanged (<code>{{ }}</code> / <code>{% %}</code>); <code>{% raw %}</code> blocks protect GitHub Actions <code>${{ }}</code> expressions in rendered workflow files.</p>
+<h2 id="network-egress-during-generation">Network egress during generation</h2>
+<p><code>uvx copier copy</code> fetches copier from the package index, PyPI or <code>UV_DEFAULT_INDEX</code>, and the template from <code>github.com</code>, or from a local clone when given a path. The render hook asks <code>pypi.org</code> for uv's releases and <code>ghcr.io</code> for the image digest to stamp a fresh pin, and falls back to the committed pin, saying so, when either is unreachable. It then runs <code>uvx uv lock</code> and <code>uvx ruff format</code>, which fetch those two tools and resolve every package from the index, and <code>uv lock</code> fetches the floor interpreter from GitHub's <code>python-build-standalone</code> releases, or <code>UV_PYTHON_INSTALL_MIRROR</code>, when the machine lacks it. A generated project's own commands and pipeline jobs are listed, per service, on the <em>Network egress</em> reference page it ships.</p>
 <h2 id="see-also">See also</h2>
 <ul>
 <li><a href="../../using/reference/copier-questions.html">Copier questions</a> — what feeds into generation.</li>
