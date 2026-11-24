@@ -1,0 +1,92 @@
+# Network egress
+
+Which services a generated project reaches, per command and per pipeline job, so a firewall rule, a proxy allowance or a fence can be set from a list rather than from a failed run. Every generated project ships the same page rendered for its own host under *Reference → Network egress* in its docs; this copy covers both hosts and generation.
+
+## The scenarios
+
+Four things decide what a command reaches, and they combine.
+
+- **Open or fenced.** In the open, packages come from PyPI and interpreters from GitHub. Behind a fenced index, `UV_DEFAULT_INDEX` and `UV_PYTHON_INSTALL_MIRROR` redirect both to the organisation's Artifactory, and the `JFROG_*` variables add one more destination, the token exchange at `JFROG_URL`. The generated how-to *Work behind a fenced index* sets the variables up.
+- **Cold or warm.** The first `./workflow.cmd` of any kind syncs the environment from `uv.lock`, which fetches every package from the index and, if `.python-version` names an interpreter the machine lacks, that interpreter. Once synced, the launcher itself reaches nothing; the rows below assume a warm environment and list what the command adds.
+- **Laptop or pipeline.** A pipeline job adds the host's own traffic: pulling the deps image, fetching actions, pushing to a registry. The pipeline sections list those per job.
+- **GitLab or GitHub.** The release and docs tasks talk to the host's API, and the pipelines pull their images from different places.
+
+Where a row says *index*, read PyPI (`pypi.org` and `files.pythonhosted.org`) in the open and `UV_DEFAULT_INDEX` behind the fence. Where it says *interpreters*, read GitHub's `python-build-standalone` releases in the open and `UV_PYTHON_INSTALL_MIRROR` behind it. *Artifactory* means the token exchange at `JFROG_URL`, reached only when the fence is set, by `index.login`, `container.tag` and `release.publish` and nothing else.
+
+## Commands that reach nothing
+
+| Command | Why nothing |
+| --- | --- |
+| `bootstrap` | `git init` and `pre-commit install`; the hooks are local, nothing is cloned. |
+| `format`, `format.ruff` | ruff rewrites files. |
+| `lint` and every `lint.*` | Every checker reads the tree; validate-pyproject carries its schemas. |
+| `test`, `test.pytest`, `test.coverage` | pytest on the synced environment. |
+| `test.view` | Opens a report in your browser; the page is local. |
+| `grade` and every `grade.*` | pyscn ships its binary in its wheel. |
+| `secure.sbom`, `secure.sbom-extract`, `secure.sbom-validate`, `secure.validate-overrides` | The SBOM is composed from the installed metadata and `uv.lock`; the schema is bundled. |
+| `develop.pre-commit-install`, `develop.pre-commit`, `develop.pylock` | Local hooks; `uv export` reads the lock. |
+| `document.serve` | Serves the site on localhost; the inventories `document.build` fetches are cached by then. |
+| `preflight.staged` | The per-file checks above, on staged files. |
+| `release.validate`, `release.bump`, `release.changelog`, `release.clean` | `release.validate` runs `git fetch origin`, the one exception: it reaches the git host. The others run commitizen on the tree. |
+| `index.login`, `container.tag` in the open | Both say there is no fence and stop. |
+
+## Commands that fetch
+
+| Command | In the open | Behind the fence |
+| --- | --- | --- |
+| `test.tox`, `preflight.tox` | *Index*, for an environment per interpreter in `env_list` (uv's cache serves what it has); *interpreters* the machine lacks. | The same, through the two variables; the netrc `index.login` wrote supplies the credentials. |
+| `build`, `build.package` | *Index*, for the `uv_build` backend if the cache lacks it. | The same. |
+| `document.build`, and `document` or `document.all`, which build first | `docs.python.org` and `typing-extensions.readthedocs.io`, for the two object inventories `properdocs.yml` names. | Unchanged, and unreachable from inside a network fence: drop or rehost the two `inventories` entries. |
+| `secure.audit` | `pypi.org`, the advisory API, once per package; `--no-deps --disable-pip` keep it off the *index*. | Unchanged. Nothing proxies the advisory API; the audit needs egress to `pypi.org` or runs where it has it. |
+| `develop.refresh-deps` | *Index*, `uv lock --upgrade`. | The same. |
+| `develop.bump-uv` | `pypi.org`, for uv's releases; `ghcr.io`, for the image digest. | Unchanged and unreachable; the bump is a hand edit of the two pins. |
+| `index.login`, `container.tag` | Nothing. | *Artifactory*; on GitHub, GitHub's token endpoint for the ID token first. |
+| `container.build` | `ghcr.io`, the base image; *index* inside the build. | The base image from the mirror the project's `base-image` names, or `ghcr.io` if none; *index* through the credentials the builder stage is given. |
+| `container.publish` | `container.build`, then the project registry, `ghcr.io` on GitHub or `CI_REGISTRY` on GitLab, for the push and, with `--reuse`, the manifest check. | The same, plus *Artifactory* for the credentials. |
+| `container.audit` | The container engine, locally; in a pipeline without one, the project registry through the registry API. | Unchanged. |
+| `preflight` | The union of `document.build`, `preflight.tox` and `build`; `--audit-dependencies` adds `secure.audit`. | The same union, through the fence. |
+
+## Commands that publish
+
+| Command | In the open | Behind the fence |
+| --- | --- | --- |
+| `release` | `git push` to `origin`, then the host API, `api.github.com` or the GitLab API, to open the pull or merge request when a token is set. | Unchanged. |
+| `release.dist` | `build` and `secure.audit`, above. | The same. |
+| `release.attest` | Sigstore: `fulcio.sigstore.dev` for the signing certificate, `rekor.sigstore.dev` for the log, and the host's OIDC token endpoint. Skipped when `UV_PUBLISH_*` credentials are set. | Skipped: a fenced project publishes with credentials. |
+| `release.publish` | `release.dist`, `release.attest`, then `upload.pypi.org`, with `pypi.org` first to mint the Trusted Publishing token. | `UV_PUBLISH_URL` instead of PyPI, and *Artifactory* for the credentials when only the URL is set. |
+| `release.tag` | The host API, to create the tag and its release entry. | Unchanged. |
+| `release.ship` | `git` on the local clone to detect the release, then `release.tag` and `release.publish`. | The same. |
+| `document.deploy-github` (GitHub only) | `git push` of `gh-pages` to `origin`, then `api.github.com` to request the Pages build. | Unchanged. |
+
+## The GitLab pipeline, per job
+
+Every job pulls its image from the registry named in the pipeline, and every job holds an ID token nothing consumes unless the fence is set.
+
+| Job | Reaches |
+| --- | --- |
+| `plan-deps-image` | `docker.io`, for `python:3-slim`; *index*, for `pip install uv` (`PIP_INDEX_URL` behind the fence); *Artifactory*, to mint the build's credentials when the fence is set. |
+| `build-deps-image` | `gcr.io`, for the kaniko executor image; the base image, from `ghcr.io` or the mirror; *index* inside the build; `CI_REGISTRY`, for the push. |
+| `preflight` | `CI_REGISTRY`, for the deps image and for `container.audit`; *Artifactory* for `index.login`; then everything `preflight` reaches above. |
+| `secure` | `CI_REGISTRY`; *Artifactory* for `index.login`; `pypi.org` for the advisory API. |
+| `publish` | `CI_REGISTRY`; *Artifactory* for `index.login` and the upload credentials; the GitLab API for the tag; Sigstore in the open; `upload.pypi.org` or `UV_PUBLISH_URL`. |
+
+## The GitHub workflows, per job
+
+Every job fetches the actions it uses from `github.com`, and `setup-uv` downloads uv from GitHub's releases wherever the deps image is not the job's container.
+
+| Job | Workflow | Reaches |
+| --- | --- | --- |
+| `build-deps-image` | every workflow that needs the image | `github.com`, for the actions and uv; the base image, from `ghcr.io` or the mirror; *index* inside the build; `ghcr.io`, for the push; *Artifactory*, for the credentials when the fence is set. |
+| `preflight` | `continuous-integration.yaml` | `ghcr.io`, for the deps image; *Artifactory* for `index.login`; then everything `preflight` reaches above. |
+| `preflight-from-fork` | `continuous-integration.yaml` | `github.com` for the actions and uv; *index* and *interpreters* at job time, with no fence credentials; then `preflight`. |
+| `secure`, `secure-from-fork` | `security-audit.yaml` | As the two above, then `pypi.org` for the advisory API. |
+| `publish` | `publish.yaml` | `ghcr.io`; *Artifactory* for `index.login` and the upload credentials; `api.github.com` for the tag and the provenance attestation; Sigstore in the open; `upload.pypi.org` or `UV_PUBLISH_URL`. |
+| `deploy-docs` | `pages.yaml`, when Pages is integrated | `ghcr.io`; `document.build`'s two inventory hosts; `git push` of `gh-pages`; `api.github.com` for the Pages build. |
+
+## Generation
+
+`uvx copier copy` fetches copier from the *index* and the template from `github.com`, or from a local clone when given a path. The render hook then asks `pypi.org` for uv's releases and `ghcr.io` for the image digest, to stamp a fresh pin; both fall back to the committed pin and say so, which is what happens behind a fence. It then runs `uvx uv lock`, which fetches uv and resolves every package from the *index*, and `uvx ruff format`, which fetches ruff the same way. A `uv lock` on a machine without the floor interpreter fetches that too. [Generation internals](../../maintaining/reference/generation-internals.md) has the rest of what the hook does.
+
+## Not a command
+
+The README badges are images on `img.shields.io` that the reader's browser fetches; nothing in the project requests them.

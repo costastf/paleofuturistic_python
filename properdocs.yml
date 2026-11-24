@@ -37,6 +37,7 @@ nav:
       - Generated project tree: using/reference/generated-project-tree.md
       - License options: using/reference/license-options.md
       - Packaging specifications: using/reference/packaging-specifications.md
+      - Network egress: using/reference/network-egress.md
     - Explanation:
       - How uv is used: using/explanation/how-uv-is-used.md
       - SBOM and security model: using/explanation/sbom-and-security-model.md

@@ -67,7 +67,7 @@ Copier renders only files whose names end in `.jinja` (the suffix is stripped fr
 
 ## Network egress during generation
 
-`uvx copier copy` fetches copier from the package index, PyPI or `UV_DEFAULT_INDEX`, and the template from `github.com`, or from a local clone when given a path. The render hook asks `pypi.org` for uv's releases and `ghcr.io` for the image digest to stamp a fresh pin, and falls back to the committed pin, saying so, when either is unreachable. It then runs `uvx uv lock` and `uvx ruff format`, which fetch those two tools and resolve every package from the index, and `uv lock` fetches the floor interpreter from GitHub's `python-build-standalone` releases, or `UV_PYTHON_INSTALL_MIRROR`, when the machine lacks it. A generated project's own commands and pipeline jobs are listed, per service, on the *Network egress* reference page it ships.
+`uvx copier copy` fetches copier from the package index, PyPI or `UV_DEFAULT_INDEX`, and the template from `github.com`, or from a local clone when given a path. The render hook asks `pypi.org` for uv's releases and `ghcr.io` for the image digest to stamp a fresh pin, and falls back to the committed pin, saying so, when either is unreachable. It then runs `uvx uv lock` and `uvx ruff format`, which fetch those two tools and resolve every package from the index, and `uv lock` fetches the floor interpreter from GitHub's `python-build-standalone` releases, or `UV_PYTHON_INSTALL_MIRROR`, when the machine lacks it. A generated project's own commands and pipeline jobs are listed, per service, in [Network egress](../../using/reference/network-egress.md), which every project also ships rendered for its host.
 
 ## See also
 
