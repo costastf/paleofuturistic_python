@@ -124,6 +124,24 @@ def test_documented_launcher_matches_the_real_one(generated_project):
     assert 'label' in doc, 'the doc omits the cmd label trick that makes the dispatch work'
 
 
+def test_the_egress_page_places_every_registered_task(generated_project):
+    """The network-egress reference names every registered task, so no command's traffic is unlisted.
+
+    A firewall rule or a fence allowance is set from this page; a task it does not mention is a
+    run that fails somewhere the page said nothing reaches. Shortcut names count as their
+    default task, as the catalog's own test reads them.
+    """
+    project, _ = generated_project
+    registered = registered_tasks(project)
+    real = {f'{namespace}.{name}' for namespace, (names, _) in registered.items() for name in names}
+    page = (project / 'docs' / 'developer' / 'reference' / 'network-egress.md').read_text(encoding='utf-8')
+    mentioned = set(re.findall(r'`([a-z][a-z0-9_.-]*)`', page))
+    placed = {name for name in mentioned if is_registered(name, real, registered)}
+    covered = {name for name in real if name in placed or name.rsplit('.', 1)[0] in placed}
+    missing = sorted(real - covered)
+    assert not missing, f'the egress page says nothing about {missing}'
+
+
 def test_task_catalog_matches_the_registered_tasks(generated_project):
     """The task catalog names every registered task, and no task that is not registered.
 
