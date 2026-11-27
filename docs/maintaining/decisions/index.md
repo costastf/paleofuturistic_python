@@ -102,3 +102,4 @@ anywhere in the repository resolves to a file.
 | [ADR-0063](0063-a-fenced-index-is-a-set-of-group-variables.md) | A fenced index is a set of group variables |
 | [ADR-0064](0064-every-job-that-fetches-logs-in-to-the-index.md) | Every job that fetches logs in to the index |
 | [ADR-0065](0065-the-deps-build-pulls-a-fenced-base-image-with-the-index-identity.md) | The deps build pulls a fenced base image with the index identity |
+| [ADR-0066](0066-github-pushes-the-deps-image-where-a-variable-says-and-pulls-it-anonymously.md) | GitHub pushes the deps image where a variable says, and pulls it anonymously |

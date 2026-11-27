@@ -43,8 +43,8 @@ jobs:
       {%- endraw %}
       credentials:
         {%- raw %}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+        username: ${{ !vars.DEPS_IMAGE_REGISTRY && github.actor || '' }}
+        password: ${{ !vars.DEPS_IMAGE_REGISTRY && secrets.GITHUB_TOKEN || '' }}
         {%- endraw %}
     permissions:
       contents: read
@@ -79,8 +79,8 @@ jobs:
       {%- endraw %}
       credentials:
         {%- raw %}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+        username: ${{ !vars.DEPS_IMAGE_REGISTRY && github.actor || '' }}
+        password: ${{ !vars.DEPS_IMAGE_REGISTRY && secrets.GITHUB_TOKEN || '' }}
         {%- endraw %}
     permissions:
       # `contents: write` is required, not an oversight: `properdocs gh-deploy` commits the

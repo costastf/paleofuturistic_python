@@ -26,7 +26,7 @@ Reads the image back, the local build by default or `--image <reference>` for a 
 
 In CI, this delegates to the host-specific publish in `_CI/tasks/{{ git_hosting_service }}.py`:
 
-- **GitHub**: logs into `ghcr.io` with `GITHUB_ACTOR` / `GITHUB_TOKEN`, builds and pushes. `--reuse` pulls a tag already in the registry instead of building it.
+- **GitHub**: logs into `ghcr.io` with `GITHUB_ACTOR` / `GITHUB_TOKEN`, builds and pushes. With `DEPS_IMAGE_REGISTRY` set, the image goes under that `host/repository` instead, logged in with the index identity when the host is the index host. `--reuse` pulls a tag already in the registry instead of building it.
 - **GitLab**: logs into `CI_REGISTRY` with the `DEPS_IMAGE_USERNAME` / `DEPS_IMAGE_PASSWORD` Deploy Token, builds and pushes `$CI_REGISTRY_IMAGE:deps-<tag>`, the same reference the shipped `build-deps-image` job builds. That job does not call this task: shared runners allow no docker daemon, so it builds with kaniko, which has no Python. The address it pushes to comes from `./workflow.cmd container.tag --output`, run in a small job before it and handed on as a dotenv artifact, so the tag is computed in one place.
 
 The image tag is 32 hex characters of a SHA-256 over `uv.lock`, `Dockerfile.deps` and the base image, so a change to any of the three produces a new tag, and with `--reuse` the same three reuse the existing image.

@@ -15,7 +15,7 @@ from invoke import Context
 from _CI import info
 
 from .configuration import DEFAULT_BRANCH
-from .index import build_deps_image
+from .index import build_deps_image, build_environment, fenced_registry, login_registry, registry_of, setting
 from .shared import PipelineComponent, container_engine, execute, image_digest_reference, strip_credentials
 
 WORKFLOWS_DIR = Path('.github/workflows')
@@ -32,9 +32,19 @@ class RegistrySettings(NamedTuple):
 
 
 def registry_settings() -> RegistrySettings:
-    """Return ghcr.io credentials sourced from GitHub Actions env vars."""
+    """Return where the deps image goes and who pushes it: ghcr.io with the workflow token, or `DEPS_IMAGE_REGISTRY`.
+
+    An organisation whose runners reach only its Artifactory sets ``DEPS_IMAGE_REGISTRY`` to
+    the docker repository there, ``host/repository``; the image goes under it by repository
+    name, and the push is logged in with the index identity when the host is the index host.
+    The jobs after the build pull it anonymously, which the repository must allow from inside
+    the network (ADR-0066). Unset, the image goes to ghcr.io as before.
+    """
     # ghcr.io rejects uppercase in image paths, but GITHUB_REPOSITORY preserves org/repo case.
     repo = os.environ['GITHUB_REPOSITORY'].lower()
+    registry = setting('DEPS_IMAGE_REGISTRY').strip('/')
+    if registry:
+        return RegistrySettings(url=registry_of(registry), user='', password_env='', image_prefix=f'{registry}/{repo}')
     return RegistrySettings(
         url='ghcr.io',
         user=os.environ['GITHUB_ACTOR'],
@@ -43,12 +53,34 @@ def registry_settings() -> RegistrySettings:
     )
 
 
+def login_deps_registry(context: Context, engine: str, settings: RegistrySettings, environment: dict[str, str]) -> None:
+    """Log ``engine`` in to the deps image registry: ghcr.io with the workflow token, a fenced one as the index.
+
+    A ``DEPS_IMAGE_REGISTRY`` on a host other than the index host gets no credentials and the
+    push goes anonymously, which says so.
+    """
+    if settings.user:
+        context.run(
+            f'echo "${settings.password_env}" | {engine} login {settings.url} -u "{settings.user}" --password-stdin',
+            hide=True,
+        )
+        return
+    registry = fenced_registry(settings.image_prefix, environment.get('INDEX_URL', ''))
+    if registry:
+        login_registry(context, engine, registry, environment)
+    else:
+        print(f'No credentials for {settings.url}; pushing anonymously.')
+
+
 def registry_read_credentials() -> tuple[str, str] | None:
     """Return what `container.audit` reads a pushed image back with: the workflow token, or nothing by hand.
 
     ghcr takes any username with ``GITHUB_TOKEN`` as the password for a pull the job's
-    ``packages: read`` permission allows; a public image needs no credentials at all.
+    ``packages: read`` permission allows; a public image needs no credentials at all. A
+    ``DEPS_IMAGE_REGISTRY`` is read anonymously, as the jobs that run in the image read it.
     """
+    if setting('DEPS_IMAGE_REGISTRY'):
+        return None
     token = os.environ.get('GITHUB_TOKEN', '')
     return (os.environ.get('GITHUB_ACTOR', 'github'), token) if token else None
 
@@ -67,17 +99,15 @@ def publish_deps_image(context: Context, tag: str, *, reuse: bool = False) -> st
     settings = registry_settings()
     image = f'{settings.image_prefix}-deps:{tag}'
     engine = container_engine()
-    context.run(
-        f'echo "${settings.password_env}" | {engine} login {settings.url} -u "{settings.user}" --password-stdin',
-        hide=True,
-    )
+    environment = build_environment()
+    login_deps_registry(context, engine, settings, environment)
     if reuse and not context.run(f'{engine} manifest inspect {image}', hide=True, warn=True).failed:
         print(f'Reusing {image}')
         # Pull so a repo digest exists locally to pin against, and so a corrupt or
         # unpullable image fails here rather than in every consumer job.
         execute(context, f'{engine} pull {image}')
     else:
-        build_deps_image(context, engine, info.base_image(), image)
+        build_deps_image(context, engine, info.base_image(), image, environment)
         execute(context, f'{engine} push {image}')
     return image_digest_reference(context, engine, image)
 

@@ -5,6 +5,7 @@ import re
 from collections.abc import Iterator
 from pathlib import Path
 from types import SimpleNamespace
+from typing import NamedTuple
 
 import pytest
 import yaml
@@ -19,6 +20,7 @@ from .support import (
     action_uses,
     calls_in,
     exec_from,
+    failing,
     fork_pair,
     function_named,
     function_source,
@@ -624,6 +626,91 @@ def test_the_audit_markers_cover_every_credential_argument(generated_project):
     markers = set(configuration.DEPS_IMAGE_SECRET_MARKERS)
     assert declared <= markers, f'the audit would miss {sorted(declared - markers)}'
     assert 'uv sync' in markers, 'the audit would not notice the sync command in the final image'
+
+
+ANONYMOUS_PULL = {
+    'username': "${{ !vars.DEPS_IMAGE_REGISTRY && github.actor || '' }}",
+    'password': "${{ !vars.DEPS_IMAGE_REGISTRY && secrets.GITHUB_TOKEN || '' }}",
+}
+
+
+def github_registry_helpers(project, environment, logins, printed):
+    """Exec the GitHub module's registry functions against a fake environment, recording index logins."""
+    source = (project / '_CI' / 'tasks' / 'github.py').read_text(encoding='utf-8')
+    names = ('RegistrySettings', 'registry_settings', 'login_deps_registry', 'registry_read_credentials')
+    return exec_from(
+        source,
+        *names,
+        os=SimpleNamespace(environ=environment),
+        NamedTuple=NamedTuple,
+        Context=object,
+        setting=lambda name: environment.get(name, '').strip(),
+        registry_of=lambda reference: reference.partition('/')[0],
+        fenced_registry=lambda reference, index: reference.partition('/')[0] if index and 'pkgs.' in reference else '',
+        login_registry=lambda _context, engine, registry, _environment: logins.append((engine, registry)),
+        print=printed.append,
+    )
+
+
+def container_credentials(workflows):
+    """Yield ``(job, credentials)`` for every GitHub job that runs inside a container."""
+    for path in sorted(workflows.glob('*.yaml')):
+        for name, job in yaml.safe_load(path.read_text(encoding='utf-8'))['jobs'].items():
+            if 'container' in job:
+                yield f'{name} in {path.name}', job['container']['credentials']
+
+
+def test_github_jobs_pull_a_fenced_deps_image_anonymously(generated_project):
+    """Every job in the image blanks its ghcr credentials when `DEPS_IMAGE_REGISTRY` is set, and the runner skips login.
+
+    The jobs that run in the image pull it before any step runs, so no token can be minted
+    for that pull. The build job, the one job outside the image, hands the variable down and
+    takes the uv manifest an organisation hosts. Unset, everything is as before (ADR-0066).
+    """
+    project, cell = generated_project
+    if cell['git_hosting_service'] != 'github':
+        pytest.skip('GitHub-only workflows')
+    workflows = project / '.github' / 'workflows'
+    build = yaml.safe_load((workflows / 'build-deps-image.yaml').read_text(encoding='utf-8'))
+    assert build['env']['DEPS_IMAGE_REGISTRY'] == '${{ vars.DEPS_IMAGE_REGISTRY }}'
+    setup = next(step for step in build['jobs']['build-deps-image']['steps'] if 'setup-uv' in step.get('uses', ''))
+    assert setup['with']['manifest-file'] == '${{ vars.UV_MANIFEST_FILE }}', 'uv is downloaded from nowhere but Astral'
+    jobs = dict(container_credentials(workflows))
+    assert len(jobs) >= 3, f'the jobs in the image are {sorted(jobs)}'
+    wrong = [job for job, credentials in jobs.items() if credentials != ANONYMOUS_PULL]
+    assert not wrong, f'these jobs send ghcr credentials to a fenced registry: {wrong}'
+
+
+def test_github_pushes_the_deps_image_where_the_registry_variable_says(generated_project):
+    """`DEPS_IMAGE_REGISTRY` moves the push off ghcr.io, logged in with the index identity on the index host only.
+
+    The audit reads such an image back with no credentials, as the jobs pull it; a registry on
+    another host gets no credentials at all and the push says so (ADR-0066).
+    """
+    project, cell = generated_project
+    if cell['git_hosting_service'] != 'github':
+        pytest.skip('GitHub-only module')
+    logins, printed = [], []
+    environment = {'GITHUB_REPOSITORY': 'Acme/Widget', 'GITHUB_ACTOR': 'octocat', 'GITHUB_TOKEN': 'ghs'}
+    helpers = github_registry_helpers(project, environment, logins, printed)
+    settings = helpers['registry_settings']()
+    assert (settings.url, settings.image_prefix, settings.user) == ('ghcr.io', 'ghcr.io/acme/widget', 'octocat')
+    assert helpers['registry_read_credentials']() == ('octocat', 'ghs')
+    context = failing(failed=False)
+    helpers['login_deps_registry'](context, 'docker', settings, {})
+    assert context.calls[0][0] == 'echo "$GITHUB_TOKEN" | docker login ghcr.io -u "octocat" --password-stdin'
+    environment['DEPS_IMAGE_REGISTRY'] = 'pkgs.example.com/docker-local/'
+    settings = helpers['registry_settings']()
+    fenced = ('pkgs.example.com', 'pkgs.example.com/docker-local/acme/widget', '')
+    assert (settings.url, settings.image_prefix, settings.user) == fenced
+    assert helpers['registry_read_credentials']() is None, 'the audit reads a fenced registry with ghcr credentials'
+    index = {'INDEX_URL': 'https://pkgs.example.com/x'}
+    helpers['login_deps_registry'](failing(failed=False), 'docker', settings, index)
+    assert logins == [('docker', 'pkgs.example.com')], 'the push to the fenced registry is not logged in with the index'
+    environment['DEPS_IMAGE_REGISTRY'] = 'other.example.net/docker'
+    helpers['login_deps_registry'](failing(failed=False), 'docker', helpers['registry_settings'](), {})
+    assert logins == [('docker', 'pkgs.example.com')], 'the index identity went to a registry off the index host'
+    assert printed[-1] == 'No credentials for other.example.net; pushing anonymously.'
 
 
 def test_every_builder_hands_the_builder_stage_its_credentials(generated_project):

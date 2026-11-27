@@ -167,7 +167,7 @@ def test_the_engine_logs_in_to_a_fenced_base_image_registry_before_it_builds(gen
     assert build.startswith(f'podman build --build-arg BASE_IMAGE={FENCED_IMAGE} --build-arg INDEX_URL="$INDEX_URL"')
     assert build_env == {'INDEX_URL': INDEX, 'INDEX_USERNAME': 'widget-ci', 'INDEX_PASSWORD': 'minted'}
     assert 'minted' not in build
-    assert helpers['printed'] == ['Logged in to pkgs.example.com as widget-ci for the base image.']
+    assert helpers['printed'] == ['Logged in to pkgs.example.com as widget-ci.']
     engine, helpers = Engine(), index_helpers(project, cell, environment)
     helpers['build_deps_image'](engine, 'podman', BASE_IMAGE, 'widget-deps:latest')
     assert not engine.logins, 'the index credentials were sent to ghcr.io'

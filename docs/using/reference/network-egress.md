@@ -42,8 +42,8 @@ Where a row says *index*, read PyPI (`pypi.org` and `files.pythonhosted.org`) in
 | `develop.bump-uv` | `pypi.org`, for uv's releases; `ghcr.io`, for the image digest. | Unchanged and unreachable; the bump is a hand edit of the two pins. |
 | `index.login`, `container.tag` | Nothing. | *Artifactory*; on GitHub, GitHub's token endpoint for the ID token first. |
 | `container.build` | `ghcr.io`, the base image; *index* inside the build. | The base image from the docker remote the project's `base-image` names, logged in with the index identity when that remote is on the index host, or `ghcr.io` if none; *index* through the credentials the builder stage is given. |
-| `container.publish` | `container.build`, then the project registry, `ghcr.io` on GitHub or `CI_REGISTRY` on GitLab, for the push and, with `--reuse`, the manifest check. | The same, plus *Artifactory* for the credentials. |
-| `container.audit` | The container engine, locally; in a pipeline without one, the project registry through the registry API. | Unchanged. |
+| `container.publish` | `container.build`, then the project registry, `ghcr.io` on GitHub or `CI_REGISTRY` on GitLab, for the push and, with `--reuse`, the manifest check. | The same, plus *Artifactory* for the credentials; on GitHub `DEPS_IMAGE_REGISTRY` in place of `ghcr.io` when set. |
+| `container.audit` | The container engine, locally; in a pipeline without one, the project registry through the registry API. | Unchanged, or `DEPS_IMAGE_REGISTRY` anonymously on GitHub. |
 | `preflight` | The union of `document.build`, `preflight.tox` and `build`; `--audit-dependencies` adds `secure.audit`. | The same union, through the fence. |
 
 ## Commands that publish
@@ -72,16 +72,16 @@ Every job pulls its image from the registry named in the pipeline, and every job
 
 ## The GitHub workflows, per job
 
-Every job fetches the actions it uses from `github.com`, and `setup-uv` downloads uv from GitHub's releases wherever the deps image is not the job's container.
+Every job fetches the actions it uses from `github.com`, and `setup-uv` downloads uv from Astral's mirror at `releases.astral.sh`, or from the manifest `UV_MANIFEST_FILE` names, wherever the deps image is not the job's container. *Deps registry* below means `ghcr.io`, or `DEPS_IMAGE_REGISTRY` when set, pulled anonymously then.
 
 | Job | Workflow | Reaches |
 | --- | --- | --- |
-| `build-deps-image` | every workflow that needs the image | `github.com`, for the actions and uv; the base image, from `ghcr.io` or the docker remote, with the index identity when the remote is on the index host; *index* inside the build; `ghcr.io`, for the push; *Artifactory*, for the credentials when the fence is set. |
-| `preflight` | `continuous-integration.yaml` | `ghcr.io`, for the deps image; *Artifactory* for `index.login`; then everything `preflight` reaches above. |
-| `preflight-from-fork` | `continuous-integration.yaml` | `github.com` for the actions and uv; *index* and *interpreters* at job time, with no fence credentials; then `preflight`. |
+| `build-deps-image` | every workflow that needs the image | `github.com`, for the actions; `releases.astral.sh` or `UV_MANIFEST_FILE`, for uv; the base image, from `ghcr.io` or the docker remote, with the index identity when the remote is on the index host; *index* inside the build; the *deps registry*, for the push; *Artifactory*, for the credentials when the fence is set. |
+| `preflight` | `continuous-integration.yaml` | The *deps registry*, for the deps image; *Artifactory* for `index.login`; then everything `preflight` reaches above. |
+| `preflight-from-fork` | `continuous-integration.yaml` | `github.com` for the actions, `releases.astral.sh` for uv; *index* and *interpreters* at job time, with no fence credentials; then `preflight`. |
 | `secure`, `secure-from-fork` | `security-audit.yaml` | As the two above, then `pypi.org` for the advisory API. |
-| `publish` | `publish.yaml` | `ghcr.io`; *Artifactory* for `index.login` and the upload credentials; `api.github.com` for the tag and the provenance attestation; Sigstore in the open; `upload.pypi.org` or `UV_PUBLISH_URL`. |
-| `deploy-docs` | `pages.yaml`, when Pages is integrated | `ghcr.io`; `document.build`'s two inventory hosts; `git push` of `gh-pages`; `api.github.com` for the Pages build. |
+| `publish` | `publish.yaml` | The *deps registry*; *Artifactory* for `index.login` and the upload credentials; `api.github.com` for the tag and the provenance attestation; Sigstore in the open; `upload.pypi.org` or `UV_PUBLISH_URL`. |
+| `deploy-docs` | `pages.yaml`, when Pages is integrated | The *deps registry*; `document.build`'s two inventory hosts; `git push` of `gh-pages`; `api.github.com` for the Pages build. |
 
 ## Generation
 

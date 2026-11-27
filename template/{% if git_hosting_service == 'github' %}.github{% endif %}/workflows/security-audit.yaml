@@ -77,9 +77,11 @@ jobs:
       id-token: write
     container:
       image: ${{ needs.build-deps-image.outputs.image }}
+      # Empty with `DEPS_IMAGE_REGISTRY` set, so the runner skips the login and pulls
+      # anonymously from the organisation's registry (ADR-0066).
       credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+        username: ${{ !vars.DEPS_IMAGE_REGISTRY && github.actor || '' }}
+        password: ${{ !vars.DEPS_IMAGE_REGISTRY && secrets.GITHUB_TOKEN || '' }}
 
     steps:
       - name: Checkout repository

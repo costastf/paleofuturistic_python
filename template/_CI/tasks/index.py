@@ -207,19 +207,24 @@ def login_registry(context: Context, engine: str, registry: str, environment: di
         hide=True,
         env=environment,
     )
-    print(f'Logged in to {registry} as {environment["INDEX_USERNAME"]} for the base image.')
+    print(f'Logged in to {registry} as {environment["INDEX_USERNAME"]}.')
 
 
-def build_deps_image(context: Context, engine: str, base_image: str, image: str) -> None:
+def build_deps_image(
+    context: Context, engine: str, base_image: str, image: str, environment: dict[str, str] | None = None
+) -> None:
     """Build the deps image as ``image`` with ``engine``, logged in to the base image's registry if the fence serves it.
 
     Every builder of the image with an engine, by hand or in a job, goes through here so the
     credentials reach the builder stage the same way everywhere: named on the command line,
     supplied by the environment (ADR-0063). A base image the index host serves is pulled with
     the same identity, logged in before the build (ADR-0065); the kaniko job, which has no
-    engine, gets the registry from `container.tag` and adds it to its own credential file.
+    engine, gets the registry from `container.tag` and adds it to its own credential file. A
+    caller that already minted the credentials passes them as ``environment``, so one job
+    exchanges its token once.
     """
-    environment = build_environment()
+    if environment is None:
+        environment = build_environment()
     registry = fenced_registry(base_image, environment.get('INDEX_URL', ''))
     if registry:
         login_registry(context, engine, registry, environment)

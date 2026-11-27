@@ -17,6 +17,10 @@ env:
   JFROG_PROJECT: ${{ vars.JFROG_PROJECT }}
   JFROG_AUDIENCE: ${{ vars.JFROG_AUDIENCE }}
   JFROG_PROVIDER: ${{ vars.JFROG_PROVIDER }}
+  # Where the deps image goes when the runners reach only the organisation's Artifactory:
+  # `host/repository`, pushed with the index identity and pulled anonymously by the jobs
+  # that run in it. Unset, the image goes to ghcr.io with the workflow token (ADR-0066).
+  DEPS_IMAGE_REGISTRY: ${{ vars.DEPS_IMAGE_REGISTRY }}
 
 jobs:
   build-deps-image:
@@ -42,6 +46,11 @@ jobs:
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
         with:
           enable-cache: true
+          # The one job that runs outside the deps image, so the one that downloads uv: from
+          # Astral's mirror, or from the manifest an organisation hosts inside its fence, in
+          # the astral-sh/versions format with the download URLs on its generic remote. Empty
+          # means the default (ADR-0066).
+          manifest-file: ${{ vars.UV_MANIFEST_FILE }}
 
       - name: Publish deps image
         id: deps

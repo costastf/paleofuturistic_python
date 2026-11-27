@@ -127,5 +127,6 @@ nav:
       - ADR-0063 A fenced index is a set of group variables: maintaining/decisions/0063-a-fenced-index-is-a-set-of-group-variables.md
       - ADR-0064 Every job that fetches logs in to the index: maintaining/decisions/0064-every-job-that-fetches-logs-in-to-the-index.md
       - ADR-0065 The deps build pulls a fenced base image with the index identity: maintaining/decisions/0065-the-deps-build-pulls-a-fenced-base-image-with-the-index-identity.md
+      - ADR-0066 GitHub pushes the deps image where a variable says, and pulls it anonymously: maintaining/decisions/0066-github-pushes-the-deps-image-where-a-variable-says-and-pulls-it-anonymously.md
 
 copyright: Copyright &copy; 2024 <a href="https://schubergphilis.com/">Schuberg Philis</a>

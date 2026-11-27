@@ -9,20 +9,23 @@ a fenced index*; this page covers both hosts and every case side by side.
 
 ## The cases
 
-| Case | Packages | Interpreters | Base image | Job images | Publishing |
-| --- | --- | --- | --- | --- | --- |
-| **1. In the open** | PyPI | GitHub's releases | `ghcr.io` | Docker Hub, gcr.io | PyPI, Trusted Publishing |
-| **2. Fenced index, runners with public egress** | Artifactory | Artifactory | `ghcr.io`, or Artifactory | Docker Hub, gcr.io | Artifactory |
-| **3. Fenced index, runners inside the fence** | Artifactory | Artifactory | Artifactory | Artifactory (GitLab) | Artifactory |
-| **4. A developer machine behind the fence** | Artifactory | Artifactory | Artifactory, or `ghcr.io` if reachable | not used | not from a laptop |
-| **5. Generating a project behind the fence** | Artifactory | Artifactory | not used | not used | not used |
+| Case | Packages | Interpreters | Base image | Deps image | Job images and uv | Publishing |
+| --- | --- | --- | --- | --- | --- | --- |
+| **1. In the open** | PyPI | GitHub's releases | `ghcr.io` | GitLab's registry, or `ghcr.io` | Docker Hub, gcr.io; Astral's mirror | PyPI, Trusted Publishing |
+| **2. Fenced index, runners with public egress** | Artifactory | Artifactory | `ghcr.io`, or Artifactory | GitLab's registry, or `ghcr.io` | Docker Hub, gcr.io; Astral's mirror | Artifactory |
+| **3. Fenced index, runners inside the fence** | Artifactory | Artifactory | Artifactory | GitLab's registry, or Artifactory | Artifactory | Artifactory |
+| **4. A developer machine behind the fence** | Artifactory | Artifactory | Artifactory, or `ghcr.io` if reachable | local build | not used | not from a laptop |
+| **5. Generating a project behind the fence** | Artifactory | Artifactory | not used | not used | not used | not used |
 
 Case 1 needs nothing. Cases 2 and 3 differ only in what the runner itself can reach: with
-public egress the base image may stay on `ghcr.io` and the two GitLab job images need no
-change; inside the fence everything comes from Artifactory. A fenced index with an open base
-image is a supported mix: the credentials are sent only to a registry on the index host, so
-`ghcr.io` never sees them. Case 4 is case 2 with a personal token in place of the job's. Case 5
-is `uv lock` and two tool fetches with the same variables as case 4.
+public egress the base image may stay on `ghcr.io`, the deps image stays where the host keeps
+it, and the GitLab job images and GitHub's uv download need no change; inside the fence
+everything comes from Artifactory. On GitLab the deps image always lives in the project's own
+registry, which is inside the fence with the instance; on GitHub it moves from `ghcr.io` to a
+docker repository in Artifactory. A fenced index with an open base image is a supported mix:
+the credentials are sent only to a registry on the index host, so `ghcr.io` never sees them.
+Case 4 is case 2 with a personal token in place of the job's. Case 5 is `uv lock` and two
+tool fetches with the same variables as case 4.
 
 ## What to set, per case
 
@@ -45,6 +48,8 @@ as unset.
 | `base-image` in `pyproject.toml` | 3; 2 optionally | the project's file | the project's file | n/a | Edited to the name the docker remote serves `ghcr.io/astral-sh/uv` under, digest kept. The build logs in to that registry with the index identity when it is the index host or one of its subdomains. |
 | `PYTHON_IMAGE`, `KANIKO_IMAGE` | 3 | group variables | n/a | no | The images the two deps jobs run in before the deps image exists, overridden with the names Docker Hub's and gcr.io's docker remotes serve them under. |
 | `DOCKER_AUTH_CONFIG` | 3 | group variable, masked | n/a | no | Read by the GitLab runner to pull a job's own image. Kaniko does not read it; the base image is pulled with the index identity instead. |
+| `DEPS_IMAGE_REGISTRY` | 3 | n/a | organisation or repository variable | no | `host/repository` of a docker repository in Artifactory the deps image goes to instead of `ghcr.io`, pushed with the index identity and pulled anonymously by the jobs that run in it. |
+| `UV_MANIFEST_FILE` | 3 | n/a | organisation or repository variable | no | The URL of a uv version manifest the organisation hosts, in the `astral-sh/versions` format, for the build job, the one GitHub job outside the deps image. |
 | `inventories` in `properdocs.yml` | 3 | the project's file | the project's file | n/a | The two object inventories `document.build` fetches from `docs.python.org` and `typing-extensions.readthedocs.io`; dropped or pointed at hosted copies inside the fence. |
 
 Two GitLab variables are not about the fence but every GitLab project needs them: the deploy
@@ -137,6 +142,20 @@ is set, including the half-set states that fail in a way the log does not explai
 | GitLab | The runner pulls every job image anonymously, which the public registries allow. With the two images overridden and this unset, the runner pulls from Artifactory anonymously and fails if it requires a login. | The runner logs in to the registries named in it before pulling a job's image. Kaniko and the tasks never read it; a value here does nothing for the base image or the index. |
 | GitHub, your machine, generation | Not read. | Not read. |
 
+### `DEPS_IMAGE_REGISTRY`
+
+| Target | Unset | Set |
+| --- | --- | --- |
+| GitHub | The build job pushes the deps image to `ghcr.io` with the workflow token, and every job that runs in it pulls with the same token. A runner that cannot reach `ghcr.io` fails at the push, and the jobs after it at the pull. | The build job pushes under `host/repository` by repository name, logged in with the index identity when the host is the index host or a subdomain; on any other host the push goes anonymously and says so. Every `container:` block's credentials become empty, the runner skips the login, and the pull is anonymous: a repository that refuses anonymous reads fails every job after the build. `container.audit` reads the image back anonymously too. The image's tag and digest handling are unchanged. |
+| GitLab, your machine, generation | Not read: GitLab's deps image lives in the project's own registry in every case, and a laptop build is local. | Not read. |
+
+### `UV_MANIFEST_FILE`
+
+| Target | Unset | Set |
+| --- | --- | --- |
+| GitHub | `setup-uv` in the build job resolves the pinned uv through Astral's manifest and downloads it from `releases.astral.sh`, falling back to GitHub's releases. A runner that reaches neither fails at that step, before the build. | The action reads the manifest at this URL, in the `astral-sh/versions` format, and downloads from the URLs it lists, which the organisation points at copies on its generic remote. The pinned version must be in it. Empty reads as unset. |
+| GitLab, your machine, generation | Not read: the GitLab plan job installs uv with pip from the index. | Not read. |
+
 ### `inventories` in `properdocs.yml`
 
 | Target | Kept | Dropped or rehosted |
@@ -181,6 +200,11 @@ the repository names are the organisation's.
 7. **Only for GitLab runners inside the fence**, docker remotes in front of Docker Hub and
    gcr.io, named in `PYTHON_IMAGE` and `KANIKO_IMAGE`, with credentials for the runner in
    `DOCKER_AUTH_CONFIG`.
+8. **Only for GitHub runners inside the fence**, a docker repository the deps image goes to,
+   named in `DEPS_IMAGE_REGISTRY`, which `<project>-ci` deploys to and anyone inside the
+   network reads without a login; and a uv version manifest hosted at `UV_MANIFEST_FILE`,
+   in the `astral-sh/versions` format, pointing at copies of the uv releases on the generic
+   remote.
 
 ## What no case covers
 
@@ -190,10 +214,10 @@ the repository names are the organisation's.
 - **The docs inventories**, above: dropped or rehosted, never proxied.
 - **The render hook's uv lookup.** Generation asks `pypi.org` for the newest uv to pin and falls
   back to the committed pin, saying so, when it cannot.
-- **GitHub self-hosted runners inside the fence.** The deps image is pushed to and pulled from
-  `ghcr.io`, and `setup-uv` fetches uv from GitHub's releases. On github.com with hosted
-  runners both are reachable; a runner inside the fence needs an allowance for both, because
-  the template has not taken a decision on a registry behind the fence for GitHub.
+- **GitHub's own endpoints.** Every workflow fetches its actions from `github.com`, and a
+  job that mints an ID token asks `actions.githubusercontent.com`. A self-hosted runner
+  reaches both by definition, since it reaches the host it works for; they are allowances
+  the organisation already has, not template variables.
 - **A docker registry on a host unrelated to the index.** The index identity goes to the index
   host and its subdomains only. Artifactory does not serve docker elsewhere; a project with such
   a registry logs in by hand before it builds.
@@ -205,7 +229,8 @@ the repository names are the organisation's.
 - [Network egress](network-egress.md), for which service every command and pipeline job
   reaches in each case.
 - [ADR-0063](../../maintaining/decisions/0063-a-fenced-index-is-a-set-of-group-variables.md),
-  [ADR-0064](../../maintaining/decisions/0064-every-job-that-fetches-logs-in-to-the-index.md)
-  and [ADR-0065](../../maintaining/decisions/0065-the-deps-build-pulls-a-fenced-base-image-with-the-index-identity.md),
-  for why the fence is variables, why every fetching job logs in, and why the base image gets
-  the same identity.
+  [ADR-0064](../../maintaining/decisions/0064-every-job-that-fetches-logs-in-to-the-index.md),
+  [ADR-0065](../../maintaining/decisions/0065-the-deps-build-pulls-a-fenced-base-image-with-the-index-identity.md)
+  and [ADR-0066](../../maintaining/decisions/0066-github-pushes-the-deps-image-where-a-variable-says-and-pulls-it-anonymously.md),
+  for why the fence is variables, why every fetching job logs in, why the base image gets the
+  same identity, and where GitHub's deps image goes behind a full fence.

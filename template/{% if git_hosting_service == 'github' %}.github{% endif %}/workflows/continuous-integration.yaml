@@ -68,9 +68,12 @@ jobs:
       id-token: write
     container:
       image: ${{ needs.build-deps-image.outputs.image }}
+      # The workflow token logs in to ghcr.io. With `DEPS_IMAGE_REGISTRY` set the image is on
+      # the organisation's registry, which ghcr credentials would be refused by, so both are
+      # left empty and the runner skips the login: the pull is anonymous (ADR-0066).
       credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+        username: ${{ !vars.DEPS_IMAGE_REGISTRY && github.actor || '' }}
+        password: ${{ !vars.DEPS_IMAGE_REGISTRY && secrets.GITHUB_TOKEN || '' }}
 
     steps:
       - name: Checkout repository

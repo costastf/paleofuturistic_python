@@ -16,6 +16,8 @@ pipeline file, Dockerfile and tasks serve a project in the open with every varia
 | `UV_PYTHON_INSTALL_MIRROR` | {% if git_hosting_service == 'gitlab' %}the group{% else %}a repository variable{% endif %}, and your shell | Where uv fetches the interpreters the tox matrix needs, which it otherwise downloads from GitHub. A generic remote in Artifactory in front of `github.com/astral-sh/python-build-standalone/releases/download` serves them. |
 {%- if git_hosting_service == 'github' %}
 | `INDEX_USERNAME`, `INDEX_PASSWORD` | repository secrets | A token the index accepts, for a project that would rather not map an OIDC identity. Set, they win over the exchange everywhere. |
+| `DEPS_IMAGE_REGISTRY` | a repository variable, only for runners inside the fence | Where the deps image goes instead of `ghcr.io`: `host/repository` of a docker repository in Artifactory. The build pushes there with the index identity, and the jobs that run in the image pull it anonymously. |
+| `UV_MANIFEST_FILE` | a repository variable, only for runners inside the fence | The URL of a uv version manifest your organisation hosts, in the `astral-sh/versions` format with download URLs on its generic remote; the build job, the one job outside the image, installs uv from it. |
 
 GitHub injects none of these on its own: every workflow names them in its `env:` from `vars`,
 so a variable the workflows do not name never reaches a job. An unset one arrives as an empty
@@ -58,7 +60,11 @@ two image names work the same way.
   `INDEX_*` values on the build command line while supplying them through the environment,
   so the echoed command shows none. The builder stage of `Dockerfile.deps` is the only stage
   that sees them; `container.audit` runs right after the push and checks that they stayed
-  there.
+  there. With `DEPS_IMAGE_REGISTRY` set the push goes there, logged in with the same identity.
+- **The jobs that run in the image** pull it before any step runs, so no token can be minted
+  for that pull. In the open they pull from `ghcr.io` with the workflow token; with
+  `DEPS_IMAGE_REGISTRY` set the workflows leave both credentials empty, the runner skips the
+  login, and the pull is anonymous, which the repository allows from inside the network.
 - **`preflight`, `secure` and `publish`** run `index.login` first, which mints and exchanges
   the token and writes a netrc for the index host, so the tox matrix, `uv build` and the
   audit's resolution authenticate for the rest of the job. `publish` fills
@@ -86,11 +92,14 @@ serve them, `PYTHON_IMAGE` and `KANIKO_IMAGE` name them at group level, and `DOC
 beside them is what the runner pulls with. kaniko never reads that variable: the base image's
 credentials come from the plan job, as above.
 {%- else %}
-The deps image is pushed to and pulled from `ghcr.io` with the workflow token, which does not
-change, and `setup-uv` fetches uv from GitHub's releases. On github.com with hosted runners
-both are reachable. On self-hosted runners inside the fence both need an allowance, because
-the workflows name `ghcr.io` and the template has not taken a decision on a registry behind
-the fence.
+The deps image is pushed to and pulled from `ghcr.io` with the workflow token, and `setup-uv`
+downloads uv from Astral's mirror at `releases.astral.sh`. On github.com with hosted runners
+both are reachable and nothing more is needed. On self-hosted runners inside the fence, two
+more variables move both inside: `DEPS_IMAGE_REGISTRY` names a docker repository in
+Artifactory the build pushes the image to with the index identity and the other jobs pull
+from anonymously, and `UV_MANIFEST_FILE` names a uv version manifest your organisation hosts,
+whose download URLs point at its generic remote. The actions themselves and the OIDC token
+endpoint stay on github.com, which a self-hosted runner reaches by definition.
 {%- endif %}
 
 ## On your machine
@@ -137,6 +146,11 @@ This how-to names what the project maps to; the names of the repositories are th
 7. **Only for a runner inside the fence**, docker remotes in front of Docker Hub and gcr.io
    for the two job images, named in `PYTHON_IMAGE` and `KANIKO_IMAGE`, and credentials for
    them in `DOCKER_AUTH_CONFIG`, read by the runner.
+{%- else %}
+7. **Only for runners inside the fence**, a docker repository the deps image goes to, named
+   in `DEPS_IMAGE_REGISTRY`, which `<project>-ci` deploys to and anyone inside the network
+   reads without a login; and a uv version manifest hosted at `UV_MANIFEST_FILE`, in the
+   `astral-sh/versions` format, pointing at copies of the uv releases on the generic remote.
 {%- endif %}
 
 Nothing on this list is a secret stored in the project: the token is minted per job from the

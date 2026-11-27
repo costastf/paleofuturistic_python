@@ -65,9 +65,11 @@ jobs:
       {#- Escape curly braces for Copier. -#}
       {%- raw %}
       image: ${{ needs.build-deps-image.outputs.image }}
+      # Empty with `DEPS_IMAGE_REGISTRY` set, so the runner skips the login and pulls
+      # anonymously from the organisation's registry (ADR-0066).
       credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+        username: ${{ !vars.DEPS_IMAGE_REGISTRY && github.actor || '' }}
+        password: ${{ !vars.DEPS_IMAGE_REGISTRY && secrets.GITHUB_TOKEN || '' }}
       {%- endraw %}
     # Protect this environment by restricting it to the `{{ default_branch }}` branch, not by
     # required reviewers: the job runs on every push to it and exits early without a release, so a
