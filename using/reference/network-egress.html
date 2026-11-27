@@ -469,6 +469,10 @@
 <li>
     <a href="../../maintaining/decisions/0064-every-job-that-fetches-logs-in-to-the-index.html" class="dropdown-item">ADR-0064 Every job that fetches logs in to the index</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/decisions/0065-the-deps-build-pulls-a-fenced-base-image-with-the-index-identity.html" class="dropdown-item">ADR-0065 The deps build pulls a fenced base image with the index identity</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -917,6 +921,9 @@
             <li class="nav-item">
                 <a href="../../maintaining/decisions/0064-every-job-that-fetches-logs-in-to-the-index.html" class="nav-link">ADR-0064 Every job that fetches logs in to the index</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0065-the-deps-build-pulls-a-fenced-base-image-with-the-index-identity.html" class="nav-link">ADR-0065 The deps build pulls a fenced base image with the index identity</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -1086,7 +1093,7 @@
 <tr>
 <td><code>container.build</code></td>
 <td><code>ghcr.io</code>, the base image; <em>index</em> inside the build.</td>
-<td>The base image from the mirror the project's <code>base-image</code> names, or <code>ghcr.io</code> if none; <em>index</em> through the credentials the builder stage is given.</td>
+<td>The base image from the docker remote the project's <code>base-image</code> names, logged in with the index identity when that remote is on the index host, or <code>ghcr.io</code> if none; <em>index</em> through the credentials the builder stage is given.</td>
 </tr>
 <tr>
 <td><code>container.publish</code></td>
@@ -1164,11 +1171,11 @@
 <tbody>
 <tr>
 <td><code>plan-deps-image</code></td>
-<td><code>docker.io</code>, for <code>python:3-slim</code>; <em>index</em>, for <code>pip install uv</code> (<code>PIP_INDEX_URL</code> behind the fence); <em>Artifactory</em>, to mint the build's credentials when the fence is set.</td>
+<td><code>docker.io</code>, for <code>python:3-slim</code>, or the docker remote <code>PYTHON_IMAGE</code> names at group level; <em>index</em>, for <code>pip install uv</code> (<code>PIP_INDEX_URL</code> behind the fence); <em>Artifactory</em>, to mint the build's credentials when the fence is set.</td>
 </tr>
 <tr>
 <td><code>build-deps-image</code></td>
-<td><code>gcr.io</code>, for the kaniko executor image; the base image, from <code>ghcr.io</code> or the mirror; <em>index</em> inside the build; <code>CI_REGISTRY</code>, for the push.</td>
+<td><code>gcr.io</code>, for the kaniko executor image, or the docker remote <code>KANIKO_IMAGE</code> names; the base image, from <code>ghcr.io</code> or the docker remote, with the index identity when the remote is on the index host; <em>index</em> inside the build; <code>CI_REGISTRY</code>, for the push.</td>
 </tr>
 <tr>
 <td><code>preflight</code></td>
@@ -1198,7 +1205,7 @@
 <tr>
 <td><code>build-deps-image</code></td>
 <td>every workflow that needs the image</td>
-<td><code>github.com</code>, for the actions and uv; the base image, from <code>ghcr.io</code> or the mirror; <em>index</em> inside the build; <code>ghcr.io</code>, for the push; <em>Artifactory</em>, for the credentials when the fence is set.</td>
+<td><code>github.com</code>, for the actions and uv; the base image, from <code>ghcr.io</code> or the docker remote, with the index identity when the remote is on the index host; <em>index</em> inside the build; <code>ghcr.io</code>, for the push; <em>Artifactory</em>, for the credentials when the fence is set.</td>
 </tr>
 <tr>
 <td><code>preflight</code></td>

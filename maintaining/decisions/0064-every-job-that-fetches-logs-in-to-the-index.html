@@ -469,6 +469,10 @@
 <li>
     <a href="0064-every-job-that-fetches-logs-in-to-the-index.html" class="dropdown-item active" aria-current="page">ADR-0064 Every job that fetches logs in to the index</a>
 </li>
+            
+<li>
+    <a href="0065-the-deps-build-pulls-a-fenced-base-image-with-the-index-identity.html" class="dropdown-item">ADR-0065 The deps build pulls a fenced base image with the index identity</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -487,7 +491,7 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a rel="next" class="nav-link disabled">
+                                <a rel="next" href="0065-the-deps-build-pulls-a-fenced-base-image-with-the-index-identity.html" class="nav-link">
                                     Next <i class="fa fa-arrow-right"></i>
                                 </a>
                             </li>
@@ -917,6 +921,9 @@
             <li class="nav-item">
                 <a href="0064-every-job-that-fetches-logs-in-to-the-index.html" class="nav-link active fw-bold">ADR-0064 Every job that fetches logs in to the index</a>
             </li>
+            <li class="nav-item">
+                <a href="0065-the-deps-build-pulls-a-fenced-base-image-with-the-index-identity.html" class="nav-link">ADR-0065 The deps build pulls a fenced base image with the index identity</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -984,7 +991,8 @@ plan job's one pip call, and <code>UV_PYTHON_INSTALL_MIRROR</code> for the inter
 <p>Four things stay outside the fence and are stated as such: the advisory database pip-audit
 asks, which nothing proxies; the docs inventories <code>document.build</code> fetches; the base image
 from ghcr, which a Docker remote serves under another name the project edits in; and the
-render hook's uv lookup, which already falls back to the committed pin.</p>
+render hook's uv lookup, which already falls back to the committed pin. The base image has
+since moved inside: ADR-0065 pulls it with the index identity.</p>
 <h2 id="consequences">Consequences</h2>
 <ul>
 <li>A netrc with a token exists in three jobs for their duration, readable by its owner only,
