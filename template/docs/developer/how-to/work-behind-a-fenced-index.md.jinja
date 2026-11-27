@@ -15,6 +15,7 @@ pipeline file, Dockerfile and tasks serve a project in the open with every varia
 | `PIP_INDEX_URL` | {% if git_hosting_service == 'gitlab' %}the group{% else %}not needed{% endif %} | {% if git_hosting_service == 'gitlab' %}The plan job installs uv with pip before the launcher exists; pip reads this, not `UV_DEFAULT_INDEX`. Same value.{% else %}Nothing on GitHub installs with pip.{% endif %} |
 | `UV_PYTHON_INSTALL_MIRROR` | {% if git_hosting_service == 'gitlab' %}the group{% else %}a repository variable{% endif %}, and your shell | Where uv fetches the interpreters the tox matrix needs, which it otherwise downloads from GitHub. A generic remote in Artifactory in front of `github.com/astral-sh/python-build-standalone/releases/download` serves them. |
 {%- if git_hosting_service == 'github' %}
+| `INDEX_USERNAME`, `INDEX_PASSWORD` | repository secrets | A token the index accepts, for a project that would rather not map an OIDC identity. Set, they win over the exchange everywhere. |
 
 GitHub injects none of these on its own: every workflow names them in its `env:` from `vars`,
 so a variable the workflows do not name never reaches a job. An unset one arrives as an empty
@@ -25,11 +26,8 @@ a token; a fenced project does not take pull requests from forks.
 Two things the GitHub pipeline reaches for that the fence may not cover: the deps image is
 pushed to and pulled from `ghcr.io`, and `setup-uv` fetches uv from GitHub's releases. On
 github.com with hosted runners both are reachable. On self-hosted runners inside the fence,
-the registry the image goes to is a decision the template has not taken; see the fence
-report in the template's `reports/` for the question it raises.
-{%- endif %}
-{%- if git_hosting_service == 'github' %}
-| `INDEX_USERNAME`, `INDEX_PASSWORD` | repository secrets | A token the index accepts, for a project that would rather not map an OIDC identity. Set, they win over the exchange everywhere. |
+both need an allowance, because the workflows name `ghcr.io` and the template has not taken
+a decision on a registry behind the fence.
 {%- endif %}
 {%- if git_hosting_service == 'gitlab' %}
 
@@ -53,8 +51,8 @@ pipeline file rank below group variables, so the group's value wins wherever it 
   resolution authenticate for the rest of the job. `publish` then fills `UV_PUBLISH_USERNAME`
   and `UV_PUBLISH_PASSWORD` beside the `UV_PUBLISH_URL` the group set.
 {%- else -%}
-- **Every workflow** hands the five variables down as environment, and every job that fetches
-  may write an OIDC token.
+- **Every workflow** hands the fence variables down as environment, and every job that
+  fetches may write an OIDC token.
 - **`build-deps-image`** mints its ID token from the Actions endpoint, exchanges it, and names
   the three `INDEX_*` values on the build command line while supplying them through the
   environment, so the echoed command shows none. The builder stage of `Dockerfile.deps` is
