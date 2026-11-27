@@ -52,6 +52,10 @@
 <li>
     <a href="../tutorials/from-zero-to-published-package.html" class="dropdown-item">From zero to a published package</a>
 </li>
+            
+<li>
+    <a href="../tutorials/work-behind-a-fence.html" class="dropdown-item">Work behind a fence</a>
+</li>
     </ul>
   </li>
                                     
@@ -477,6 +481,10 @@
 <li>
     <a href="../../maintaining/decisions/0065-the-deps-build-pulls-a-fenced-base-image-with-the-index-identity.html" class="dropdown-item">ADR-0065 The deps build pulls a fenced base image with the index identity</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/decisions/0066-github-pushes-the-deps-image-where-a-variable-says-and-pulls-it-anonymously.html" class="dropdown-item">ADR-0066 GitHub pushes the deps image where a variable says, and pulls it anonymously</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -587,6 +595,9 @@
             </li>
             <li class="nav-item">
                 <a href="../tutorials/from-zero-to-published-package.html" class="nav-link">From zero to a published package</a>
+            </li>
+            <li class="nav-item">
+                <a href="../tutorials/work-behind-a-fence.html" class="nav-link">Work behind a fence</a>
             </li>
                     </ul>
                 </details>
@@ -931,6 +942,9 @@
             <li class="nav-item">
                 <a href="../../maintaining/decisions/0065-the-deps-build-pulls-a-fenced-base-image-with-the-index-identity.html" class="nav-link">ADR-0065 The deps build pulls a fenced base image with the index identity</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0066-github-pushes-the-deps-image-where-a-variable-says-and-pulls-it-anonymously.html" class="nav-link">ADR-0066 GitHub pushes the deps image where a variable says, and pulls it anonymously</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -993,7 +1007,8 @@ a fenced index</em>; this page covers both hosts and every case side by side.</p
 <th>Packages</th>
 <th>Interpreters</th>
 <th>Base image</th>
-<th>Job images</th>
+<th>Deps image</th>
+<th>Job images and uv</th>
 <th>Publishing</th>
 </tr>
 </thead>
@@ -1003,7 +1018,8 @@ a fenced index</em>; this page covers both hosts and every case side by side.</p
 <td>PyPI</td>
 <td>GitHub's releases</td>
 <td><code>ghcr.io</code></td>
-<td>Docker Hub, gcr.io</td>
+<td>GitLab's registry, or <code>ghcr.io</code></td>
+<td>Docker Hub, gcr.io; Astral's mirror</td>
 <td>PyPI, Trusted Publishing</td>
 </tr>
 <tr>
@@ -1011,7 +1027,8 @@ a fenced index</em>; this page covers both hosts and every case side by side.</p
 <td>Artifactory</td>
 <td>Artifactory</td>
 <td><code>ghcr.io</code>, or Artifactory</td>
-<td>Docker Hub, gcr.io</td>
+<td>GitLab's registry, or <code>ghcr.io</code></td>
+<td>Docker Hub, gcr.io; Astral's mirror</td>
 <td>Artifactory</td>
 </tr>
 <tr>
@@ -1019,7 +1036,8 @@ a fenced index</em>; this page covers both hosts and every case side by side.</p
 <td>Artifactory</td>
 <td>Artifactory</td>
 <td>Artifactory</td>
-<td>Artifactory (GitLab)</td>
+<td>GitLab's registry, or Artifactory</td>
+<td>Artifactory</td>
 <td>Artifactory</td>
 </tr>
 <tr>
@@ -1027,6 +1045,7 @@ a fenced index</em>; this page covers both hosts and every case side by side.</p
 <td>Artifactory</td>
 <td>Artifactory</td>
 <td>Artifactory, or <code>ghcr.io</code> if reachable</td>
+<td>local build</td>
 <td>not used</td>
 <td>not from a laptop</td>
 </tr>
@@ -1037,15 +1056,19 @@ a fenced index</em>; this page covers both hosts and every case side by side.</p
 <td>not used</td>
 <td>not used</td>
 <td>not used</td>
+<td>not used</td>
 </tr>
 </tbody>
 </table>
 <p>Case 1 needs nothing. Cases 2 and 3 differ only in what the runner itself can reach: with
-public egress the base image may stay on <code>ghcr.io</code> and the two GitLab job images need no
-change; inside the fence everything comes from Artifactory. A fenced index with an open base
-image is a supported mix: the credentials are sent only to a registry on the index host, so
-<code>ghcr.io</code> never sees them. Case 4 is case 2 with a personal token in place of the job's. Case 5
-is <code>uv lock</code> and two tool fetches with the same variables as case 4.</p>
+public egress the base image may stay on <code>ghcr.io</code>, the deps image stays where the host keeps
+it, and the GitLab job images and GitHub's uv download need no change; inside the fence
+everything comes from Artifactory. On GitLab the deps image always lives in the project's own
+registry, which is inside the fence with the instance; on GitHub it moves from <code>ghcr.io</code> to a
+docker repository in Artifactory. A fenced index with an open base image is a supported mix:
+the credentials are sent only to a registry on the index host, so <code>ghcr.io</code> never sees them.
+Case 4 is case 2 with a personal token in place of the job's. Case 5 is <code>uv lock</code> and two
+tool fetches with the same variables as case 4.</p>
 <h2 id="what-to-set-per-case">What to set, per case</h2>
 <p>Each variable is set once at the organisation level and inherited by every project: a group on
 GitLab, an organisation or repository on GitHub. GitHub injects nothing on its own, so every
@@ -1151,6 +1174,22 @@ as unset.</p>
 <td>n/a</td>
 <td>no</td>
 <td>Read by the GitLab runner to pull a job's own image. Kaniko does not read it; the base image is pulled with the index identity instead.</td>
+</tr>
+<tr>
+<td><code>DEPS_IMAGE_REGISTRY</code></td>
+<td>3</td>
+<td>n/a</td>
+<td>organisation or repository variable</td>
+<td>no</td>
+<td><code>host/repository</code> of a docker repository in Artifactory the deps image goes to instead of <code>ghcr.io</code>, pushed with the index identity and pulled anonymously by the jobs that run in it.</td>
+</tr>
+<tr>
+<td><code>UV_MANIFEST_FILE</code></td>
+<td>3</td>
+<td>n/a</td>
+<td>organisation or repository variable</td>
+<td>no</td>
+<td>The URL of a uv version manifest the organisation hosts, in the <code>astral-sh/versions</code> format, for the build job, the one GitHub job outside the deps image.</td>
 </tr>
 <tr>
 <td><code>inventories</code> in <code>properdocs.yml</code></td>
@@ -1439,6 +1478,50 @@ is set, including the half-set states that fail in a way the log does not explai
 </tr>
 </tbody>
 </table>
+<h3 id="deps_image_registry"><code>DEPS_IMAGE_REGISTRY</code></h3>
+<table>
+<thead>
+<tr>
+<th>Target</th>
+<th>Unset</th>
+<th>Set</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GitHub</td>
+<td>The build job pushes the deps image to <code>ghcr.io</code> with the workflow token, and every job that runs in it pulls with the same token. A runner that cannot reach <code>ghcr.io</code> fails at the push, and the jobs after it at the pull.</td>
+<td>The build job pushes under <code>host/repository</code> by repository name, logged in with the index identity when the host is the index host or a subdomain; on any other host the push goes anonymously and says so. Every <code>container:</code> block's credentials become empty, the runner skips the login, and the pull is anonymous: a repository that refuses anonymous reads fails every job after the build. <code>container.audit</code> reads the image back anonymously too. The image's tag and digest handling are unchanged.</td>
+</tr>
+<tr>
+<td>GitLab, your machine, generation</td>
+<td>Not read: GitLab's deps image lives in the project's own registry in every case, and a laptop build is local.</td>
+<td>Not read.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="uv_manifest_file"><code>UV_MANIFEST_FILE</code></h3>
+<table>
+<thead>
+<tr>
+<th>Target</th>
+<th>Unset</th>
+<th>Set</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GitHub</td>
+<td><code>setup-uv</code> in the build job resolves the pinned uv through Astral's manifest and downloads it from <code>releases.astral.sh</code>, falling back to GitHub's releases. A runner that reaches neither fails at that step, before the build.</td>
+<td>The action reads the manifest at this URL, in the <code>astral-sh/versions</code> format, and downloads from the URLs it lists, which the organisation points at copies on its generic remote. The pinned version must be in it. Empty reads as unset.</td>
+</tr>
+<tr>
+<td>GitLab, your machine, generation</td>
+<td>Not read: the GitLab plan job installs uv with pip from the index.</td>
+<td>Not read.</td>
+</tr>
+</tbody>
+</table>
 <h3 id="inventories-in-properdocsyml"><code>inventories</code> in <code>properdocs.yml</code></h3>
 <table>
 <thead>
@@ -1498,6 +1581,11 @@ the repository names are the organisation's.</p>
 <li><strong>Only for GitLab runners inside the fence</strong>, docker remotes in front of Docker Hub and
    gcr.io, named in <code>PYTHON_IMAGE</code> and <code>KANIKO_IMAGE</code>, with credentials for the runner in
    <code>DOCKER_AUTH_CONFIG</code>.</li>
+<li><strong>Only for GitHub runners inside the fence</strong>, a docker repository the deps image goes to,
+   named in <code>DEPS_IMAGE_REGISTRY</code>, which <code>&lt;project&gt;-ci</code> deploys to and anyone inside the
+   network reads without a login; and a uv version manifest hosted at <code>UV_MANIFEST_FILE</code>,
+   in the <code>astral-sh/versions</code> format, pointing at copies of the uv releases on the generic
+   remote.</li>
 </ol>
 <h2 id="what-no-case-covers">What no case covers</h2>
 <ul>
@@ -1507,25 +1595,28 @@ the repository names are the organisation's.</p>
 <li><strong>The docs inventories</strong>, above: dropped or rehosted, never proxied.</li>
 <li><strong>The render hook's uv lookup.</strong> Generation asks <code>pypi.org</code> for the newest uv to pin and falls
   back to the committed pin, saying so, when it cannot.</li>
-<li><strong>GitHub self-hosted runners inside the fence.</strong> The deps image is pushed to and pulled from
-  <code>ghcr.io</code>, and <code>setup-uv</code> fetches uv from GitHub's releases. On github.com with hosted
-  runners both are reachable; a runner inside the fence needs an allowance for both, because
-  the template has not taken a decision on a registry behind the fence for GitHub.</li>
+<li><strong>GitHub's own endpoints.</strong> Every workflow fetches its actions from <code>github.com</code>, and a
+  job that mints an ID token asks <code>actions.githubusercontent.com</code>. A self-hosted runner
+  reaches both by definition, since it reaches the host it works for; they are allowances
+  the organisation already has, not template variables.</li>
 <li><strong>A docker registry on a host unrelated to the index.</strong> The index identity goes to the index
   host and its subdomains only. Artifactory does not serve docker elsewhere; a project with such
   a registry logs in by hand before it builds.</li>
 </ul>
 <h2 id="where-the-pieces-are">Where the pieces are</h2>
 <ul>
+<li><a href="../tutorials/work-behind-a-fence.html">Work behind a fence</a>, the tutorial: the same material
+  as a walk from a fenced laptop to a green pipeline and a first release.</li>
 <li>The generated project's <em>Work behind a fenced index</em>, under its how-to pages, rendered for
   its host with the same variables and the same list.</li>
 <li><a href="network-egress.html">Network egress</a>, for which service every command and pipeline job
   reaches in each case.</li>
 <li><a href="../../maintaining/decisions/0063-a-fenced-index-is-a-set-of-group-variables.html">ADR-0063</a>,
-  <a href="../../maintaining/decisions/0064-every-job-that-fetches-logs-in-to-the-index.html">ADR-0064</a>
-  and <a href="../../maintaining/decisions/0065-the-deps-build-pulls-a-fenced-base-image-with-the-index-identity.html">ADR-0065</a>,
-  for why the fence is variables, why every fetching job logs in, and why the base image gets
-  the same identity.</li>
+  <a href="../../maintaining/decisions/0064-every-job-that-fetches-logs-in-to-the-index.html">ADR-0064</a>,
+  <a href="../../maintaining/decisions/0065-the-deps-build-pulls-a-fenced-base-image-with-the-index-identity.html">ADR-0065</a>
+  and <a href="../../maintaining/decisions/0066-github-pushes-the-deps-image-where-a-variable-says-and-pulls-it-anonymously.html">ADR-0066</a>,
+  for why the fence is variables, why every fetching job logs in, why the base image gets the
+  same identity, and where GitHub's deps image goes behind a full fence.</li>
 </ul></div>
             </div>
         </div>

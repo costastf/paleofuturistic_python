@@ -52,6 +52,10 @@
 <li>
     <a href="../tutorials/from-zero-to-published-package.html" class="dropdown-item">From zero to a published package</a>
 </li>
+            
+<li>
+    <a href="../tutorials/work-behind-a-fence.html" class="dropdown-item">Work behind a fence</a>
+</li>
     </ul>
   </li>
                                     
@@ -477,6 +481,10 @@
 <li>
     <a href="../../maintaining/decisions/0065-the-deps-build-pulls-a-fenced-base-image-with-the-index-identity.html" class="dropdown-item">ADR-0065 The deps build pulls a fenced base image with the index identity</a>
 </li>
+            
+<li>
+    <a href="../../maintaining/decisions/0066-github-pushes-the-deps-image-where-a-variable-says-and-pulls-it-anonymously.html" class="dropdown-item">ADR-0066 GitHub pushes the deps image where a variable says, and pulls it anonymously</a>
+</li>
     </ul>
   </li>
                                 </ul>
@@ -587,6 +595,9 @@
             </li>
             <li class="nav-item">
                 <a href="../tutorials/from-zero-to-published-package.html" class="nav-link">From zero to a published package</a>
+            </li>
+            <li class="nav-item">
+                <a href="../tutorials/work-behind-a-fence.html" class="nav-link">Work behind a fence</a>
             </li>
                     </ul>
                 </details>
@@ -931,6 +942,9 @@
             <li class="nav-item">
                 <a href="../../maintaining/decisions/0065-the-deps-build-pulls-a-fenced-base-image-with-the-index-identity.html" class="nav-link">ADR-0065 The deps build pulls a fenced base image with the index identity</a>
             </li>
+            <li class="nav-item">
+                <a href="../../maintaining/decisions/0066-github-pushes-the-deps-image-where-a-variable-says-and-pulls-it-anonymously.html" class="nav-link">ADR-0066 GitHub pushes the deps image where a variable says, and pulls it anonymously</a>
+            </li>
                     </ul>
                 </details>
             </li>
@@ -1105,12 +1119,12 @@
 <tr>
 <td><code>container.publish</code></td>
 <td><code>container.build</code>, then the project registry, <code>ghcr.io</code> on GitHub or <code>CI_REGISTRY</code> on GitLab, for the push and, with <code>--reuse</code>, the manifest check.</td>
-<td>The same, plus <em>Artifactory</em> for the credentials.</td>
+<td>The same, plus <em>Artifactory</em> for the credentials; on GitHub <code>DEPS_IMAGE_REGISTRY</code> in place of <code>ghcr.io</code> when set.</td>
 </tr>
 <tr>
 <td><code>container.audit</code></td>
 <td>The container engine, locally; in a pipeline without one, the project registry through the registry API.</td>
-<td>Unchanged.</td>
+<td>Unchanged, or <code>DEPS_IMAGE_REGISTRY</code> anonymously on GitHub.</td>
 </tr>
 <tr>
 <td><code>preflight</code></td>
@@ -1199,7 +1213,7 @@
 </tbody>
 </table>
 <h2 id="the-github-workflows-per-job">The GitHub workflows, per job</h2>
-<p>Every job fetches the actions it uses from <code>github.com</code>, and <code>setup-uv</code> downloads uv from GitHub's releases wherever the deps image is not the job's container.</p>
+<p>Every job fetches the actions it uses from <code>github.com</code>, and <code>setup-uv</code> downloads uv from Astral's mirror at <code>releases.astral.sh</code>, or from the manifest <code>UV_MANIFEST_FILE</code> names, wherever the deps image is not the job's container. <em>Deps registry</em> below means <code>ghcr.io</code>, or <code>DEPS_IMAGE_REGISTRY</code> when set, pulled anonymously then.</p>
 <table>
 <thead>
 <tr>
@@ -1212,17 +1226,17 @@
 <tr>
 <td><code>build-deps-image</code></td>
 <td>every workflow that needs the image</td>
-<td><code>github.com</code>, for the actions and uv; the base image, from <code>ghcr.io</code> or the docker remote, with the index identity when the remote is on the index host; <em>index</em> inside the build; <code>ghcr.io</code>, for the push; <em>Artifactory</em>, for the credentials when the fence is set.</td>
+<td><code>github.com</code>, for the actions; <code>releases.astral.sh</code> or <code>UV_MANIFEST_FILE</code>, for uv; the base image, from <code>ghcr.io</code> or the docker remote, with the index identity when the remote is on the index host; <em>index</em> inside the build; the <em>deps registry</em>, for the push; <em>Artifactory</em>, for the credentials when the fence is set.</td>
 </tr>
 <tr>
 <td><code>preflight</code></td>
 <td><code>continuous-integration.yaml</code></td>
-<td><code>ghcr.io</code>, for the deps image; <em>Artifactory</em> for <code>index.login</code>; then everything <code>preflight</code> reaches above.</td>
+<td>The <em>deps registry</em>, for the deps image; <em>Artifactory</em> for <code>index.login</code>; then everything <code>preflight</code> reaches above.</td>
 </tr>
 <tr>
 <td><code>preflight-from-fork</code></td>
 <td><code>continuous-integration.yaml</code></td>
-<td><code>github.com</code> for the actions and uv; <em>index</em> and <em>interpreters</em> at job time, with no fence credentials; then <code>preflight</code>.</td>
+<td><code>github.com</code> for the actions, <code>releases.astral.sh</code> for uv; <em>index</em> and <em>interpreters</em> at job time, with no fence credentials; then <code>preflight</code>.</td>
 </tr>
 <tr>
 <td><code>secure</code>, <code>secure-from-fork</code></td>
@@ -1232,12 +1246,12 @@
 <tr>
 <td><code>publish</code></td>
 <td><code>publish.yaml</code></td>
-<td><code>ghcr.io</code>; <em>Artifactory</em> for <code>index.login</code> and the upload credentials; <code>api.github.com</code> for the tag and the provenance attestation; Sigstore in the open; <code>upload.pypi.org</code> or <code>UV_PUBLISH_URL</code>.</td>
+<td>The <em>deps registry</em>; <em>Artifactory</em> for <code>index.login</code> and the upload credentials; <code>api.github.com</code> for the tag and the provenance attestation; Sigstore in the open; <code>upload.pypi.org</code> or <code>UV_PUBLISH_URL</code>.</td>
 </tr>
 <tr>
 <td><code>deploy-docs</code></td>
 <td><code>pages.yaml</code>, when Pages is integrated</td>
-<td><code>ghcr.io</code>; <code>document.build</code>'s two inventory hosts; <code>git push</code> of <code>gh-pages</code>; <code>api.github.com</code> for the Pages build.</td>
+<td>The <em>deps registry</em>; <code>document.build</code>'s two inventory hosts; <code>git push</code> of <code>gh-pages</code>; <code>api.github.com</code> for the Pages build.</td>
 </tr>
 </tbody>
 </table>
