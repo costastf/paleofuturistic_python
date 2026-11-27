@@ -151,13 +151,15 @@ def test_the_fencing_page_names_every_variable_the_shipped_how_to_names(generate
     """
     project, cell = generated_project
     shipped = (project / 'docs' / 'developer' / 'how-to' / 'work-behind-a-fenced-index.md').read_text(encoding='utf-8')
-    page = (Path(__file__).resolve().parents[2] / 'docs' / 'using' / 'reference' / 'fencing-options.md').read_text(
-        encoding='utf-8'
-    )
+    page_root = Path(__file__).resolve().parents[2]
+    page = (page_root / 'docs' / 'using' / 'reference' / 'fencing-options.md').read_text(encoding='utf-8')
     named = set(re.findall(r'`([A-Z][A-Z0-9_]+)`', shipped)) | set(re.findall(r'`([A-Z][A-Z0-9_]+)`', page))
     missing = sorted(name for name in named if f'`{name}`' in shipped and f'`{name}`' not in page)
     host = cell['git_hosting_service']
     assert not missing, f'the fencing page says nothing about {missing}, which the {host} how-to names'
+    tutorial = (page_root / 'docs' / 'using' / 'tutorials' / 'work-behind-a-fence.md').read_text(encoding='utf-8')
+    unknown = sorted(set(re.findall(r'`([A-Z][A-Z0-9_]+)`', tutorial)) - named)
+    assert not unknown, f'the tutorial names {unknown}, which neither the fencing page nor the how-to knows'
 
 
 def test_task_catalog_matches_the_registered_tasks(generated_project):

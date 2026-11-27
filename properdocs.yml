@@ -25,6 +25,7 @@ nav:
     - Tutorials:
       - Generate your first project: using/tutorials/generate-your-first-project.md
       - From zero to a published package: using/tutorials/from-zero-to-published-package.md
+      - Work behind a fence: using/tutorials/work-behind-a-fence.md
     - How-to:
       - Update an existing project with copier: using/how-to/update-existing-project-with-copier.md
       - Choose a git host: using/how-to/choose-a-git-host.md

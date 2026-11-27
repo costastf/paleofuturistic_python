@@ -224,6 +224,8 @@ the repository names are the organisation's.
 
 ## Where the pieces are
 
+- [Work behind a fence](../tutorials/work-behind-a-fence.md), the tutorial: the same material
+  as a walk from a fenced laptop to a green pipeline and a first release.
 - The generated project's *Work behind a fenced index*, under its how-to pages, rendered for
   its host with the same variables and the same list.
 - [Network egress](network-egress.md), for which service every command and pipeline job
