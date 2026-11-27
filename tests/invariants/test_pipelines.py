@@ -2,6 +2,7 @@
 
 import inspect
 import re
+from collections.abc import Iterator
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -165,6 +166,44 @@ def test_gitlab_deps_tag_reaches_kaniko_from_the_launcher(generated_project):
     assert 'DEPS_IMAGE=${CI_REGISTRY_IMAGE}@${DIGEST}' in deps_job, 'DEPS_IMAGE is not digest-pinned'
 
 
+def test_the_kaniko_job_pulls_a_fenced_base_image_with_the_index_identity(generated_project):
+    """The kaniko credential file gets the base image's registry from the plan job, with the index credentials.
+
+    kaniko reads `/kaniko/.docker/config.json` and nothing else; `DOCKER_AUTH_CONFIG` is the
+    runner's. The job writes the project registry's entry, then the base image's when the plan
+    job named one, with the same `INDEX_*` values the builder stage takes, and closes the
+    document. The two images the job and the plan job run in are pipeline variables, so a
+    fenced runner can be pointed at a docker remote at group level, and the SBOM still resolves
+    both from the file (ADR-0065).
+    """
+    project, cell = generated_project
+    if cell['git_hosting_service'] != 'gitlab':
+        pytest.skip('GitLab-only pipeline')
+    pipeline = (project / '.gitlab-ci.yml').read_text(encoding='utf-8')
+    config = yaml.safe_load(pipeline)
+    script = config['build-deps-image']['script']
+    credential_file = '/kaniko/.docker/config.json'
+    writes = [line for line in script if credential_file in line]
+    assert len(writes) == 3, f'the credential file is not written in three parts: {writes}'
+    assert writes[0].endswith(f'"$CI_REGISTRY" "$DEPS_IMAGE_USERNAME" "$DEPS_IMAGE_PASSWORD" > {credential_file}')
+    assert writes[1].startswith('test -z "$BASE_IMAGE_REGISTRY" || printf ')
+    assert f'"$BASE_IMAGE_REGISTRY" "$INDEX_USERNAME" "$INDEX_PASSWORD" >> {credential_file}' in writes[1]
+    assert writes[2] == f"printf '}}}}' >> {credential_file}"
+    assert 'DOCKER_AUTH_CONFIG' not in '\n'.join(script), 'the job reads the runner variable kaniko ignores'
+    assert config['plan-deps-image']['image'] == '$PYTHON_IMAGE'
+    assert config['build-deps-image']['image']['name'] == '$KANIKO_IMAGE'
+    assert config['variables']['PYTHON_IMAGE'] == 'python:3-slim'
+    assert config['variables']['KANIKO_IMAGE'].startswith('gcr.io/kaniko-project/executor:')
+    source = (project / '_CI' / 'tasks' / 'gitlab.py').read_text(encoding='utf-8')
+    names = ('IMAGE_LINE', 'IMAGE_REFERENCE', 'VARIABLE_LINE', 'VARIABLE_USE', 'pipeline_variables', 'image_references')
+    helpers = exec_from(source, *names, re=re, Iterator=Iterator)
+    references = set(helpers['image_references'](pipeline.splitlines()))
+    names = {name for name, _ in references}
+    assert ('python', '3-slim') in references, f'the SBOM lost the plan image: {references}'
+    assert 'gcr.io/kaniko-project/executor' in names, f'the SBOM lost kaniko: {references}'
+    assert not any('$' in name for name in names), f'an unresolved variable reached the SBOM: {references}'
+
+
 def test_container_tag_writes_the_dotenv_the_kaniko_job_reads(generated_project):
     """`container.tag --output` writes the two keys the kaniko job substitutes, and the credentials behind a fence.
 
@@ -185,6 +224,7 @@ def test_container_tag_writes_the_dotenv_the_kaniko_job_reads(generated_project)
         logged=lambda _name: lambda fn: fn,
         deps_image_tag=lambda: 'cafe' * 8,
         build_environment=lambda: dict(credentials),
+        fenced_registry=lambda _reference, index: 'pkgs.example.com' if index else '',
         info=SimpleNamespace(base_image=lambda: 'ghcr.io/astral-sh/uv:0.13.7-python3.11-trixie-slim@sha256:abc'),
         print=printed.append,
     )
@@ -200,7 +240,10 @@ def test_container_tag_writes_the_dotenv_the_kaniko_job_reads(generated_project)
     credentials['INDEX_PASSWORD'] = 'minted'  # noqa: S105 — a test value
     helpers['tag'](None, output=str(output))
     written = output.read_text(encoding='utf-8')
-    assert written.endswith('INDEX_URL=https://pkgs.example.com/simple\nINDEX_USERNAME=w-ci\nINDEX_PASSWORD=minted\n')
+    assert written.endswith(
+        'INDEX_URL=https://pkgs.example.com/simple\nINDEX_USERNAME=w-ci\nINDEX_PASSWORD=minted\n'
+        'BASE_IMAGE_REGISTRY=pkgs.example.com\n'
+    )
     assert not any('minted' in line for line in printed), 'the task printed the credential it minted'
 
 
@@ -586,7 +629,7 @@ def test_the_audit_markers_cover_every_credential_argument(generated_project):
 def test_every_builder_hands_the_builder_stage_its_credentials(generated_project):
     """Each way the deps image gets built passes the credential arguments by name, never by value (ADR-0063).
 
-    By hand and in a job with an engine, every build goes through `deps_build_command`, whose
+    By hand and in a job with an engine, every build goes through `build_deps_image`, whose
     command line says `"$INDEX_PASSWORD"` and whose environment supplies it, so the echoed
     command shows no secret. The kaniko job spells the same three flags from the plan job's
     dotenv, and GitHub's build job forwards the three names from the repository's secrets.
@@ -596,7 +639,8 @@ def test_every_builder_hands_the_builder_stage_its_credentials(generated_project
     tasks = project / '_CI' / 'tasks'
     for module in ('container.py', f'{cell["git_hosting_service"]}.py'):
         source = (tasks / module).read_text(encoding='utf-8')
-        assert '{engine} build ' not in source, f'{module} builds the image without deps_build_command'
+        assert '{engine} build ' not in source, f'{module} builds the image without build_deps_image'
+        assert 'build_deps_image(context, ' in source, f'{module} builds the image without build_deps_image'
     index = (tasks / 'index.py').read_text(encoding='utf-8')
     helpers = exec_from(index, 'build_arguments')
     flags = helpers['build_arguments']({'INDEX_URL': 'https://x', 'INDEX_PASSWORD': 'hunter2'})

@@ -18,8 +18,13 @@ INDEX_NAMES = (
     'github_id_token',
     'exchange_id_token',
     'index_login',
+    'registry_of',
+    'fenced_registry',
     'build_environment',
     'build_arguments',
+    'deps_build_command',
+    'login_registry',
+    'build_deps_image',
     'netrc_path',
     'write_netrc',
     'login',
@@ -77,9 +82,11 @@ def index_helpers(project, cell, environment, *, answers=()):
         return Response(json.dumps(replies.pop(0) if replies else {}).encode('utf-8'))
 
     printed = []
+    executed = []
     helpers = exec_from(
         source,
         *INDEX_NAMES,
+        execute=lambda _context, command, env=None: executed.append((command, dict(env or {}))),
         os=SimpleNamespace(environ=dict(environment)),
         json=json,
         Path=Path,
@@ -99,7 +106,77 @@ def index_helpers(project, cell, environment, *, answers=()):
     )
     helpers['printed'] = printed
     helpers['requests'] = requests
+    helpers['executed'] = executed
     return helpers
+
+
+class Engine:
+    """A context whose `run` records the engine logins the build asks for."""
+
+    def __init__(self) -> None:
+        """Start with no login recorded."""
+        self.logins: list[tuple[str, dict]] = []
+
+    def run(self, command: str, **options: object) -> None:
+        """Record the command and the environment it was given."""
+        env = options.get('env')
+        self.logins.append((command, dict(env) if isinstance(env, dict) else {}))
+
+
+BASE_IMAGE = 'ghcr.io/astral-sh/uv:0.13.7-python3.11-trixie-slim@sha256:abc'
+FENCED_IMAGE = 'pkgs.example.com/docker-remote/astral-sh/uv:0.13.7@sha256:abc'
+INDEX = 'https://pkgs.example.com/artifactory/api/pypi/internal/simple'
+INDEX_ON_A_PORT = 'https://pkgs.example.com:8081/artifactory/api/pypi/x/simple'
+
+
+@pytest.mark.parametrize(
+    ('reference', 'index', 'registry'),
+    [
+        (BASE_IMAGE, INDEX, ''),
+        (BASE_IMAGE, '', ''),
+        (FENCED_IMAGE, INDEX, 'pkgs.example.com'),
+        ('docker.pkgs.example.com/astral-sh/uv:0.13.7', INDEX, 'docker.pkgs.example.com'),
+        ('pkgs.example.com:5001/astral-sh/uv:0.13.7', INDEX, 'pkgs.example.com:5001'),
+        ('pkgs.example.com/docker/uv:1', INDEX_ON_A_PORT, 'pkgs.example.com'),
+        ('notpkgs.example.com/uv:1', INDEX, ''),
+        ('pkgs.example.com.evil.net/uv:1', INDEX, ''),
+    ],
+)
+def test_the_index_identity_reaches_only_the_index_host(generated_project, reference, index, registry):
+    """A base image on the index host, a subdomain or a port of it gets the index identity; any other does not."""
+    project, cell = generated_project
+    helpers = index_helpers(project, cell, {})
+    assert helpers['fenced_registry'](reference, index) == registry
+
+
+def test_the_engine_logs_in_to_a_fenced_base_image_registry_before_it_builds(generated_project):
+    """`build_deps_image` logs the engine in with the index credentials, by name, only when the fence serves the image.
+
+    In the open, and for an open base image behind a fence, no login runs at all.
+    """
+    project, cell = generated_project
+    environment = {'UV_DEFAULT_INDEX': INDEX, 'INDEX_USERNAME': 'widget-ci', 'INDEX_PASSWORD': 'minted'}
+    helpers = index_helpers(project, cell, environment)
+    engine = Engine()
+    helpers['build_deps_image'](engine, 'podman', FENCED_IMAGE, 'widget-deps:latest')
+    assert len(engine.logins) == 1, f'the engine logged in {len(engine.logins)} times'
+    login, login_env = engine.logins[0]
+    assert login == 'echo "$INDEX_PASSWORD" | podman login pkgs.example.com -u "$INDEX_USERNAME" --password-stdin'
+    assert login_env['INDEX_PASSWORD'] == 'minted'  # noqa: S105 — a test value
+    build, build_env = helpers['executed'][0]
+    assert build.startswith(f'podman build --build-arg BASE_IMAGE={FENCED_IMAGE} --build-arg INDEX_URL="$INDEX_URL"')
+    assert build_env == {'INDEX_URL': INDEX, 'INDEX_USERNAME': 'widget-ci', 'INDEX_PASSWORD': 'minted'}
+    assert 'minted' not in build
+    assert helpers['printed'] == ['Logged in to pkgs.example.com as widget-ci for the base image.']
+    engine, helpers = Engine(), index_helpers(project, cell, environment)
+    helpers['build_deps_image'](engine, 'podman', BASE_IMAGE, 'widget-deps:latest')
+    assert not engine.logins, 'the index credentials were sent to ghcr.io'
+    assert helpers['executed'][0][1]['INDEX_PASSWORD'] == 'minted', 'the builder stage lost its credentials'  # noqa: S105
+    engine, helpers = Engine(), index_helpers(project, cell, {})
+    helpers['build_deps_image'](engine, 'docker', FENCED_IMAGE, 'widget-deps:latest')
+    assert not engine.logins
+    open_build = f'docker build --build-arg BASE_IMAGE={FENCED_IMAGE} -f Dockerfile.deps -t widget-deps:latest .'
+    assert helpers['executed'] == [(open_build, {})]
 
 
 def test_nothing_happens_in_the_open(generated_project, tmp_path):

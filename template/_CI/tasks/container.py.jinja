@@ -12,9 +12,9 @@ from _CI import info
 
 from .configuration import DEPS_IMAGE_FILE, DEPS_IMAGE_SECRET_MARKERS, DOCKERFILE_DEPS, IMAGE_NAME, UV_LOCK
 from .{{ git_hosting_service }} import publish_deps_image, registry_read_credentials
-from .index import build_environment, deps_build_command
+from .index import build_deps_image, build_environment, fenced_registry
 from .registry import RegistryError, image_config
-from .shared import available_container_engine, container_engine, execute, is_ci, logged
+from .shared import available_container_engine, container_engine, is_ci, logged
 
 
 def deps_image_tag() -> str:
@@ -47,10 +47,10 @@ def build(context: Context) -> None:
     """Build the dependency cache container image locally.
 
     Behind a fenced index the builder stage takes the credentials `index.build_environment`
-    finds, named on the command line and supplied by the environment (ADR-0063).
+    finds, named on the command line and supplied by the environment (ADR-0063), and the
+    engine logs in to the base image's registry first when the index host serves it (ADR-0065).
     """
-    command, environment = deps_build_command(container_engine(), info.base_image(), f'{IMAGE_NAME}:latest')
-    execute(context, command, env=environment)
+    build_deps_image(context, container_engine(), info.base_image(), f'{IMAGE_NAME}:latest')
 
 
 @task
@@ -63,7 +63,9 @@ def tag(context: Context, output: str = '') -> None:  # noqa: ARG001
     for it; with ``--output`` this writes ``DEPS_TAG`` and ``BASE_IMAGE`` as a dotenv artifact
     that job reads, so the algorithm above stays the only one (ADR-0043). Behind a fenced
     index the same file carries the credential arguments the builder stage takes, minted here
-    from the job's ID token, because the kaniko job cannot mint them itself (ADR-0063).
+    from the job's ID token, because the kaniko job cannot mint them itself (ADR-0063), and
+    ``BASE_IMAGE_REGISTRY`` when the index host serves the base image, so the job pulls it with
+    the same identity (ADR-0065).
 
     Args:
         context: Invoke context.
@@ -76,10 +78,14 @@ def tag(context: Context, output: str = '') -> None:  # noqa: ARG001
         print(value)
         return
     environment = build_environment()
+    registry = fenced_registry(base_image, environment.get('INDEX_URL', ''))
     lines = [f'DEPS_TAG={value}', f'BASE_IMAGE={base_image}', *(f'{name}={val}' for name, val in environment.items())]
+    if registry:
+        lines.append(f'BASE_IMAGE_REGISTRY={registry}')
     Path(output).write_text('\n'.join(lines) + '\n', encoding='utf-8')
     handed = ', with the index credentials' if environment else ''
-    print(f'Wrote {output}: deps-{value} on {base_image}{handed}')
+    pulled = f', which also pull from {registry}' if registry else ''
+    print(f'Wrote {output}: deps-{value} on {base_image}{handed}{pulled}')
 
 
 @task
@@ -107,8 +113,7 @@ def publish(context: Context, reuse: bool = False) -> None:
         if not result.failed:
             print(f'Image already exists: {image}')
         else:
-            command, environment = deps_build_command(engine, info.base_image(), image)
-            execute(context, command, env=environment)
+            build_deps_image(context, engine, info.base_image(), image)
     DEPS_IMAGE_FILE.write_text(image, encoding='utf-8')
 
 

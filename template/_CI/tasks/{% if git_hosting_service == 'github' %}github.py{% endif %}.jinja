@@ -15,7 +15,7 @@ from invoke import Context
 from _CI import info
 
 from .configuration import DEFAULT_BRANCH
-from .index import deps_build_command
+from .index import build_deps_image
 from .shared import PipelineComponent, container_engine, execute, image_digest_reference, strip_credentials
 
 WORKFLOWS_DIR = Path('.github/workflows')
@@ -77,8 +77,7 @@ def publish_deps_image(context: Context, tag: str, *, reuse: bool = False) -> st
         # unpullable image fails here rather than in every consumer job.
         execute(context, f'{engine} pull {image}')
     else:
-        command, environment = deps_build_command(engine, info.base_image(), image)
-        execute(context, command, env=environment)
+        build_deps_image(context, engine, info.base_image(), image)
         execute(context, f'{engine} push {image}')
     return image_digest_reference(context, engine, image)
 

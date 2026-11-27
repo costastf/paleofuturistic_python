@@ -41,7 +41,7 @@ Where a row says *index*, read PyPI (`pypi.org` and `files.pythonhosted.org`) in
 | `develop.refresh-deps` | *Index*, `uv lock --upgrade`. | The same. |
 | `develop.bump-uv` | `pypi.org`, for uv's releases; `ghcr.io`, for the image digest. | Unchanged and unreachable; the bump is a hand edit of the two pins. |
 | `index.login`, `container.tag` | Nothing. | *Artifactory*; on GitHub, GitHub's token endpoint for the ID token first. |
-| `container.build` | `ghcr.io`, the base image; *index* inside the build. | The base image from the mirror the project's `base-image` names, or `ghcr.io` if none; *index* through the credentials the builder stage is given. |
+| `container.build` | `ghcr.io`, the base image; *index* inside the build. | The base image from the docker remote the project's `base-image` names, logged in with the index identity when that remote is on the index host, or `ghcr.io` if none; *index* through the credentials the builder stage is given. |
 | `container.publish` | `container.build`, then the project registry, `ghcr.io` on GitHub or `CI_REGISTRY` on GitLab, for the push and, with `--reuse`, the manifest check. | The same, plus *Artifactory* for the credentials. |
 | `container.audit` | The container engine, locally; in a pipeline without one, the project registry through the registry API. | Unchanged. |
 | `preflight` | The union of `document.build`, `preflight.tox` and `build`; `--audit-dependencies` adds `secure.audit`. | The same union, through the fence. |
@@ -64,8 +64,8 @@ Every job pulls its image from the registry named in the pipeline, and every job
 
 | Job | Reaches |
 | --- | --- |
-| `plan-deps-image` | `docker.io`, for `python:3-slim`; *index*, for `pip install uv` (`PIP_INDEX_URL` behind the fence); *Artifactory*, to mint the build's credentials when the fence is set. |
-| `build-deps-image` | `gcr.io`, for the kaniko executor image; the base image, from `ghcr.io` or the mirror; *index* inside the build; `CI_REGISTRY`, for the push. |
+| `plan-deps-image` | `docker.io`, for `python:3-slim`, or the docker remote `PYTHON_IMAGE` names at group level; *index*, for `pip install uv` (`PIP_INDEX_URL` behind the fence); *Artifactory*, to mint the build's credentials when the fence is set. |
+| `build-deps-image` | `gcr.io`, for the kaniko executor image, or the docker remote `KANIKO_IMAGE` names; the base image, from `ghcr.io` or the docker remote, with the index identity when the remote is on the index host; *index* inside the build; `CI_REGISTRY`, for the push. |
 | `preflight` | `CI_REGISTRY`, for the deps image and for `container.audit`; *Artifactory* for `index.login`; then everything `preflight` reaches above. |
 | `secure` | `CI_REGISTRY`; *Artifactory* for `index.login`; `pypi.org` for the advisory API. |
 | `publish` | `CI_REGISTRY`; *Artifactory* for `index.login` and the upload credentials; the GitLab API for the tag; Sigstore in the open; `upload.pypi.org` or `UV_PUBLISH_URL`. |
@@ -76,7 +76,7 @@ Every job fetches the actions it uses from `github.com`, and `setup-uv` download
 
 | Job | Workflow | Reaches |
 | --- | --- | --- |
-| `build-deps-image` | every workflow that needs the image | `github.com`, for the actions and uv; the base image, from `ghcr.io` or the mirror; *index* inside the build; `ghcr.io`, for the push; *Artifactory*, for the credentials when the fence is set. |
+| `build-deps-image` | every workflow that needs the image | `github.com`, for the actions and uv; the base image, from `ghcr.io` or the docker remote, with the index identity when the remote is on the index host; *index* inside the build; `ghcr.io`, for the push; *Artifactory*, for the credentials when the fence is set. |
 | `preflight` | `continuous-integration.yaml` | `ghcr.io`, for the deps image; *Artifactory* for `index.login`; then everything `preflight` reaches above. |
 | `preflight-from-fork` | `continuous-integration.yaml` | `github.com` for the actions and uv; *index* and *interpreters* at job time, with no fence credentials; then `preflight`. |
 | `secure`, `secure-from-fork` | `security-audit.yaml` | As the two above, then `pypi.org` for the advisory API. |

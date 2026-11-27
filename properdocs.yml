@@ -125,5 +125,6 @@ nav:
       - ADR-0062 The deps image is built in stages and read back before it is trusted: maintaining/decisions/0062-the-deps-image-is-built-in-stages-and-read-back.md
       - ADR-0063 A fenced index is a set of group variables: maintaining/decisions/0063-a-fenced-index-is-a-set-of-group-variables.md
       - ADR-0064 Every job that fetches logs in to the index: maintaining/decisions/0064-every-job-that-fetches-logs-in-to-the-index.md
+      - ADR-0065 The deps build pulls a fenced base image with the index identity: maintaining/decisions/0065-the-deps-build-pulls-a-fenced-base-image-with-the-index-identity.md
 
 copyright: Copyright &copy; 2024 <a href="https://schubergphilis.com/">Schuberg Philis</a>

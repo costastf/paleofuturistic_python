@@ -16,7 +16,7 @@ from invoke import Context
 from _CI import info
 
 from .configuration import DEFAULT_BRANCH
-from .index import deps_build_command
+from .index import build_deps_image
 from .shared import (
     PipelineComponent,
     RemoteRef,
@@ -27,10 +27,13 @@ from .shared import (
 )
 
 CI_FILE = Path('.gitlab-ci.yml')
-# Matches inline `image: foo/bar:tag` and the `name: foo/bar:tag` line inside
-# block-form `image:` mappings. `$VAR`-style values are excluded by the char
-# class — the SBOM only records statically-pinned image references.
-IMAGE_PATTERN = re.compile(r'^\s*(?:image|name):\s*"?([A-Za-z0-9._/\-]+):([A-Za-z0-9._\-]+)"?\s*$')
+# Matches inline `image: <value>` and the `name: <value>` line inside block-form `image:`
+# mappings; the value is then expanded from the pipeline's own `variables:` and kept only
+# when it is a statically pinned `name:tag`, which is what the SBOM records.
+IMAGE_LINE = re.compile(r'^\s*(?:image|name):\s*"?([^"\s]+)"?\s*$')
+IMAGE_REFERENCE = re.compile(r'^([A-Za-z0-9._/\-]+):([A-Za-z0-9._\-]+)$')
+VARIABLE_LINE = re.compile(r'^  ([A-Z][A-Z0-9_]*):\s*"?([^"\s]+)"?\s*$')
+VARIABLE_USE = re.compile(r'\$\{?([A-Z][A-Z0-9_]*)\}?')
 
 
 class RegistrySettings(NamedTuple):
@@ -93,8 +96,7 @@ def publish_deps_image(context: Context, tag: str, *, reuse: bool = False) -> st
         print(f'Reusing {image}')
         execute(context, f'{engine} pull {image}')
     else:
-        command, environment = deps_build_command(engine, info.base_image(), image)
-        execute(context, command, env=environment)
+        build_deps_image(context, engine, info.base_image(), image)
         execute(context, f'{engine} push {image}')
     return image_digest_reference(context, engine, image)
 
@@ -288,6 +290,36 @@ def create_release(context: Context, tag: str, sha: str) -> str:
     return data.get('_links', {}).get('self', '') if status else ''
 
 
+def pipeline_variables(lines: list[str]) -> dict[str, str]:
+    """Return the pipeline's top-level ``variables:``, which its image names refer to by ``$NAME``."""
+    variables: dict[str, str] = {}
+    inside = False
+    for line in lines:
+        if line.startswith('variables:'):
+            inside = True
+        elif line and not line.startswith((' ', '#')):
+            inside = False
+        elif inside and (match := VARIABLE_LINE.match(line)):
+            variables[match.group(1)] = match.group(2)
+    return variables
+
+
+def image_references(lines: list[str]) -> Iterator[tuple[str, str]]:
+    """Yield ``(name, tag)`` for every pinned image the pipeline names, its variables expanded, repeats included.
+
+    A job image is a variable in the pipeline file, so a fenced runner can be pointed at a
+    docker remote at group level (ADR-0065); the SBOM records what the file itself resolves
+    it to. A group override is the group's to record.
+    """
+    variables = pipeline_variables(lines)
+    for line in lines:
+        if not (match := IMAGE_LINE.match(line)):
+            continue
+        value = VARIABLE_USE.sub(lambda use: variables.get(use.group(1), use.group(0)), match.group(1))
+        if reference := IMAGE_REFERENCE.match(value):
+            yield reference.group(1), reference.group(2)
+
+
 def iter_pipeline_components() -> Iterator[PipelineComponent]:
     """Yield CI pipeline components for inclusion in the SBOM.
 
@@ -298,11 +330,7 @@ def iter_pipeline_components() -> Iterator[PipelineComponent]:
     if not CI_FILE.exists():
         return
     seen: set[tuple[str, str]] = set()
-    for line in CI_FILE.read_text(encoding='utf-8').splitlines():
-        match = IMAGE_PATTERN.match(line)
-        if not match:
-            continue
-        name, tag = match.group(1), match.group(2)
+    for name, tag in image_references(CI_FILE.read_text(encoding='utf-8').splitlines()):
         if (name, tag) in seen:
             continue
         seen.add((name, tag))

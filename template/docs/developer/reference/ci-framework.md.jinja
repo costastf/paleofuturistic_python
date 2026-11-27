@@ -85,7 +85,9 @@ index](../how-to/work-behind-a-fenced-index.md) has it: a set of variables the o
 sets once{% if git_hosting_service == 'gitlab' %}, with the `plan-deps-image` job minting the credentials from its ID token and
 handing them to the kaniko job in the dotenv it already writes{% else %}, forwarded by the build job as environment{% endif %}. Every builder of the image names
 them on the command line as `"$INDEX_PASSWORD"` and supplies them through the environment, so
-the command a task echoes shows no secret.
+the command a task echoes shows no secret. The same identity pulls the base image when its
+registry is the index host or one of its subdomains: an engine logs in before it builds,
+{% if git_hosting_service == 'gitlab' %}and the kaniko job adds the registry the plan job named to its credential file{% else %}by hand and in the build job alike{% endif %} (ADR-0065).
 
 `container.audit` makes sure of it: it reads the pushed image's configuration back and fails
 on any history line or environment entry naming an argument, the sync command or the netrc.

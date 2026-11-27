@@ -10,7 +10,8 @@ no stored secret exists anywhere. A developer behind the same fence sets `INDEX_
 the open every variable is unset and nothing here runs.
 
 `index.login` is the task: it writes the credentials into a netrc for the rest of a job, which
-uv, tox-uv and pip all read, so every fetch after it authenticates (ADR-0064).
+uv, tox-uv and pip all read, so every fetch after it authenticates (ADR-0064). The same identity
+pulls the deps image's base image when the index host serves it (ADR-0065).
 """
 
 import json
@@ -24,7 +25,7 @@ from urllib.parse import quote
 from invoke import Collection, Context, Task, task
 
 from .configuration import DEPS_IMAGE_BUILD_ARGS, DOCKERFILE_DEPS, INDEX_OIDC_PROVIDER
-from .shared import logged
+from .shared import execute, logged
 
 # Artifactory's token exchange: RFC 8693, plus two fields of its own naming the identity provider
 # to verify the token against and the project the resulting token is scoped to.
@@ -59,6 +60,26 @@ def index_url() -> str:
 def index_host(url: str) -> str:
     """Return the host a netrc entry for ``url`` names."""
     return url.partition('://')[2].partition('/')[0]
+
+
+def registry_of(reference: str) -> str:
+    """Return the registry an image reference names: everything before its first slash, port included."""
+    return reference.partition('/')[0]
+
+
+def fenced_registry(reference: str, index: str) -> str:
+    """Return the registry of ``reference`` when the index host serves it, else ''.
+
+    Artifactory serves its docker repositories under the host that serves the index, by path,
+    by port or by subdomain, so a base image whose registry is that host or one of its
+    subdomains is pulled with the index identity (ADR-0065). Any other registry, ghcr.io in the
+    open among them, is never sent the credentials.
+    """
+    registry, host = registry_of(reference), index_host(index)
+    name, root = registry.partition(':')[0], host.partition(':')[0]
+    if root and (name == root or name.endswith(f'.{root}')):
+        return registry
+    return ''
 
 
 def fetch_json(request: urllib.request.Request, what: str) -> dict:
@@ -173,16 +194,36 @@ def build_arguments(environment: dict[str, str]) -> str:
     return ' '.join(f'--build-arg {name}="${name}"' for name in environment)
 
 
-def deps_build_command(engine: str, base_image: str, image: str) -> tuple[str, dict[str, str]]:
-    """Return the command that builds the deps image as ``image``, and the environment it runs in.
+def deps_build_command(engine: str, base_image: str, image: str, environment: dict[str, str]) -> str:
+    """Return the command that builds the deps image as ``image``, its credentials named from ``environment``."""
+    flags = ' '.join(filter(None, (f'--build-arg BASE_IMAGE={base_image}', build_arguments(environment))))
+    return f'{engine} build {flags} -f {DOCKERFILE_DEPS} -t {image} .'
 
-    Every builder of the image, by hand or in a pipeline job with an engine, goes through here
-    so the credentials reach the builder stage the same way everywhere: named on the command
-    line, supplied by the environment.
+
+def login_registry(context: Context, engine: str, registry: str, environment: dict[str, str]) -> None:
+    """Log ``engine`` in to ``registry`` with the index credentials in ``environment``, read from the shell's own."""
+    context.run(
+        f'echo "$INDEX_PASSWORD" | {engine} login {registry} -u "$INDEX_USERNAME" --password-stdin',
+        hide=True,
+        env=environment,
+    )
+    print(f'Logged in to {registry} as {environment["INDEX_USERNAME"]} for the base image.')
+
+
+def build_deps_image(context: Context, engine: str, base_image: str, image: str) -> None:
+    """Build the deps image as ``image`` with ``engine``, logged in to the base image's registry if the fence serves it.
+
+    Every builder of the image with an engine, by hand or in a job, goes through here so the
+    credentials reach the builder stage the same way everywhere: named on the command line,
+    supplied by the environment (ADR-0063). A base image the index host serves is pulled with
+    the same identity, logged in before the build (ADR-0065); the kaniko job, which has no
+    engine, gets the registry from `container.tag` and adds it to its own credential file.
     """
     environment = build_environment()
-    flags = ' '.join(filter(None, (f'--build-arg BASE_IMAGE={base_image}', build_arguments(environment))))
-    return f'{engine} build {flags} -f {DOCKERFILE_DEPS} -t {image} .', environment
+    registry = fenced_registry(base_image, environment.get('INDEX_URL', ''))
+    if registry:
+        login_registry(context, engine, registry, environment)
+    execute(context, deps_build_command(engine, base_image, image, environment), env=environment)
 
 
 def netrc_path() -> Path:

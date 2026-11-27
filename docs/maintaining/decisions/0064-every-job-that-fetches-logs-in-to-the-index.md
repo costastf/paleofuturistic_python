@@ -37,7 +37,8 @@ plan job's one pip call, and `UV_PYTHON_INSTALL_MIRROR` for the interpreters.
 Four things stay outside the fence and are stated as such: the advisory database pip-audit
 asks, which nothing proxies; the docs inventories `document.build` fetches; the base image
 from ghcr, which a Docker remote serves under another name the project edits in; and the
-render hook's uv lookup, which already falls back to the committed pin.
+render hook's uv lookup, which already falls back to the committed pin. The base image has
+since moved inside: ADR-0065 pulls it with the index identity.
 
 ## Consequences
 

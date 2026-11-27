@@ -41,7 +41,7 @@ The full image reference is written to `.deps-image` (gitignored) for downstream
 
 The Dockerfile is small and host-agnostic. Common edits:
 
-- **Base image**: edit `[tool.docker-versions]` in `pyproject.toml`. The `base-image` key feeds into the Dockerfile build arg.
+- **Base image**: edit `[tool.docker-versions]` in `pyproject.toml`. The `base-image` key feeds into the Dockerfile build arg. Behind a fenced index, point it at the docker remote that serves it and keep the digest: the build logs in to that registry with the index credentials when it is the index host or one of its subdomains, as [Work behind a fenced index](work-behind-a-fenced-index.md) describes.
 - **Extra system packages**: edit `Dockerfile.deps` directly. The edit changes the deps-image tag, so the next pipeline run rebuilds rather than reusing the old image.
 
 ## When you outgrow the deps cache

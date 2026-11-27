@@ -49,7 +49,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # The organisation's package index, when there is one: a repository variable and
           # two secrets, empty otherwise. They reach the builder stage of `Dockerfile.deps`
-          # only, and the audit below checks that they stayed there (ADR-0063).
+          # only, and the audit below checks that they stayed there (ADR-0063). The same
+          # identity logs the engine in to the base image's registry first, when the index
+          # host serves it (ADR-0065).
           INDEX_URL: ${{ vars.UV_DEFAULT_INDEX }}
           INDEX_USERNAME: ${{ secrets.INDEX_USERNAME }}
           INDEX_PASSWORD: ${{ secrets.INDEX_PASSWORD }}
