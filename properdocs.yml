@@ -38,6 +38,7 @@ nav:
       - License options: using/reference/license-options.md
       - Packaging specifications: using/reference/packaging-specifications.md
       - Network egress: using/reference/network-egress.md
+      - Fencing options: using/reference/fencing-options.md
     - Explanation:
       - How uv is used: using/explanation/how-uv-is-used.md
       - SBOM and security model: using/explanation/sbom-and-security-model.md

@@ -142,6 +142,24 @@ def test_the_egress_page_places_every_registered_task(generated_project):
     assert not missing, f'the egress page says nothing about {missing}'
 
 
+def test_the_fencing_page_names_every_variable_the_shipped_how_to_names(generated_project):
+    """The template's own fencing reference covers every variable the shipped fence how-to names, on either host.
+
+    The shipped how-to is rendered per host; the parent page lays every case out side by side.
+    A variable the how-to names and the page does not is a case the page claims to cover and
+    does not.
+    """
+    project, cell = generated_project
+    shipped = (project / 'docs' / 'developer' / 'how-to' / 'work-behind-a-fenced-index.md').read_text(encoding='utf-8')
+    page = (Path(__file__).resolve().parents[2] / 'docs' / 'using' / 'reference' / 'fencing-options.md').read_text(
+        encoding='utf-8'
+    )
+    named = set(re.findall(r'`([A-Z][A-Z0-9_]+)`', shipped)) | set(re.findall(r'`([A-Z][A-Z0-9_]+)`', page))
+    missing = sorted(name for name in named if f'`{name}`' in shipped and f'`{name}`' not in page)
+    host = cell['git_hosting_service']
+    assert not missing, f'the fencing page says nothing about {missing}, which the {host} how-to names'
+
+
 def test_task_catalog_matches_the_registered_tasks(generated_project):
     """The task catalog names every registered task, and no task that is not registered.
 

@@ -6,7 +6,7 @@ Which services a generated project reaches, per command and per pipeline job, so
 
 Four things decide what a command reaches, and they combine.
 
-- **Open or fenced.** In the open, packages come from PyPI and interpreters from GitHub. Behind a fenced index, `UV_DEFAULT_INDEX` and `UV_PYTHON_INSTALL_MIRROR` redirect both to the organisation's Artifactory, and the `JFROG_*` variables add one more destination, the token exchange at `JFROG_URL`. The generated how-to *Work behind a fenced index* sets the variables up.
+- **Open or fenced.** In the open, packages come from PyPI and interpreters from GitHub. Behind a fenced index, `UV_DEFAULT_INDEX` and `UV_PYTHON_INSTALL_MIRROR` redirect both to the organisation's Artifactory, and the `JFROG_*` variables add one more destination, the token exchange at `JFROG_URL`. [Fencing options](fencing-options.md) lists every case and what each needs set; the generated how-to *Work behind a fenced index* sets the variables up.
 - **Cold or warm.** The first `./workflow.cmd` of any kind syncs the environment from `uv.lock`, which fetches every package from the index and, if `.python-version` names an interpreter the machine lacks, that interpreter. Once synced, the launcher itself reaches nothing; the rows below assume a warm environment and list what the command adds.
 - **Laptop or pipeline.** A pipeline job adds the host's own traffic: pulling the deps image, fetching actions, pushing to a registry. The pipeline sections list those per job.
 - **GitLab or GitHub.** The release and docs tasks talk to the host's API, and the pipelines pull their images from different places.
